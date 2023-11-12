@@ -1,0 +1,52 @@
+import React, { useState } from 'react';
+import { TextInputField } from 'evergreen-ui';
+import UserEnergyLevelLineChart from '../components/UserEnergyLevelLineChart';
+
+const Dashboard = () => {
+    const [formData, setFormData] = useState({
+        occupation: "",
+        freeTime: "",
+        plannerGoal: ""
+    });
+
+    const handleInputChange = (event) => {
+        const { name, value } = event.target;
+        setFormData({
+            ...formData,
+            [name]: value
+        });
+    };
+
+    return (
+      <div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
+        <form style={{width: "50%"}}>
+          <TextInputField
+            label="Occupation"
+            name="occupation"
+            value={formData.occupation}
+            onChange={handleInputChange}
+            placeholder="Enter your occupation"
+          />
+
+          <TextInputField
+            label="How do you like to spend your free time?"
+            name="freeTime"
+            value={formData.freeTime}
+            onChange={handleInputChange}
+            placeholder="Describe how you like to spend your free time"
+          />
+
+          <TextInputField
+            label="What is your goal with this planner?"
+            name="plannerGoal"
+            value={formData.plannerGoal}
+            onChange={handleInputChange}
+            placeholder="Explain your goal with this planner"
+          />
+          <UserEnergyLevelLineChart />
+        </form>
+      </div>
+    );
+};
+
+export default Dashboard;
