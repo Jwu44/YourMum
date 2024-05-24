@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TextInputField } from 'evergreen-ui';
+import PlannerMenu from '../components/PlannerMenu';
 import UserEnergyLevelLineChart from '../components/UserEnergyLevelLineChart';
 
 const Dashboard = () => {
@@ -10,6 +11,7 @@ const Dashboard = () => {
     });
 
     const handleInputChange = (event) => {
+      // event.preventDefault();
         const { name, value } = event.target;
         setFormData({
             ...formData,
@@ -17,8 +19,10 @@ const Dashboard = () => {
         });
     };
 
+    const plannerType = ["Calendar", "To do list", "Priority-based number list"]
+
     return (
-      <div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
+      <div style={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}}>
         <form style={{width: "50%"}}>
           <TextInputField
             label="Occupation"
@@ -37,14 +41,17 @@ const Dashboard = () => {
           />
 
           <TextInputField
-            label="What is your goal with this planner?"
+            label="What are you using Myself for?"
             name="plannerGoal"
             value={formData.plannerGoal}
             onChange={handleInputChange}
-            placeholder="Explain your goal with this planner"
+            placeholder="Enter your goal?"
           />
-          <UserEnergyLevelLineChart />
         </form>
+        <div>
+          <PlannerMenu plannerType={plannerType}/>
+        </div>
+        <UserEnergyLevelLineChart />
       </div>
     );
 };
