@@ -6,30 +6,23 @@ api_bp = Blueprint("api", __name__)
 
 @api_bp.route("/submit_data", methods=["POST"])
 def submit_data():
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    else:
-        return _corsify_actual_response(submit_data_post())
-
-def submit_data_post():
-    user_data = request.get_json()
     try:
-        # Process the user data and return the response
+        user_data = request.json
+        if not user_data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Process the user data as needed
+        # You can save it to a file, database, or process it further
+        # Here, we'll simply print it to the console for demonstration purposes
+        print("User data received:", user_data)
+
+        # Call your function to process the user data and get the schedule
         schedule = process_user_data(user_data)
+
         return jsonify({"schedule": schedule})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-def _build_cors_preflight_response():
-    response = jsonify({"message": "CORS preflight"})
-    response.headers.add("Access-Control-Allow-Origin", "http://localhost:8001")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-    response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
-    return response
-
-def _corsify_actual_response(response):
-    response.headers.add("Access-Control-Allow-Origin", "http://localhost:8001")
-    return response
 
 @api_bp.route("/schedule", methods=["GET"])
 def get_schedule():
