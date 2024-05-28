@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { CanvasJSChart } from './canvasjs.react';
 import $ from 'jquery';
 
-var chart;
+let chart;
 
 class UserEnergyLevelLineChart extends Component {
   constructor(props) {
@@ -18,23 +18,23 @@ class UserEnergyLevelLineChart extends Component {
   }
 
   getPosition = (e) => {
-    var parentOffset = document
+    const parentOffset = document
       .getElementsByClassName('canvasjs-chart-container')[0]
       .getBoundingClientRect();
-    var relX = e.pageX - parentOffset.left;
-    var relY = e.pageY - parentOffset.top;
+    const relX = e.pageX - parentOffset.left;
+    const relY = e.pageY - parentOffset.top;
     this.xValue = Math.round(chart.axisX[0].convertPixelToValue(relX));
     this.yValue = Math.round(chart.axisY[0].convertPixelToValue(relY));
   };
 
   searchDataPoint = () => {
-    var dps = chart.data[0].dataPoints;
-    for (var i = 0; i < dps.length; i++) {
+    const dps = chart.data[0].dataPoints;
+    for (let i = 0; i < dps.length; i++) {
       if (
-        this.xValue >= dps[i].x - this.ySnapDistance &&
-        this.xValue <= dps[i].x + this.ySnapDistance &&
-        this.yValue >= dps[i].y - this.xSnapDistance &&
-        this.yValue <= dps[i].y + this.xSnapDistance
+        this.xValue >= dps[i].x - this.xSnapDistance &&
+        this.xValue <= dps[i].x + this.xSnapDistance &&
+        this.yValue >= dps[i].y - this.ySnapDistance &&
+        this.yValue <= dps[i].y + this.ySnapDistance
       ) {
         if (this.mouseDown) {
           this.selected = i;
@@ -50,76 +50,77 @@ class UserEnergyLevelLineChart extends Component {
     }
   };
 
+  handleMouseDown = (e) => {
+    this.mouseDown = true;
+    this.getPosition(e);
+    this.searchDataPoint();
+  };
+
+  handleMouseMove = (e) => {
+    this.getPosition(e);
+    if (this.mouseDown) {
+      clearTimeout(this.timerId);
+      this.timerId = setTimeout(() => {
+        if (this.selected !== null) {
+          chart.data[0].dataPoints[this.selected].y = this.yValue;
+          chart.render();
+        }
+      }, 0);
+    } else {
+      this.searchDataPoint();
+      if (this.changeCursor) {
+        $('.canvasjs-chart-container').css('cursor', 'n-resize');
+      } else {
+        $('.canvasjs-chart-container').css('cursor', 'default');
+      }
+    }
+  };
+
+  handleMouseUp = () => {
+    if (this.selected !== null) {
+      chart.data[0].dataPoints[this.selected].y = this.yValue;
+      chart.render();
+    }
+    this.mouseDown = false;
+    this.selected = null;  // Clear the selected point after releasing
+  };
+
   componentDidMount() {
     this.xSnapDistance = 1;
     this.ySnapDistance = 3;
-    var _this = this;
-    $("#canvasjs-react-chart-container-0 > .canvasjs-chart-container").on({
-      mousedown: function (e) {
-        _this.mouseDown = true;
-        _this.getPosition(e);
-        _this.searchDataPoint();
-      },
-      mousemove: function (e) {
-        _this.getPosition(e);
-        if (_this.mouseDown) {
-          clearTimeout(_this.timerId);
-          _this.timerId = setTimeout(function () {
-            if (_this.selected !== null) {
-              chart.data[0].dataPoints[_this.selected].y = _this.yValue;
-              chart.render();
-            }
-          }, 0);
-        } else {
-          _this.searchDataPoint();
-          if (_this.changeCursor) {
-            chart.data[0].set("cursor", "n-resize");
-          } else {
-            chart.data[0].set("cursor", "default");
-          }
-        }
-      },
-      mouseup: function (e) {
-        if (_this.selected !== null) {
-          chart.data[0].dataPoints[_this.selected].y = _this.yValue;
-          chart.render();
-          _this.mouseDown = false;
-        }
-      }
+    $('.canvasjs-chart-container').on({
+      mousedown: this.handleMouseDown,
+      mousemove: this.handleMouseMove,
+      mouseup: this.handleMouseUp,
     });
   }
 
   render() {
     const options = {
-      backgroundColor: "rgba(255, 255, 255, 0)",
+      backgroundColor: 'rgba(255, 255, 255, 0)',
       animationEnabled: true,
-      theme: "light2",
+      theme: 'light2',
       title: {
-        text: "Plot your energy levels throughout the day",
+        text: 'Plot your energy levels throughout the day',
       },
-      // subtitles: [
-      //   {
-      //     text: "Click anywhere on plotarea to add new Data Points",
-      //   },
-      // ],
       axisX: {
-				title: "Time (24 hour)",
+        title: 'Time (24 hour)',
         labelFormatter: function (e) {
           // Format the label to display in 24-hour format
-          var hours = e.value;
-          var formattedHours = (hours < 10 ? "0" : "") + hours + ":00";
+          const hours = e.value;
+          const formattedHours = (hours < 10 ? '0' : '') + hours + ':00';
           return formattedHours;
         },
-			},
+      },
       axisY: {
-				title: "Energy levels (%)",
+        title: 'Energy levels (%)',
         minimum: 0,
         maximum: 100,
-			},
+      },
       data: [
         {
-          type: "splineArea",
-          cursor: "move",
+          type: 'splineArea',
+          cursor: 'move',
           dataPoints: [
             { x: 0, y: 0 },
             { x: 1, y: 0 },
@@ -151,8 +152,8 @@ class UserEnergyLevelLineChart extends Component {
     };
 
     return (
-      <div id="chartContainer" style={{ width: "100%", margin: "auto" }}>
-        <CanvasJSChart options={options} onRef={ref => (chart = ref)} />
+      <div id="chartContainer" style={{ width: '100%', margin: 'auto' }}>
+        <CanvasJSChart options={options} onRef={(ref) => (chart = ref)} />
       </div>
     );
   }
