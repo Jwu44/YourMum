@@ -22,6 +22,7 @@ def submit_data():
         return jsonify({"schedule": schedule})
 
     except Exception as e:
+        print(f"Error in submit_data: {e}")
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/schedule", methods=["GET"])
