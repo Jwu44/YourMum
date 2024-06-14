@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from backend.services.oauth2_setup import get_gdrive_service
 from backend.services.colab_integration import process_user_data
+import traceback
 
 api_bp = Blueprint("api", __name__)
 
@@ -11,45 +12,21 @@ def submit_data():
         if not user_data:
             return jsonify({"error": "No data provided"}), 400
         
-        # Process the user data as needed
-        # You can save it to a file, database, or process it further
-        # Here, we'll simply print it to the console for demonstration purposes
+        # Log the received user data
         print("User data received:", user_data)
 
-        # Call your function to process the user data and get the schedule
-        schedule = process_user_data(user_data)
+        # Send the request to the Colab server
+        colab_response = process_user_data(user_data)
 
-        return jsonify({"schedule": schedule})
+        # Log the response from the Colab server
+        print("Response from Colab server:", colab_response)
 
-    except Exception as e:
-        print(f"Error in submit_data: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/schedule", methods=["GET"])
-def get_schedule():
-    try:
-        service = get_gdrive_service()
-
-        # Search for the file named "schedule.txt"
-        results = (
-            service.files()
-            .list(q="name='schedule.txt'", spaces="drive", fields="files(id, name)")
-            .execute()
-        )
-        items = results.get("files", [])
-
-        if not items:
-            return jsonify({"error": "File not found: schedule.txt"}), 404
-
-        file_id = items[0]["id"]
-        request = service.files().get_media(fileId=file_id)
-        file_content = request.execute().decode('utf-8')  # Decoding bytes to string
-
-        # Debugging information
-        print("Raw file content:", file_content)
-
-        # Return the file content as plain text
-        return jsonify({"schedule": file_content})
+        if colab_response and 'schedule' in colab_response:
+            return jsonify({"schedule": colab_response['schedule']})
+        else:
+            return jsonify({"error": "Failed to generate schedule"}), 500
 
     except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()  # Log the stack trace
         return jsonify({"error": str(e)}), 500

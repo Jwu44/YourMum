@@ -1,24 +1,29 @@
 import React, { useState } from 'react';
-import { TextInputField, TextareaField, SelectField, Button } from 'evergreen-ui';
+import { TextInputField, Button, Pane, Heading, Paragraph } from 'evergreen-ui';
+// import { TextInputField, TextareaField, SelectField, Button } from 'evergreen-ui';
 import UserEnergyLevelLineChart from '../components/UserEnergyLevelLineChart';
 
 const Dashboard = () => {
   const [formData, setFormData] = useState({
     name: "",
     age: "",
-    work_schedule: { employment_type: "", days: {} },
-    energy_levels: {},
-    tasks: [],
-    exercise_routine: "",
-    relationships: "",
-    fun_activities: [],
-    ambitions: { short_term: [], long_term: [] },
-    priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
-    break_preferences: { frequency: "", duration: "" },
-    sleep_schedule: "",
-    meal_times: { breakfast: "", lunch: "", dinner: "" },
-    layout_preference: { type: "", subcategory: "" }
+    work_start_time: "",
+    work_end_time: "",
+    tasks: "",
+    energy_levels: [],
+    // exercise_routine: "",
+    // relationships: "",
+    // fun_activities: [],
+    // ambitions: { short_term: [], long_term: [] },
+    // priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
+    // break_preferences: { frequency: "", duration: "" },
+    // sleep_schedule: "",
+    // meal_times: { breakfast: "", lunch: "", dinner: "" },
+    // layout_preference: { type: "", subcategory: "" }
   });
+
+  const [response, setResponse] = useState(null); // State for storing the response
+  const [error, setError] = useState(null); // State for storing errors
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -46,19 +51,29 @@ const Dashboard = () => {
   const handleSubmit = (event) => {
     event.preventDefault();
     console.log("Form Data Before Submission:", formData); // Log form data before submission
-    fetch('http://localhost:8000/api/submit_data', {
+
+    fetch('http://localhost:8000/api/submit_data', {  // Replace with your actual backend URL
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(formData)
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    })
     .then(data => {
       console.log("Response from server:", data);
+      setResponse(data.schedule); // Store the schedule in the state
+      setError(null); // Clear any previous errors
     })
     .catch(error => {
       console.error("Error submitting form:", error);
+      setError(error.message); // Store the error message in the state
+      setResponse(null); // Clear any previous response
     });
   };
 
@@ -80,22 +95,29 @@ const Dashboard = () => {
           onChange={handleInputChange}
           placeholder="Enter your age"
         />
-        <TextareaField
-          label="Work Schedule"
-          name="work_schedule.employment_type"
-          value={formData.work_schedule.employment_type}
+        <TextInputField
+          label="Work Start Time"
+          name="work_start_time"
+          value={formData.work_start_time}
           onChange={handleInputChange}
-          placeholder="Enter your work schedule"
+          placeholder="Enter your work start time (e.g., 9:00am)"
+        />
+        <TextInputField
+          label="Work End Time"
+          name="work_end_time"
+          value={formData.work_end_time}
+          onChange={handleInputChange}
+          placeholder="Enter your work end time (e.g., 5:00pm)"
         />
         <TextInputField
           label="Tasks"
           name="tasks"
           value={formData.tasks}
           onChange={handleInputChange}
-          placeholder="Enter your tasks (comma separated with importance in parentheses)"
+          placeholder="Enter your tasks for today from most important to least separated by a comma"
         />
         <UserEnergyLevelLineChart onChange={handleEnergyLevelsChange} />
-        <TextInputField
+        {/* <TextInputField
           label="Exercise Routine"
           name="exercise_routine"
           value={formData.exercise_routine}
@@ -225,9 +247,21 @@ const Dashboard = () => {
             <option value="unstructured and time-boxed">Unstructured and Time-Boxed</option>
             <option value="unstructured and un-time-boxed">Unstructured and Un-Time-Boxed</option>
           </SelectField>
-        )}
+        )} */}
         <Button type="submit">Submit</Button>
       </form>
+      {response && (
+        <Pane marginTop={20}>
+          <Heading size={600}>Generated Schedule</Heading>
+          <Paragraph>{response}</Paragraph>
+        </Pane>
+      )}
+      {error && (
+        <Pane marginTop={20}>
+          <Heading size={600} color="red">Error</Heading>
+          <Paragraph>{error}</Paragraph>
+        </Pane>
+      )}
     </div>
   );
 };
