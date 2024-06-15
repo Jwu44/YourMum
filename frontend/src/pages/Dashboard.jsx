@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextInputField, Button, Pane, Heading, Paragraph } from 'evergreen-ui';
+import { TextInputField, Button, Pane, Heading, Paragraph, SelectField } from 'evergreen-ui';
 // import { TextInputField, TextareaField, SelectField, Button } from 'evergreen-ui';
 import UserEnergyLevelLineChart from '../components/UserEnergyLevelLineChart';
 
@@ -11,15 +11,15 @@ const Dashboard = () => {
     work_end_time: "",
     tasks: "",
     energy_levels: [],
-    // exercise_routine: "",
-    // relationships: "",
-    // fun_activities: [],
-    // ambitions: { short_term: [], long_term: [] },
-    // priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
+    exercise_routine: "",
+    relationships: "",
+    fun_activities: [],
+    ambitions: { short_term: "", long_term: "" },
+    priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
     // break_preferences: { frequency: "", duration: "" },
     // sleep_schedule: "",
     // meal_times: { breakfast: "", lunch: "", dinner: "" },
-    // layout_preference: { type: "", subcategory: "" }
+    layout_preference: { type: "", subcategory: "" }
   });
 
   const [response, setResponse] = useState(null); // State for storing the response
@@ -117,40 +117,40 @@ const Dashboard = () => {
           placeholder="Enter your tasks for today from most important to least separated by a comma"
         />
         <UserEnergyLevelLineChart onChange={handleEnergyLevelsChange} />
-        {/* <TextInputField
+        <TextInputField
           label="Exercise Routine"
           name="exercise_routine"
           value={formData.exercise_routine}
           onChange={handleInputChange}
           placeholder="Enter your exercise routine"
         />
-        <TextareaField
+        <TextInputField
           label="Relationships"
           name="relationships"
           value={formData.relationships}
           onChange={handleInputChange}
           placeholder="Enter how you manage relationships"
         />
-        <TextareaField
+        <TextInputField
           label="Fun Activities"
           name="fun_activities"
           value={formData.fun_activities}
           onChange={handleInputChange}
           placeholder="Enter your fun activities (comma separated)"
         />
-        <TextareaField
+        <TextInputField
           label="Short Term Ambitions"
           name="ambitions.short_term"
           value={formData.ambitions.short_term}
           onChange={handleInputChange}
-          placeholder="Enter your short term ambitions"
+          placeholder="What is 1 thing you'd like to achieve by the end of this month?"
         />
-        <TextareaField
+        <TextInputField
           label="Long Term Ambitions"
           name="ambitions.long_term"
           value={formData.ambitions.long_term}
           onChange={handleInputChange}
-          placeholder="Enter your long term ambitions"
+          placeholder="What is 1 thing  you'd like to achieve by the end of the year?"
         />
         <TextInputField
           label="Priority for Health (0-100)"
@@ -184,7 +184,7 @@ const Dashboard = () => {
           onChange={handleInputChange}
           placeholder="Enter priority for ambitions"
         />
-        <TextInputField
+        {/* <TextInputField
           label="Break Frequency"
           name="break_preferences.frequency"
           value={formData.break_preferences.frequency}
@@ -225,7 +225,7 @@ const Dashboard = () => {
           value={formData.meal_times.dinner}
           onChange={handleInputChange}
           placeholder="Enter your dinner time"
-        />
+        /> */}
         <SelectField
           label="Planner Layout Preference"
           name="layout_preference.type"
@@ -247,7 +247,7 @@ const Dashboard = () => {
             <option value="unstructured and time-boxed">Unstructured and Time-Boxed</option>
             <option value="unstructured and un-time-boxed">Unstructured and Un-Time-Boxed</option>
           </SelectField>
-        )} */}
+        )}
         <Button type="submit">Submit</Button>
       </form>
       {response && (
