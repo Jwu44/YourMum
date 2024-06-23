@@ -12,6 +12,7 @@ import Ambitions from './pages/Ambitions';
 import ScoreValues from './pages/ScoreValues';
 import LayoutPreference from './pages/LayoutPreference';
 import LandingPage from './pages/LandingPage';
+import { submitFormData } from './helper';
 
 function App() {
   const [response, setResponse] = useState(null); // State for storing the response
@@ -33,34 +34,7 @@ function App() {
   });
 
   const submitForm = () => {
-    setLoading(true);
-    setError(null);
-    console.log("Form Data Before Submission:", formData); // Log form data before submission
-
-    fetch('http://localhost:8000/api/submit_data', {  // Replace with your actual backend URL
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formData)
-    })
-    .then(response => {
-      setLoading(false);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log("Response from server:", data);
-      setResponse(data.schedule); // Store the schedule in the state
-    })
-    .catch(error => {
-      setLoading(false);
-      console.error("Error submitting form:", error);
-      setError("There was an error submitting the form. Please try again.");
-      setResponse(null); // Clear any previous response
-    });
+    submitFormData(formData, setLoading, setError, setResponse);
   };
 
   return (
@@ -77,7 +51,7 @@ function App() {
         <Route path="/ambitions" element={<Ambitions formData={formData} setFormData={setFormData} />} />
         <Route path="/score-values" element={<ScoreValues formData={formData} setFormData={setFormData} />} />
         <Route path="/layout-preference" element={<LayoutPreference formData={formData} setFormData={setFormData} submitForm={submitForm} />} />
-        <Route path="/dashboard" element={<Dashboard response={response} />} />
+        <Route path="/dashboard" element={<Dashboard formData={formData} setFormData={setFormData} response={response} submitForm={submitForm} />} />
       </Routes>
       {loading && <p>Loading...</p>}
       {error && <p>{error}</p>}

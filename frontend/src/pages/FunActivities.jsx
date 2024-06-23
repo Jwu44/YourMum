@@ -2,6 +2,7 @@ import React from 'react';
 import { TextInputField, Button, Pane } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleSimpleInputChange } from '../helper.jsx';
+import CenteredPane from '../components/CentredPane';
 
 const FunActivities = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ const FunActivities = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
       <TextInputField
         label="Fun Activities"
         name="fun_activities"
@@ -29,7 +30,7 @@ const FunActivities = ({ formData, setFormData }) => {
         <Button onClick={handlePrevious}>Back</Button>
         <Button onClick={handleNext}>Next</Button>
       </Pane>
-    </Pane>
+    </CenteredPane>
   );
 };
 
