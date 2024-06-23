@@ -1,6 +1,7 @@
 import React from 'react';
 import { TextInputField, Button, Pane } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
+import CenteredPane from '../components/CentredPane';
 
 const Ambitions = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ const Ambitions = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
       <TextInputField
         label="Short Term Ambitions"
         name="ambitions.short_term"
@@ -45,7 +46,7 @@ const Ambitions = ({ formData, setFormData }) => {
         <Button onClick={handlePrevious}>Back</Button>
         <Button onClick={handleNext}>Next</Button>
       </Pane>
-    </Pane>
+    </CenteredPane>
   );
 };
 
