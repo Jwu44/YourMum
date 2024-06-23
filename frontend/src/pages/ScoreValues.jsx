@@ -2,6 +2,7 @@ import React from 'react';
 import { TextInputField, Button, Pane } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleNestedInputChange } from '../helper.jsx';
+import CenteredPane from '../components/CentredPane';
 
 const ScoreValues = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ const ScoreValues = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
       <TextInputField
         label="Health"
         name="priorities.health"
@@ -50,7 +51,7 @@ const ScoreValues = ({ formData, setFormData }) => {
         <Button onClick={handlePrevious}>Back</Button>
         <Button onClick={handleNext}>Next</Button>
       </Pane>
-    </Pane>
+    </CenteredPane>
   );
 };
 

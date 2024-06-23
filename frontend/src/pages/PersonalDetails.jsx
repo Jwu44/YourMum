@@ -2,6 +2,7 @@ import React from 'react';
 import { TextInputField, Button, Pane } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleSimpleInputChange } from '../helper.jsx';
+import CenteredPane from '../components/CentredPane';
 
 const Personal = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ const Personal = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
       <TextInputField
         label="Name"
         name="name"
@@ -32,7 +33,7 @@ const Personal = ({ formData, setFormData }) => {
       <Pane display="flex" justifyContent="flex-end" marginTop={20}>
         <Button onClick={handleNext}>Next</Button>
       </Pane>
-    </Pane>
+    </CenteredPane>
   );
 };
 

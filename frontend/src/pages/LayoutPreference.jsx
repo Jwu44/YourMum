@@ -2,6 +2,7 @@ import React from 'react';
 import { SelectField, Button, Pane } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleNestedInputChange } from '../helper.jsx';
+import CenteredPane from '../components/CentredPane';
 
 const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
       <SelectField
         label="Planner Layout Preference"
         name="layout_preference.type"
@@ -45,7 +46,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
         <Button onClick={handlePrevious}>Back</Button>
         <Button onClick={handleSubmit}>Submit</Button>
       </Pane>
-    </Pane>
+    </CenteredPane>
   );
 };
 
