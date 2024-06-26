@@ -1,8 +1,9 @@
 import React from 'react';
-import { TextInputField, Button, Pane } from 'evergreen-ui';
+import { TextInputField, Heading } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleSimpleInputChange } from '../helper.jsx';
 import CenteredPane from '../components/CentredPane';
+import OnboardingNav from '../components/OnboardingNav';
 
 const WorkTimes = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const WorkTimes = ({ formData, setFormData }) => {
 
   return (
     <CenteredPane>
+      <Heading size={700} marginBottom={24} textAlign="center">Work Times</Heading>
       <TextInputField
         label="Work Start Time"
         name="work_start_time"
@@ -33,10 +35,7 @@ const WorkTimes = ({ formData, setFormData }) => {
         onChange={handleInputChange}
         placeholder="Enter your work end time (e.g., 5:00pm)"
       />
-      <Pane display="flex" justifyContent="space-between" marginTop={20}>
-        <Button onClick={handlePrevious}>Back</Button>
-        <Button onClick={handleNext}>Next</Button>
-      </Pane>
+      <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>
   );
 };
