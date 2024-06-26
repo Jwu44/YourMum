@@ -1,8 +1,9 @@
 import React from 'react';
-import { TextInputField, Button, Pane } from 'evergreen-ui';
+import { TextInputField, Heading } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleSimpleInputChange } from '../helper.jsx';
 import CenteredPane from '../components/CentredPane';
+import OnboardingNav from '../components/OnboardingNav';
 
 const ExerciseRoutine = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -19,17 +20,14 @@ const ExerciseRoutine = ({ formData, setFormData }) => {
 
   return (
     <CenteredPane>
+      <Heading size={700} marginBottom={12} textAlign="center">Exercise Routine</Heading>
       <TextInputField
-        label="Exercise Routine"
         name="exercise_routine"
         value={formData.exercise_routine}
         onChange={handleInputChange}
         placeholder="Enter your exercise routine"
       />
-      <Pane display="flex" justifyContent="space-between" marginTop={20}>
-        <Button onClick={handlePrevious}>Back</Button>
-        <Button onClick={handleNext}>Next</Button>
-      </Pane>
+      <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>
   );
 };

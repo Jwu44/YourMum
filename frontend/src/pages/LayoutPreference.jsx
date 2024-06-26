@@ -1,8 +1,9 @@
 import React from 'react';
-import { SelectField, Button, Pane } from 'evergreen-ui';
+import { SelectField, Heading } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleNestedInputChange } from '../helper.jsx';
 import CenteredPane from '../components/CentredPane';
+import OnboardingNav from '../components/OnboardingNav';
 
 const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
 
   return (
     <CenteredPane>
+      <Heading size={700} marginBottom={24} textAlign="center">Layout Preferences</Heading>
       <SelectField
         label="Planner Layout Preference"
         name="layout_preference.type"
@@ -42,10 +44,8 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
           <option value="unstructured and un-time-boxed">Unstructured and Un-Time-Boxed</option>
         </SelectField>
       )}
-      <Pane display="flex" justifyContent="space-between" marginTop={20}>
-        <Button onClick={handlePrevious}>Back</Button>
-        <Button onClick={handleSubmit}>Submit</Button>
-      </Pane>
+      
+      <OnboardingNav onBack={handlePrevious} onNext={handleSubmit} />
     </CenteredPane>
   );
 };
