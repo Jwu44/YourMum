@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pane, Heading, TextInputField, Button, Textarea } from 'evergreen-ui';
+import { Pane, Heading, TextInputField, SelectField, Button } from 'evergreen-ui';
 import { handleSimpleInputChange, handleNestedInputChange } from '../helper'; // Ensure you have these helpers
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
@@ -40,7 +40,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           onChange={handleSimpleChange}
           placeholder="Enter your work end time"
         />
-        <Textarea
+        <TextInputField
           label="Tasks"
           name="tasks"
           value={formData.tasks}
@@ -48,7 +48,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           placeholder="Enter your tasks separated by commas"
           marginBottom={16}
         />
-        <Textarea
+        <TextInputField
           label="Exercise Routine"
           name="exercise_routine"
           value={formData.exercise_routine}
@@ -56,7 +56,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           placeholder="Describe your exercise routine"
           marginBottom={16}
         />
-        <Textarea
+        <TextInputField
           label="Relationships"
           name="relationships"
           value={formData.relationships}
@@ -64,7 +64,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           placeholder="Describe your relationships"
           marginBottom={16}
         />
-        <Textarea
+        <TextInputField
           label="Fun Activities"
           name="fun_activities"
           value={formData.fun_activities}
@@ -118,6 +118,28 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           onChange={handleNestedChange}
           placeholder="Ambitions priority percentage"
         />
+        <SelectField
+        label="Planner Layout Preference"
+        name="layout_preference.type"
+        value={formData.layout_preference.type}
+        onChange={handleNestedChange}
+        >
+          <option value="kanban">Kanban</option>
+          <option value="to-do-list">To-do List</option>
+        </SelectField>
+        {formData.layout_preference.type === 'to-do-list' && (
+          <SelectField
+            label="To-do List Subcategory"
+            name="layout_preference.subcategory"
+            value={formData.layout_preference.subcategory}
+            onChange={handleNestedChange}
+          >
+            <option value="structured-timeboxed">Structured and Time-Boxed</option>
+            <option value="structured-untimeboxed">Structured and Un-Time-Boxed</option>
+            <option value="unstructured-timeboxed">Unstructured and Time-Boxed</option>
+            <option value="unstructured-untimeboxed">Unstructured and Un-Time-Boxed</option>
+          </SelectField>
+        )}
         <Button appearance="primary" onClick={submitForm} marginTop={16}>Update Schedule</Button>
       </Pane>
 
@@ -129,7 +151,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{response}</pre>
           </Pane>
         ) : (
-          <Heading size={500} marginTop={32}>No schedule generated. Please complete the form.</Heading>
+          <Heading size={500} marginTop={32}>Generating your schedule...</Heading>
         )}
       </Pane>
     </Pane>
