@@ -25,7 +25,7 @@ const ExerciseRoutine = ({ formData, setFormData }) => {
         name="exercise_routine"
         value={formData.exercise_routine}
         onChange={handleInputChange}
-        placeholder="Enter your exercise routine"
+        placeholder="Any plans on exercising today?"
       />
       <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>
