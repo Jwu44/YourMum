@@ -25,7 +25,7 @@ const Relationships = ({ formData, setFormData }) => {
         name="relationships"
         value={formData.relationships}
         onChange={handleInputChange}
-        placeholder="Enter how you manage relationships"
+        placeholder="What commitments do you have with friends or family today?"
       />
       <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>

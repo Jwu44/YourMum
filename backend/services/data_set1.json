@@ -1,0 +1,213 @@
+[
+    {
+        "input": {
+            "name": "Asta",
+            "age": "21",
+            "work_start_time": "7:30am",
+            "work_end_time": "4:30pm",
+            "tasks": "create hand splint, conduct assessment on patient, learn how to operate a pacemaker",
+            "energy_levels": [
+              {"x": 0, "y": 0},
+              {"x": 1, "y": 0},
+              {"x": 2, "y": 0},
+              {"x": 3, "y": 0},
+              {"x": 4, "y": 0},
+              {"x": 5, "y": 3},
+              {"x": 6, "y": 31},
+              {"x": 7, "y": 39},
+              {"x": 8, "y": 46},
+              {"x": 9, "y": 54},
+              {"x": 10, "y": 93},
+              {"x": 11, "y": 93},
+              {"x": 12, "y": 82},
+              {"x": 13, "y": 86},
+              {"x": 14, "y": 80},
+              {"x": 15, "y": 62},
+              {"x": 16, "y": 52},
+              {"x": 17, "y": 38},
+              {"x": 18, "y": 34},
+              {"x": 19, "y": 26},
+              {"x": 20, "y": 17},
+              {"x": 21, "y": 11},
+              {"x": 22, "y": 4},
+              {"x": 23, "y": 0}
+            ],
+            "exercise_routine": "muay thai after work",
+            "relationships": "dinner with friends",
+            "fun_activities": "doom scrolling",
+            "ambitions": {
+              "short_term": "run 10km",
+              "long_term": "get a job as an occupational therapist"
+            },
+            "priorities": {
+              "health": "40",
+              "relationships": "30",
+              "fun_activities": "20",
+              "ambitions": "10"
+            },
+            "layout_preference": {
+              "type": "to-do-list",
+              "subcategory": "structured-untimeboxed"
+            }
+          },
+        "output": "Morning 🌅\n□ Wake Up > Routine\n□ Review energy levels and plan the day accordingly\n□ Go through calendar, emails, and any pending tasks\n    □ Prioritize creating the hand splint\n    □ Conduct patient assessment\n□ Learn to operate a pacemaker)\n\nArvo 🌇\n□ Lunch\n□ Muay Thai\n□ Walk or light exercise\n\nEvening 💤\n□ Dinner with friends\n□ Night time reading or studying\n□ Doom scrolling\n□ Bedtime routine and sleep"
+    },
+    {
+        "input": {
+            "name": "Liam",
+            "age": "25",
+            "work_start_time": "",
+            "work_end_time": "",
+            "tasks": "walking in ashfield, getting jacked, packing for Europe",
+            "energy_levels": [
+              {"x": 0, "y": 0},
+              {"x": 1, "y": 0},
+              {"x": 2, "y": 0},
+              {"x": 3, "y": 0},
+              {"x": 4, "y": 0},
+              {"x": 5, "y": 15},
+              {"x": 6, "y": 26},
+              {"x": 7, "y": 61},
+              {"x": 8, "y": 77},
+              {"x": 9, "y": 90},
+              {"x": 10, "y": 91},
+              {"x": 11, "y": 97},
+              {"x": 12, "y": 86},
+              {"x": 13, "y": 74},
+              {"x": 14, "y": 58},
+              {"x": 15, "y": 70},
+              {"x": 16, "y": 84},
+              {"x": 17, "y": 92},
+              {"x": 18, "y": 93},
+              {"x": 19, "y": 75},
+              {"x": 20, "y": 57},
+              {"x": 21, "y": 49},
+              {"x": 22, "y": 38},
+              {"x": 23, "y": 0}
+            ],
+            "exercise_routine": "5km walk in ashfield",
+            "relationships": "eating dinner with Sarah",
+            "fun_activities": "reading, table tennis",
+            "ambitions": {
+              "short_term": "Write 1 page for my upcoming book",
+              "long_term": "Publish my first book"
+            },
+            "priorities": {
+              "health": "35",
+              "relationships": "25",
+              "fun_activities": "20",
+              "ambitions": "10"
+            },
+            "layout_preference": {
+              "type": "to-do-list",
+              "subcategory": "unstructured-timeboxed"
+            }
+          }
+          ,
+        "output": "□ 7:00am - 8:00am Wake Up + Morning Routine\n□ 8:00am - 10:00am Writing Session for Upcoming Book\n□ 10:00am - 11:00am 5km Walk in Ashfield\n□ 11:00am - 12:00pm Packing for Europe Trip\n□ 12:00pm - 1:00pm Lunch Break\n□ 1:00pm - 2:30pm Gym Session\n□ 2:30pm - 4:00pm Reading Time\n□ 4:00pm - 5:30pm Table Tennis\n□ 5:30pm - 7:00pm Dinner with Sarah\n□ 7:00pm - 8:00pm Planning for Next Day\n□ 8:00pm - 10:00pm Relaxation Time\n□ 10:00pm Sleep"
+    },{
+        "input": {
+            "name": "Fariha",
+            "age": "50",
+            "work_start_time": "9:00am",
+            "work_end_time": "5:00pm",
+            "tasks": "delegate work to William, join meetings, talking to manager about PDP",
+            "energy_levels": [
+              {"x": 0, "y": 0},
+              {"x": 1, "y": 0},
+              {"x": 2, "y": 0},
+              {"x": 3, "y": 0},
+              {"x": 4, "y": 0},
+              {"x": 5, "y": 0},
+              {"x": 6, "y": 0},
+              {"x": 7, "y": 0},
+              {"x": 8, "y": 32},
+              {"x": 9, "y": 55},
+              {"x": 10, "y": 72},
+              {"x": 11, "y": 94},
+              {"x": 12, "y": 86},
+              {"x": 13, "y": 74},
+              {"x": 14, "y": 72},
+              {"x": 15, "y": 60},
+              {"x": 16, "y": 53},
+              {"x": 17, "y": 37},
+              {"x": 18, "y": 50},
+              {"x": 19, "y": 59},
+              {"x": 20, "y": 62},
+              {"x": 21, "y": 60},
+              {"x": 22, "y": 50},
+              {"x": 23, "y": 30}
+            ],
+            "exercise_routine": "swimming after work",
+            "relationships": "eating dinner with family",
+            "fun_activities": "reading",
+            "ambitions": {
+              "short_term": "learn how to crochet",
+              "long_term": "finish painting of oranges"
+            },
+            "priorities": {
+              "health": "40",
+              "relationships": "40",
+              "fun_activities": "10",
+              "ambitions": "10"
+            },
+            "layout_preference": {
+              "type": "to-do-list",
+              "subcategory": "structured-timeboxed"
+            }
+          },
+        "output": "Morning 🌞\n□ 7:00am - 7:30am Wake up and morning routine\n□ 7:30am - 8:30am Read a book while having breakfast\n□ 8:30am - 11:00am Delegate work to William and join important meetings\n□ 11:00am - 12:00pm Talk to manager about Personal Development Plan (PDP)\n\nAfternoon 🌇\n□ 12:00pm - 1:00pm Lunch break\n□ 1:00pm - 2:00pm Light exercise (e.g., stretching, yoga)\n□ 2:00pm - 4:00pm Join remaining meetings and complete pending work tasks\n□ 4:00pm - 5:00pm Prepare for the next day's tasks\n\nEvening 💤\n□ 5:30pm - 6:30pm Swimming\n□ 6:30pm - 7:30pm Dinner with family\n□ 7:30pm - 8:30pm Learn how to crochet\n□ 8:30pm - 9:30pm Read a book\n□ 9:30pm - 10:00pm Work on the painting of oranges\n□ 10:00pm Bedtime"
+    },{
+        "input": {
+            "name": "Justin",
+            "age": "22",
+            "work_start_time": "9:00am",
+            "work_end_time": "5:00pm",
+            "tasks": "call clients, SM sync, engineering catchup",
+            "energy_levels": [
+              {"x": 0, "y": 0},
+              {"x": 1, "y": 0},
+              {"x": 2, "y": 0},
+              {"x": 3, "y": 0},
+              {"x": 4, "y": 0},
+              {"x": 5, "y": 0},
+              {"x": 6, "y": 0},
+              {"x": 7, "y": 0},
+              {"x": 8, "y": 30},
+              {"x": 9, "y": 53},
+              {"x": 10, "y": 67},
+              {"x": 11, "y": 79},
+              {"x": 12, "y": 90},
+              {"x": 13, "y": 93},
+              {"x": 14, "y": 82},
+              {"x": 15, "y": 75},
+              {"x": 16, "y": 67},
+              {"x": 17, "y": 54},
+              {"x": 18, "y": 46},
+              {"x": 19, "y": 58},
+              {"x": 20, "y": 64},
+              {"x": 21, "y": 51},
+              {"x": 22, "y": 34},
+              {"x": 23, "y": 0}
+            ],
+            "exercise_routine": "gym after work",
+            "relationships": "dinner with family",
+            "fun_activities": "reading",
+            "ambitions": {
+              "short_term": "build V2 of yourdAI",
+              "long_term": "deploy yourdAI"
+            },
+            "priorities": {
+              "health": "40",
+              "relationships": "30",
+              "fun_activities": "20",
+              "ambitions": "10"
+            },
+            "layout_preference": {
+              "type": "to-do-list",
+              "subcategory": "unstructured-untimeboxed"
+            }
+          },
+        "output": "\n\n🚶 Walk x2 [Highest] [In progress]\n💤 10:30 sleep, 8:00 wakeup [Highest] [In progress]\n👥 Dinner with family [High] [In progress]\n✏️ Call clients [High] [Not started]\n👨\u200d💻 SM sync [High] [Not started]\n💬 Engineering catchup [High] [Not started]\n📓 Reflect on progress towards V2 of yourdAI [High] [Not started]\n🏋️ Gym after work [Medium] [In progress]\n🍔 Meal prep healthy lunches for the week [Medium] [Not started]\n📄 Update resume with yourdAI project [Medium] [Not started]\n🎤 Read about latest AI developments [Medium] [In progress]\n🤔 Write down thoughts on deploying yourdAI [Low] [In progress]\n🧗 Boulder x2 [Low] [Not started]\n🚫 Limit social media to 1 hour [Low] [Not started]\n💰 Review finances [Lowest] [In progress]\n🏃 Run if time permits [Lowest] [Blocked]"
+    }
+]
