@@ -1,7 +1,9 @@
 import React from 'react';
-import { Button, Pane } from 'evergreen-ui';
 import UserEnergyLevelLineChart from '../components/UserEnergyLevelLineChart';
 import { useNavigate } from 'react-router-dom';
+import { Pane, Heading } from 'evergreen-ui';
+import OnboardingNav from '../components/OnboardingNav';
+import CenteredPane from '../components/CentredPane';
 
 const EnergyLevels = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -22,13 +24,13 @@ const EnergyLevels = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
-      <UserEnergyLevelLineChart onChange={handleEnergyLevelsChange} />
-      <Pane display="flex" justifyContent="space-between" marginTop={20}>
-        <Button onClick={handlePrevious}>Back</Button>
-        <Button onClick={handleNext}>Next</Button>
+    <CenteredPane>
+      <Heading size={700} marginBottom={24} textAlign="center">Plot your energy levels throughout the day</Heading>
+      <Pane width="100%" height={400} marginBottom={24}>
+        <UserEnergyLevelLineChart onChange={handleEnergyLevelsChange} />
       </Pane>
-    </Pane>
+      <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
+    </CenteredPane>
   );
 };
 

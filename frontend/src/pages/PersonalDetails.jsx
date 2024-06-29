@@ -1,7 +1,9 @@
 import React from 'react';
-import { TextInputField, Button, Pane } from 'evergreen-ui';
+import { TextInputField, Heading } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleSimpleInputChange } from '../helper.jsx';
+import CenteredPane from '../components/CentredPane';
+import OnboardingNav from '../components/OnboardingNav';
 
 const Personal = ({ formData, setFormData }) => {
   const navigate = useNavigate();
@@ -13,7 +15,8 @@ const Personal = ({ formData, setFormData }) => {
   };
 
   return (
-    <Pane>
+    <CenteredPane>
+      <Heading size={700} marginBottom={24} textAlign="center">Personal Details</Heading>
       <TextInputField
         label="Name"
         name="name"
@@ -29,10 +32,8 @@ const Personal = ({ formData, setFormData }) => {
         onChange={handleInputChange}
         placeholder="Enter your age"
       />
-      <Pane display="flex" justifyContent="flex-end" marginTop={20}>
-        <Button onClick={handleNext}>Next</Button>
-      </Pane>
-    </Pane>
+      <OnboardingNav onNext={handleNext} />
+    </CenteredPane>
   );
 };
 
