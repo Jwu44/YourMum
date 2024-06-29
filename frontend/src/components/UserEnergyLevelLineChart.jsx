@@ -138,9 +138,6 @@ class UserEnergyLevelLineChart extends Component {
       backgroundColor: 'rgba(255, 255, 255, 0)',
       animationEnabled: true,
       theme: 'light2',
-      title: {
-        text: 'Plot your energy levels throughout the day',
-      },
       axisX: {
         title: 'Time (24 hour)',
         labelFormatter: function (e) {
