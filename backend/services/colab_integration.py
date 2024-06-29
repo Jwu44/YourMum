@@ -5,7 +5,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def process_user_data(user_data):
-    colab_url = "https://2416-34-16-216-57.ngrok-free.app/process_user_data"  # Replace with your actual Google Colab URL
+    colab_url = "https://628d-34-126-68-95.ngrok-free.app/process_user_data"  # Replace with your actual Google Colab URL
     
     try:
         # Log the request details
