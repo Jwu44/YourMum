@@ -25,7 +25,7 @@ const FunActivities = ({ formData, setFormData }) => {
         name="fun_activities"
         value={formData.fun_activities}
         onChange={handleInputChange}
-        placeholder="Enter your fun hobbies (comma separated)"
+        placeholder="What are some hobbies you have today? (comma separated)"
       />
       <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>
