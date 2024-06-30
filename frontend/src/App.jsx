@@ -23,7 +23,7 @@ function App() {
     age: "",
     work_start_time: "",
     work_end_time: "",
-    tasks: "",
+    tasks: [],
     energy_levels: [],
     exercise_routine: "",
     relationships: "",
