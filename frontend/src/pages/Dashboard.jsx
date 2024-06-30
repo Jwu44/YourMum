@@ -12,21 +12,6 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       <Pane width="30%" padding={16} background="tint1" overflowY="auto">
         <Heading size={700} marginBottom={16}>Edit Inputs</Heading>
         <TextInputField
-          label="Name"
-          name="name"
-          value={formData.name}
-          onChange={handleSimpleChange}
-          placeholder="Enter your name"
-        />
-        <TextInputField
-          label="Age"
-          name="age"
-          type="number"
-          value={formData.age}
-          onChange={handleSimpleChange}
-          placeholder="Enter your age"
-        />
-        <TextInputField
           label="Work Start Time"
           name="work_start_time"
           value={formData.work_start_time}
@@ -47,44 +32,6 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           onChange={handleSimpleChange}
           placeholder="Enter your tasks separated by commas"
           marginBottom={16}
-        />
-        <TextInputField
-          label="Exercise Routine"
-          name="exercise_routine"
-          value={formData.exercise_routine}
-          onChange={handleSimpleChange}
-          placeholder="Describe your exercise routine"
-          marginBottom={16}
-        />
-        <TextInputField
-          label="Relationships"
-          name="relationships"
-          value={formData.relationships}
-          onChange={handleSimpleChange}
-          placeholder="Describe your relationships"
-          marginBottom={16}
-        />
-        <TextInputField
-          label="Fun Activities"
-          name="fun_activities"
-          value={formData.fun_activities}
-          onChange={handleSimpleChange}
-          placeholder="Enter your fun activities separated by commas"
-          marginBottom={16}
-        />
-        <TextInputField
-          label="Short Term Ambitions"
-          name="ambitions.short_term"
-          value={formData.ambitions.short_term}
-          onChange={handleNestedChange}
-          placeholder="Short term ambitions"
-        />
-        <TextInputField
-          label="Long Term Ambitions"
-          name="ambitions.long_term"
-          value={formData.ambitions.long_term}
-          onChange={handleNestedChange}
-          placeholder="Long term ambitions"
         />
         <TextInputField
           label="Health Priority"
