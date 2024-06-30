@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pane, Heading, TextInput, Button, toaster } from 'evergreen-ui';
+import { Pane, Heading, TextInput, toaster } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
@@ -20,9 +20,10 @@ const Tasks = ({ formData, setFormData }) => {
       try {
         const result = await addTask(newTask);
         if (result.success) {
+          const newTaskId = Date.now();
           setFormData(prevData => ({
             ...prevData,
-            tasks: [...prevData.tasks, { text: newTask, category: result.category }]
+            tasks: [...prevData.tasks, { id: newTaskId, text: newTask.trim(), category: result.category }]
           }));
           setNewTask('');
           toaster.success('Task added successfully');
@@ -38,6 +39,12 @@ const Tasks = ({ formData, setFormData }) => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTask();
+    }
+  };
+
   const handleUpdateTask = async (updatedTask) => {
     setIsLoading(true);
     setError(null);
@@ -48,7 +55,7 @@ const Tasks = ({ formData, setFormData }) => {
         setFormData(prevData => ({
           ...prevData,
           tasks: prevData.tasks.map(task => 
-            task.id === updatedTask.id ? { ...task, text: updatedTask.text, category: result.category } : task
+            task.id === updatedTask.id ? { ...updatedTask, category: result.category } : task
           )
         }));
         toaster.success('Task updated successfully');
@@ -98,11 +105,11 @@ const Tasks = ({ formData, setFormData }) => {
             placeholder="+ New task"
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
+            onKeyPress={handleKeyPress}
+            onBlur={handleAddTask}
             width="100%"
+            disabled={isLoading}
           />
-          <Button onClick={handleAddTask} marginLeft={8} isLoading={isLoading}>
-            Add
-          </Button>
         </Pane>
       </Pane>
       {error && <Pane marginY={8} color="red500">{error}</Pane>}
