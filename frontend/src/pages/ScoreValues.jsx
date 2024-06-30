@@ -15,7 +15,7 @@ const ScoreValues = ({ formData, setFormData }) => {
   };
 
   const handlePrevious = () => {
-    navigate('/ambitions');
+    navigate('/energy-levels');
   };
 
   return (
