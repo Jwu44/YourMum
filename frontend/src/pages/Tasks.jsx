@@ -1,14 +1,75 @@
-import React from 'react';
-import { TextInputField, Heading } from 'evergreen-ui';
+import React, { useState } from 'react';
+import { Pane, Heading, TextInput, Button, toaster } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
-import { handleSimpleInputChange } from '../helper.jsx';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
+import TaskItem from '../components/TaskItem';
+import { addTask, updateTask } from '../helper.jsx';
 
 const Tasks = ({ formData, setFormData }) => {
   const navigate = useNavigate();
+  const [newTask, setNewTask] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleInputChange = handleSimpleInputChange(setFormData);
+  const handleAddTask = async () => {
+    if (newTask.trim()) {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await addTask(newTask);
+        if (result.success) {
+          setFormData(prevData => ({
+            ...prevData,
+            tasks: [...prevData.tasks, { text: newTask, category: result.category }]
+          }));
+          setNewTask('');
+          toaster.success('Task added successfully');
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        setError(error.message);
+        toaster.danger('Failed to add task');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleUpdateTask = async (updatedTask) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await updateTask(updatedTask.text);
+      if (result.success) {
+        setFormData(prevData => ({
+          ...prevData,
+          tasks: prevData.tasks.map(task => 
+            task.id === updatedTask.id ? { ...task, text: updatedTask.text, category: result.category } : task
+          )
+        }));
+        toaster.success('Task updated successfully');
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      setError(error.message);
+      toaster.danger('Failed to update task');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTask = (taskId) => {
+    setFormData(prevData => ({
+      ...prevData,
+      tasks: prevData.tasks.filter(task => task.id !== taskId)
+    }));
+    toaster.notify('Task deleted');
+  };
 
   const handleNext = () => {
     navigate('/energy-levels');
@@ -20,13 +81,31 @@ const Tasks = ({ formData, setFormData }) => {
 
   return (
     <CenteredPane>
-      <Heading size={700} marginBottom={12} textAlign="center">Tasks</Heading>
-      <TextInputField
-        name="tasks"
-        value={formData.tasks}
-        onChange={handleInputChange}
-        placeholder="Enter your tasks for today from most important to least separated by a comma"
-      />
+      <Heading size={700} marginBottom={12} textAlign="center">
+        What tasks do you have for today?
+      </Heading>
+      <Pane>
+        {formData.tasks.map((task) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUpdate={handleUpdateTask}
+            onDelete={handleDeleteTask}
+          />
+        ))}
+        <Pane display="flex" alignItems="center" marginY={8}>
+          <TextInput
+            placeholder="+ New task"
+            value={newTask}
+            onChange={(e) => setNewTask(e.target.value)}
+            width="100%"
+          />
+          <Button onClick={handleAddTask} marginLeft={8} isLoading={isLoading}>
+            Add
+          </Button>
+        </Pane>
+      </Pane>
+      {error && <Pane marginY={8} color="red500">{error}</Pane>}
       <OnboardingNav onBack={handlePrevious} onNext={handleNext} />
     </CenteredPane>
   );
