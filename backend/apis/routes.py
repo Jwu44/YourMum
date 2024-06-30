@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.services.colab_integration import process_user_data
+from backend.services.colab_integration import process_user_data, categorize_task
 import traceback
 
 api_bp = Blueprint("api", __name__)
@@ -28,4 +28,22 @@ def submit_data():
     except Exception as e:
         print("Exception occurred:", str(e))
         traceback.print_exc()  # Log the stack trace
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/categorize_task", methods=["POST"])
+def add_task():
+    try:
+        task_data = request.json
+        if not task_data or 'task' not in task_data:
+            return jsonify({"error": "No task provided"}), 400
+        
+        print("Task received for categorization:", task_data['task'])
+        category = categorize_task(task_data['task'])
+        print("Categorization result:", category)
+
+        return jsonify({"category": category})
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
