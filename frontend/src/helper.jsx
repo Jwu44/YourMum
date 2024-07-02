@@ -110,3 +110,51 @@ export const updateTask = async (taskText) => {
     };
   }
 };
+
+export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
+  if (newTask.trim()) {
+    try {
+      const result = await addTask(newTask);
+      if (result.success) {
+        const newTaskId = Date.now();
+        setFormData(prevData => ({
+          ...prevData,
+          tasks: [...prevData.tasks, { id: newTaskId, text: newTask.trim(), category: result.category }]
+        }));
+        setNewTask('');
+        toaster.success('Task added successfully');
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toaster.danger('Failed to add task');
+    }
+  }
+};
+
+export const handleUpdateTask = (setFormData, toaster) => async (updatedTask) => {
+  try {
+    const result = await updateTask(updatedTask.text);
+    if (result.success) {
+      setFormData(prevData => ({
+        ...prevData,
+        tasks: prevData.tasks.map(task => 
+          task.id === updatedTask.id ? { ...task, text: updatedTask.text, category: result.category } : task
+        )
+      }));
+      toaster.success('Task updated successfully');
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    toaster.danger('Failed to update task');
+  }
+};
+
+export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
+  setFormData(prevData => ({
+    ...prevData,
+    tasks: prevData.tasks.filter(task => task.id !== taskId)
+  }));
+  toaster.notify('Task deleted');
+};
