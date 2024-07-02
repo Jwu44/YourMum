@@ -1,10 +1,16 @@
-import React from 'react';
-import { Pane, Heading, TextInputField, SelectField, Button } from 'evergreen-ui';
-import { handleSimpleInputChange, handleNestedInputChange } from '../helper'; // Ensure you have these helpers
+import { useState }  from 'react';
+import { Pane, Heading, TextInputField, SelectField, Button, toaster } from 'evergreen-ui';
+import { handleSimpleInputChange, handleNestedInputChange, handleAddTask, handleUpdateTask, handleDeleteTask } from '../helper';
+import TaskItem from '../components/TaskItem';
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
+  const [newTask, setNewTask] = useState('');
   const handleSimpleChange = handleSimpleInputChange(setFormData);
   const handleNestedChange = handleNestedInputChange(setFormData);
+
+  const addTask = handleAddTask(setFormData, newTask, setNewTask, toaster);
+  const updateTask = handleUpdateTask(setFormData, toaster);
+  const deleteTask = handleDeleteTask(setFormData, toaster);
 
   return (
     <Pane display="flex" height="100vh">
@@ -25,13 +31,24 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
           onChange={handleSimpleChange}
           placeholder="Enter your work end time"
         />
+        <Heading size={500} marginBottom={8}>Tasks</Heading>
+        {formData.tasks.map(task => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUpdate={updateTask}
+            onDelete={deleteTask}
+          />
+        ))}
         <TextInputField
-          label="Tasks"
-          name="tasks"
-          value={formData.tasks}
-          onChange={handleSimpleChange}
-          placeholder="Enter your tasks separated by commas"
-          marginBottom={16}
+          placeholder="Add new task"
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              addTask();
+            }
+          }}
         />
         <TextInputField
           label="Health Priority"
