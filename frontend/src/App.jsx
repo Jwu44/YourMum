@@ -5,7 +5,7 @@ import PersonalDetails from './pages/PersonalDetails';
 import WorkTimes from './pages/WorkTimes';
 import Tasks from './pages/Tasks';
 import EnergyLevels from './pages/EnergyLevels';
-import ScoreValues from './pages/ScoreValues';
+import Priorties from './pages/Priorties';
 import LayoutPreference from './pages/LayoutPreference';
 import LandingPage from './pages/LandingPage';
 import { submitFormData } from './helper';
@@ -37,7 +37,7 @@ function App() {
         <Route path="/work-times" element={<WorkTimes formData={formData} setFormData={setFormData} />} />
         <Route path="/tasks" element={<Tasks formData={formData} setFormData={setFormData} />} />
         <Route path="/energy-levels" element={<EnergyLevels formData={formData} setFormData={setFormData} />} />
-        <Route path="/score-values" element={<ScoreValues formData={formData} setFormData={setFormData} />} />
+        <Route path="/priorties" element={<Priorties formData={formData} setFormData={setFormData} />} />
         <Route path="/layout-preference" element={<LayoutPreference formData={formData} setFormData={setFormData} submitForm={submitForm} />} />
         <Route path="/dashboard" element={<Dashboard formData={formData} setFormData={setFormData} response={response} submitForm={submitForm} />} />
       </Routes>
