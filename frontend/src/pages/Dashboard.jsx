@@ -1,16 +1,68 @@
-import { useState }  from 'react';
+import { useState, useEffect }  from 'react';
 import { Pane, Heading, TextInputField, SelectField, Button, toaster } from 'evergreen-ui';
 import { handleSimpleInputChange, handleNestedInputChange, handleAddTask, handleUpdateTask, handleDeleteTask } from '../helper';
 import TaskItem from '../components/TaskItem';
+import PriosDraggableList from '../components/PriosDraggableList';
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const [newTask, setNewTask] = useState('');
+  const [extractedSchedule, setExtractedSchedule] = useState('');
+  const [priorities, setPriorities] = useState([
+    { id: 'health', name: 'Health' },
+    { id: 'relationships', name: 'Relationships' },
+    { id: 'fun_activities', name: 'Fun Activities' },
+    { id: 'ambitions', name: 'Ambitions' }
+  ]);
+
   const handleSimpleChange = handleSimpleInputChange(setFormData);
   const handleNestedChange = handleNestedInputChange(setFormData);
 
   const addTask = handleAddTask(setFormData, newTask, setNewTask, toaster);
   const updateTask = handleUpdateTask(setFormData, toaster);
   const deleteTask = handleDeleteTask(setFormData, toaster);
+
+  useEffect(() => {
+    if (response) {
+      const scheduleContent = extractSchedule(response);
+      setExtractedSchedule(scheduleContent);
+    }
+  }, [response]);
+
+  useEffect(() => {
+    const updatedPriorities = priorities.reduce((acc, priority, index) => {
+      acc[priority.id] = index + 1; // Assign values 1, 2, 3, 4 based on position (top to bottom)
+      return acc;
+    }, {});
+
+    setFormData(prevData => ({
+      ...prevData,
+      priorities: updatedPriorities
+    }));
+  }, [priorities, setFormData]);
+
+  const handleReorder = (newPriorities) => {
+    setPriorities(newPriorities);
+  };
+
+  const extractSchedule = (fullResponse) => {
+    const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+    const match = fullResponse.match(scheduleRegex);
+    return match ? match[1].trim() : 'Schedule not found';
+  };
+
+  const formatSchedule = (scheduleText) => {
+    const sections = scheduleText.split('\n\n');
+    return sections.map((section, index) => (
+      <div key={index} className="schedule-section">
+        <Heading size={500} marginTop={16} marginBottom={8}>{section.split('\n')[0]}</Heading>
+        <ul>
+          {section.split('\n').slice(1).map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    ));
+  };
 
   return (
     <Pane display="flex" height="100vh">
@@ -50,43 +102,13 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
             }
           }}
         />
-        <TextInputField
-          label="Health Priority"
-          name="priorities.health"
-          type="number"
-          value={formData.priorities.health}
-          onChange={handleNestedChange}
-          placeholder="Health priority percentage"
-        />
-        <TextInputField
-          label="Relationships Priority"
-          name="priorities.relationships"
-          type="number"
-          value={formData.priorities.relationships}
-          onChange={handleNestedChange}
-          placeholder="Relationships priority percentage"
-        />
-        <TextInputField
-          label="Fun Activities Priority"
-          name="priorities.fun_activities"
-          type="number"
-          value={formData.priorities.fun_activities}
-          onChange={handleNestedChange}
-          placeholder="Fun activities priority percentage"
-        />
-        <TextInputField
-          label="Ambitions Priority"
-          name="priorities.ambitions"
-          type="number"
-          value={formData.priorities.ambitions}
-          onChange={handleNestedChange}
-          placeholder="Ambitions priority percentage"
-        />
+        <Heading size={500} marginY={16}>Priorities (Drag to reorder)</Heading>
+        <PriosDraggableList items={priorities} onReorder={handleReorder} />
         <SelectField
-        label="Planner Layout Preference"
-        name="layout_preference.type"
-        value={formData.layout_preference.type}
-        onChange={handleNestedChange}
+          label="Planner Layout Preference"
+          name="layout_preference.type"
+          value={formData.layout_preference.type}
+          onChange={handleNestedChange}
         >
           <option value="kanban">Kanban</option>
           <option value="to-do-list">To-do List</option>
@@ -110,12 +132,14 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       {/* Right Column: Display Generated Schedule */}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {response ? (
+        {extractedSchedule ? (
           <Pane padding={16} background="white" borderRadius={4} elevation={1}>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{response}</pre>
+            {formatSchedule(extractedSchedule)}
           </Pane>
         ) : (
-          <Heading size={500} marginTop={32}>Generating your schedule...</Heading>
+          <Heading size={500} marginTop={32}>
+            {response ? 'Generating your schedule...' : 'Update your inputs and click "Update Schedule" to generate a schedule'}
+          </Heading>
         )}
       </Pane>
     </Pane>
