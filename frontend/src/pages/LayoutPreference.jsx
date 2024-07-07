@@ -9,7 +9,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   const navigate = useNavigate();
 
   const handlePrevious = () => {
-    navigate('/score-values');
+    navigate('/priorties');
   };
 
   const handleSubmit = () => {
