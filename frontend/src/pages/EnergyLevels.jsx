@@ -15,7 +15,7 @@ const EnergyLevels = ({ formData, setFormData }) => {
   };
 
   const handleNext = () => {
-    navigate('/score-values');
+    navigate('/priorties');
   };
 
   const handlePrevious = () => {
