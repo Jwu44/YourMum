@@ -21,12 +21,14 @@ V1 - still optimising prompt and making the output more interactable
 ## Backend
 1. **Python**: Primary programming language
 2. **Flask**: Web framework for creating the REST API
-3. **Claude Sonnet 3.5)**: API for NLP generation
-4. **PyTorch**: Deep learning framework, used as the backend for the Transformers library
 
-## Frontend (Implied from the project context)
+### AI
+1. **Claude Sonnet 3.5**: API for NLP generation
+2. **PyTorch**: Deep learning framework, used as the backend for the Transformers library
+
+## Frontend 
 1. **React**: JavaScript library for building user interfaces
-3. **Evergreen UI**: React UI framework for building the user interface
+2. **Evergreen UI**: React UI framework for building the user interface
 
 ## Testing
 1. **Pytest**: For backend testing
