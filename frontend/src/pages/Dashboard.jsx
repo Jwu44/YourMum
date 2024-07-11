@@ -1,12 +1,13 @@
-import { useState, useEffect }  from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Pane, Heading, TextInputField, SelectField, Button, toaster } from 'evergreen-ui';
 import { handleSimpleInputChange, handleNestedInputChange, handleAddTask, handleUpdateTask, handleDeleteTask } from '../helper';
 import TaskItem from '../components/TaskItem';
 import PriosDraggableList from '../components/PriosDraggableList';
+import EditableSchedule from '../components/EditableSchedule';
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const [newTask, setNewTask] = useState('');
-  const [extractedSchedule, setExtractedSchedule] = useState('');
+  const [scheduleTasks, setScheduleTasks] = useState([]);
   const [priorities, setPriorities] = useState([
     { id: 'health', name: 'Health' },
     { id: 'relationships', name: 'Relationships' },
@@ -21,16 +22,41 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const updateTask = handleUpdateTask(setFormData, toaster);
   const deleteTask = handleDeleteTask(setFormData, toaster);
 
+  const extractSchedule = useCallback((fullResponse) => {
+    const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+    const match = fullResponse.match(scheduleRegex);
+    return match ? match[1].trim() : '';
+  }, []);
+
+  const parseScheduleToTasks = useCallback((scheduleText) => {
+    const lines = scheduleText.split('\n');
+    let currentSection = '';
+    return lines.map((line, index) => {
+      if (line.trim() === 'Morning 🌅' || line.trim() === 'Afternoon 🌇' || line.trim() === 'Evening 🌙') {
+        currentSection = line.trim();
+        return null;
+      }
+      const task = line.trim().replace(/^□ /, '');
+      return {
+        id: `schedule-task-${index}`,
+        text: task,
+        completed: false,
+        section: currentSection,
+      };
+    }).filter(Boolean);
+  }, []);
+
   useEffect(() => {
     if (response) {
       const scheduleContent = extractSchedule(response);
-      setExtractedSchedule(scheduleContent);
+      const parsedTasks = parseScheduleToTasks(scheduleContent);
+      setScheduleTasks(parsedTasks);
     }
-  }, [response]);
+  }, [response, extractSchedule, parseScheduleToTasks]);
 
   useEffect(() => {
     const updatedPriorities = priorities.reduce((acc, priority, index) => {
-      acc[priority.id] = index + 1; // Assign values 1, 2, 3, 4 based on position (top to bottom)
+      acc[priority.id] = index + 1;
       return acc;
     }, {});
 
@@ -44,25 +70,23 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     setPriorities(newPriorities);
   };
 
-  const extractSchedule = (fullResponse) => {
-    const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
-    const match = fullResponse.match(scheduleRegex);
-    return match ? match[1].trim() : 'Schedule not found';
-  };
+  const handleScheduleTaskUpdate = useCallback(async (updatedTask) => {
+    const result = await updateTask(updatedTask);
+    if (result.success) {
+      setScheduleTasks(prevTasks => 
+        prevTasks.map(task => task.id === updatedTask.id ? { ...task, ...updatedTask } : task)
+      );
+    }
+  }, [updateTask]);
 
-  const formatSchedule = (scheduleText) => {
-    const sections = scheduleText.split('\n\n');
-    return sections.map((section, index) => (
-      <div key={index} className="schedule-section">
-        <Heading size={500} marginTop={16} marginBottom={8}>{section.split('\n')[0]}</Heading>
-        <ul>
-          {section.split('\n').slice(1).map((item, i) => (
-            <li key={i}>{item}</li>
-          ))}
-        </ul>
-      </div>
-    ));
-  };
+  const handleScheduleTaskDelete = useCallback((taskId) => {
+    deleteTask(taskId);
+    setScheduleTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+  }, [deleteTask]);
+
+  const handleScheduleReorder = useCallback((reorderedTasks) => {
+    setScheduleTasks(reorderedTasks);
+  }, []);
 
   return (
     <Pane display="flex" height="100vh">
@@ -129,12 +153,17 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
         <Button appearance="primary" onClick={submitForm} marginTop={16}>Update Schedule</Button>
       </Pane>
 
-      {/* Right Column: Display Generated Schedule */}
+      {/* Right Column: Display Editable Generated Schedule */}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {extractedSchedule ? (
+        {scheduleTasks.length > 0 ? (
           <Pane padding={16} background="white" borderRadius={4} elevation={1}>
-            {formatSchedule(extractedSchedule)}
+            <EditableSchedule
+              tasks={scheduleTasks}
+              onUpdateTask={handleScheduleTaskUpdate}
+              onDeleteTask={handleScheduleTaskDelete}
+              onReorderTasks={handleScheduleReorder}
+            />
           </Pane>
         ) : (
           <Heading size={500} marginTop={32}>
