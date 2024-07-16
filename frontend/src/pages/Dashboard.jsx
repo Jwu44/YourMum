@@ -31,19 +31,30 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const parseScheduleToTasks = useCallback((scheduleText) => {
     const lines = scheduleText.split('\n');
     let currentSection = '';
-    return lines.map((line, index) => {
-      if (line.trim() === 'Morning 🌅' || line.trim() === 'Afternoon 🌇' || line.trim() === 'Evening 🌙') {
-        currentSection = line.trim();
-        return null;
+    let tasks = [];
+  
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
+        currentSection = trimmedLine;
+        tasks.push({
+          id: `section-${index}`,
+          text: trimmedLine,
+          isSection: true,
+          section: currentSection
+        });
+      } else if (trimmedLine) {
+        tasks.push({
+          id: `task-${index}`,
+          text: trimmedLine.replace(/^□ /, ''),
+          completed: false,
+          isSection: false,
+          section: currentSection
+        });
       }
-      const task = line.trim().replace(/^□ /, '');
-      return {
-        id: `schedule-task-${index}`,
-        text: task,
-        completed: false,
-        section: currentSection,
-      };
-    }).filter(Boolean);
+    });
+  
+    return tasks;
   }, []);
 
   useEffect(() => {
