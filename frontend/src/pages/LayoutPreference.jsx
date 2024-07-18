@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SelectField, Heading } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import { handleNestedInputChange } from '../helper.jsx';
@@ -7,6 +7,19 @@ import OnboardingNav from '../components/OnboardingNav';
 
 const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Initialize subcategory if it's not set and type is 'to-do-list'
+    if (formData.layout_preference.type === 'to-do-list' && !formData.layout_preference.subcategory) {
+      setFormData(prevData => ({
+        ...prevData,
+        layout_preference: {
+          ...prevData.layout_preference,
+          subcategory: 'structured-timeboxed'
+        }
+      }));
+    }
+  }, [formData.layout_preference.type, formData.layout_preference.subcategory, setFormData]);
 
   const handlePrevious = () => {
     navigate('/priorties');
@@ -17,6 +30,17 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
     navigate('/dashboard');
   };
 
+  const handleLayoutTypeChange = (e) => {
+    const newType = e.target.value;
+    setFormData(prevData => ({
+      ...prevData,
+      layout_preference: {
+        type: newType,
+        subcategory: newType === 'to-do-list' ? 'structured-timeboxed' : ''
+      }
+    }));
+  };
+
   return (
     <CenteredPane>
       <Heading size={700} marginBottom={24} textAlign="center">Layout Preferences</Heading>
@@ -24,7 +48,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
         label="Planner Layout Preference"
         name="layout_preference.type"
         value={formData.layout_preference.type}
-        onChange={handleNestedInputChange(setFormData)}
+        onChange={handleLayoutTypeChange}
       >
         <option value="kanban">Kanban</option>
         <option value="to-do-list">To-do List</option>

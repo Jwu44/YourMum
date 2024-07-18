@@ -5,6 +5,11 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(task.text);
   const inputRef = useRef(null);
+  const deleteButtonRef = useRef(null);
+
+  useEffect(() => {
+    setEditedText(task.text);
+  }, [task]);
 
   const handleSave = useCallback(() => {
     if (editedText.trim() !== task.text) {
@@ -30,6 +35,19 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
     }
   }, [handleSave, handleCancel]);
 
+  const handleBlur = useCallback((e) => {
+    // Check if the click was on the delete button
+    if (deleteButtonRef.current && deleteButtonRef.current.contains(e.relatedTarget)) {
+      // If it was, don't save or cancel
+      return;
+    }
+    handleSave();
+  }, [handleSave]);
+
+  const handleDelete = useCallback(() => {
+    onDeleteTask(task.id);
+  }, [onDeleteTask, task.id]);
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -51,14 +69,23 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
         marginRight={8}
       />
       {isEditing ? (
-        <TextInput
-          ref={inputRef}
-          value={editedText}
-          onChange={(e) => setEditedText(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          flex={1}
-        />
+        <Pane display="flex" alignItems="center" flex={1}>
+          <TextInput
+            ref={inputRef}
+            value={editedText}
+            onChange={(e) => setEditedText(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            flex={1}
+          />
+          <IconButton
+            ref={deleteButtonRef}
+            icon="trash"
+            intent="danger"
+            onClick={handleDelete}
+            marginLeft={8}
+          />
+        </Pane>
       ) : (
         <Paragraph
           onClick={() => setIsEditing(true)}
@@ -69,14 +96,8 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
           {task.text}
         </Paragraph>
       )}
-      <IconButton
-        icon="trash"
-        intent="danger"
-        appearance="minimal"
-        onClick={() => onDeleteTask(task.id)}
-      />
     </Pane>
   );
 };
 
-export default EditableScheduleRow;
+export default React.memo(EditableScheduleRow);
