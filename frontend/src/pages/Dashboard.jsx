@@ -81,22 +81,25 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     setPriorities(newPriorities);
   };
 
-  const handleScheduleTaskUpdate = useCallback(async (updatedTask) => {
-    const result = await updateTask(updatedTask);
-    if (result.success) {
-      setScheduleTasks(prevTasks => 
-        prevTasks.map(task => task.id === updatedTask.id ? { ...task, ...updatedTask } : task)
-      );
-    }
-  }, [updateTask]);
+  const handleScheduleTaskUpdate = useCallback((updatedTask) => {
+    setScheduleTasks(prevTasks => 
+      prevTasks.map(task => task.id === updatedTask.id ? { ...task, ...updatedTask } : task)
+    );
+  }, []);
 
   const handleScheduleTaskDelete = useCallback((taskId) => {
-    deleteTask(taskId);
     setScheduleTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-  }, [deleteTask]);
+  }, []);
 
-  const handleScheduleReorder = useCallback((reorderedTasks) => {
-    setScheduleTasks(reorderedTasks);
+  const handleScheduleReorder = useCallback((reorderedItems) => {
+    const newScheduleTasks = reorderedItems.map(item => {
+      if (item.type === 'section') {
+        return { ...item, isSection: true };
+      } else {
+        return { ...item, isSection: false };
+      }
+    });
+    setScheduleTasks(newScheduleTasks);
   }, []);
 
   return (
