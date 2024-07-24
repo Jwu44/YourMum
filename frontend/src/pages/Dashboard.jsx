@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Pane, Heading, TextInputField, SelectField, Button, toaster } from 'evergreen-ui';
-import { handleSimpleInputChange, handleNestedInputChange, handleAddTask, handleUpdateTask, handleDeleteTask } from '../helper';
+import {
+  handleSimpleInputChange,
+  handleNestedInputChange,
+  handleAddTask,
+  handleUpdateTask,
+  handleDeleteTask,
+  getDateString,
+  getNextDay,
+  generateNextDayTasks,
+  updateScheduleTasks,
+  fetchNextDaySchedule
+} from '../helper';
 import TaskItem from '../components/TaskItem';
 import PriosDraggableList from '../components/PriosDraggableList';
 import EditableSchedule from '../components/EditableSchedule';
@@ -14,7 +25,8 @@ const initialPriorities = [
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const [newTask, setNewTask] = useState('');
-  const [scheduleTasks, setScheduleTasks] = useState([]);
+  const [scheduleTasks, setScheduleTasks] = useState({});
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [priorities, setPriorities] = useState(initialPriorities);
 
   const handleSimpleChange = useCallback((e) => {
@@ -73,9 +85,12 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     if (response) {
       const scheduleContent = extractSchedule(response);
       const parsedTasks = parseScheduleToTasks(scheduleContent);
-      setScheduleTasks(parsedTasks);
+      setScheduleTasks(prevTasks => ({
+        ...prevTasks,
+        [getDateString(currentDate)]: parsedTasks
+      }));
     }
-  }, [response, extractSchedule, parseScheduleToTasks]);
+  }, [response, extractSchedule, parseScheduleToTasks, currentDate]);
 
   useEffect(() => {
     const updatedPriorities = priorities.reduce((acc, priority, index) => {
@@ -90,21 +105,51 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   }, []);
 
   const handleScheduleTaskUpdate = useCallback((updatedTask) => {
-    setScheduleTasks(prevTasks => 
-      prevTasks.map(task => task.id === updatedTask.id ? { ...task, ...updatedTask } : task)
-    );
-  }, []);
+    const dateString = getDateString(currentDate);
+    setScheduleTasks(prevTasks => ({
+      ...prevTasks,
+      [dateString]: prevTasks[dateString].map(task => 
+        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+      )
+    }));
+  }, [currentDate]);
 
   const handleScheduleTaskDelete = useCallback((taskId) => {
-    setScheduleTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-  }, []);
+    const dateString = getDateString(currentDate);
+    setScheduleTasks(prevTasks => ({
+      ...prevTasks,
+      [dateString]: prevTasks[dateString].filter(task => task.id !== taskId)
+    }));
+  }, [currentDate]);
 
   const handleScheduleReorder = useCallback((reorderedItems) => {
-    setScheduleTasks(reorderedItems.map(item => ({
-      ...item,
-      isSection: item.type === 'section'
-    })));
-  }, []);
+    const dateString = getDateString(currentDate);
+    setScheduleTasks(prevTasks => ({
+      ...prevTasks,
+      [dateString]: reorderedItems.map(item => ({
+        ...item,
+        isSection: item.type === 'section'
+      }))
+    }));
+  }, [currentDate]);
+
+  const handleNextDay = useCallback(async () => {
+    const nextDate = getNextDay(currentDate);
+    const currentDateString = getDateString(currentDate);
+    // const nextDateString = getDateString(nextDate);
+
+    const currentTasks = scheduleTasks[currentDateString] || [];
+    const nextDayTasks = generateNextDayTasks(currentTasks, nextDate);
+
+    try {
+      const data = await fetchNextDaySchedule(currentDate, nextDayTasks, formData);
+      setScheduleTasks(prevTasks => updateScheduleTasks(prevTasks, nextDate, data.schedule));
+      setCurrentDate(new Date(data.date));
+    } catch (error) {
+      console.error('Error generating next day schedule:', error);
+      toaster.danger('Failed to generate next day schedule');
+    }
+  }, [currentDate, scheduleTasks, formData]);
 
   const renderLeftColumn = useMemo(() => (
     <Pane width="30%" padding={16} background="tint1" overflowY="auto">
@@ -166,20 +211,34 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     </Pane>
   ), [formData, newTask, priorities, handleSimpleChange, handleNestedChange, updateTask, deleteTask, addTask, handleReorder, submitForm]);
 
+  const renderSchedule = useMemo(() => {
+    const dateString = getDateString(currentDate);
+    const tasks = scheduleTasks[dateString] || [];
+    
+    return (
+      <Pane padding={16} background="white" borderRadius={4} elevation={1}>
+        <EditableSchedule
+          tasks={tasks}
+          onUpdateTask={handleScheduleTaskUpdate}
+          onDeleteTask={handleScheduleTaskDelete}
+          onReorderTasks={handleScheduleReorder}
+        />
+        <Pane display="flex" justifyContent="flex-end" marginTop={16}>
+          <Button appearance="primary" onClick={handleNextDay}>
+            Next Day
+          </Button>
+        </Pane>
+      </Pane>
+    );
+  }, [currentDate, scheduleTasks, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay]);
+
   return (
     <Pane display="flex" height="100vh">
       {renderLeftColumn}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
-        <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {scheduleTasks.length > 0 ? (
-          <Pane padding={16} background="white" borderRadius={4} elevation={1}>
-            <EditableSchedule
-              tasks={scheduleTasks}
-              onUpdateTask={handleScheduleTaskUpdate}
-              onDeleteTask={handleScheduleTaskDelete}
-              onReorderTasks={handleScheduleReorder}
-            />
-          </Pane>
+        <Heading size={700} marginBottom={16}>Generated Schedule for {currentDate.toDateString()}</Heading>
+        {Object.keys(scheduleTasks).length > 0 ? (
+          renderSchedule
         ) : (
           <Heading size={500} marginTop={32}>
             {response ? 'Generating your schedule...' : 'Update your inputs and click "Update Schedule" to generate a schedule'}
