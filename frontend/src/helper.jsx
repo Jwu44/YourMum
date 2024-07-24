@@ -1,3 +1,5 @@
+import { format, addDays } from 'date-fns';
+
 const API_BASE_URL = 'http://localhost:8000/api'; 
 
 export const handleSimpleInputChange = (setFormData) => (event) => {
@@ -157,4 +159,57 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
     tasks: prevData.tasks.filter(task => task.id !== taskId)
   }));
   toaster.notify('Task deleted');
+};
+
+// Generate next day's tasks by taking previous day's unfinished tasks
+export const getDateString = (date) => format(date, 'yyyy-MM-dd');
+
+export const getNextDay = (date) => addDays(date, 1);
+
+export const filterUnfinishedTasks = (tasks) => {
+  return tasks.filter(task => !task.completed);
+};
+
+export const generateNextDayTasks = (currentTasks, nextDate) => {
+  const unfinishedTasks = filterUnfinishedTasks(currentTasks);
+  const nextDateString = getDateString(nextDate);
+  
+  return unfinishedTasks.map(task => ({
+    ...task,
+    id: `${task.id}-${nextDateString}`,
+    date: nextDateString
+  }));
+};
+
+export const updateScheduleTasks = (prevTasks, date, newTasks) => {
+  const dateString = getDateString(date);
+  return {
+    ...prevTasks,
+    [dateString]: newTasks,
+  };
+};
+
+export const fetchNextDaySchedule = async (currentDate, unfinishedTasks, userData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        currentDate: currentDate.toISOString(),
+        unfinishedTasks,
+        userData,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate next day schedule');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error generating next day schedule:', error);
+    throw error;
+  }
 };
