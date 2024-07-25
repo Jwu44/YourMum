@@ -4,7 +4,7 @@ import urllib3
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://b810-35-194-218-115.ngrok-free.app" 
+COLAB_BASE_URL = "https://e0e0-35-201-223-215.ngrok-free.app" 
 
 def process_user_data(user_data):
     colab_url = f"{COLAB_BASE_URL}/process_user_data" # Replace with your actual Google Colab URL
@@ -34,6 +34,22 @@ def categorize_task(task):
             return result.get('category', 'Uncategorized')
         else:
             raise Exception(f"Task categorization failed: {response.text}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        raise
+
+def generate_next_day_schedule(data):
+    url = f"{COLAB_BASE_URL}/generate_next_day_schedule"
+    
+    try:
+        response = requests.post(url, json=data, verify=False)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result
+        else:
+            raise Exception(f"Next day schedule generation failed: {response.text}")
     
     except requests.exceptions.RequestException as e:
         print(f"Request failed: {e}")

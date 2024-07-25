@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pane, Heading, TextInput, toaster } from 'evergreen-ui';
+import { Pane, Heading, TextInput, toaster, Paragraph } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
@@ -33,6 +33,9 @@ const Tasks = ({ formData, setFormData }) => {
       <Heading size={700} marginBottom={12} textAlign="center">
         What tasks do you have for today?
       </Heading>
+      <Paragraph>
+        There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work
+      </Paragraph>
       <Pane>
         {formData.tasks.map((task) => (
           <TaskItem

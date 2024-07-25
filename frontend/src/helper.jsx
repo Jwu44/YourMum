@@ -158,3 +158,66 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
   }));
   toaster.notify('Task deleted');
 };
+
+export const filterUnfinishedTasks = (tasks) => {
+  return tasks.filter(task => !task.completed && !task.isSection);
+};
+
+export const generateNextDayTasks = (currentTasks) => {
+  const unfinishedTasks = filterUnfinishedTasks(currentTasks);
+  
+  return unfinishedTasks.map(task => ({
+    ...task,
+    id: `${task.id}-next`,
+  }));
+};
+
+export const fetchNextDaySchedule = async (unfinishedTasks, userData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        unfinishedTasks,
+        userData,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate next day schedule');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error generating next day schedule:', error);
+    throw error;
+  }
+};
+
+export const parseScheduleToTasks = (scheduleText) => {
+  const lines = scheduleText.split('\n');
+  let currentSection = '';
+  return lines.reduce((tasks, line, index) => {
+    const trimmedLine = line.trim();
+    if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
+      currentSection = trimmedLine;
+      tasks.push({
+        id: `section-${index}`,
+        text: trimmedLine,
+        isSection: true,
+        section: currentSection
+      });
+    } else if (trimmedLine) {
+      tasks.push({
+        id: `task-${index}`,
+        text: trimmedLine.replace(/^□ /, ''),
+        completed: false,
+        isSection: false,
+        section: currentSection
+      });
+    }
+    return tasks;
+  }, []);
+};
