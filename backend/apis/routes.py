@@ -52,7 +52,7 @@ def add_task():
 def next_day_schedule():
     try:
         data = request.json
-        if not data or 'currentDate' not in data or 'unfinishedTasks' not in data or 'userData' not in data:
+        if not data  or 'unfinishedTasks' not in data or 'userData' not in data:
             return jsonify({"error": "Missing required data"}), 400
         
         print("Data received for next day schedule generation:", data)
@@ -63,9 +63,8 @@ def next_day_schedule():
         # Log the response from the Colab server
         print("Response from Colab server for next day schedule:", colab_response)
 
-        if colab_response and 'schedule' in colab_response and 'date' in colab_response:
+        if colab_response and 'schedule' in colab_response:
             return jsonify({
-                "date": colab_response['date'],
                 "schedule": colab_response['schedule']
             })
         else:
