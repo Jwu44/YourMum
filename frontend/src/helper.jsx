@@ -1,5 +1,3 @@
-import { format, addDays } from 'date-fns';
-
 const API_BASE_URL = 'http://localhost:8000/api'; 
 
 export const handleSimpleInputChange = (setFormData) => (event) => {
@@ -161,35 +159,20 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
   toaster.notify('Task deleted');
 };
 
-// Generate next day's tasks by taking previous day's unfinished tasks
-export const getDateString = (date) => format(date, 'yyyy-MM-dd');
-
-export const getNextDay = (date) => addDays(date, 1);
-
 export const filterUnfinishedTasks = (tasks) => {
-  return tasks.filter(task => !task.completed);
+  return tasks.filter(task => !task.completed && !task.isSection);
 };
 
-export const generateNextDayTasks = (currentTasks, nextDate) => {
+export const generateNextDayTasks = (currentTasks) => {
   const unfinishedTasks = filterUnfinishedTasks(currentTasks);
-  const nextDateString = getDateString(nextDate);
   
   return unfinishedTasks.map(task => ({
     ...task,
-    id: `${task.id}-${nextDateString}`,
-    date: nextDateString
+    id: `${task.id}-next`,
   }));
 };
 
-export const updateScheduleTasks = (prevTasks, date, newTasks) => {
-  const dateString = getDateString(date);
-  return {
-    ...prevTasks,
-    [dateString]: newTasks,
-  };
-};
-
-export const fetchNextDaySchedule = async (currentDate, unfinishedTasks, userData) => {
+export const fetchNextDaySchedule = async (unfinishedTasks, userData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
       method: 'POST',
@@ -197,7 +180,6 @@ export const fetchNextDaySchedule = async (currentDate, unfinishedTasks, userDat
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        currentDate: currentDate.toISOString(),
         unfinishedTasks,
         userData,
       }),
@@ -212,4 +194,30 @@ export const fetchNextDaySchedule = async (currentDate, unfinishedTasks, userDat
     console.error('Error generating next day schedule:', error);
     throw error;
   }
+};
+
+export const parseScheduleToTasks = (scheduleText) => {
+  const lines = scheduleText.split('\n');
+  let currentSection = '';
+  return lines.reduce((tasks, line, index) => {
+    const trimmedLine = line.trim();
+    if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
+      currentSection = trimmedLine;
+      tasks.push({
+        id: `section-${index}`,
+        text: trimmedLine,
+        isSection: true,
+        section: currentSection
+      });
+    } else if (trimmedLine) {
+      tasks.push({
+        id: `task-${index}`,
+        text: trimmedLine.replace(/^□ /, ''),
+        completed: false,
+        isSection: false,
+        section: currentSection
+      });
+    }
+    return tasks;
+  }, []);
 };
