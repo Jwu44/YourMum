@@ -159,44 +159,12 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
   toaster.notify('Task deleted');
 };
 
-export const filterUnfinishedTasks = (tasks) => {
-  return tasks.filter(task => !task.completed && !task.isSection);
-};
-
-export const generateNextDayTasks = (currentTasks) => {
-  const unfinishedTasks = filterUnfinishedTasks(currentTasks);
-  
-  return unfinishedTasks.map(task => ({
-    ...task,
-    id: `${task.id}-next`,
-  }));
-};
-
-export const fetchNextDaySchedule = async (unfinishedTasks, userData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        unfinishedTasks,
-        userData,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate next day schedule');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error generating next day schedule:', error);
-    throw error;
-  }
-};
-
 export const parseScheduleToTasks = (scheduleText) => {
+  if (!scheduleText || typeof scheduleText !== 'string') {
+    console.error('Invalid schedule text:', scheduleText);
+    return [];
+  }
+
   const lines = scheduleText.split('\n');
   let currentSection = '';
   return lines.reduce((tasks, line, index) => {
@@ -220,4 +188,70 @@ export const parseScheduleToTasks = (scheduleText) => {
     }
     return tasks;
   }, []);
+};
+
+export const generateNextDaySchedule = (currentSchedule, userData) => {
+  const { layout_preference } = userData;
+  const isStructured = layout_preference.subcategory.startsWith('structured');
+
+  // Filter out unfinished tasks and maintain their original order
+  const unfinishedTasks = currentSchedule
+    .filter(task => !task.completed && !task.isSection)
+    .map((task, index) => ({ ...task, originalIndex: index }));
+
+  // Create a new schedule
+  let newSchedule = [];
+
+  if (isStructured) {
+    // Add section headers for structured layout
+    newSchedule = [
+      { id: 'section-morning', text: 'Morning 🌅', isSection: true },
+      { id: 'section-afternoon', text: 'Afternoon 🌞', isSection: true },
+      { id: 'section-evening', text: 'Evening 💤', isSection: true }
+    ];
+  }
+
+  // Add unfinished tasks to the new schedule
+  unfinishedTasks.forEach((task, index) => {
+    const newTask = {
+      id: `task-${index}-next`,
+      text: task.text,
+      completed: false,
+      isSection: false,
+      section: task.section
+    };
+
+    if (isStructured) {
+      // Find the index of the section in the new schedule
+      const sectionIndex = newSchedule.findIndex(item => item.text.includes(task.section));
+
+      // If the section exists, insert the task after it, maintaining the original order
+      if (sectionIndex !== -1) {
+        const insertIndex = newSchedule.slice(sectionIndex + 1).findIndex(item => 
+          item.isSection || (item.originalIndex && item.originalIndex > task.originalIndex)
+        );
+        
+        if (insertIndex === -1) {
+          newSchedule.push(newTask);
+        } else {
+          newSchedule.splice(sectionIndex + 1 + insertIndex, 0, newTask);
+        }
+      } else {
+        // If the section doesn't exist, add to the end
+        newSchedule.push(newTask);
+      }
+    } else {
+      // For unstructured layout, just add tasks in their original order
+      newSchedule.push(newTask);
+    }
+  });
+
+  // // Remove empty sections for structured layout
+  // if (isStructured) {
+  //   newSchedule = newSchedule.filter(item => 
+  //     !item.isSection || newSchedule.some(task => !task.isSection && task.section === item.text)
+  //   );
+  // }
+
+  return newSchedule;
 };

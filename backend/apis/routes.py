@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.services.colab_integration import process_user_data, categorize_task, generate_next_day_schedule
+from backend.services.colab_integration import process_user_data, categorize_task
 import traceback
 
 api_bp = Blueprint("api", __name__)
@@ -48,29 +48,3 @@ def add_task():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     
-@api_bp.route("/generate_next_day_schedule", methods=["POST"])
-def next_day_schedule():
-    try:
-        data = request.json
-        if not data  or 'unfinishedTasks' not in data or 'userData' not in data:
-            return jsonify({"error": "Missing required data"}), 400
-        
-        print("Data received for next day schedule generation:", data)
-
-        # Send the request to the Colab server
-        colab_response = generate_next_day_schedule(data)
-
-        # Log the response from the Colab server
-        print("Response from Colab server for next day schedule:", colab_response)
-
-        if colab_response and 'schedule' in colab_response:
-            return jsonify({
-                "schedule": colab_response['schedule']
-            })
-        else:
-            return jsonify({"error": "Failed to generate next day schedule"}), 500
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
