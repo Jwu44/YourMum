@@ -6,9 +6,8 @@ import {
   handleAddTask,
   handleUpdateTask,
   handleDeleteTask,
-  generateNextDayTasks,
-  fetchNextDaySchedule,
-  parseScheduleToTasks
+  parseScheduleToTasks,
+  generateNextDaySchedule
 } from '../helper';
 import TaskItem from '../components/TaskItem';
 import PriosDraggableList from '../components/PriosDraggableList';
@@ -23,8 +22,9 @@ const initialPriorities = [
 
 const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const [newTask, setNewTask] = useState('');
-  const [scheduleTasks, setScheduleTasks] = useState([]);
+  const [scheduleDays, setScheduleDays] = useState([]);
   const [priorities, setPriorities] = useState(initialPriorities);
+  const [currentDayIndex, setCurrentDayIndex] = useState(0);
 
   const handleSimpleChange = useCallback((e) => {
     handleSimpleInputChange(setFormData)(e);
@@ -46,6 +46,10 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     handleDeleteTask(setFormData, toaster)(taskId);
   }, [setFormData]);
 
+  const handleReorder = useCallback((newPriorities) => {
+    setPriorities(newPriorities);
+  }, []);
+
   const extractSchedule = useCallback((fullResponse) => {
     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
     const match = fullResponse.match(scheduleRegex);
@@ -56,7 +60,8 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     if (response) {
       const scheduleContent = extractSchedule(response);
       const parsedTasks = parseScheduleToTasks(scheduleContent);
-      setScheduleTasks(parsedTasks);
+      setScheduleDays([parsedTasks]);
+      setCurrentDayIndex(0);
     }
   }, [response, extractSchedule]);
 
@@ -68,39 +73,49 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     setFormData(prevData => ({ ...prevData, priorities: updatedPriorities }));
   }, [priorities, setFormData]);
 
-  const handleReorder = useCallback((newPriorities) => {
-    setPriorities(newPriorities);
-  }, []);
-
   const handleScheduleTaskUpdate = useCallback((updatedTask) => {
-    setScheduleTasks(prevTasks => prevTasks.map(task => 
-      task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-    ));
-  }, []);
-
+    setScheduleDays(prevDays => {
+      const newDays = [...prevDays];
+      newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
+        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+      );
+      return newDays;
+    });
+  }, [currentDayIndex]);
+  
   const handleScheduleTaskDelete = useCallback((taskId) => {
-    setScheduleTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-  }, []);
-
+    setScheduleDays(prevDays => {
+      const newDays = [...prevDays];
+      newDays[currentDayIndex] = newDays[currentDayIndex].filter(task => task.id !== taskId);
+      return newDays;
+    });
+  }, [currentDayIndex]);
+  
   const handleScheduleReorder = useCallback((reorderedItems) => {
-    setScheduleTasks(reorderedItems.map(item => ({
-      ...item,
-      isSection: item.type === 'section'
-    })));
-  }, []);
+    setScheduleDays(prevDays => {
+      const newDays = [...prevDays];
+      newDays[currentDayIndex] = reorderedItems.map(item => ({
+        ...item,
+        isSection: item.type === 'section'
+      }));
+      return newDays;
+    });
+  }, [currentDayIndex]);
 
-  const handleNextDay = useCallback(async () => {
-    const nextDayTasks = generateNextDayTasks(scheduleTasks);
+  const handleNextDay = useCallback(() => {
+    const currentSchedule = scheduleDays[currentDayIndex];
+    
+    const newSchedule = generateNextDaySchedule(currentSchedule, formData);
+    
+    setScheduleDays(prevDays => [...prevDays, newSchedule]);
+    setCurrentDayIndex(prevIndex => prevIndex + 1);
+  }, [scheduleDays, currentDayIndex, formData]);
 
-    try {
-      const data = await fetchNextDaySchedule(nextDayTasks, formData);
-      const newSchedule = parseScheduleToTasks(data.schedule);
-      setScheduleTasks(newSchedule);
-    } catch (error) {
-      console.error('Error generating next day schedule:', error);
-      toaster.danger('Failed to generate next day schedule');
+  const handlePreviousDay = useCallback(() => {
+    if (currentDayIndex > 0) {
+      setCurrentDayIndex(prevIndex => prevIndex - 1);
     }
-  }, [scheduleTasks, formData]);
+  }, [currentDayIndex]);
 
   const renderLeftColumn = useMemo(() => (
     <Pane width="30%" padding={16} background="tint1" overflowY="auto">
@@ -165,25 +180,34 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const renderSchedule = useMemo(() => (
     <Pane padding={16} background="white" borderRadius={4} elevation={1}>
       <EditableSchedule
-        tasks={scheduleTasks}
+        tasks={scheduleDays[currentDayIndex] || []}
         onUpdateTask={handleScheduleTaskUpdate}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
       />
-      <Pane display="flex" justifyContent="flex-end" marginTop={16}>
-        <Button appearance="primary" onClick={handleNextDay}>
+      <Pane display="flex" justifyContent="space-between" marginTop={16}>
+        <Button
+          appearance="primary"
+          onClick={handlePreviousDay}
+          disabled={currentDayIndex === 0}
+        >
+          Previous
+        </Button>
+        <Button 
+          appearance="primary"
+          onClick={handleNextDay}>
           Next Day
         </Button>
       </Pane>
     </Pane>
-  ), [scheduleTasks, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay]);
+  ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay]);
 
   return (
     <Pane display="flex" height="100vh">
       {renderLeftColumn}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {scheduleTasks.length > 0 ? (
+        {scheduleDays.length > 0 ? (
           renderSchedule
         ) : (
           <Heading size={500} marginTop={32}>
