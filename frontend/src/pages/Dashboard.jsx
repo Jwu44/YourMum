@@ -107,7 +107,11 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     
     const newSchedule = generateNextDaySchedule(currentSchedule, formData);
     
-    setScheduleDays(prevDays => [...prevDays, newSchedule]);
+    setScheduleDays(prevDays => {
+      const updatedDays = [...prevDays];
+      updatedDays[currentDayIndex + 1] = newSchedule;
+      return updatedDays;
+    });
     setCurrentDayIndex(prevIndex => prevIndex + 1);
   }, [scheduleDays, currentDayIndex, formData]);
 
@@ -184,6 +188,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
         onUpdateTask={handleScheduleTaskUpdate}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
+        isStructured={formData.layout_preference.subcategory.startsWith('structured')}
       />
       <Pane display="flex" justifyContent="space-between" marginTop={16}>
         <Button
@@ -200,7 +205,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
         </Button>
       </Pane>
     </Pane>
-  ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay]);
+  ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay, formData.layout_preference.subcategory]);
 
   return (
     <Pane display="flex" height="100vh">
