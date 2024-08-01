@@ -1,6 +1,6 @@
 # About
 
-A daily planner powered by Claude-Sonnet 3.5. If only there was a personalised planner that was tailored based on your habits, needs and preferences with thet whole planner creation process streamlined...
+A daily planner powered by Claude-Sonnet 3.5. If only there was a personalised planner that was tailored based on your lifestyle, body chemistry, habits, needs and preferences with the whole planner creation process streamlined...
 
 ## Features
 
