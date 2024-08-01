@@ -13,7 +13,7 @@ A daily planner powered by Claude-Sonnet 3.5. If only there was a personalised p
 ## Main Dashboard
 V1 - still optimising prompt and making the output more interactable
 
-![image](https://github.com/Jwu44/yourdAI/assets/70676614/ec6c8c69-08ac-40d3-9b7f-b732b94d7ab0)
+![image](https://github.com/user-attachments/assets/94c239f5-5afd-4204-9a73-31347e7dd75d)
 
 
 # Tech Stack Summary
