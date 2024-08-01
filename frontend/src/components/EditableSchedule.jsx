@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { Heading } from 'evergreen-ui';
 import EditableScheduleRow from './EditableScheduleRow';
 
-const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks }) => {
+const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, isStructured }) => {
   const allItems = useMemo(() => 
     tasks.map(task => ({
       ...task,
@@ -33,25 +33,11 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks })
 
   const handleDeleteTask = useCallback((taskId) => {
     onDeleteTask(taskId);
-    // If the task being deleted is the last task in its section, we need to remove the section as well
-    const updatedItems = allItems.reduce((acc, item, index, arr) => {
-      if (item.id === taskId) {
-        // Skip this item as it's being deleted
-        return acc;
-      }
-      if (item.type === 'section' && index < arr.length - 1 && arr[index + 1].id === taskId) {
-        // This is a section header followed by the task being deleted
-        // Check if there are any other tasks in this section
-        const nextNonDeletedTask = arr.slice(index + 2).find(i => i.type !== 'section');
-        if (!nextNonDeletedTask || nextNonDeletedTask.section !== item.text) {
-          // If there are no more tasks in this section, skip the section header
-          return acc;
-        }
-      }
-      return [...acc, item];
-    }, []);
-    onReorderTasks(updatedItems);
-  }, [allItems, onDeleteTask, onReorderTasks]);
+    if (isStructured) {
+      const updatedItems = allItems.filter(item => item.id !== taskId);
+      onReorderTasks(updatedItems);
+    }
+  }, [allItems, onDeleteTask, onReorderTasks, isStructured]);
 
   const renderDraggable = useCallback(({ item, index, snapshot, provided }) => (
     <div
@@ -77,12 +63,19 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks })
     </div>
   ), [onUpdateTask, handleDeleteTask]);
 
+  const renderItems = useCallback(() => {
+    if (!isStructured) {
+      return allItems.filter(item => item.type !== 'section');
+    }
+    return allItems;
+  }, [allItems, isStructured]);
+
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Droppable droppableId="schedule">
         {(provided) => (
           <div {...provided.droppableProps} ref={provided.innerRef}>
-            {allItems.map((item, index) => (
+            {renderItems().map((item, index) => (
               <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
                 {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
               </Draggable>
