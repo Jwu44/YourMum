@@ -194,64 +194,54 @@ export const generateNextDaySchedule = (currentSchedule, userData) => {
   const { layout_preference } = userData;
   const isStructured = layout_preference.subcategory.startsWith('structured');
 
-  // Filter out unfinished tasks and maintain their original order
-  const unfinishedTasks = currentSchedule
-    .filter(task => !task.completed && !task.isSection)
-    .map((task, index) => ({ ...task, originalIndex: index }));
+  // Filter out unfinished tasks
+  const unfinishedTasks = currentSchedule.filter(task => !task.completed && !task.isSection);
 
   // Create a new schedule
   let newSchedule = [];
 
   if (isStructured) {
-    // Add section headers for structured layout
-    newSchedule = [
-      { id: 'section-morning', text: 'Morning 🌅', isSection: true },
-      { id: 'section-afternoon', text: 'Afternoon 🌞', isSection: true },
-      { id: 'section-evening', text: 'Evening 💤', isSection: true }
+    // Define sections with emojis
+    const sections = [
+      { id: 'morning', text: 'Morning 🌅', tasks: [] },
+      { id: 'afternoon', text: 'Afternoon 🌇', tasks: [] },
+      { id: 'evening', text: 'Evening 💤', tasks: [] }
     ];
-  }
 
-  // Add unfinished tasks to the new schedule
-  unfinishedTasks.forEach((task, index) => {
-    const newTask = {
-      id: `task-${index}-next`,
-      text: task.text,
-      completed: false,
-      isSection: false,
-      section: task.section
-    };
-
-    if (isStructured) {
-      // Find the index of the section in the new schedule
-      const sectionIndex = newSchedule.findIndex(item => item.text.includes(task.section));
-
-      // If the section exists, insert the task after it, maintaining the original order
+    // Categorize unfinished tasks
+    unfinishedTasks.forEach(task => {
+      const sectionIndex = sections.findIndex(section => 
+        task.section.toLowerCase().includes(section.id)
+      );
       if (sectionIndex !== -1) {
-        const insertIndex = newSchedule.slice(sectionIndex + 1).findIndex(item => 
-          item.isSection || (item.originalIndex && item.originalIndex > task.originalIndex)
-        );
-        
-        if (insertIndex === -1) {
-          newSchedule.push(newTask);
-        } else {
-          newSchedule.splice(sectionIndex + 1 + insertIndex, 0, newTask);
-        }
+        sections[sectionIndex].tasks.push(task);
       } else {
-        // If the section doesn't exist, add to the end
-        newSchedule.push(newTask);
+        // If no matching section, add to evening
+        sections[2].tasks.push(task);
       }
-    } else {
-      // For unstructured layout, just add tasks in their original order
-      newSchedule.push(newTask);
-    }
-  });
+    });
 
-  // // Remove empty sections for structured layout
-  // if (isStructured) {
-  //   newSchedule = newSchedule.filter(item => 
-  //     !item.isSection || newSchedule.some(task => !task.isSection && task.section === item.text)
-  //   );
-  // }
+    // Build new schedule
+    sections.forEach(section => {
+      newSchedule.push({ id: `section-${section.id}`, text: section.text, isSection: true });
+      section.tasks.forEach((task, index) => {
+        newSchedule.push({
+          ...task,
+          id: `task-${section.id}-${index}-next`,
+          completed: false
+        });
+      });
+    });
+  } else {
+    // For unstructured layout, just add tasks in their original order
+    unfinishedTasks.forEach((task, index) => {
+      newSchedule.push({
+        ...task,
+        id: `task-${index}-next`,
+        completed: false
+      });
+    });
+  }
 
   return newSchedule;
 };
