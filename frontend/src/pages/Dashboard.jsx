@@ -102,17 +102,37 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     });
   }, [currentDayIndex]);
 
-  const handleNextDay = useCallback(() => {
+  const handleNextDay = useCallback(async () => {
     const currentSchedule = scheduleDays[currentDayIndex];
     
-    const newSchedule = generateNextDaySchedule(currentSchedule, formData);
-    
-    setScheduleDays(prevDays => {
-      const updatedDays = [...prevDays];
-      updatedDays[currentDayIndex + 1] = newSchedule;
-      return updatedDays;
-    });
-    setCurrentDayIndex(prevIndex => prevIndex + 1);
+    if (!Array.isArray(currentSchedule)) {
+      console.error("Current schedule is not an array:", currentSchedule);
+      toaster.danger("Invalid schedule data. Please try again.");
+      return;
+    }
+  
+    try {
+      const result = await generateNextDaySchedule(
+        currentSchedule, 
+        formData, 
+        scheduleDays.slice(0, currentDayIndex + 1)
+      );
+      
+      if (result.success) {
+        setScheduleDays(prevDays => {
+          const updatedDays = [...prevDays];
+          updatedDays[currentDayIndex + 1] = result.schedule;
+          return updatedDays;
+        });
+        setCurrentDayIndex(prevIndex => prevIndex + 1);
+      } else {
+        toaster.danger(result.error);
+      }
+    } catch (error) {
+      console.error("Error generating next day schedule:", error);
+      toaster.danger("Failed to generate next day's schedule. Please try again.");
+    } finally {
+    }
   }, [scheduleDays, currentDayIndex, formData]);
 
   const handlePreviousDay = useCallback(() => {
