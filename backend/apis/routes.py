@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.services.colab_integration import process_user_data, categorize_task
+from backend.services.colab_integration import process_user_data, categorize_task, identify_recurring_tasks
 import traceback
 
 api_bp = Blueprint("api", __name__)
@@ -47,4 +47,24 @@ def add_task():
         print("Exception occurred:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-    
+
+@api_bp.route("/identify_recurring_tasks", methods=["POST"])
+def get_recurring_tasks():
+    try:
+        data = request.json
+        if not data or 'current_schedule' not in data:
+            return jsonify({"error": "No current schedule provided"}), 400
+        
+        current_schedule = data['current_schedule']
+        previous_schedules = data.get('previous_schedules', [])
+        
+        print("Identifying recurring tasks")
+        recurring_tasks = identify_recurring_tasks(current_schedule, previous_schedules)
+        print("Recurring tasks identified:", recurring_tasks)
+
+        return jsonify({"recurring_tasks": recurring_tasks})
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
