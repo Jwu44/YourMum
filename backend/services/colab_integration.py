@@ -4,7 +4,7 @@ import urllib3
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://ef42-35-194-188-127.ngrok-free.app" 
+COLAB_BASE_URL = "https://c7e3-35-231-84-68.ngrok-free.app" 
 
 def process_user_data(user_data):
     colab_url = f"{COLAB_BASE_URL}/process_user_data" # Replace with your actual Google Colab URL
@@ -34,6 +34,26 @@ def categorize_task(task):
             return result.get('category', 'Uncategorized')
         else:
             raise Exception(f"Task categorization failed: {response.text}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        raise
+
+def identify_recurring_tasks(current_schedule, previous_schedules):
+    url = f"{COLAB_BASE_URL}/identify_recurring_tasks"
+    
+    try:
+        data = {
+            "current_schedule": current_schedule,
+            "previous_schedules": previous_schedules
+        }
+        response = requests.post(url, json=data, verify=False)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('recurring_tasks', [])
+        else:
+            raise Exception(f"Recurring task identification failed: {response.text}")
     
     except requests.exceptions.RequestException as e:
         print(f"Request failed: {e}")
