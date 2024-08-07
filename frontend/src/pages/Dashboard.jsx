@@ -76,9 +76,18 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const handleScheduleTaskUpdate = useCallback((updatedTask) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
-        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-      );
+      const updateTaskRecursive = (tasks) => {
+        return tasks.map(task => {
+          if (task.id === updatedTask.id) {
+            return { ...task, ...updatedTask };
+          }
+          if (task.children) {
+            return { ...task, children: updateTaskRecursive(task.children) };
+          }
+          return task;
+        });
+      };
+      newDays[currentDayIndex] = updateTaskRecursive(newDays[currentDayIndex]);
       return newDays;
     });
   }, [currentDayIndex]);
@@ -86,7 +95,18 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   const handleScheduleTaskDelete = useCallback((taskId) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = newDays[currentDayIndex].filter(task => task.id !== taskId);
+      const deleteTaskRecursive = (tasks) => {
+        return tasks.filter(task => {
+          if (task.id === taskId) {
+            return false;
+          }
+          if (task.children) {
+            task.children = deleteTaskRecursive(task.children);
+          }
+          return true;
+        });
+      };
+      newDays[currentDayIndex] = deleteTaskRecursive(newDays[currentDayIndex]);
       return newDays;
     });
   }, [currentDayIndex]);

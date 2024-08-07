@@ -17,6 +17,19 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
 
     const newItems = Array.from(allItems);
     const [reorderedItem] = newItems.splice(result.source.index, 1);
+    
+    // Check if the task is being dropped onto another task
+    if (result.destination.index === result.source.index + 1 && 
+        newItems[result.destination.index - 1].type === 'task') {
+      // Make the dropped task a subtask
+      reorderedItem.parentId = newItems[result.destination.index - 1].id;
+      reorderedItem.level = (newItems[result.destination.index - 1].level || 0) + 1;
+    } else {
+      // Reset parentId and level if it's not a subtask
+      reorderedItem.parentId = null;
+      reorderedItem.level = 0;
+    }
+
     newItems.splice(result.destination.index, 0, reorderedItem);
 
     let currentSection = '';
@@ -34,7 +47,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   const handleDeleteTask = useCallback((taskId) => {
     onDeleteTask(taskId);
     if (isStructured) {
-      const updatedItems = allItems.filter(item => item.id !== taskId);
+      const updatedItems = allItems.filter(item => item.id !== taskId && item.parentId !== taskId);
       onReorderTasks(updatedItems);
     }
   }, [allItems, onDeleteTask, onReorderTasks, isStructured]);
@@ -47,6 +60,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       style={{
         ...provided.draggableProps.style,
         opacity: snapshot.isDragging ? 0.5 : 1,
+        marginLeft: `${(item.level || 0) * 20}px`, // Add indentation for subtasks
       }}
     >
       {item.type === 'section' ? (
