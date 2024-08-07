@@ -36,9 +36,7 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
   }, [handleSave, handleCancel]);
 
   const handleBlur = useCallback((e) => {
-    // Check if the click was on the delete button
     if (deleteButtonRef.current && deleteButtonRef.current.contains(e.relatedTarget)) {
-      // If it was, don't save or cancel
       return;
     }
     handleSave();
@@ -62,7 +60,11 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask }) => {
       marginY={4}
       background="tint1"
       borderRadius={4}
+      marginLeft={`${(task.level || 0) * 20}px`} // Add indentation for subtasks
     >
+      {task.level > 0 && (
+        <Pane width={16} height={16} marginRight={8} borderLeft={1} borderBottom={1} borderColor="muted" />
+      )}
       <Checkbox
         checked={task.completed}
         onChange={handleToggleComplete}
