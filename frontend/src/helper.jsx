@@ -167,7 +167,10 @@ export const parseScheduleToTasks = (scheduleText) => {
 
   const lines = scheduleText.split('\n');
   let currentSection = '';
-  return lines.reduce((tasks, line, index) => {
+  let taskStack = [];
+  let tasks = [];
+
+  lines.forEach((line, index) => {
     const trimmedLine = line.trim();
     if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
       currentSection = trimmedLine;
@@ -178,16 +181,31 @@ export const parseScheduleToTasks = (scheduleText) => {
         section: currentSection
       });
     } else if (trimmedLine) {
-      tasks.push({
+      const indentLevel = line.search(/\S|$/) / 2; // Assuming 2 spaces per indent level
+      const task = {
         id: `task-${index}`,
         text: trimmedLine.replace(/^□ /, ''),
         completed: false,
         isSection: false,
-        section: currentSection
-      });
+        section: currentSection,
+        level: indentLevel,
+        parentId: null
+      };
+
+      while (taskStack.length > indentLevel) {
+        taskStack.pop();
+      }
+
+      if (taskStack.length > 0) {
+        task.parentId = taskStack[taskStack.length - 1].id;
+      }
+
+      taskStack.push(task);
+      tasks.push(task);
     }
-    return tasks;
-  }, []);
+  });
+
+  return tasks;
 };
 
 export const generateNextDaySchedule = async (currentSchedule, userData, previousSchedules = []) => {
@@ -220,7 +238,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     const isStructured = layout_preference.subcategory.startsWith('structured');
 
     // Filter out unfinished tasks
-    const unfinishedTasks = currentSchedule.filter(item => item && !item.completed && !item.isSection);
+    const unfinishedTasks = createTaskHierarchy(currentSchedule.filter(item => item && !item.completed && !item.isSection))
 
     // Create a map of recurring tasks to their previous sections
     const recurringTaskSections = new Map();
@@ -283,7 +301,8 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       ];
 
       // Categorize tasks
-      Array.from(combinedTasks.values()).forEach(task => {
+      const allTasks = [...flattenTasks(unfinishedTasks), ...Array.from(combinedTasks.values())];
+      allTasks.forEach(task => {
         const sectionIndex = getSectionIndex(task.section);
         if (sectionIndex !== -1) {
           sections[sectionIndex].tasks.push(task);
@@ -307,13 +326,11 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       });
     } else {
       // For unstructured layout, add tasks in their original order
-      Array.from(combinedTasks.values()).forEach((task, index) => {
-        newSchedule.push({
-          ...task,
-          id: `task-${index}-next`,
-          completed: false
-        });
-      });
+      newSchedule = flattenTasks(unfinishedTasks).concat(Array.from(combinedTasks.values())).map((task, index) => ({
+        ...task,
+        id: `task-${index}-next`,
+        completed: false
+      }));
     }
 
     return {
@@ -328,4 +345,36 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       error: "There was an error generating the next day's schedule. Please try again."
     };
   }
+};
+
+// Helper function to create a task hierarchy
+const createTaskHierarchy = (tasks) => {
+  const taskMap = new Map();
+  const rootTasks = [];
+
+  tasks.forEach(task => {
+    taskMap.set(task.id, { ...task, children: [] });
+  });
+
+  taskMap.forEach(task => {
+    if (task.parentId && taskMap.has(task.parentId)) {
+      taskMap.get(task.parentId).children.push(task);
+    } else {
+      rootTasks.push(task);
+    }
+  });
+
+  return rootTasks;
+};
+
+// Flatten the task hierarchy
+const flattenTasks = (tasks, parentId = null, level = 0) => {
+  return tasks.reduce((acc, task) => {
+    const flatTask = { ...task, parentId, level };
+    acc.push(flatTask);
+    if (task.children && task.children.length > 0) {
+      acc.push(...flattenTasks(task.children, task.id, level + 1));
+    }
+    return acc;
+  }, []);
 };
