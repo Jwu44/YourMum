@@ -27,22 +27,25 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   const onDragEnd = useCallback((result) => {
     setDragIndicator(null);
     if (!result.destination) return;
-
+  
     const newItems = Array.from(allItems);
     const [reorderedItem] = newItems.splice(result.source.index, 1);
     
-    if (result.destination.index > result.source.index &&
-        newItems[result.destination.index - 1].type === 'task' &&
-        newItems[result.destination.index - 1].section === reorderedItem.section) {
-      reorderedItem.parentId = newItems[result.destination.index - 1].id;
-      reorderedItem.level = (newItems[result.destination.index - 1].level || 0) + 1;
+    const destinationIndex = result.destination.index;
+    const targetItem = newItems[destinationIndex - 1];
+  
+    if (targetItem && targetItem.type === 'task' && 
+        targetItem.section === reorderedItem.section &&
+        destinationIndex > result.source.index) {
+      reorderedItem.parentId = targetItem.id;
+      reorderedItem.level = (targetItem.level || 0) + 1;
     } else {
       reorderedItem.parentId = null;
       reorderedItem.level = 0;
     }
-
-    newItems.splice(result.destination.index, 0, reorderedItem);
-
+  
+    newItems.splice(destinationIndex, 0, reorderedItem);
+  
     onReorderTasks(newItems);
   }, [allItems, onReorderTasks]);
 
@@ -51,34 +54,37 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       setDragIndicator(null);
       return;
     }
-
-    const destinationIndex = update.destination.index;
+  
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const scrollTop = containerRef.current.scrollTop;
+    const taskElements = containerRef.current.querySelectorAll('.editable-schedule-row');
+    
     const sourceIndex = update.source.index;
-    const draggedItem = allItems[sourceIndex];
-
-    if (destinationIndex > sourceIndex && destinationIndex < allItems.length) {
-      const potentialParentIndex = destinationIndex - 1;
-      const potentialParent = allItems[potentialParentIndex];
-      
-      if (potentialParent && potentialParent.type === 'task' && potentialParent.section === draggedItem.section) {
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const scrollTop = containerRef.current.scrollTop;
-
-        // Find the start of the current section
-        const sectionStartIndex = allItems.findIndex(item => item.isSection && item.text === potentialParent.section);
-        
-        // Calculate the top position based on the index within the section and a fixed row height
-        const rowHeight = 40; // Adjust this value based on your actual row height
-        const topPosition = ((potentialParentIndex - sectionStartIndex) * rowHeight) - scrollTop;
-
-        setDragIndicator({
-          top: topPosition + rowHeight, // Position it below the potential parent
-          left: (potentialParent.level + 1) * 20,
-          width: containerRect.width - ((potentialParent.level + 1) * 20)
-        });
-      } else {
-        setDragIndicator(null);
-      }
+    const destinationIndex = update.destination.index;
+    const targetItem = allItems[destinationIndex];
+  
+    const targetElement = taskElements[destinationIndex];
+  
+    if (targetElement) {
+      const targetRect = targetElement.getBoundingClientRect();
+      const topPosition = targetRect.top - containerRect.top + scrollTop;
+      const indentationLevel = targetItem.level || 0;
+  
+      // Calculate the potential indentation based on the drag position
+      const dragThreshold = targetRect.left + 20; // 20px from the left edge
+      const potentialIndentation = Math.max(0, Math.floor((update.clientX - dragThreshold) / 20));
+  
+      // Determine if we're creating a subtask (dragging downwards)
+      const isCreatingSubtask = destinationIndex > sourceIndex && potentialIndentation > indentationLevel;
+  
+      // Set the indicator properties
+      setDragIndicator({
+        top: isCreatingSubtask ? targetRect.bottom - containerRect.top + scrollTop : topPosition,
+        left: (isCreatingSubtask ? indentationLevel + 1 : indentationLevel) * 20,
+        width: containerRect.width - ((isCreatingSubtask ? indentationLevel + 1 : indentationLevel) * 20),
+        height: 2,
+        backgroundColor: "#3366FF"
+      });
     } else {
       setDragIndicator(null);
     }
@@ -101,6 +107,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
         ...provided.draggableProps.style,
         marginLeft: `${(item.level || 0) * 20}px`,
       }}
+      className={`editable-schedule-row ${snapshot.isDragging ? 'is-dragging' : ''}`}
     >
       {item.type === 'section' ? (
         <Heading size={500} marginTop={16} marginBottom={8}>
@@ -111,6 +118,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
           task={item}
           onUpdateTask={onUpdateTask}
           onDeleteTask={handleDeleteTask}
+          isDragging={snapshot.isDragging}
         />
       )}
     </Pane>
@@ -124,40 +132,47 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   }, [allItems, isStructured]);
 
   return (
-    <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
-      <Droppable droppableId="schedule">
-        {(provided) => (
-          <Pane
-            position="relative"
-            height="100%"
-            overflowY="auto"
-            ref={el => {
-              provided.innerRef(el);
-              containerRef.current = el;
-            }}
-            {...provided.droppableProps}
-          >
-            {renderItems().map((item, index) => (
-              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
-                {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
-              </Draggable>
-            ))}
-            {dragIndicator && (
-              <Pane
-                position="absolute"
-                top={dragIndicator.top}
-                left={dragIndicator.left}
-                width={dragIndicator.width}
-                height={2}
-                backgroundColor="#3366FF"
-                zIndex={1000}
-              />
-            )}
-            {provided.placeholder}
-          </Pane>
-        )}
-      </Droppable>
-    </DragDropContext>
+    <>
+      <style>
+        {`
+          .editable-schedule-row.is-dragging,
+          .editable-schedule-row.is-dragging * {
+            opacity: 0.5 !important;
+            transition: opacity 0.2s ease;
+          }
+        `}
+      </style>
+      <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
+        <Droppable droppableId="schedule">
+          {(provided) => (
+            <Pane
+              position="relative"
+              height="100%"
+              overflowY="auto"
+              ref={el => {
+                provided.innerRef(el);
+                containerRef.current = el;
+              }}
+              {...provided.droppableProps}
+            >
+              {renderItems().map((item, index) => (
+                <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
+                  {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
+                </Draggable>
+              ))}
+              {dragIndicator && (
+                <Pane
+                  position="absolute"
+                  {...dragIndicator}
+                  zIndex={1000}
+                />
+              )}
+              {provided.placeholder}
+            </Pane>
+          )}
+        </Droppable>
+      </DragDropContext>
+    </>
   );
 };
 
