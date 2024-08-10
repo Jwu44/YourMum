@@ -15,6 +15,8 @@ V1 - still optimising prompt and making the output more interactable
 
 ![image](https://github.com/user-attachments/assets/94c239f5-5afd-4204-9a73-31347e7dd75d)
 
+# Architecture
+![image](https://github.com/user-attachments/assets/436dd66c-5144-4b94-8487-e1203336601f)
 
 # Tech Stack Summary
 
