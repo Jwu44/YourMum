@@ -15,6 +15,8 @@ V1 - still optimising prompt and making the output more interactable
 
 ![image](https://github.com/Jwu44/yourdAI/assets/70676614/ec6c8c69-08ac-40d3-9b7f-b732b94d7ab0)
 
+# Architecture
+![image](https://github.com/user-attachments/assets/436dd66c-5144-4b94-8487-e1203336601f)
 
 # Tech Stack Summary
 
