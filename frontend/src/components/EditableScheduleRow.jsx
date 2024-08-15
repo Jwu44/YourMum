@@ -65,7 +65,7 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
         className={`editable-schedule-row ${isDragging ? 'is-dragging' : ''}`}
       >
         {task.level > 0 && (
-          <Pane width={16} height={16} marginRight={8} borderLeft={1} borderBottom={1} borderColor="muted" />
+          <Pane width={16} height={16} marginRight={8} borderLeft="1px solid" borderBottom="1px solid" borderColor="muted" />
         )}
         <Checkbox
           checked={task.completed}

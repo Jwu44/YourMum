@@ -238,62 +238,42 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     const isStructured = layout_preference.subcategory.startsWith('structured');
 
     // Filter out unfinished tasks
-    const unfinishedTasks = createTaskHierarchy(currentSchedule.filter(item => item && !item.completed && !item.isSection))
+    const unfinishedTasks = currentSchedule.filter(item => item && !item.completed && !item.isSection);
 
     // Create a map of recurring tasks to their previous sections
     const recurringTaskSections = new Map();
-    [...previousSchedules, currentSchedule].reverse().forEach(schedule => {
+    [...previousSchedules, currentSchedule].forEach(schedule => {
       schedule.forEach(item => {
-        if (item && result.recurring_tasks.includes(item.text) && !recurringTaskSections.has(item.text)) {
+        if (item && result.recurring_tasks.includes(item.text)) {
           recurringTaskSections.set(item.text, item.section);
-          console.log(`Recurring task "${item.text}" assigned to section: ${item.section}`);
         }
       });
     });
 
-    // Create a new schedule
-    let newSchedule = [];
-
-    // Function to get section index
-    const getSectionIndex = (section) => {
-      if (!section) return -1;
-      const lowerSection = section.toLowerCase();
-      if (lowerSection.includes('morning')) return 0;
-      if (lowerSection.includes('afternoon')) return 1;
-      if (lowerSection.includes('evening') || lowerSection.includes('night')) return 2;
-      return -1;
-    };
-
-    // Combine unfinished and recurring tasks, prioritizing unfinished tasks
+    // Combine unfinished and recurring tasks, avoiding duplication
     const combinedTasks = new Map();
 
     // First, add all unfinished tasks
     unfinishedTasks.forEach(task => {
-      combinedTasks.set(task.text, task);
+      combinedTasks.set(task.text, { ...task, isRecurring: false });
     });
 
     // Then, add recurring tasks that aren't already in the unfinished tasks
     result.recurring_tasks.forEach(taskText => {
       if (!combinedTasks.has(taskText)) {
-        const taskSection = recurringTaskSections.get(taskText);
-        let standardSection = 'morning';
-        if (taskSection) {
-          const sectionIndex = getSectionIndex(taskSection);
-          if (sectionIndex !== -1) {
-            standardSection = ['morning', 'afternoon', 'evening'][sectionIndex];
-          }
-        }
+        const taskSection = recurringTaskSections.get(taskText) || 'morning';
         combinedTasks.set(taskText, {
           text: taskText,
           completed: false,
           isRecurring: true,
-          section: standardSection
+          section: taskSection
         });
       }
     });
 
+    let newSchedule = [];
+
     if (isStructured) {
-      // Define sections with emojis
       const sections = [
         { id: 'morning', text: 'Morning 🌅', tasks: [] },
         { id: 'afternoon', text: 'Afternoon 🌇', tasks: [] },
@@ -301,8 +281,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       ];
 
       // Categorize tasks
-      const allTasks = [...flattenTasks(unfinishedTasks), ...Array.from(combinedTasks.values())];
-      allTasks.forEach(task => {
+      Array.from(combinedTasks.values()).forEach(task => {
         const sectionIndex = getSectionIndex(task.section);
         if (sectionIndex !== -1) {
           sections[sectionIndex].tasks.push(task);
@@ -326,7 +305,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       });
     } else {
       // For unstructured layout, add tasks in their original order
-      newSchedule = flattenTasks(unfinishedTasks).concat(Array.from(combinedTasks.values())).map((task, index) => ({
+      newSchedule = Array.from(combinedTasks.values()).map((task, index) => ({
         ...task,
         id: `task-${index}-next`,
         completed: false
@@ -347,34 +326,44 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
   }
 };
 
-// Helper function to create a task hierarchy
-const createTaskHierarchy = (tasks) => {
-  const taskMap = new Map();
-  const rootTasks = [];
-
-  tasks.forEach(task => {
-    taskMap.set(task.id, { ...task, children: [] });
-  });
-
-  taskMap.forEach(task => {
-    if (task.parentId && taskMap.has(task.parentId)) {
-      taskMap.get(task.parentId).children.push(task);
-    } else {
-      rootTasks.push(task);
-    }
-  });
-
-  return rootTasks;
+// Helper function to get section index (unchanged)
+const getSectionIndex = (section) => {
+  if (!section) return -1;
+  const lowerSection = section.toLowerCase();
+  if (lowerSection.includes('morning')) return 0;
+  if (lowerSection.includes('afternoon')) return 1;
+  if (lowerSection.includes('evening') || lowerSection.includes('night')) return 2;
+  return -1;
 };
 
-// Flatten the task hierarchy
-const flattenTasks = (tasks, parentId = null, level = 0) => {
-  return tasks.reduce((acc, task) => {
-    const flatTask = { ...task, parentId, level };
-    acc.push(flatTask);
-    if (task.children && task.children.length > 0) {
-      acc.push(...flattenTasks(task.children, task.id, level + 1));
-    }
-    return acc;
-  }, []);
-};
+// // Helper function to create a task hierarchy
+// const createTaskHierarchy = (tasks) => {
+//   const taskMap = new Map();
+//   const rootTasks = [];
+
+//   tasks.forEach(task => {
+//     taskMap.set(task.id, { ...task, children: [] });
+//   });
+
+//   taskMap.forEach(task => {
+//     if (task.parentId && taskMap.has(task.parentId)) {
+//       taskMap.get(task.parentId).children.push(task);
+//     } else {
+//       rootTasks.push(task);
+//     }
+//   });
+
+//   return rootTasks;
+// };
+
+// // Flatten the task hierarchy
+// const flattenTasks = (tasks, parentId = null, level = 0) => {
+//   return tasks.reduce((acc, task) => {
+//     const flatTask = { ...task, parentId, level };
+//     acc.push(flatTask);
+//     if (task.children && task.children.length > 0) {
+//       acc.push(...flattenTasks(task.children, task.id, level + 1));
+//     }
+//     return acc;
+//   }, []);
+// };
