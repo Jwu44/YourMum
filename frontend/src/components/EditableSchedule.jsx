@@ -4,7 +4,7 @@ import { Heading, Pane } from 'evergreen-ui';
 import EditableScheduleRow from './EditableScheduleRow';
 
 const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, isStructured }) => {
-  const [dragIndicator, setDragIndicator] = useState(null);
+  const [potentialParentId, setPotentialParentId] = useState(null);
   const containerRef = useRef(null);
 
   const allItems = useMemo(() => {
@@ -24,8 +24,12 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
     });
   }, [tasks]);
 
+  const onDragStart = useCallback(() => {
+    // We can leave this empty or add any necessary logic for drag start
+  }, []);
+
   const onDragEnd = useCallback((result) => {
-    setDragIndicator(null);
+    setPotentialParentId(null);
     if (!result.destination) return;
   
     const newItems = Array.from(allItems);
@@ -50,43 +54,24 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   }, [allItems, onReorderTasks]);
 
   const onDragUpdate = useCallback((update) => {
-    if (!update.destination || !containerRef.current) {
-      setDragIndicator(null);
+    if (!update.destination) {
+      setPotentialParentId(null);
       return;
     }
-  
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const scrollTop = containerRef.current.scrollTop;
-    const taskElements = containerRef.current.querySelectorAll('.editable-schedule-row');
-    
-    const sourceIndex = update.source.index;
+
     const destinationIndex = update.destination.index;
-    const targetItem = allItems[destinationIndex];
-  
-    const targetElement = taskElements[destinationIndex];
-  
-    if (targetElement) {
-      const targetRect = targetElement.getBoundingClientRect();
-      const topPosition = targetRect.top - containerRect.top + scrollTop;
-      const indentationLevel = targetItem.level || 0;
-  
-      // Calculate the potential indentation based on the drag position
-      const dragThreshold = targetRect.left + 20; // 20px from the left edge
-      const potentialIndentation = Math.max(0, Math.floor((update.clientX - dragThreshold) / 20));
-  
-      // Determine if we're creating a subtask (dragging downwards)
-      const isCreatingSubtask = destinationIndex > sourceIndex && potentialIndentation > indentationLevel;
-  
-      // Set the indicator properties
-      setDragIndicator({
-        top: isCreatingSubtask ? targetRect.bottom - containerRect.top + scrollTop : topPosition,
-        left: (isCreatingSubtask ? indentationLevel + 1 : indentationLevel) * 20,
-        width: containerRect.width - ((isCreatingSubtask ? indentationLevel + 1 : indentationLevel) * 20),
-        height: 2,
-        backgroundColor: "#3366FF"
-      });
+    const sourceIndex = update.source.index;
+    const isMovingDown = destinationIndex > sourceIndex;
+
+    if (isMovingDown) {
+      const potentialParent = allItems[destinationIndex - 1];
+      if (potentialParent && potentialParent.type === 'task') {
+        setPotentialParentId(potentialParent.id);
+      } else {
+        setPotentialParentId(null);
+      }
     } else {
-      setDragIndicator(null);
+      setPotentialParentId(null);
     }
   }, [allItems]);
 
@@ -119,10 +104,11 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
           onUpdateTask={onUpdateTask}
           onDeleteTask={handleDeleteTask}
           isDragging={snapshot.isDragging}
+          showIndicator={potentialParentId === item.id}
         />
       )}
     </Pane>
-  ), [onUpdateTask, handleDeleteTask]);
+  ), [onUpdateTask, handleDeleteTask, potentialParentId]);
 
   const renderItems = useCallback(() => {
     if (!isStructured) {
@@ -132,47 +118,26 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   }, [allItems, isStructured]);
 
   return (
-    <>
-      <style>
-        {`
-          .editable-schedule-row.is-dragging,
-          .editable-schedule-row.is-dragging * {
-            opacity: 0.5 !important;
-            transition: opacity 0.2s ease;
-          }
-        `}
-      </style>
-      <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
-        <Droppable droppableId="schedule">
-          {(provided) => (
-            <Pane
-              position="relative"
-              height="100%"
-              overflowY="auto"
-              ref={el => {
-                provided.innerRef(el);
-                containerRef.current = el;
-              }}
-              {...provided.droppableProps}
-            >
-              {renderItems().map((item, index) => (
-                <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
-                  {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
-                </Draggable>
-              ))}
-              {dragIndicator && (
-                <Pane
-                  position="absolute"
-                  {...dragIndicator}
-                  zIndex={1000}
-                />
-              )}
-              {provided.placeholder}
-            </Pane>
-          )}
-        </Droppable>
-      </DragDropContext>
-    </>
+    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
+      <Droppable droppableId="schedule">
+        {(provided) => (
+          <Pane
+            ref={el => {
+              provided.innerRef(el);
+              containerRef.current = el;
+            }}
+            {...provided.droppableProps}
+          >
+            {renderItems().map((item, index) => (
+              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
+                {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+          </Pane>
+        )}
+      </Droppable>
+    </DragDropContext>
   );
 };
 
