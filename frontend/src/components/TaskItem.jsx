@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pane, TextInput, Badge, Spinner } from 'evergreen-ui';
+import { Pane, TextInput, Badge, Spinner, Popover, Menu } from 'evergreen-ui';
 
-const TaskItem = ({ task, onUpdate, onDelete }) => {
+const categories = ['Exercise', 'Relationships', 'Fun', 'Ambition', 'Work'];
+
+const TaskItem = ({ task, onUpdate, onUpdateCategory, onDelete }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState(task.text);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +36,7 @@ const TaskItem = ({ task, onUpdate, onDelete }) => {
         return 'blue';
       case 'Fun':
         return 'yellow';
-      case 'Relationship':
+      case 'Relationships':
         return 'purple';
       case 'Ambition':
         return 'orange';
@@ -61,9 +63,35 @@ const TaskItem = ({ task, onUpdate, onDelete }) => {
           {task.text}
         </Pane>
       )}
-      <Badge color={getCategoryColor(task.category)} marginRight={8}>
-        {isLoading ? <Spinner size={12} /> : task.category}
-      </Badge>
+      <Pane>
+        {isLoading ? (
+          <Spinner size={12} marginRight={8} />
+        ) : (
+          <Popover
+            content={
+              <Menu>
+                {categories.map((cat) => (
+                  <Menu.Item
+                    key={cat}
+                    onSelect={() => onUpdateCategory(task.id, cat)}
+                  >
+                    {cat}
+                  </Menu.Item>
+                ))}
+              </Menu>
+            }
+          >
+            <Badge
+              color={getCategoryColor(task.categories[0])}
+              marginRight={4}
+              marginBottom={4}
+              cursor="pointer"
+            >
+              {task.categories[0]}
+            </Badge>
+          </Popover>
+        )}
+      </Pane>
       <Pane
         onClick={() => onDelete(task.id)}
         marginLeft={8}
