@@ -1,21 +1,31 @@
 import requests
 import urllib3
+from backend.models.task import Task
+import uuid
 
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://8d35-34-48-102-232.ngrok-free.app" 
+COLAB_BASE_URL = "https://00a3-35-193-215-56.ngrok-free.app" 
 
 def process_user_data(user_data):
-    colab_url = f"{COLAB_BASE_URL}/process_user_data" # Replace with your actual Google Colab URL
+    colab_url = f"{COLAB_BASE_URL}/process_user_data"
+    
+    # Convert Task objects to dictionaries
+    if 'tasks' in user_data:
+        user_data['tasks'] = [task.to_dict() if isinstance(task, Task) else task for task in user_data['tasks']]
     
     try:
-        # Send the POST request with SSL verification
         response = requests.post(colab_url, json=user_data, verify=False)
         
-        # Check if the response is successful
         if response.status_code == 200:
-            return response.json()  # Return the full JSON response
+            result = response.json()
+            
+            # Convert task dictionaries back to Task objects
+            if 'tasks' in result:
+                result['tasks'] = [Task.from_dict(task) if isinstance(task, dict) else task for task in result['tasks']]
+            
+            return result
         else:
             raise Exception(f"Colab processing failed: {response.text}")
     
@@ -23,15 +33,21 @@ def process_user_data(user_data):
         print(f"Request failed: {e}")
         raise
 
-def categorize_task(task):
+def categorize_task(task_text):
     url = f"{COLAB_BASE_URL}/categorize_task"
     
     try:
-        response = requests.post(url, json={"task": task}, verify=False)
+        response = requests.post(url, json={"task": task_text}, verify=False)
         
         if response.status_code == 200:
             result = response.json()
-            return result.get('category', 'Uncategorized')
+            category = result.get('category', 'Uncategorized')
+            
+            # Create a Task object
+            task = Task(id=str(uuid.uuid4()), text=task_text, categories=[category])
+            
+            # Return a dictionary representation of the Task
+            return task.to_dict()
         else:
             raise Exception(f"Task categorization failed: {response.text}")
     
