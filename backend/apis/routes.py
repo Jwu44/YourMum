@@ -38,10 +38,11 @@ def add_task():
             return jsonify({"error": "No task provided"}), 400
         
         print("Task received for categorization:", task_data['task'])
-        category = categorize_task(task_data['task'])
-        print("Categorization result:", category)
+        categorized_task = categorize_task(task_data['task'])
+        print("Categorization result:", categorized_task)
 
-        return jsonify({"category": category})
+        # Return the entire task dictionary
+        return jsonify(categorized_task)
 
     except Exception as e:
         print("Exception occurred:", str(e))
