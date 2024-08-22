@@ -39,7 +39,6 @@ app = Flask(__name__)
 app.config["BASE_URL"] = public_url
 
 # Initialize the Anthropic client
-os.environ["ANTHROPIC_API_KEY"] = "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"
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 # rag examples
