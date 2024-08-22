@@ -11,5 +11,9 @@
     "babel-plugin-polyfill-es-shims": "^0.10.5",
     "babel-plugin-polyfill-regenerator": "^0.5.5",
     "flask": "^0.2.10"
+  },
+  "devDependencies": {
+    "eslint": "^9.9.0",
+    "eslint-plugin-json-format": "^2.0.1"
   }
 }
