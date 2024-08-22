@@ -38,9 +38,6 @@ app = Flask(__name__)
 # Update any base URLs to use the public ngrok URL
 app.config["BASE_URL"] = public_url
 
-# Initialize the Anthropic client
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
 # rag examples
 example_schedules = {
     "structured-timeboxed": """
