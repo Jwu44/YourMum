@@ -114,19 +114,28 @@ export const updateTask = async (taskText) => {
 export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
   if (newTask.trim()) {
     try {
-      const result = await addTask(newTask);
-      if (result.success) {
-        const newTaskId = Date.now();
-        setFormData(prevData => ({
-          ...prevData,
-          tasks: [...prevData.tasks, { id: newTaskId, text: newTask.trim(), category: result.category }]
-        }));
-        setNewTask('');
-        toaster.success('Task added successfully');
-      } else {
-        throw new Error(result.error);
+      const response = await fetch(`${API_BASE_URL}/categorize_task`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ task: newTask })
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
       }
+
+      const result = await response.json();
+      
+      setFormData(prevData => ({
+        ...prevData,
+        tasks: [...prevData.tasks, result]
+      }));
+      setNewTask('');
+      toaster.success('Task added successfully');
     } catch (error) {
+      console.error("Error adding task:", error);
       toaster.danger('Failed to add task');
     }
   }
@@ -134,19 +143,36 @@ export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => asyn
 
 export const handleUpdateTask = (setFormData, toaster) => async (updatedTask) => {
   try {
-    const result = await updateTask(updatedTask.text);
-    if (result.success) {
-      setFormData(prevData => ({
-        ...prevData,
-        tasks: prevData.tasks.map(task => 
-          task.id === updatedTask.id ? { ...task, text: updatedTask.text, category: result.category } : task
-        )
-      }));
-      toaster.success('Task updated successfully');
-    } else {
-      throw new Error(result.error);
+    const response = await fetch(`${API_BASE_URL}/categorize_task`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ task: updatedTask.text })
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
     }
+
+    const result = await response.json();
+
+    setFormData(prevData => ({
+      ...prevData,
+      tasks: prevData.tasks.map(task => 
+        task.id === updatedTask.id 
+          ? { 
+              ...task, 
+              text: updatedTask.text, 
+              categories: result.categories // Use the categories from the API response
+            }
+          : task
+      )
+    }));
+
+    toaster.success('Task updated successfully');
   } catch (error) {
+    console.error("Error updating task:", error);
     toaster.danger('Failed to update task');
   }
 };
@@ -335,35 +361,3 @@ const getSectionIndex = (section) => {
   if (lowerSection.includes('evening') || lowerSection.includes('night')) return 2;
   return -1;
 };
-
-// // Helper function to create a task hierarchy
-// const createTaskHierarchy = (tasks) => {
-//   const taskMap = new Map();
-//   const rootTasks = [];
-
-//   tasks.forEach(task => {
-//     taskMap.set(task.id, { ...task, children: [] });
-//   });
-
-//   taskMap.forEach(task => {
-//     if (task.parentId && taskMap.has(task.parentId)) {
-//       taskMap.get(task.parentId).children.push(task);
-//     } else {
-//       rootTasks.push(task);
-//     }
-//   });
-
-//   return rootTasks;
-// };
-
-// // Flatten the task hierarchy
-// const flattenTasks = (tasks, parentId = null, level = 0) => {
-//   return tasks.reduce((acc, task) => {
-//     const flatTask = { ...task, parentId, level };
-//     acc.push(flatTask);
-//     if (task.children && task.children.length > 0) {
-//       acc.push(...flattenTasks(task.children, task.id, level + 1));
-//     }
-//     return acc;
-//   }, []);
-// };
