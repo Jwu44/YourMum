@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Pane, Checkbox, TextInput, IconButton, Paragraph } from 'evergreen-ui';
+import { Pane, Checkbox, TextInput, IconButton, Paragraph, Badge } from 'evergreen-ui';
 
 const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, showIndicator }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -91,14 +91,21 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
             />
           </Pane>
         ) : (
-          <Paragraph
-            onClick={() => setIsEditing(true)}
-            flex={1}
-            textDecoration={task.completed ? 'line-through' : 'none'}
-            color={task.completed ? 'muted' : 'default'}
-          >
-            {task.text}
-          </Paragraph>
+          <Pane flex={1} display="flex" alignItems="center">
+            <Paragraph
+              onClick={() => setIsEditing(true)}
+              flex={1}
+              textDecoration={task.completed ? 'line-through' : 'none'}
+              color={task.completed ? 'muted' : 'default'}
+            >
+              {task.text}
+            </Paragraph>
+            {task.categories && task.categories.map((category, index) => (
+              <Badge key={index} color="blue" marginLeft={4}>
+                {category}
+              </Badge>
+            ))}
+          </Pane>
         )}
       </Pane>
       {showIndicator && (

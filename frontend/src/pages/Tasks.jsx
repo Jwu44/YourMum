@@ -11,7 +11,22 @@ const Tasks = ({ formData, setFormData }) => {
   const [newTask, setNewTask] = useState('');
 
   const addTask = handleAddTask(setFormData, newTask, setNewTask, toaster);
-  const updateTask = handleUpdateTask(setFormData, toaster);
+  
+  const updateTask = (updatedTask) => {
+    handleUpdateTask(setFormData, toaster)(updatedTask);
+  };
+
+  const updateTaskCategory = (taskId, newCategory) => {
+    setFormData(prevData => ({
+      ...prevData,
+      tasks: prevData.tasks.map(task => 
+        task.id === taskId
+          ? { ...task, categories: [newCategory] }
+          : task
+      )
+    }));
+  };
+
   const deleteTask = handleDeleteTask(setFormData, toaster);
 
   const handleKeyPress = (e) => {
@@ -33,7 +48,7 @@ const Tasks = ({ formData, setFormData }) => {
       <Heading size={700} marginBottom={12} textAlign="center">
         What tasks do you have for today?
       </Heading>
-      <Paragraph>
+      <Paragraph marginBottom={16}>
         There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work
       </Paragraph>
       <Pane>
@@ -42,6 +57,7 @@ const Tasks = ({ formData, setFormData }) => {
             key={task.id}
             task={task}
             onUpdate={updateTask}
+            onUpdateCategory={updateTaskCategory}
             onDelete={deleteTask}
           />
         ))}
