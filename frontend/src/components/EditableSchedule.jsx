@@ -37,20 +37,29 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
     
     const destinationIndex = result.destination.index;
     const targetItem = newItems[destinationIndex - 1];
-  
+
     if (targetItem && targetItem.type === 'task' && 
         targetItem.section === reorderedItem.section &&
         destinationIndex > result.source.index) {
       reorderedItem.parentId = targetItem.id;
       reorderedItem.level = (targetItem.level || 0) + 1;
+      reorderedItem.is_subtask = true;
     } else {
       reorderedItem.parentId = null;
       reorderedItem.level = 0;
+      reorderedItem.is_subtask = false;
     }
-  
+
     newItems.splice(destinationIndex, 0, reorderedItem);
-  
-    onReorderTasks(newItems);
+
+    // Update section_index for all items
+    const updatedItems = newItems.map((item, index) => ({
+      ...item,
+      section_index: index
+    }));
+
+    console.log('Updated items after drag:', updatedItems);
+    onReorderTasks(updatedItems);
   }, [allItems, onReorderTasks]);
 
   const onDragUpdate = useCallback((update) => {
@@ -94,7 +103,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       }}
       className={`editable-schedule-row ${snapshot.isDragging ? 'is-dragging' : ''}`}
     >
-      {item.type === 'section' ? (
+      {item.is_section ? (
         <Heading size={500} marginTop={16} marginBottom={8}>
           {item.text}
         </Heading>
@@ -129,7 +138,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
             {...provided.droppableProps}
           >
             {renderItems().map((item, index) => (
-              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
+              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.is_section}>
                 {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
               </Draggable>
             ))}

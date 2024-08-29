@@ -195,16 +195,22 @@ export const parseScheduleToTasks = (scheduleText) => {
   let currentSection = '';
   let taskStack = [];
   let tasks = [];
+  let sectionStartIndex = 0;
 
   lines.forEach((line, index) => {
     const trimmedLine = line.trim();
     if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
       currentSection = trimmedLine;
+      sectionStartIndex = index;
       tasks.push({
         id: `section-${index}`,
         text: trimmedLine,
-        isSection: true,
-        section: currentSection
+        is_section: true,
+        section: currentSection,
+        parent_id: null,
+        level: 0,
+        section_index: 0,
+        type: 'section'
       });
     } else if (trimmedLine) {
       const indentLevel = line.search(/\S|$/) / 2; // Assuming 2 spaces per indent level
@@ -212,10 +218,13 @@ export const parseScheduleToTasks = (scheduleText) => {
         id: `task-${index}`,
         text: trimmedLine.replace(/^□ /, ''),
         completed: false,
-        isSection: false,
+        is_subtask: indentLevel > 0,
+        is_section: false,
         section: currentSection,
+        parent_id: null,
         level: indentLevel,
-        parentId: null
+        section_index: index - sectionStartIndex,
+        type: 'task'
       };
 
       while (taskStack.length > indentLevel) {
@@ -223,7 +232,7 @@ export const parseScheduleToTasks = (scheduleText) => {
       }
 
       if (taskStack.length > 0) {
-        task.parentId = taskStack[taskStack.length - 1].id;
+        task.parent_id = taskStack[taskStack.length - 1].id;
       }
 
       taskStack.push(task);
@@ -264,7 +273,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     const isStructured = layout_preference.subcategory.startsWith('structured');
 
     // Filter out unfinished tasks
-    const unfinishedTasks = currentSchedule.filter(item => item && !item.completed && !item.isSection);
+    const unfinishedTasks = currentSchedule.filter(item => item && !item.completed && !item.is_section);
 
     // Create a map of recurring tasks to their previous sections
     const recurringTaskSections = new Map();
@@ -319,13 +328,28 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
 
       // Build new schedule
       sections.forEach(section => {
-        newSchedule.push({ id: `section-${section.id}`, text: section.text, isSection: true });
+        newSchedule.push({
+          id: `section-${section.id}`,
+          text: section.text,
+          is_section: true,
+          section: section.id,
+          parent_id: null,
+          level: 0,
+          section_index: 0,
+          type: 'section'
+        });
         section.tasks.forEach((task, index) => {
           newSchedule.push({
             ...task,
             id: `task-${section.id}-${index}-next`,
             completed: false,
-            section: section.id
+            section: section.id,
+            is_subtask: task.level > 0,
+            is_section: false,
+            parent_id: null,
+            level: task.level || 0,
+            section_index: index,
+            type: 'task'
           });
         });
       });
@@ -334,7 +358,13 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       newSchedule = Array.from(combinedTasks.values()).map((task, index) => ({
         ...task,
         id: `task-${index}-next`,
-        completed: false
+        completed: false,
+        is_subtask: task.level > 0,
+        is_section: false,
+        parent_id: null,
+        level: task.level || 0,
+        section_index: index,
+        type: 'task'
       }));
     }
 

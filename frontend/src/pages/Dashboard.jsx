@@ -79,7 +79,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       const updateTaskRecursive = (tasks) => {
         return tasks.map(task => {
           if (task.id === updatedTask.id) {
-            return { ...task, ...updatedTask };
+            return { ...task, ...updatedTask, is_subtask: task.level > 0 };
           }
           if (task.children) {
             return { ...task, children: updateTaskRecursive(task.children) };
@@ -91,7 +91,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       return newDays;
     });
   }, [currentDayIndex]);
-  
+
   const handleScheduleTaskDelete = useCallback((taskId) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
@@ -110,14 +110,20 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       return newDays;
     });
   }, [currentDayIndex]);
-  
+
   const handleScheduleReorder = useCallback((reorderedItems) => {
+    console.log('Reordered items:', reorderedItems);
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = reorderedItems.map(item => ({
-        ...item,
-        isSection: item.type === 'section'
-      }));
+      newDays[currentDayIndex] = reorderedItems.map((item, index) => {
+        const updatedItem = {
+          ...item,
+          is_section: item.type === 'section',
+          section_index: index // Update section_index based on new order
+        };
+        console.log('Updated item:', updatedItem);
+        return updatedItem;
+      });
       return newDays;
     });
   }, [currentDayIndex]);
@@ -225,7 +231,10 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     <Pane padding={16} background="white" borderRadius={4} elevation={1}>
       <EditableSchedule
         tasks={scheduleDays[currentDayIndex] || []}
-        onUpdateTask={handleScheduleTaskUpdate}
+        onUpdateTask={(updatedTask) => {
+          console.log('Updated task:', updatedTask);
+          handleScheduleTaskUpdate(updatedTask);
+        }}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
         isStructured={formData.layout_preference.subcategory.startsWith('structured')}
