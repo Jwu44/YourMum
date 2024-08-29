@@ -1,6 +1,6 @@
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
-print(langchain.__version__)
+import sys
+import langchain
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import json
 
 # Load example schedules
