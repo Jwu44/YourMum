@@ -39,7 +39,6 @@ app = Flask(__name__)
 app.config["BASE_URL"] = public_url
 
 # Initialize the Anthropic client
-os.environ["ANTHROPIC_API_KEY"] = "your_mama_tities"
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 # rag examples
