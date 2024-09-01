@@ -24,7 +24,9 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
   }, [task.text]);
 
   const handleToggleComplete = useCallback(() => {
-    onUpdateTask({ ...task, completed: !task.completed });
+    const updatedTask = { ...task, completed: !task.completed };
+    console.log('Toggling task completion:', updatedTask);
+    onUpdateTask(updatedTask);
   }, [onUpdateTask, task]);
 
   const handleKeyDown = useCallback((e) => {

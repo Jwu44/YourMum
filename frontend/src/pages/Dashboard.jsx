@@ -74,6 +74,7 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   }, [priorities, setFormData]);
 
   const handleScheduleTaskUpdate = useCallback((updatedTask) => {
+    console.log('Updating task:', updatedTask);
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
       const updateTaskRecursive = (tasks) => {
