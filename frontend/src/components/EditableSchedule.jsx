@@ -11,13 +11,19 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
     let currentSection = null;
     let sectionStartIndex = 0;
     return tasks.map((task, index) => {
-      if (task.isSection) {
+      if (task.is_section) {
         currentSection = task.text;
         sectionStartIndex = index;
+        return {
+          ...task,
+          type: 'section',
+          section: currentSection,
+          sectionIndex: 0
+        };
       }
       return {
         ...task,
-        type: task.isSection ? 'section' : 'task',
+        type: 'task',
         section: currentSection,
         sectionIndex: index - sectionStartIndex
       };
