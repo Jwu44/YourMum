@@ -51,27 +51,58 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     setPriorities(newPriorities);
   }, []);
 
-  const submitForm = useCallback(async () => {
-    const dataToSubmit = {
-      ...formData,
-      energy_patterns: formData.energy_patterns,
-    };
-    await submitFormData(dataToSubmit, setResponse);
-  }, [formData, setResponse]);
-
   const extractSchedule = useCallback((fullResponse) => {
     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
     const match = fullResponse.match(scheduleRegex);
     return match ? match[1].trim() : '';
   }, []);
 
+  const cleanupTasks = useCallback((tasks) => {
+    return tasks.map(task => ({
+      ...task,
+      text: task.text.replace(/^□\s*/, ''), // Remove "□" from the beginning of the task text
+    }));
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    try {
+      const fullResponse = await submitFormData(formData);
+      const scheduleContent = extractSchedule(fullResponse);
+      setResponse(scheduleContent);
+      
+      if (scheduleContent) {
+        const parsedTasks = parseScheduleToTasks(scheduleContent);
+        const cleanedTasks = cleanupTasks(parsedTasks); // Clean up the tasks
+        const tasksWithCategories = cleanedTasks.map(task => {
+          const matchingTask = formData.tasks.find(t => t.text === task.text);
+          return {
+            ...task,
+            categories: matchingTask ? matchingTask.categories : []
+          };
+        });
+        
+        setScheduleDays([tasksWithCategories]);
+        setCurrentDayIndex(0);
+        
+        toaster.success('Schedule updated successfully');
+      } else {
+        toaster.danger('No valid schedule found in the response');
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toaster.danger('Failed to update schedule. Please try again.');
+    }
+  }, [formData, setResponse, extractSchedule, cleanupTasks]);
+
   useEffect(() => {
     if (response) {
       const scheduleContent = extractSchedule(response);
       const parsedTasks = parseScheduleToTasks(scheduleContent);
+      const cleanedTasks = cleanupTasks(parsedTasks); // Clean up the tasks
       
-      // Assign categories based on the formData.tasks
-      const tasksWithCategories = parsedTasks.map(task => {
+      console.log('Cleaned tasks:', cleanedTasks);
+      
+      const tasksWithCategories = cleanedTasks.map(task => {
         const matchingTask = formData.tasks.find(t => t.text === task.text);
         return {
           ...task,
@@ -79,10 +110,12 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
         };
       });
       
+      console.log('Tasks with categories:', tasksWithCategories);
+      
       setScheduleDays([tasksWithCategories]);
       setCurrentDayIndex(0);
     }
-  }, [response, extractSchedule, formData.tasks]);
+  }, [response, extractSchedule, cleanupTasks, formData.tasks]);
 
   useEffect(() => {
     const updatedPriorities = priorities.reduce((acc, priority, index) => {
@@ -252,9 +285,9 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
           <option value="unstructured-untimeboxed">Unstructured and Un-Time-Boxed</option>
         </SelectField>
       )}
-      <Button appearance="primary" onClick={submitForm} marginTop={16}>Update Schedule</Button>
+      <Button appearance="primary" onClick={handleSubmit} marginTop={16}>Update Schedule</Button>
     </Pane>
-  ), [formData, newTask, priorities, handleSimpleChange, handleNestedChange, updateTask, deleteTask, addTask, handleReorder, submitForm]);
+  ), [formData, newTask, priorities, handleSimpleChange, handleNestedChange, updateTask, deleteTask, addTask, handleReorder, handleSubmit]);
 
   const renderSchedule = useMemo(() => (
     <Pane padding={16} background="white" borderRadius={4} elevation={1}>
@@ -290,11 +323,11 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
       {renderLeftColumn}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {scheduleDays.length > 0 ? (
+        {scheduleDays.length > 0 && scheduleDays[currentDayIndex].length > 0 ? (
           renderSchedule
         ) : (
           <Heading size={500} marginTop={32}>
-            {response ? 'Generating your schedule...' : 'Update your inputs and click "Update Schedule" to generate a schedule'}
+            {response ? 'Processing your schedule...' : 'Update your inputs and click "Update Schedule" to generate a schedule'}
           </Heading>
         )}
       </Pane>
