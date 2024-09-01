@@ -120,7 +120,9 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
         const updatedItem = {
           ...item,
           is_section: item.type === 'section',
-          section_index: index // Update section_index based on new order
+          section_index: index,
+          // Ensure the section is updated
+          section: item.section
         };
         console.log('Updated item:', updatedItem);
         return updatedItem;
