@@ -16,12 +16,12 @@ const Tasks = ({ formData, setFormData }) => {
     handleUpdateTask(setFormData, toaster)(updatedTask);
   };
 
-  const updateTaskCategory = (taskId, newCategory) => {
+  const updateTaskCategories = (taskId, newCategories) => {
     setFormData(prevData => ({
       ...prevData,
       tasks: prevData.tasks.map(task => 
         task.id === taskId
-          ? { ...task, categories: [newCategory] }
+          ? { ...task, categories: newCategories }
           : task
       )
     }));
@@ -36,7 +36,7 @@ const Tasks = ({ formData, setFormData }) => {
   };
 
   const handleNext = () => {
-    navigate('/energy-levels');
+    navigate('/energy-patterns');
   };
 
   const handlePrevious = () => {
@@ -49,7 +49,7 @@ const Tasks = ({ formData, setFormData }) => {
         What tasks do you have for today?
       </Heading>
       <Paragraph marginBottom={16}>
-        There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work
+        There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work. You can assign multiple categories to each task.
       </Paragraph>
       <Pane>
         {formData.tasks.map((task) => (
@@ -57,7 +57,7 @@ const Tasks = ({ formData, setFormData }) => {
             key={task.id}
             task={task}
             onUpdate={updateTask}
-            onUpdateCategory={updateTaskCategory}
+            onUpdateCategories={updateTaskCategories}
             onDelete={deleteTask}
           />
         ))}

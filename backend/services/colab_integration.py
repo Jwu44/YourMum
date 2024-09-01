@@ -41,10 +41,13 @@ def categorize_task(task_text):
         
         if response.status_code == 200:
             result = response.json()
-            category = result.get('category', 'Uncategorized')
+            category = result.get('category', 'Work')
+            
+            # Ensure category is a list, even if there's only one category
+            category = category if isinstance(category, list) else [category]
             
             # Create a Task object
-            task = Task(id=str(uuid.uuid4()), text=task_text, categories=[category])
+            task = Task(id=str(uuid.uuid4()), text=task_text, categories=category)
             
             # Return a dictionary representation of the Task
             return task.to_dict()

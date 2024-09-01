@@ -42,7 +42,7 @@ const ScoreValues = ({ formData, setFormData }) => {
   };
 
   const handlePrevious = () => {
-    navigate('/energy-levels');
+    navigate('/energy-patterns');
   };
 
   return (

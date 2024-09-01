@@ -65,10 +65,15 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       reorderedItem.is_subtask = false;
     }
 
-    // Update the section of the reordered item
-    reorderedItem.section = newSection;
+    const reorderedItemWithCategories = {
+      ...reorderedItem,
+      categories: reorderedItem.categories || [] // Ensure categories are maintained
+    };
 
-    newItems.splice(destinationIndex, 0, reorderedItem);
+    // Update the section of the reordered item
+    reorderedItemWithCategories.section = newSection;
+
+    newItems.splice(destinationIndex, 0, reorderedItemWithCategories);
 
     // Update section_index for all items
     const updatedItems = newItems.map((item, index) => ({
@@ -76,7 +81,9 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       section_index: index
     }));
 
-    console.log('Updated items after drag:', updatedItems);
+    // Log only the dragged task with categories
+    console.log('Dragged task:', reorderedItemWithCategories);
+
     onReorderTasks(updatedItems);
   }, [allItems, onReorderTasks]);
 

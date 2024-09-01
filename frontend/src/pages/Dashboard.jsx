@@ -7,7 +7,8 @@ import {
   handleUpdateTask,
   handleDeleteTask,
   parseScheduleToTasks,
-  generateNextDaySchedule
+  generateNextDaySchedule,
+  submitFormData
 } from '../helper';
 import TaskItem from '../components/TaskItem';
 import PriosDraggableList from '../components/PriosDraggableList';
@@ -20,7 +21,7 @@ const initialPriorities = [
   { id: 'ambitions', name: 'Ambitions' }
 ];
 
-const Dashboard = ({ formData, setFormData, response, submitForm }) => {
+const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   const [newTask, setNewTask] = useState('');
   const [scheduleDays, setScheduleDays] = useState([]);
   const [priorities, setPriorities] = useState(initialPriorities);
@@ -50,6 +51,14 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     setPriorities(newPriorities);
   }, []);
 
+  const submitForm = useCallback(async () => {
+    const dataToSubmit = {
+      ...formData,
+      energy_patterns: formData.energy_patterns,
+    };
+    await submitFormData(dataToSubmit, setResponse);
+  }, [formData, setResponse]);
+
   const extractSchedule = useCallback((fullResponse) => {
     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
     const match = fullResponse.match(scheduleRegex);
@@ -60,10 +69,20 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
     if (response) {
       const scheduleContent = extractSchedule(response);
       const parsedTasks = parseScheduleToTasks(scheduleContent);
-      setScheduleDays([parsedTasks]);
+      
+      // Assign categories based on the formData.tasks
+      const tasksWithCategories = parsedTasks.map(task => {
+        const matchingTask = formData.tasks.find(t => t.text === task.text);
+        return {
+          ...task,
+          categories: matchingTask ? matchingTask.categories : []
+        };
+      });
+      
+      setScheduleDays([tasksWithCategories]);
       setCurrentDayIndex(0);
     }
-  }, [response, extractSchedule]);
+  }, [response, extractSchedule, formData.tasks]);
 
   useEffect(() => {
     const updatedPriorities = priorities.reduce((acc, priority, index) => {
@@ -80,7 +99,14 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       const updateTaskRecursive = (tasks) => {
         return tasks.map(task => {
           if (task.id === updatedTask.id) {
-            return { ...task, ...updatedTask, is_subtask: task.level > 0 };
+            const mergedTask = { 
+              ...task, 
+              ...updatedTask, 
+              is_subtask: task.level > 0,
+              categories: updatedTask.categories || task.categories || [] // Ensure categories are preserved
+            };
+            console.log('Updated task with categories:', mergedTask.categories);
+            return mergedTask;
           }
           if (task.children) {
             return { ...task, children: updateTaskRecursive(task.children) };
@@ -91,6 +117,9 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
       newDays[currentDayIndex] = updateTaskRecursive(newDays[currentDayIndex]);
       return newDays;
     });
+  
+    // Log the updated task with categories
+    console.log('Updated task:', updatedTask);
   }, [currentDayIndex]);
 
   const handleScheduleTaskDelete = useCallback((taskId) => {
@@ -113,16 +142,13 @@ const Dashboard = ({ formData, setFormData, response, submitForm }) => {
   }, [currentDayIndex]);
 
   const handleScheduleReorder = useCallback((reorderedItems) => {
-    console.log('Reordered items:', reorderedItems);
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
       newDays[currentDayIndex] = reorderedItems.map((item, index) => {
         const updatedItem = {
           ...item,
           is_section: item.type === 'section',
-          section_index: index,
-          // Ensure the section is updated
-          section: item.section
+          section_index: index // Update section_index based on new order
         };
         console.log('Updated item:', updatedItem);
         return updatedItem;
