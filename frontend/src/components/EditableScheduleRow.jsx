@@ -24,7 +24,9 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
   }, [task.text]);
 
   const handleToggleComplete = useCallback(() => {
-    onUpdateTask({ ...task, completed: !task.completed });
+    const updatedTask = { ...task, completed: !task.completed };
+    console.log('Toggling task completion:', updatedTask);
+    onUpdateTask(updatedTask);
   }, [onUpdateTask, task]);
 
   const handleKeyDown = useCallback((e) => {
@@ -61,10 +63,10 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
         marginY={4}
         background="tint1"
         borderRadius={4}
-        marginLeft={`${(task.level || 0) * 20}px`}
+        marginLeft={task.is_subtask ? `${(task.level || 1) * 20}px` : 0} // Update this line
         className={`editable-schedule-row ${isDragging ? 'is-dragging' : ''}`}
       >
-        {task.level > 0 && (
+        {task.is_subtask && ( // Update this condition
           <Pane width={16} height={16} marginRight={8} borderLeft="1px solid" borderBottom="1px solid" borderColor="muted" />
         )}
         <Checkbox
