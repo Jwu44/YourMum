@@ -39,7 +39,7 @@ function App() {
         <Route path="/energy-patterns" element={<EnergyPattern formData={formData} setFormData={setFormData} />} />
         <Route path="/priorties" element={<Priorties formData={formData} setFormData={setFormData} />} />
         <Route path="/layout-preference" element={<LayoutPreference formData={formData} setFormData={setFormData} submitForm={submitForm} />} />
-        <Route path="/dashboard" element={<Dashboard formData={formData} setFormData={setFormData} response={response} submitForm={submitForm} />} />
+        <Route path="/dashboard" element={<Dashboard formData={formData} setFormData={setFormData} response={response} setResponse={submitForm} />} />
       </Routes>
       {loading && <p>Loading...</p>}
       {error && <p>{error}</p>}
