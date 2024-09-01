@@ -44,8 +44,17 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
     const destinationIndex = result.destination.index;
     const targetItem = newItems[destinationIndex - 1];
 
+    // Determine the new section for the reordered item
+    let newSection = reorderedItem.section;
+    for (let i = destinationIndex; i >= 0; i--) {
+      if (newItems[i] && newItems[i].is_section) {
+        newSection = newItems[i].text;
+        break;
+      }
+    }
+
     if (targetItem && targetItem.type === 'task' && 
-        targetItem.section === reorderedItem.section &&
+        targetItem.section === newSection &&
         destinationIndex > result.source.index) {
       reorderedItem.parentId = targetItem.id;
       reorderedItem.level = (targetItem.level || 0) + 1;
@@ -55,6 +64,9 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       reorderedItem.level = 0;
       reorderedItem.is_subtask = false;
     }
+
+    // Update the section of the reordered item
+    reorderedItem.section = newSection;
 
     newItems.splice(destinationIndex, 0, reorderedItem);
 
