@@ -17,13 +17,11 @@ export const handleNestedInputChange = (setFormData) => (event) => {
   }));
 };
 
-export const submitFormData = async (formData, setLoading, setError, setResponse) => {
-  setLoading(true);
-  setError(null);
-  console.log("Form Data Before Submission:", formData); // Log form data before submission
+export const submitFormData = async (formData) => {
+  console.log("Form Data Before Submission:", formData);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/submit_data`, {  // Replace with your actual backend URL
+    const response = await fetch(`${API_BASE_URL}/submit_data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -31,19 +29,16 @@ export const submitFormData = async (formData, setLoading, setError, setResponse
       body: JSON.stringify(formData)
     });
 
-    setLoading(false);
     if (!response.ok) {
       throw new Error('Network response was not ok');
     }
 
     const data = await response.json();
     console.log("Response from server:", data);
-    setResponse(data.schedule); // Store the schedule in the state
+    return data.schedule; // Return the schedule instead of setting it
   } catch (error) {
-    setLoading(false);
     console.error("Error submitting form:", error);
-    setError("There was an error submitting the form. Please try again.");
-    setResponse(null); // Clear any previous response
+    throw error;
   }
 };
 
@@ -206,15 +201,12 @@ export const parseScheduleToTasks = (scheduleText) => {
 
   const lines = scheduleText.split('\n');
   let currentSection = '';
-  let taskStack = [];
   let tasks = [];
-  let sectionStartIndex = 0;
 
   lines.forEach((line, index) => {
     const trimmedLine = line.trim();
     if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
       currentSection = trimmedLine;
-      sectionStartIndex = index;
       tasks.push({
         id: `section-${index}`,
         text: trimmedLine,
@@ -222,35 +214,21 @@ export const parseScheduleToTasks = (scheduleText) => {
         section: currentSection,
         parent_id: null,
         level: 0,
-        section_index: 0,
+        section_index: tasks.length,
         type: 'section'
       });
     } else if (trimmedLine) {
-      const indentLevel = line.search(/\S|$/) / 2; // Assuming 2 spaces per indent level
-      const task = {
+      tasks.push({
         id: `task-${index}`,
-        text: trimmedLine.replace(/^□ /, ''),
+        text: trimmedLine,
         completed: false,
-        is_subtask: indentLevel > 0,
         is_section: false,
         section: currentSection,
         parent_id: null,
-        level: indentLevel,
-        section_index: index - sectionStartIndex,
-        type: 'task',
-        categories: [] // Initialize with an empty array
-      };
-
-      while (taskStack.length > indentLevel) {
-        taskStack.pop();
-      }
-
-      if (taskStack.length > 0) {
-        task.parent_id = taskStack[taskStack.length - 1].id;
-      }
-
-      taskStack.push(task);
-      tasks.push(task);
+        level: 0,
+        section_index: tasks.length,
+        type: 'task'
+      });
     }
   });
 
