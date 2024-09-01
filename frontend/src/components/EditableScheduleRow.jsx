@@ -24,8 +24,12 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
   }, [task.text]);
 
   const handleToggleComplete = useCallback(() => {
-    const updatedTask = { ...task, completed: !task.completed };
-    console.log('Toggling task completion:', updatedTask);
+    const updatedTask = { 
+      ...task, 
+      completed: !task.completed,
+      categories: task.categories || [] // Ensure categories are included
+    };
+    console.log('Toggling task with categories:', updatedTask.categories);
     onUpdateTask(updatedTask);
   }, [onUpdateTask, task]);
 
@@ -102,7 +106,7 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
             >
               {task.text}
             </Paragraph>
-            {task.categories && task.categories.map((category, index) => (
+            {!isEditing && task.categories && task.categories.map((category, index) => (
               <Badge key={index} color="blue" marginLeft={4}>
                 {category}
               </Badge>

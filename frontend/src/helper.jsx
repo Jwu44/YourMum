@@ -112,32 +112,44 @@ export const updateTask = async (taskText) => {
 };
 
 export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
-  if (newTask.trim()) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/categorize_task`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task: newTask })
-      });
+  if (newTask.trim() === '') {
+    toaster.danger('Task cannot be empty');
+    return;
+  }
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
+  try {
+    const response = await fetch(`${API_BASE_URL}/categorize_task`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ task: newTask })
+    });
 
-      const result = await response.json();
-      
-      setFormData(prevData => ({
-        ...prevData,
-        tasks: [...prevData.tasks, result]
-      }));
-      setNewTask('');
-      toaster.success('Task added successfully');
-    } catch (error) {
-      console.error("Error adding task:", error);
-      toaster.danger('Failed to add task');
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
     }
+
+    const result = await response.json();
+
+    setFormData(prevData => ({
+      ...prevData,
+      tasks: [
+        ...prevData.tasks,
+        {
+          id: result.id,
+          text: newTask,
+          categories: result.categories || [] // Ensure categories are included
+        }
+      ]
+    }));
+
+    setNewTask('');
+    toaster.success('Task added successfully');
+    console.log('New task added with categories:', result.categories); // Log the categories
+  } catch (error) {
+    console.error("Error adding task:", error);
+    toaster.danger('Failed to add task');
   }
 };
 
@@ -163,14 +175,15 @@ export const handleUpdateTask = (setFormData, toaster) => async (updatedTask) =>
         task.id === updatedTask.id 
           ? { 
               ...task, 
-              text: updatedTask.text, 
-              categories: result.categories // Use the categories from the API response
+              ...updatedTask,
+              categories: updatedTask.categories || result.categories || [] // Ensure categories are included
             }
           : task
       )
     }));
 
     toaster.success('Task updated successfully');
+    console.log('Task updated with categories:', updatedTask.categories || result.categories); // Log the categories
   } catch (error) {
     console.error("Error updating task:", error);
     toaster.danger('Failed to update task');
@@ -224,7 +237,8 @@ export const parseScheduleToTasks = (scheduleText) => {
         parent_id: null,
         level: indentLevel,
         section_index: index - sectionStartIndex,
-        type: 'task'
+        type: 'task',
+        categories: [] // Initialize with an empty array
       };
 
       while (taskStack.length > indentLevel) {
@@ -269,7 +283,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     const result = await response.json();
     console.log("Recurring tasks identified:", result.recurring_tasks);
 
-    const { layout_preference } = userData;
+    const { layout_preference, energy_patterns } = userData; // Add energy_patterns
     const isStructured = layout_preference.subcategory.startsWith('structured');
 
     // Filter out unfinished tasks
@@ -368,6 +382,20 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       }));
     }
 
+    // When creating new tasks, consider the energy pattern
+    newSchedule = Array.from(combinedTasks.values()).map((task, index) => ({
+      ...task,
+      id: `task-${index}-next`,
+      completed: false,
+      is_subtask: task.level > 0,
+      is_section: false,
+      parent_id: null,
+      level: task.level || 0,
+      section_index: index,
+      type: 'task',
+      energyPattern: determineEnergyPattern(task, energy_patterns) // Add this line
+    }));
+
     return {
       success: true,
       schedule: newSchedule
@@ -390,4 +418,11 @@ const getSectionIndex = (section) => {
   if (lowerSection.includes('afternoon')) return 1;
   if (lowerSection.includes('evening') || lowerSection.includes('night')) return 2;
   return -1;
+};
+
+// Add this helper function
+const determineEnergyPattern = (task, userEnergyPatterns) => {
+  // Logic to determine the appropriate energy pattern for the task
+  // based on the task's time and the user's energy patterns
+  // Return the appropriate energy pattern
 };

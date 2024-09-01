@@ -1,10 +1,10 @@
 class Task:
-    def __init__(self, id, text, categories=None, is_subtask=False):
+    def __init__(self, id, text, categories=None):
         self.id = id
         self.text = text
-        self.categories = set(categories) if categories else set()
+        self.categories = set(map(str, categories)) if categories else set()
         self.completed = False
-        self.is_subtask = is_subtask
+        self.is_subtask = False
         self.is_section = False
         self.section = None
         self.parent_id = None
