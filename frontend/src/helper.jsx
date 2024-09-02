@@ -246,18 +246,11 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
       const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
       let categories = matchingTask ? matchingTask.categories : [];
 
-      // Log the matching task and its categories
-      console.log("Matching Task:", matchingTask);
-      console.log("Categories from Matching Task:", categories);
-
       // If no categories found, categorize the task
       if (categories.length === 0) {
         const categorizedTask = await categorizeTask(taskText);
         categories = categorizedTask.categories;
       }
-
-      // Log the categories after categorization
-      console.log("Categories after Categorization:", categories);
 
       const task = {
         id: `task-${index}`,
