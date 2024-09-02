@@ -20,7 +20,7 @@ const WorkTimes = ({ formData, setFormData }) => {
   };
 
   const handleNext = () => {
-    navigate('/tasks');
+    navigate('/priorties');
   };
 
   const handlePrevious = () => {
@@ -35,28 +35,32 @@ const WorkTimes = ({ formData, setFormData }) => {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <CenteredPane>
-          <Heading size={700} marginBottom={24} textAlign="center">Work Times</Heading>
-          <Pane display="flex" width="100%" justifyContent="space-between" marginBottom={24}>
-              <TimePicker
-                label="Work Start Time"
-                value={parseTime(formData.work_start_time)}
-                onChange={handleTimeChange('work_start_time')}
-                renderInput={(params) => <TextField {...params} fullWidth />}
-                ampm={true}
-                views={['hours', 'minutes']}
-                format="h:mm a"
-              />
-              <TimePicker
-                label="Work End Time"
-                value={parseTime(formData.work_end_time)}
-                onChange={handleTimeChange('work_end_time')}
-                renderInput={(params) => <TextField {...params} fullWidth />}
-                ampm={true}
-                views={['hours', 'minutes']}
-                format="h:mm a"
-              />
+        <Heading size={700} marginBottom={24} textAlign="center">Work Times</Heading>
+        <Pane display="flex" justifyContent="center" width="100%" marginBottom={24}>
+          <Pane marginRight={16} width="100%" maxWidth={200}>
+            <TimePicker
+              label="Work Start Time"
+              value={parseTime(formData.work_start_time)}
+              onChange={handleTimeChange('work_start_time')}
+              renderInput={(params) => <TextField {...params} fullWidth />}
+              ampm={true}
+              views={['hours', 'minutes']}
+              format="h:mm a"
+            />
           </Pane>
-          <OnboardingNav onBack={handlePrevious} onNext={handleNext} marginTop={24} />
+          <Pane width="100%" maxWidth={200}>
+            <TimePicker
+              label="Work End Time"
+              value={parseTime(formData.work_end_time)}
+              onChange={handleTimeChange('work_end_time')}
+              renderInput={(params) => <TextField {...params} fullWidth />}
+              ampm={true}
+              views={['hours', 'minutes']}
+              format="h:mm a"
+            />
+          </Pane>
+        </Pane>
+        <OnboardingNav onBack={handlePrevious} onNext={handleNext} marginTop={24} />
       </CenteredPane>
     </LocalizationProvider>
   );
