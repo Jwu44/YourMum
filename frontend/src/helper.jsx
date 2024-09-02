@@ -18,7 +18,7 @@ export const handleNestedInputChange = (setFormData) => (event) => {
 };
 
 export const submitFormData = async (formData) => {
-  console.log("Form Data Before Submission:", formData);
+  console.log("Form Data Before Submission:", formData); // Log form data before submission
 
   try {
     const response = await fetch(`${API_BASE_URL}/submit_data`, {
@@ -35,10 +35,10 @@ export const submitFormData = async (formData) => {
 
     const data = await response.json();
     console.log("Response from server:", data);
-    return data.schedule; // Return the schedule instead of setting it
+    return data.schedule; // Return the schedule instead of setting it directly
   } catch (error) {
     console.error("Error submitting form:", error);
-    throw error;
+    throw error; // Re-throw the error to be caught in the Dashboard component
   }
 };
 
@@ -107,44 +107,32 @@ export const updateTask = async (taskText) => {
 };
 
 export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
-  if (newTask.trim() === '') {
-    toaster.danger('Task cannot be empty');
-    return;
-  }
+  if (newTask.trim()) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/categorize_task`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ task: newTask })
+      });
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/categorize_task`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ task: newTask })
-    });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+      const result = await response.json();
+      
+      setFormData(prevData => ({
+        ...prevData,
+        tasks: [...prevData.tasks, result]
+      }));
+      setNewTask('');
+      toaster.success('Task added successfully');
+    } catch (error) {
+      console.error("Error adding task:", error);
+      toaster.danger('Failed to add task');
     }
-
-    const result = await response.json();
-
-    setFormData(prevData => ({
-      ...prevData,
-      tasks: [
-        ...prevData.tasks,
-        {
-          id: result.id,
-          text: newTask,
-          categories: result.categories || [] // Ensure categories are included
-        }
-      ]
-    }));
-
-    setNewTask('');
-    toaster.success('Task added successfully');
-    console.log('New task added with categories:', result.categories); // Log the categories
-  } catch (error) {
-    console.error("Error adding task:", error);
-    toaster.danger('Failed to add task');
   }
 };
 
@@ -170,15 +158,14 @@ export const handleUpdateTask = (setFormData, toaster) => async (updatedTask) =>
         task.id === updatedTask.id 
           ? { 
               ...task, 
-              ...updatedTask,
-              categories: updatedTask.categories || result.categories || [] // Ensure categories are included
+              text: updatedTask.text, 
+              categories: result.categories // Use the categories from the API response
             }
           : task
       )
     }));
 
     toaster.success('Task updated successfully');
-    console.log('Task updated with categories:', updatedTask.categories || result.categories); // Log the categories
   } catch (error) {
     console.error("Error updating task:", error);
     toaster.danger('Failed to update task');
@@ -201,12 +188,15 @@ export const parseScheduleToTasks = (scheduleText) => {
 
   const lines = scheduleText.split('\n');
   let currentSection = '';
+  let taskStack = [];
   let tasks = [];
+  let sectionStartIndex = 0;
 
   lines.forEach((line, index) => {
     const trimmedLine = line.trim();
     if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
       currentSection = trimmedLine;
+      sectionStartIndex = index;
       tasks.push({
         id: `section-${index}`,
         text: trimmedLine,
@@ -214,21 +204,34 @@ export const parseScheduleToTasks = (scheduleText) => {
         section: currentSection,
         parent_id: null,
         level: 0,
-        section_index: tasks.length,
+        section_index: 0,
         type: 'section'
       });
     } else if (trimmedLine) {
-      tasks.push({
+      const indentLevel = line.search(/\S|$/) / 2; // Assuming 2 spaces per indent level
+      const task = {
         id: `task-${index}`,
-        text: trimmedLine,
+        text: trimmedLine.replace(/^□ /, ''),
         completed: false,
+        is_subtask: indentLevel > 0,
         is_section: false,
         section: currentSection,
         parent_id: null,
-        level: 0,
-        section_index: tasks.length,
+        level: indentLevel,
+        section_index: index - sectionStartIndex,
         type: 'task'
-      });
+      };
+
+      while (taskStack.length > indentLevel) {
+        taskStack.pop();
+      }
+
+      if (taskStack.length > 0) {
+        task.parent_id = taskStack[taskStack.length - 1].id;
+      }
+
+      taskStack.push(task);
+      tasks.push(task);
     }
   });
 
@@ -261,7 +264,7 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     const result = await response.json();
     console.log("Recurring tasks identified:", result.recurring_tasks);
 
-    const { layout_preference, energy_patterns } = userData; // Add energy_patterns
+    const { layout_preference } = userData;
     const isStructured = layout_preference.subcategory.startsWith('structured');
 
     // Filter out unfinished tasks
@@ -360,20 +363,6 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       }));
     }
 
-    // When creating new tasks, consider the energy pattern
-    newSchedule = Array.from(combinedTasks.values()).map((task, index) => ({
-      ...task,
-      id: `task-${index}-next`,
-      completed: false,
-      is_subtask: task.level > 0,
-      is_section: false,
-      parent_id: null,
-      level: task.level || 0,
-      section_index: index,
-      type: 'task',
-      energyPattern: determineEnergyPattern(task, energy_patterns) // Add this line
-    }));
-
     return {
       success: true,
       schedule: newSchedule
@@ -398,9 +387,55 @@ const getSectionIndex = (section) => {
   return -1;
 };
 
-// Add this helper function
-const determineEnergyPattern = (task, userEnergyPatterns) => {
-  // Logic to determine the appropriate energy pattern for the task
-  // based on the task's time and the user's energy patterns
-  // Return the appropriate energy pattern
+// // Add this helper function
+// const determineEnergyPattern = (task, userEnergyPatterns) => {
+//   // Logic to determine the appropriate energy pattern for the task
+//   // based on the task's time and the user's energy patterns
+//   // Return the appropriate energy pattern
+// };
+
+export const extractSchedule = (fullResponse) => {
+  const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+  const match = fullResponse.match(scheduleRegex);
+  if (match) {
+    // Remove any <thinking> tags and their content from the extracted schedule
+    return match[1].replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+  }
+  return '';
+};
+
+export const cleanupTasks = (tasks, formDataTasks) => {
+  return tasks.map(task => {
+    const cleanedTask = {
+      ...task,
+      text: task.text.replace(/^□\s*/, ''),
+    };
+    const matchingTask = formDataTasks.find(t => t.text === cleanedTask.text);
+    if (matchingTask) {
+      cleanedTask.categories = matchingTask.categories;
+    }
+    return cleanedTask;
+  });
+};
+
+export const updatePriorities = (setFormData, priorities) => {
+  const updatedPriorities = priorities.reduce((acc, priority, index) => {
+    acc[priority.id] = index + 1;
+    return acc;
+  }, {});
+  setFormData(prevData => ({ ...prevData, priorities: updatedPriorities }));
+};
+
+export const handleEnergyChange = (setFormData) => (value) => {
+  setFormData(prevData => {
+    const currentPatterns = prevData.energy_patterns || [];
+    const updatedPatterns = currentPatterns.includes(value)
+      ? currentPatterns.filter(pattern => pattern !== value)
+      : [...currentPatterns, value];
+    
+    return {
+      ...prevData,
+      energy_patterns: updatedPatterns
+    };
+  });
 };

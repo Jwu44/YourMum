@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Pane, Heading, TextInputField, SelectField, Button, toaster } from 'evergreen-ui';
+import { Pane, Heading, Button, toaster } from 'evergreen-ui';
 import {
-  handleSimpleInputChange,
-  handleNestedInputChange,
   handleAddTask,
   handleUpdateTask,
   handleDeleteTask,
   parseScheduleToTasks,
   generateNextDaySchedule,
-  submitFormData
+  submitFormData,
+  extractSchedule,
+  cleanupTasks,
+  updatePriorities,
+  handleEnergyChange // Add this import
 } from '../helper';
-import TaskItem from '../components/TaskItem';
-import PriosDraggableList from '../components/PriosDraggableList';
+import DashboardLeftCol from '../components/DashboardLeftCol';
 import EditableSchedule from '../components/EditableSchedule';
 
 const initialPriorities = [
@@ -26,13 +27,23 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   const [scheduleDays, setScheduleDays] = useState([]);
   const [priorities, setPriorities] = useState(initialPriorities);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSimpleChange = useCallback((e) => {
-    handleSimpleInputChange(setFormData)(e);
+    const { name, value } = e.target;
+    setFormData(prevData => ({ ...prevData, [name]: value }));
   }, [setFormData]);
 
   const handleNestedChange = useCallback((e) => {
-    handleNestedInputChange(setFormData)(e);
+    const { name, value } = e.target;
+    const [category, subCategory] = name.split('.');
+    setFormData(prevData => ({
+      ...prevData,
+      [category]: {
+        ...prevData[category],
+        [subCategory]: value
+      }
+    }));
   }, [setFormData]);
 
   const addTask = useCallback(() => {
@@ -49,22 +60,11 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
 
   const handleReorder = useCallback((newPriorities) => {
     setPriorities(newPriorities);
-  }, []);
-
-  const extractSchedule = useCallback((fullResponse) => {
-    const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
-    const match = fullResponse.match(scheduleRegex);
-    return match ? match[1].trim() : '';
-  }, []);
-
-  const cleanupTasks = useCallback((tasks) => {
-    return tasks.map(task => ({
-      ...task,
-      text: task.text.replace(/^□\s*/, ''), // Remove "□" from the beginning of the task text
-    }));
-  }, []);
+    updatePriorities(setFormData, newPriorities);
+  }, [setFormData]);
 
   const handleSubmit = useCallback(async () => {
+    setIsLoading(true);
     try {
       const fullResponse = await submitFormData(formData);
       const scheduleContent = extractSchedule(fullResponse);
@@ -72,18 +72,9 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
       
       if (scheduleContent) {
         const parsedTasks = parseScheduleToTasks(scheduleContent);
-        const cleanedTasks = cleanupTasks(parsedTasks); // Clean up the tasks
-        const tasksWithCategories = cleanedTasks.map(task => {
-          const matchingTask = formData.tasks.find(t => t.text === task.text);
-          return {
-            ...task,
-            categories: matchingTask ? matchingTask.categories : []
-          };
-        });
-        
-        setScheduleDays([tasksWithCategories]);
+        const cleanedTasks = cleanupTasks(parsedTasks, formData.tasks);
+        setScheduleDays([cleanedTasks]);
         setCurrentDayIndex(0);
-        
         toaster.success('Schedule updated successfully');
       } else {
         toaster.danger('No valid schedule found in the response');
@@ -91,85 +82,34 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     } catch (error) {
       console.error("Error submitting form:", error);
       toaster.danger('Failed to update schedule. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-  }, [formData, setResponse, extractSchedule, cleanupTasks]);
+  }, [formData, setResponse]);
 
   useEffect(() => {
     if (response) {
-      const scheduleContent = extractSchedule(response);
-      const parsedTasks = parseScheduleToTasks(scheduleContent);
-      const cleanedTasks = cleanupTasks(parsedTasks); // Clean up the tasks
-      
-      console.log('Cleaned tasks:', cleanedTasks);
-      
-      const tasksWithCategories = cleanedTasks.map(task => {
-        const matchingTask = formData.tasks.find(t => t.text === task.text);
-        return {
-          ...task,
-          categories: matchingTask ? matchingTask.categories : []
-        };
-      });
-      
-      console.log('Tasks with categories:', tasksWithCategories);
-      
-      setScheduleDays([tasksWithCategories]);
+      const parsedTasks = parseScheduleToTasks(response);
+      const cleanedTasks = cleanupTasks(parsedTasks, formData.tasks);
+      setScheduleDays([cleanedTasks]);
       setCurrentDayIndex(0);
     }
-  }, [response, extractSchedule, cleanupTasks, formData.tasks]);
-
-  useEffect(() => {
-    const updatedPriorities = priorities.reduce((acc, priority, index) => {
-      acc[priority.id] = index + 1;
-      return acc;
-    }, {});
-    setFormData(prevData => ({ ...prevData, priorities: updatedPriorities }));
-  }, [priorities, setFormData]);
+  }, [response, formData.tasks]);
 
   const handleScheduleTaskUpdate = useCallback((updatedTask) => {
-    console.log('Updating task:', updatedTask);
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      const updateTaskRecursive = (tasks) => {
-        return tasks.map(task => {
-          if (task.id === updatedTask.id) {
-            const mergedTask = { 
-              ...task, 
-              ...updatedTask, 
-              is_subtask: task.level > 0,
-              categories: updatedTask.categories || task.categories || [] // Ensure categories are preserved
-            };
-            console.log('Updated task with categories:', mergedTask.categories);
-            return mergedTask;
-          }
-          if (task.children) {
-            return { ...task, children: updateTaskRecursive(task.children) };
-          }
-          return task;
-        });
-      };
-      newDays[currentDayIndex] = updateTaskRecursive(newDays[currentDayIndex]);
+      newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
+        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+      );
       return newDays;
     });
-  
-    // Log the updated task with categories
-    console.log('Updated task:', updatedTask);
   }, [currentDayIndex]);
 
   const handleScheduleTaskDelete = useCallback((taskId) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      const deleteTaskRecursive = (tasks) => {
-        return tasks.filter(task => {
-          if (task.id === taskId) {
-            return false;
-          }
-          if (task.children) {
-            task.children = deleteTaskRecursive(task.children);
-          }
-          return true;
-        });
-      };
-      newDays[currentDayIndex] = deleteTaskRecursive(newDays[currentDayIndex]);
+      newDays[currentDayIndex] = newDays[currentDayIndex].filter(task => task.id !== taskId);
       return newDays;
     });
   }, [currentDayIndex]);
@@ -177,24 +117,18 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   const handleScheduleReorder = useCallback((reorderedItems) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = reorderedItems.map((item, index) => {
-        const updatedItem = {
-          ...item,
-          is_section: item.type === 'section',
-          section_index: index // Update section_index based on new order
-        };
-        console.log('Updated item:', updatedItem);
-        return updatedItem;
-      });
+      newDays[currentDayIndex] = reorderedItems.map((item, index) => ({
+        ...item,
+        is_section: item.type === 'section',
+        section_index: index
+      }));
       return newDays;
     });
   }, [currentDayIndex]);
 
   const handleNextDay = useCallback(async () => {
     const currentSchedule = scheduleDays[currentDayIndex];
-    
     if (!Array.isArray(currentSchedule)) {
-      console.error("Current schedule is not an array:", currentSchedule);
       toaster.danger("Invalid schedule data. Please try again.");
       return;
     }
@@ -207,11 +141,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
       );
       
       if (result.success) {
-        setScheduleDays(prevDays => {
-          const updatedDays = [...prevDays];
-          updatedDays[currentDayIndex + 1] = result.schedule;
-          return updatedDays;
-        });
+        setScheduleDays(prevDays => [...prevDays, result.schedule]);
         setCurrentDayIndex(prevIndex => prevIndex + 1);
       } else {
         toaster.danger(result.error);
@@ -219,7 +149,6 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     } catch (error) {
       console.error("Error generating next day schedule:", error);
       toaster.danger("Failed to generate next day's schedule. Please try again.");
-    } finally {
     }
   }, [scheduleDays, currentDayIndex, formData]);
 
@@ -229,74 +158,11 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     }
   }, [currentDayIndex]);
 
-  const renderLeftColumn = useMemo(() => (
-    <Pane width="30%" padding={16} background="tint1" overflowY="auto">
-      <Heading size={700} marginBottom={16}>Edit Inputs</Heading>
-      <TextInputField
-        label="Work Start Time"
-        name="work_start_time"
-        value={formData.work_start_time}
-        onChange={handleSimpleChange}
-        placeholder="Enter your work start time"
-      />
-      <TextInputField
-        label="Work End Time"
-        name="work_end_time"
-        value={formData.work_end_time}
-        onChange={handleSimpleChange}
-        placeholder="Enter your work end time"
-      />
-      <Heading size={500} marginBottom={8}>Tasks</Heading>
-      {formData.tasks.map(task => (
-        <TaskItem
-          key={task.id}
-          task={task}
-          onUpdate={updateTask}
-          onDelete={deleteTask}
-        />
-      ))}
-      <TextInputField
-        placeholder="Add new task"
-        value={newTask}
-        onChange={(e) => setNewTask(e.target.value)}
-        onKeyPress={(e) => e.key === 'Enter' && addTask()}
-      />
-      <Heading size={500} marginY={16}>Priorities (Drag to reorder)</Heading>
-      <PriosDraggableList items={priorities} onReorder={handleReorder} />
-      <SelectField
-        label="Planner Layout Preference"
-        name="layout_preference.type"
-        value={formData.layout_preference.type}
-        onChange={handleNestedChange}
-      >
-        <option value="kanban">Kanban</option>
-        <option value="to-do-list">To-do List</option>
-      </SelectField>
-      {formData.layout_preference.type === 'to-do-list' && (
-        <SelectField
-          label="To-do List Subcategory"
-          name="layout_preference.subcategory"
-          value={formData.layout_preference.subcategory}
-          onChange={handleNestedChange}
-        >
-          <option value="structured-timeboxed">Structured and Time-Boxed</option>
-          <option value="structured-untimeboxed">Structured and Un-Time-Boxed</option>
-          <option value="unstructured-timeboxed">Unstructured and Time-Boxed</option>
-          <option value="unstructured-untimeboxed">Unstructured and Un-Time-Boxed</option>
-        </SelectField>
-      )}
-      <Button appearance="primary" onClick={handleSubmit} marginTop={16}>Update Schedule</Button>
-    </Pane>
-  ), [formData, newTask, priorities, handleSimpleChange, handleNestedChange, updateTask, deleteTask, addTask, handleReorder, handleSubmit]);
-
   const renderSchedule = useMemo(() => (
     <Pane padding={16} background="white" borderRadius={4} elevation={1}>
       <EditableSchedule
         tasks={scheduleDays[currentDayIndex] || []}
-        onUpdateTask={(updatedTask) => {
-          console.log('Updated task:', updatedTask);
-          handleScheduleTaskUpdate(updatedTask);
-        }}
+        onUpdateTask={handleScheduleTaskUpdate}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
         isStructured={formData.layout_preference.subcategory.startsWith('structured')}
@@ -318,9 +184,27 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     </Pane>
   ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay, formData.layout_preference.subcategory]);
 
+  const handleEnergyChangeCallback = useCallback((value) => {
+    handleEnergyChange(setFormData)(value);
+  }, [setFormData]);
+
   return (
     <Pane display="flex" height="100vh">
-      {renderLeftColumn}
+      <DashboardLeftCol
+        formData={formData}
+        newTask={newTask}
+        setNewTask={setNewTask}
+        priorities={priorities}
+        handleSimpleChange={handleSimpleChange}
+        handleNestedChange={handleNestedChange}
+        updateTask={updateTask}
+        deleteTask={deleteTask}
+        addTask={addTask}
+        handleReorder={handleReorder}
+        submitForm={handleSubmit}
+        isLoading={isLoading}
+        handleEnergyChange={handleEnergyChangeCallback} // Add this prop
+      />
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
         {scheduleDays.length > 0 && scheduleDays[currentDayIndex].length > 0 ? (
@@ -335,4 +219,4 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   );
 };
 
-export default React.memo(Dashboard);
+export default Dashboard;
