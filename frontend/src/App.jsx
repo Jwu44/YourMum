@@ -20,7 +20,7 @@ function App() {
     work_start_time: "",
     work_end_time: "",
     tasks: [],
-    energy_levels: [],
+    energy_patterns: [],
     priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
     layout_preference: { type: "", subcategory: "" }
   });

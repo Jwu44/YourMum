@@ -4,25 +4,13 @@ import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
+import { handleEnergyChange } from '../helper'; // Import the function from helper.jsx
 
 const EnergyPattern = ({ formData, setFormData }) => {
   const navigate = useNavigate();
-  const handleEnergyChange = (value) => {
-    setFormData(prevData => {
-      const currentPatterns = prevData.energy_patterns || [];
-      const updatedPatterns = currentPatterns.includes(value)
-        ? currentPatterns.filter(pattern => pattern !== value)
-        : [...currentPatterns, value];
-      
-      return {
-        ...prevData,
-        energy_patterns: updatedPatterns
-      };
-    });
-  };
 
   const handleNext = () => {
-    navigate('/priorties');
+    navigate('/layout-preference');
   };
 
   const handlePrevious = () => {
@@ -65,7 +53,7 @@ const EnergyPattern = ({ formData, setFormData }) => {
               <Paragraph marginBottom={12} lineHeight={1.2}>{option.label}</Paragraph>
               <Checkbox
                 checked={(formData.energy_patterns || []).includes(option.value)}
-                onChange={() => handleEnergyChange(option.value)}
+                onChange={() => handleEnergyChange(setFormData)(option.value)}
               />
             </Pane>
           ))}

@@ -22,7 +22,7 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   }, [formData.layout_preference.type, formData.layout_preference.subcategory, setFormData]);
 
   const handlePrevious = () => {
-    navigate('/priorties');
+    navigate('/energy-patterns');
   };
 
   const handleSubmit = () => {
