@@ -15,15 +15,9 @@ export const categorizeTask = async (taskText) => {
       }
   
       const data = await response.json();
-      return {
-        text: taskText,
-        categories: [data.category]
-      };
+      return data; // Return the entire object from the backend
     } catch (error) {
-      console.error("Error categorizing task:", error);
-      return {
-        text: taskText,
-        categories: ['Uncategorized']
-      };
+      console.error('Error categorizing task:', error);
+      throw error;
     }
   };
