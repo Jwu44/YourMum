@@ -40,7 +40,7 @@ const Tasks = ({ formData, setFormData }) => {
   };
 
   const handlePrevious = () => {
-    navigate('/work-times');
+    navigate('/priorties');
   };
 
   return (
