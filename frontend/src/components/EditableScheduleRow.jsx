@@ -13,7 +13,7 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
 
   const handleSave = useCallback(() => {
     if (editedText.trim() !== task.text) {
-      onUpdateTask({ ...task, text: editedText.trim() });
+      onUpdateTask({ ...task, text: editedText.trim(), categories: task.categories || [] });
     }
     setIsEditing(false);
   }, [editedText, onUpdateTask, task]);

@@ -1,3 +1,5 @@
+import { categorizeTask } from './api';
+
 const API_BASE_URL = 'http://localhost:8000/api'; 
 
 export const handleSimpleInputChange = (setFormData) => (event) => {
@@ -18,7 +20,7 @@ export const handleNestedInputChange = (setFormData) => (event) => {
 };
 
 export const submitFormData = async (formData) => {
-  console.log("Form Data Before Submission:", formData); // Log form data before submission
+  console.log("Form Data Before Submission:", formData);
 
   try {
     const response = await fetch(`${API_BASE_URL}/submit_data`, {
@@ -35,11 +37,30 @@ export const submitFormData = async (formData) => {
 
     const data = await response.json();
     console.log("Response from server:", data);
-    return data.schedule; // Return the schedule instead of setting it directly
+    
+    // Return the entire data object
+    return data;
   } catch (error) {
     console.error("Error submitting form:", error);
-    throw error; // Re-throw the error to be caught in the Dashboard component
+    throw error;
   }
+};
+
+export const extractSchedule = (response) => {  
+  if (typeof response === 'object' && response.schedule) {
+    return response.schedule;
+  }
+  
+  if (typeof response === 'string') {
+    const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+    const match = response.match(scheduleRegex);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  
+  console.warn("No valid schedule found in the response.");
+  return '';
 };
 
 export const addTask = async (taskText) => {
@@ -180,19 +201,28 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
   toaster.notify('Task deleted');
 };
 
-export const parseScheduleToTasks = (scheduleText) => {
+export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
   if (!scheduleText || typeof scheduleText !== 'string') {
     console.error('Invalid schedule text:', scheduleText);
     return [];
   }
 
-  const lines = scheduleText.split('\n');
+  const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+  const match = scheduleText.match(scheduleRegex);
+  if (!match) {
+    console.error('No <schedule> tags found in the text');
+    return [];
+  }
+
+  const scheduleContent = match[1].trim();
+  const lines = scheduleContent.split('\n');
   let currentSection = '';
   let taskStack = [];
   let tasks = [];
   let sectionStartIndex = 0;
 
-  lines.forEach((line, index) => {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     const trimmedLine = line.trim();
     if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
       currentSection = trimmedLine;
@@ -205,13 +235,33 @@ export const parseScheduleToTasks = (scheduleText) => {
         parent_id: null,
         level: 0,
         section_index: 0,
-        type: 'section'
+        type: 'section',
+        categories: []
       });
     } else if (trimmedLine) {
-      const indentLevel = line.search(/\S|$/) / 2; // Assuming 2 spaces per indent level
+      const indentLevel = line.search(/\S|$/) / 2;
+      const taskText = trimmedLine.replace(/^□ /, '');
+
+      // Find matching task with similar keywords
+      const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
+      let categories = matchingTask ? matchingTask.categories : [];
+
+      // Log the matching task and its categories
+      console.log("Matching Task:", matchingTask);
+      console.log("Categories from Matching Task:", categories);
+
+      // If no categories found, categorize the task
+      if (categories.length === 0) {
+        const categorizedTask = await categorizeTask(taskText);
+        categories = categorizedTask.categories;
+      }
+
+      // Log the categories after categorization
+      console.log("Categories after Categorization:", categories);
+
       const task = {
         id: `task-${index}`,
-        text: trimmedLine.replace(/^□ /, ''),
+        text: taskText,
         completed: false,
         is_subtask: indentLevel > 0,
         is_section: false,
@@ -219,9 +269,13 @@ export const parseScheduleToTasks = (scheduleText) => {
         parent_id: null,
         level: indentLevel,
         section_index: index - sectionStartIndex,
-        type: 'task'
+        type: 'task',
+        categories: categories
       };
 
+      // Log the created task
+      console.log("Created Task:", task);
+      
       while (taskStack.length > indentLevel) {
         taskStack.pop();
       }
@@ -233,7 +287,7 @@ export const parseScheduleToTasks = (scheduleText) => {
       taskStack.push(task);
       tasks.push(task);
     }
-  });
+  }
 
   return tasks;
 };
@@ -387,35 +441,21 @@ const getSectionIndex = (section) => {
   return -1;
 };
 
-// // Add this helper function
-// const determineEnergyPattern = (task, userEnergyPatterns) => {
-//   // Logic to determine the appropriate energy pattern for the task
-//   // based on the task's time and the user's energy patterns
-//   // Return the appropriate energy pattern
-// };
+export const cleanupTasks = async (parsedTasks, existingTasks) => {
+  // Assuming cleanupTasks is a function that processes parsedTasks
+  // and returns a cleaned version of the tasks.
+  // Modify this function to ensure categories are retained.
 
-export const extractSchedule = (fullResponse) => {
-  const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
-  const match = fullResponse.match(scheduleRegex);
-  if (match) {
-    // Remove any <thinking> tags and their content from the extracted schedule
-    return match[1].replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
-  }
-  return '';
-};
-
-export const cleanupTasks = (tasks, formDataTasks) => {
-  return tasks.map(task => {
-    const cleanedTask = {
+  const cleanedTasks = parsedTasks.map(task => {
+    // Find the matching task in existingTasks to retain categories
+    const matchingTask = existingTasks.find(t => t && t.id === task.id);
+    return {
       ...task,
-      text: task.text.replace(/^□\s*/, ''),
+      categories: task.categories || (matchingTask ? matchingTask.categories : [])
     };
-    const matchingTask = formDataTasks.find(t => t.text === cleanedTask.text);
-    if (matchingTask) {
-      cleanedTask.categories = matchingTask.categories;
-    }
-    return cleanedTask;
   });
+
+  return cleanedTasks;
 };
 
 export const updatePriorities = (setFormData, priorities) => {

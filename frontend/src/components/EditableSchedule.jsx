@@ -78,7 +78,8 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
     // Update section_index for all items
     const updatedItems = newItems.map((item, index) => ({
       ...item,
-      section_index: index
+      section_index: index,
+      categories: item.categories || [] // Ensure categories are maintained for all items
     }));
 
     // Log only the dragged task with categories

@@ -12,6 +12,7 @@ import {
   updatePriorities,
   handleEnergyChange // Add this import
 } from '../helper';
+import { categorizeTask } from '../api';
 import DashboardLeftCol from '../components/DashboardLeftCol';
 import EditableSchedule from '../components/EditableSchedule';
 
@@ -66,19 +67,27 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   const handleSubmit = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fullResponse = await submitFormData(formData);
-      const scheduleContent = extractSchedule(fullResponse);
+      const result = await submitFormData(formData);
+
+      let scheduleContent = extractSchedule(result);
+      console.log("Extracted schedule content:", scheduleContent);
+
+      if (!scheduleContent) {
+        toaster.danger('No valid schedule found in the response');
+        return;
+      }
+
       setResponse(scheduleContent);
       
-      if (scheduleContent) {
-        const parsedTasks = parseScheduleToTasks(scheduleContent);
-        const cleanedTasks = cleanupTasks(parsedTasks, formData.tasks);
-        setScheduleDays([cleanedTasks]);
-        setCurrentDayIndex(0);
-        toaster.success('Schedule updated successfully');
-      } else {
-        toaster.danger('No valid schedule found in the response');
-      }
+      const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks);
+      console.log("Parsed tasks:", parsedTasks);
+
+      const cleanedTasks = await cleanupTasks(parsedTasks, formData.tasks);
+      console.log("Cleaned tasks:", cleanedTasks);
+
+      setScheduleDays([cleanedTasks]);
+      setCurrentDayIndex(0);
+      toaster.success('Schedule updated successfully');
     } catch (error) {
       console.error("Error submitting form:", error);
       toaster.danger('Failed to update schedule. Please try again.');
@@ -96,15 +105,21 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     }
   }, [response, formData.tasks]);
 
-  const handleScheduleTaskUpdate = useCallback((updatedTask) => {
+  const handleScheduleTaskUpdate = useCallback(async (updatedTask) => {
+    // If the task text has changed, re-categorize it
+    if (updatedTask.text !== scheduleDays[currentDayIndex].find(task => task.id === updatedTask.id)?.text) {
+      const categorizedTask = await categorizeTask(updatedTask.text);
+      updatedTask.categories = categorizedTask.categories;
+    }
+
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
       newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
-        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+        task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
       );
       return newDays;
     });
-  }, [currentDayIndex]);
+  }, [currentDayIndex, scheduleDays]);
 
   const handleScheduleTaskDelete = useCallback((taskId) => {
     setScheduleDays(prevDays => {
