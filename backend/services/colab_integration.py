@@ -6,7 +6,7 @@ import uuid
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://89b8-34-81-110-122.ngrok-free.app" 
+COLAB_BASE_URL = "https://aa9d-35-223-30-216.ngrok-free.app" 
 
 def process_user_data(user_data):
     colab_url = f"{COLAB_BASE_URL}/process_user_data"
@@ -41,10 +41,13 @@ def categorize_task(task_text):
         
         if response.status_code == 200:
             result = response.json()
-            category = result.get('category', 'Uncategorized')
+            category = result.get('category', 'Work')
+            
+            # Ensure category is a list, even if there's only one category
+            category = category if isinstance(category, list) else [category]
             
             # Create a Task object
-            task = Task(id=str(uuid.uuid4()), text=task_text, categories=[category])
+            task = Task(id=str(uuid.uuid4()), text=task_text, categories=category)
             
             # Return a dictionary representation of the Task
             return task.to_dict()

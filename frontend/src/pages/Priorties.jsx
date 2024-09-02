@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heading, Pane } from 'evergreen-ui';
+import { Heading, Pane, Paragraph } from 'evergreen-ui';
 import { useNavigate } from 'react-router-dom';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
@@ -38,18 +38,21 @@ const ScoreValues = ({ formData, setFormData }) => {
 
   const handleNext = () => {
     console.log('Final priorities before navigation:', formData.priorities);
-    navigate('/layout-preference');
+    navigate('/tasks');
   };
 
   const handlePrevious = () => {
-    navigate('/energy-levels');
+    navigate('/work-times');
   };
 
   return (
     <CenteredPane>
-      <Heading size={700} marginBottom={24} textAlign="center">
-        Rank your priorities (1 - highest, 4 - lowest)
+      <Heading size={700} marginBottom={8} textAlign="center">
+        What are your priorties outside of work?
       </Heading>
+      <Paragraph marginBottom={8} textAlign="center">
+        Drag each priority to rank (1 - highest, 4 - lowest)
+      </Paragraph>
       <Pane marginBottom={24}>
         <PriosDraggableList items={priorities} onReorder={handleReorder} />
       </Pane>
