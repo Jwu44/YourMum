@@ -80,10 +80,8 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
       setResponse(scheduleContent);
       
       const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks);
-      console.log("Parsed tasks:", parsedTasks);
 
       const cleanedTasks = await cleanupTasks(parsedTasks, formData.tasks);
-      console.log("Cleaned tasks:", cleanedTasks);
 
       setScheduleDays([cleanedTasks]);
       setCurrentDayIndex(0);
