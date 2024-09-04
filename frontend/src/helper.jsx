@@ -1,4 +1,5 @@
 import { categorizeTask } from './api';
+import { v4 as uuidv4 } from 'uuid'; // Add this import
 
 const API_BASE_URL = 'http://localhost:8000/api'; 
 
@@ -24,7 +25,7 @@ export const submitFormData = async (formData) => {
 
   try {
     const response = await fetch(`${API_BASE_URL}/submit_data`, {
-      method: 'POST',
+      method: 'POST', 
       headers: {
         'Content-Type': 'application/json'
       },
@@ -130,20 +131,9 @@ export const updateTask = async (taskText) => {
 export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
   if (newTask.trim()) {
     try {
-      const response = await fetch(`${API_BASE_URL}/categorize_task`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task: newTask })
-      });
+      const result = await categorizeTask(newTask);
+      console.log('Categorization result:', result); // Add this line
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const result = await response.json();
-      
       setFormData(prevData => ({
         ...prevData,
         tasks: [...prevData.tasks, result]
@@ -228,7 +218,7 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
       currentSection = trimmedLine;
       sectionStartIndex = index;
       tasks.push({
-        id: `section-${index}`,
+        id: uuidv4(), // Generate a unique ID
         text: trimmedLine,
         is_section: true,
         section: currentSection,
@@ -248,12 +238,13 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
 
       // If no categories found, categorize the task
       if (categories.length === 0) {
+        console.log("no categories found")
         const categorizedTask = await categorizeTask(taskText);
         categories = categorizedTask.categories;
       }
 
       const task = {
-        id: `task-${index}`,
+        id: uuidv4(), // Generate a unique ID
         text: taskText,
         completed: false,
         is_subtask: indentLevel > 0,
