@@ -9,21 +9,16 @@ export const categorizeTask = async (taskText) => {
         },
         body: JSON.stringify({ task: taskText })
       });
-  
+
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Network response was not ok');
       }
-  
+
       const data = await response.json();
-      return {
-        text: taskText,
-        categories: [data.category]
-      };
+      return { categories: data.categories || ['Uncategorized'] };
     } catch (error) {
-      console.error("Error categorizing task:", error);
-      return {
-        text: taskText,
-        categories: ['Uncategorized']
-      };
+      console.error('Error categorizing task:', error);
+      return { categories: ['Uncategorized'] };
     }
   };

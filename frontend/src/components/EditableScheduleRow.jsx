@@ -1,6 +1,17 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Pane, Checkbox, TextInput, IconButton, Paragraph, Badge } from 'evergreen-ui';
 
+const getCategoryColor = (category) => {
+  switch (category) {
+    case 'Work': return 'blue';
+    case 'Fun': return 'yellow';
+    case 'Relationships': return 'purple';
+    case 'Ambition': return 'orange';
+    case 'Exercise': return 'green';
+    default: return 'neutral';
+  }
+};
+
 const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, showIndicator }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(task.text);
@@ -107,7 +118,11 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
               {task.text}
             </Paragraph>
             {!isEditing && task.categories && task.categories.map((category, index) => (
-              <Badge key={index} color="blue" marginLeft={4}>
+              <Badge
+                key={index}
+                color={getCategoryColor(category)}
+                marginLeft={4}
+              >
                 {category}
               </Badge>
             ))}
