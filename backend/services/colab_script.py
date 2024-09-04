@@ -37,7 +37,6 @@ app = Flask(__name__)
 
 # Update any base URLs to use the public ngrok URL
 app.config["BASE_URL"] = public_url
-
 # rag examples
 example_schedules = {
     "structured-timeboxed": """
@@ -128,7 +127,7 @@ def create_prompt_schedule(user_data):
         name = user_data['name']
         age = user_data['age']
         work_schedule = f"{user_data['work_start_time']} - {user_data['work_end_time']}"
-        energy_levels = ', '.join([f"{entry['x']:02d}:00, energy level = {entry['y']}% " for entry in user_data['energy_levels']])
+        energy_patterns = user_data['energy_patterns']
         priorities = user_data['priorities']
         layout_preference = user_data['layout_preference']['type']
         layout_subcategory = user_data['layout_preference']['subcategory']
@@ -145,7 +144,7 @@ def create_prompt_schedule(user_data):
         priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
         priority_description = ", ".join([f"{category} (rank {5-rank})" for category, rank in priority_list])
 
-        system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create tailored schedules that maximize productivity, well-being, and personal growth for your clients."""
+        system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximize productivity, well-being, and personal growth."""
 
         user_prompt = f"""
             <context>
@@ -162,15 +161,16 @@ def create_prompt_schedule(user_data):
             - Relationship tasks: {', '.join(relationship_tasks)}
             - Fun tasks: {', '.join(fun_tasks)}
             - Ambition tasks: {', '.join(ambition_tasks)}
-            Energy levels throughout the day: {energy_levels}, where 'x' represents the hour of day in 24 hour format and 'y' represents how active the user is with 0% meaning {name} is asleep while 100% meaning {name} is feeling their absolute best.
+            Energy patterns: {energy_patterns}
             Priorities outside {work_schedule} (ranked from 4 - highest to 1 - lowest): {priority_description}
             </client_info>
 
             <instructions>
             1. Analyze the client's information and create a personalized, balanced schedule.
             2. To identify and priortise tasks, follow these guidelines:
-            a. Schedule work tasks strictly within {work_schedule} ensuring the most challenging work tasks are done when {name}'s energy levels are above 70% during {work_schedule}.
-            b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and what {name}'s energy levels are outside {work_schedule}.
+            a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
+            b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
+            c. Tasks can have multiple cateogires. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
             3. To format the schedule, follow these guidelines:
             a. Display the planner in a {layout_subcategory} {layout_preference} format.
             b. Use {example_schedules[layout_subcategory]} as an example of the expected layout ensuring each task in this generated schedule belongs to {name}.
@@ -213,6 +213,7 @@ def create_prompt_categorize(task):
     Categorize the following task: {task}.
 
     Respond only with the category name.
+    The task may belong to multiple categories. Ensure if a task has been categorised as 'Work', then there should be no other category. Respond with a comma-separated list of category names, or 'Work' if no categories apply.
     """
 
     return prompt
@@ -242,14 +243,29 @@ def categorize_task(prompt):
             {"role": "user", "content": prompt}
         ]
     )
-    category = response.content[0].text.strip()
+    categories = response.content[0].text.strip().split(', ')
 
-    # Ensure the category is one of the predefined options
-    valid_categories = ["Work", "Exercise", "Relationship", "Fun", "Ambition"]
-    if category not in valid_categories:
-        category = "Work"  # Default to Work if the API returns an unexpected category
+    # Ensure the categories are valid
+    valid_categories = ["Work", "Exercise", "Relationships", "Fun", "Ambition", "Uncategorized"]
+    categories = [cat for cat in categories if cat in valid_categories]
 
-    return category
+    if not categories:
+        categories = ["Work"]
+    return categories
+
+def extract_tasks_with_categories(schedule_text):
+    tasks = []
+    for line in schedule_text.split('\n'):
+        if line.strip().startswith('□'):
+            task_text = line.strip()[1:].strip()
+            category_match = re.search(r'\[([^\]]+)\]$', task_text)
+            if category_match:
+                category = category_match.group(1)
+                task_text = task_text[:category_match.start()].strip()
+            else:
+                category = "Uncategorized"
+            tasks.append({"text": task_text, "category": category})
+    return tasks
 
 @app.route('/process_user_data', methods=['POST'])
 def process_user_data():
@@ -262,7 +278,10 @@ def process_user_data():
     system_prompt, user_prompt = create_prompt_schedule(user_data)
     response = generate_schedule(system_prompt, user_prompt)
 
-    return jsonify({'schedule': response})
+    # Extract tasks with categories from the generated schedule
+    tasks_with_categories = extract_tasks_with_categories(response)
+
+    return jsonify({'schedule': response, 'tasks': tasks_with_categories})
 
 @app.route('/categorize_task', methods=['POST'])
 def process_task():
@@ -291,12 +310,7 @@ def identify_recurring_tasks():
     Schedule History:
     {schedule_text}
 
-    Please list the recurring tasks, one per line, in the following format:
-    <recurring_tasks>
-    [Task 1]
-    [Task 2]
-    ...
-    </recurring_tasks>
+    Please list the recurring tasks.
     """
 
     response = client.messages.create(

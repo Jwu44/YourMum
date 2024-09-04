@@ -33,11 +33,9 @@ const ScoreValues = ({ formData, setFormData }) => {
 
   const handleReorder = (newPriorities) => {
     setPriorities(newPriorities);
-    console.log('Priorities after reorder:', newPriorities);
   };
 
   const handleNext = () => {
-    console.log('Final priorities before navigation:', formData.priorities);
     navigate('/tasks');
   };
 
