@@ -3,7 +3,6 @@ import requests
 import threading
 from flask import Flask, request, jsonify
 import anthropic
-import logging
 import re
 import uuid
 
@@ -28,98 +27,186 @@ class Task:
             categories=data.get("categories", [])
         )
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 # Setup app
 app = Flask(__name__)
 
-# Update any base URLs to use the public ngrok URL
-app.config["BASE_URL"] = public_url
 # rag examples
 example_schedules = {
-    "structured-timeboxed": """
-        Morning 🌞
-        □ 8:45am - 9:15am Wake Up + Morning Routine
-        □ 9:15am - 9:30am After my Morning Routine, I will continue reading my book for 15 minutes at my desk
-        □ 9:30am - 10:00am Come up with RT playlist
-        □ 10:00am - 10:15am Learn RT routes back and forth
-        □ 10:15am - 10:30am Learn RT drinking games
-        □ 10:30am - 12:00pm Clean up home page
+    "structured-day_sections-timeboxed": """
+    Morning 🌞
+    □ 7:00am - 7:30am: Wake up and morning routine
+    □ 7:30am - 8:00am: Breakfast and check emails
+    □ 8:00am - 9:30am: Work on high-priority project
+    □ 9:30am - 10:00am: Team standup meeting
+    □ 10:00am - 11:30am: Continue high-priority project work
+    □ 11:30am - 12:00pm: Review and respond to important messages
 
-        Arvo 🌇
-        □ 12:00 - 12:45pm Lunch
-        □ 12:45pm - 1:30pm Plan for next day
-        □ 1:30pm - 4:00pm Clean up Moodle Case Study
-        □ 4:00pm - 5:30pm Gym push
-        □ 5:30pm - 6:00pm Collate assets for Tribespot
+    Afternoon 🌇
+    □ 12:00pm - 1:00pm: Lunch break and short walk
+    □ 1:00pm - 3:00pm: Deep work session on main tasks
+    □ 3:00pm - 3:30pm: Quick break and snack
+    □ 3:30pm - 5:00pm: Finish up daily tasks and plan for tomorrow
 
-        Evening 💤
-        □ 6:00pm - 6:45pm Dinners
-        □ 8:00pm - 9:00pm CMs Meeting
-        □ 9:00pm sleep
-        """,
-    "structured-untimeboxed": """
-        Morning 🌅
-        □ Wake Up > Routine
-        □ Hugging Face || Podcast || Morning Read
-        □ Go through calendar, emails and Slack messages
-            □ Review previous day
-            □ Meeting prep
-        □ This Sprint - increasing SM preview + shortlist % [L
-            □ Let Appy + Callum know of the banner being shown for draft job
-            □ Create microslices
-        □ Previous Sprint - Hypothesis 1 [L]
-            □ Testing
-            □ Release - gpt this template
-        □ Refine GPT prompt document [N]
-        □ GetAhead comp analysis [N
+    Evening 💤
+    □ 5:00pm - 6:00pm: Exercise or gym session
+    □ 6:00pm - 7:00pm: Dinner and relaxation
+    □ 7:00pm - 8:30pm: Personal project or hobby time
+    □ 8:30pm - 9:30pm: Wind down routine
+    □ 9:30pm: Bedtime
+    """,
 
-        Arvo 🌇
-        □ Lunch
-        □ Gym
-        □ Walk
+    "structured-day_sections-untimeboxed": """
+    Morning 🌞
+    □ Wake up and complete morning routine
+    □ Enjoy breakfast while checking and responding to urgent emails
+    □ Begin work on the day's highest priority task
+    □ Attend team standup meeting
+    □ Continue focused work on priority tasks
+    □ Review and respond to important messages
 
-        Evening 💤
-        □ Dinner
-        □ Night time reading
-        """,
+    Afternoon 🌇
+    □ Take a lunch break and go for a short walk
+    □ Engage in a deep work session for main project tasks
+    □ Take a quick break and have a healthy snack
+    □ Wrap up daily tasks and plan for the next day
+
+    Evening 💤
+    □ Exercise or attend a gym session
+    □ Prepare and enjoy dinner
+    □ Spend time on a personal project or hobby
+    □ Complete evening wind-down routine
+    □ Go to bed at a consistent time
+    """,
+
+    "structured-priority-timeboxed": """
+    High Priority
+    □ 8:00am - 10:00am: Finish presentation for tomorrow's meeting
+    □ 10:00am - 10:30am: Schedule dentist appointment
+    □ 10:30am - 11:00am: Pay utility bills
+    □ 2:00pm - 4:00pm: Complete high-priority project deliverables
+
+    Medium Priority
+    □ 11:00am - 11:30am: Start learning Spanish (Duolingo, 15 minutes)
+    □ 12:30pm - 1:00pm: Plan weekend hiking trip
+    □ 4:00pm - 4:30pm: Research new recipes for meal prep
+    □ 6:00pm - 7:00pm: Work on personal development goals
+
+    Low Priority
+    □ 1:00pm - 1:30pm: Organize digital photos
+    □ 5:00pm - 5:30pm: Clean out email inbox
+    □ 7:00pm - 7:30pm: Look into new productivity apps
+    """,
+
+    "structured-priority-untimeboxed": """
+    High Priority
+    □ Finish presentation for tomorrow's meeting
+    □ Schedule dentist appointment
+    □ Pay utility bills
+    □ Complete high-priority project deliverables
+
+    Medium Priority
+    □ Start learning Spanish (Duolingo, 15 minutes)
+    □ Plan weekend hiking trip
+    □ Research new recipes for meal prep
+    □ Work on personal development goals
+
+    Low Priority
+    □ Organize digital photos
+    □ Clean out email inbox
+    □ Look into new productivity apps
+    """,
+
+    "structured-category-timeboxed": """
+    Work 💼
+    □ 9:00am - 9:30am: Prepare for team meeting
+    □ 9:30am - 10:30am: Attend team meeting
+    □ 10:30am - 11:30am: Review and respond to important emails
+    □ 2:00pm - 4:00pm: Work on quarterly report
+
+    Health & Fitness 🏋️‍♀️
+    □ 7:00am - 7:30am: 30-minute jog
+    □ 12:00pm - 12:30pm: Prepare healthy lunch
+    □ Throughout the day: Drink 8 glasses of water
+
+    Relationships ❤️
+    □ 5:00pm - 5:30pm: Plan date night with partner
+    □ 7:00pm - 7:30pm: Call best friend
+    □ 8:00pm - 9:00pm: Organize game night with friends
+
+    Fun 🎉
+    □ 12:30pm - 1:00pm: Play a quick game or solve a puzzle
+    □ 6:00pm - 6:30pm: Watch an episode of favorite TV show
+    □ 9:00pm - 9:30pm: Engage in a hobby (painting, gardening, etc.)
+
+    Ambition 🚀
+    □ 6:30am - 7:00am: Read 20 pages of a book on personal development
+    □ 5:30pm - 6:00pm: Work on side project or business idea
+    □ 9:30pm - 10:00pm: Reflect on goals and plan next steps
+    """,
+
+    "structured-category-untimeboxed": """
+    Work 💼
+    □ Prepare for team meeting
+    □ Attend team meeting
+    □ Review and respond to important emails
+    □ Work on quarterly report
+
+    Health & Fitness 🏋️‍♀️
+    □ 30-minute jog
+    □ Prepare healthy lunch
+    □ Drink 8 glasses of water throughout the day
+
+    Relationships ❤️
+    □ Plan date night with partner
+    □ Call best friend
+    □ Organize game night with friends
+
+    Fun 🎉
+    □ Play a quick game or solve a puzzle
+    □ Watch an episode of favorite TV show
+    □ Engage in a hobby (painting, gardening, etc.)
+
+    Ambition 🚀
+    □ Read pages from a book on personal development
+    □ Work on side project or business idea
+    □ Reflect on goals and plan next steps
+    """,
+
     "unstructured-timeboxed": """
-        □ 8:45am - 9:15am Wake Up + Morning Routine
-        □ 9:15am - 9:30am After my Morning Routine, I will continue reading my book for 15 minutes at my desk
-        □ 9:30am - 10:00am Come up with RT playlist
-        □ 10:00am - 10:15am Learn RT routes back and forth
-        □ 10:15am - 10:30am Learn RT drinking games
-        □ 10:30am - 12:00pm Clean up home page
-        □ 12:00pm - 12:45pm Lunch
-        □ 12:45pm - 1:30pm Plan for next day
-        □ 1:30pm - 4:00pm Clean up Moodle Case Study
-        □ 4:00pm - 5:30pm Gym push
-        □ 5:30pm - 6:00pm Collate assets for Tribespot
-        □ 6:00pm - 6:45pm Dinners
-        □ 8:00pm - 9:00pm CMs Meeting
-        □ 9:00pm sleep
-        """,
+    □ 6:30am - 7:00am: Morning meditation and stretching
+    □ 7:00am - 7:30am: Breakfast and coffee
+    □ 7:30am - 9:00am: Deep work on main project
+    □ 9:00am - 9:15am: Quick break
+    □ 9:15am - 10:30am: Respond to emails and messages
+    □ 10:30am - 12:00pm: Team meeting and collaboration
+    □ 12:00pm - 1:00pm: Lunch and short walk
+    □ 1:00pm - 3:00pm: Continue work on main project
+    □ 3:00pm - 3:30pm: Afternoon snack and break
+    □ 3:30pm - 5:00pm: Wrap up daily tasks and plan for tomorrow
+    □ 5:00pm - 6:00pm: Exercise or gym session
+    □ 6:00pm - 7:00pm: Dinner preparation and eating
+    □ 7:00pm - 8:30pm: Personal hobby or project time
+    □ 8:30pm - 9:30pm: Reading or learning time
+    □ 9:30pm - 10:00pm: Evening routine and prepare for bed
+    """,
+
     "unstructured-untimeboxed": """
-      🚶 Walk x2 [Highiest] [In progress]
-      💤 10:30 sleep, 7:30 wakeup [Highiest] [In progress]
-      👥 Chat with the Fam [High] [In progress]
-      ✏️ Submit as many APM apps as possible [High] [Not started]
-      👨‍💻 Work on dev proj [High] [In progress]
-      💬 Debate about learnings [High] [In progress]
-      📓 Use journal to reflect on profound moments [High] [Not started]
-      🏋️ Gym x3 [Medium] [In progress]
-      🍔 Limit junk food [Medium] [In progress]
-      📄 Update resume with latest dev proj [Medium] [Not started]
-      🎤 Learnings [Medium] [In progress]
-      🤔 Share vulnerability/ambitions [Low] [In progress]
-      🧗 Boulder x2 [Low] [Not started]
-      🚫 Limit socials < 1hr/day [Low] [Not started]
-      💰 Scraping by [Lowest] [In progress]
-      🏃 Run x1+ [Lowest] [Blocked]
-      """
-}
+    □ Morning meditation and stretching
+    □ Enjoy breakfast and coffee
+    □ Deep work session on main project
+    □ Respond to important emails and messages
+    □ Attend team meeting and collaborate on projects
+    □ Lunch break and short walk
+    □ Continue work on main project
+    □ Take short breaks as needed
+    □ Wrap up daily tasks and plan for tomorrow
+    □ Exercise or gym session
+    □ Prepare and eat dinner
+    □ Spend time on personal hobby or project
+    □ Read or engage in learning activity
+    □ Complete evening routine and prepare for bed
+    """
+};
 
 def create_prompt_schedule(user_data):
     try:
@@ -127,80 +214,91 @@ def create_prompt_schedule(user_data):
         name = user_data['name']
         age = user_data['age']
         work_schedule = f"{user_data['work_start_time']} - {user_data['work_end_time']}"
-        energy_patterns = user_data['energy_patterns']
+        energy_patterns = ', '.join(user_data['energy_patterns'])
         priorities = user_data['priorities']
-        layout_preference = user_data['layout_preference']['type']
-        layout_subcategory = user_data['layout_preference']['subcategory']
+        layout_preference = user_data['layout_preference']
 
         # Process tasks
         tasks = user_data['tasks']
-        work_tasks = [task.text for task in tasks if 'Work' in task.categories]
-        exercise_tasks = [task.text for task in tasks if 'Exercise' in task.categories]
-        relationship_tasks = [task.text for task in tasks if 'Relationship' in task.categories]
-        fun_tasks = [task.text for task in tasks if 'Fun' in task.categories]
-        ambition_tasks = [task.text for task in tasks if 'Ambition' in task.categories]
+        categorized_tasks = {
+            'Work': [], 'Exercise': [], 'Relationship': [], 
+            'Fun': [], 'Ambition': []
+        }
+        for task in tasks:
+            for category in task.categories:
+                if category in categorized_tasks:
+                    categorized_tasks[category].append(task.text)
 
         # Convert priorities to a sorted list of tuples (category, rank)
         priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
         priority_description = ", ".join([f"{category} (rank {5-rank})" for category, rank in priority_list])
 
-        system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximize productivity, well-being, and personal growth."""
+        # Determine the example schedule to use
+        structure = layout_preference['structure']
+        timeboxed = layout_preference['timeboxed']
+
+        # Construct the example_key based on user preferences
+        if structure == "structured":
+            subcategory = layout_preference['subcategory']
+            example_key = f"structured-{subcategory}-{timeboxed}"
+        else:  # unstructured
+            example_key = f"unstructured-{timeboxed}"
+
+        example_schedule = example_schedules.get(example_key, "No matching example found.")
+        print(example_schedule)
+        system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth."""
 
         user_prompt = f"""
-            <context>
-            I need you to create a personalized daily schedule for my client. The schedule should balance work responsibilities with personal priorities, taking into account energy levels throughout the day. The final output will be used by the client to structure their day effectively.
-            </context>
+        <context>
+        I need you to create a personalized daily schedule for my client. The schedule should balance work responsibilities with personal priorities, taking into account energy levels throughout the day. The final output will be used by the client to structure their day effectively.
+        </context>
 
-            <client_info>
-            Name: {name}
-            Age: {age}
-            Work schedule: {work_schedule}
-            Tasks:
-            - Work tasks: {', '.join(work_tasks)}
-            - Exercise tasks: {', '.join(exercise_tasks)}
-            - Relationship tasks: {', '.join(relationship_tasks)}
-            - Fun tasks: {', '.join(fun_tasks)}
-            - Ambition tasks: {', '.join(ambition_tasks)}
-            Energy patterns: {energy_patterns}
-            Priorities outside {work_schedule} (ranked from 4 - highest to 1 - lowest): {priority_description}
-            </client_info>
+        <client_info>
+        Name: {name}
+        Age: {age}
+        Work schedule: {work_schedule}
+        Tasks:
+        - Work tasks: {', '.join(categorized_tasks['Work'])}
+        - Exercise tasks: {', '.join(categorized_tasks['Exercise'])}
+        - Relationship tasks: {', '.join(categorized_tasks['Relationship'])}
+        - Fun tasks: {', '.join(categorized_tasks['Fun'])}
+        - Ambition tasks: {', '.join(categorized_tasks['Ambition'])}
+        Energy patterns: {energy_patterns}
+        Priorities outside {work_schedule} (ranked from 4 - highest to 1 - lowest): {priority_description}
+        </client_info>
 
-            <instructions>
-            1. Analyze the client's information and create a personalized, balanced schedule.
-            2. To identify and priortise tasks, follow these guidelines:
-            a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
-            b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
-            c. Tasks can have multiple cateogires. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
-            3. To format the schedule, follow these guidelines:
-            a. Display the planner in a {layout_subcategory} {layout_preference} format.
-            b. Use {example_schedules[layout_subcategory]} as an example of the expected layout ensuring each task in this generated schedule belongs to {name}.
-            c. Double check the format given the following definitions for each subcategory: Time-boxed means the user would like to see each task with a starting and end time. Un-time-boxed means there should be no start or end time with any tasks. Structured means the user would like to see 'Morning, 'Afternoon' and 'Evening sections in their schedule. Unstructured means there should be no 'Morning, 'Afternoon' and 'Evening sections in the schedule.
-            4. Edit the language of the schedule by following these guidelines:
-            a. Write in a clear, concise, and conversational tone. Avoid jargon and unnecessary complexity.
-            b. Do not include explanations or notes sections.
-            c. Do not show categories for each task.
-            </instructions>
+        <instructions>
+        1. Analyze the client's information and create a personalized, balanced schedule.
+        2. To identify and prioritise tasks, follow these guidelines:
+        a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
+        b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
+        c. Tasks can have multiple categories. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
+        3. To format the schedule, follow these guidelines:
+        a. Use a {structure} format{f", with {layout_preference['subcategory']} organization" if structure == "structured" else ""}.
+        b. {f"Organize tasks into {layout_preference['subcategory']}" if structure == "structured" else "List tasks in order"}.
+        c. {"Show start and end times for each task" if timeboxed else "Do not include specific times for tasks"}.
+        d. Use this example as a reference for the expected layout:
+        {example_schedule}
+        e. Ensure each task in the generated schedule belongs to {name}.
+        4. Edit the language of the schedule by following these guidelines:
+        a. Write in a clear, concise, and conversational tone. Avoid jargon and unnecessary complexity.
+        b. Do not include explanations or notes sections.
+        c. Do not show categories for each task.
+        </instructions>
 
-            <output_format>
-            Please structure your response as follows:
-            <thinking>
-            [Your step-by-step thought process for creating the schedule]
-            </thinking>
+        <output_format>
+        Please structure your response as follows:
+        <thinking>
+        [Your step-by-step thought process for creating the schedule]
+        </thinking>
 
-            <schedule>
-            [The final personalized schedule]
-            </schedule>
-            </output_format>
+        <schedule>
+        [The final personalized schedule]
+        </schedule>
+        </output_format>
         """
 
         return system_prompt, user_prompt
-
-    except KeyError as e:
-        logger.error(f"Missing key in user data: {str(e)}")
-        raise ValueError(f"Missing required field in user data: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error creating prompt: {str(e)}")
-        raise
 
 def create_prompt_categorize(task):
     prompt = f"""Given the following 5 categories to an ordinary life:
@@ -281,7 +379,10 @@ def process_user_data():
     # Extract tasks with categories from the generated schedule
     tasks_with_categories = extract_tasks_with_categories(response)
 
-    return jsonify({'schedule': response, 'tasks': tasks_with_categories})
+    # Convert Task objects to dictionaries
+    serializable_tasks = [task.to_dict() if isinstance(task, Task) else task for task in tasks_with_categories]
+
+    return jsonify({'schedule': response, 'tasks': serializable_tasks})
 
 @app.route('/categorize_task', methods=['POST'])
 def process_task():
