@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pane, Heading, TextInputField, SelectField, Button, Checkbox } from 'evergreen-ui';
+import { Pane, Heading, TextInputField, SelectField, Button, Checkbox, RadioGroup } from 'evergreen-ui';
 import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
 import TaskItem from './TaskItem';
 import PriosDraggableList from './PriosDraggableList';
@@ -89,28 +89,48 @@ const DashboardLeftCol = ({
         </Pane>
       ))}
 
-      <SelectField
-        label="Planner Layout Preference"
-        name="layout_preference.type"
-        value={formData.layout_preference.type}
-        onChange={handleNestedChange}
-      >
-        <option value="kanban">Kanban</option>
-        <option value="to-do-list">To-do List</option>
-      </SelectField>
-      {formData.layout_preference.type === 'to-do-list' && (
+      <Heading size={500} marginY={16}>Layout Preferences</Heading>
+      
+      <RadioGroup
+        label="Day Structure"
+        value={formData.layout_preference.structure || ''}
+        options={[
+          { label: 'Structured day with clear sections', value: 'structured' },
+          { label: 'Flexible day without sections', value: 'unstructured' }
+        ]}
+        onChange={(event) => handleNestedChange({
+          target: { name: 'layout_preference.structure', value: event.target.value }
+        })}
+      />
+
+      {formData.layout_preference.structure === 'structured' && (
         <SelectField
-          label="To-do List Subcategory"
+          label="Structured Layout Type"
           name="layout_preference.subcategory"
-          value={formData.layout_preference.subcategory}
+          value={formData.layout_preference.subcategory || ''}
           onChange={handleNestedChange}
+          marginY={8}
         >
-          <option value="structured-timeboxed">Structured and Time-Boxed</option>
-          <option value="structured-untimeboxed">Structured and Un-Time-Boxed</option>
-          <option value="unstructured-timeboxed">Unstructured and Time-Boxed</option>
-          <option value="unstructured-untimeboxed">Unstructured and Un-Time-Boxed</option>
+          <option value="">Select a layout type</option>
+          <option value="day-sections">Day Sections (Morning, Afternoon, Evening)</option>
+          <option value="priority">Priority (High, Medium, Low)</option>
+          <option value="category">Category Based (Work, Fun, Relationships, Ambition, Exercise)</option>
         </SelectField>
       )}
+
+      <RadioGroup
+        label="Task Timeboxing"
+        value={formData.layout_preference.timeboxed || ''}
+        options={[
+          { label: 'Timeboxed tasks', value: 'timeboxed' },
+          { label: 'Flexible timing', value: 'untimeboxed' }
+        ]}
+        onChange={(event) => handleNestedChange({
+          target: { name: 'layout_preference.timeboxed', value: event.target.value }
+        })}
+        marginY={8}
+      />
+
       <Button appearance="primary" onClick={submitForm} marginTop={16} isLoading={isLoading}>
         Update Schedule
       </Button>
