@@ -79,7 +79,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
 
       setResponse(scheduleContent);
       
-      const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks);
+      const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks, formData.layout_preference);
 
       const cleanedTasks = await cleanupTasks(parsedTasks, formData.tasks);
 
@@ -178,7 +178,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
         onUpdateTask={handleScheduleTaskUpdate}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
-        isStructured={formData.layout_preference.subcategory.startsWith('structured')}
+        layoutPreference={formData.layout_preference.subcategory}
       />
       <Pane display="flex" justifyContent="space-between" marginTop={16}>
         <Button
