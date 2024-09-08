@@ -11,7 +11,7 @@ const Tasks = ({ formData, setFormData }) => {
   const [newTask, setNewTask] = useState('');
 
   const addTask = handleAddTask(setFormData, newTask, setNewTask, toaster);
-  
+
   const updateTask = (updatedTask) => {
     handleUpdateTask(setFormData, toaster)(updatedTask);
   };

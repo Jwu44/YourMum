@@ -3,32 +3,60 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { Heading, Pane } from 'evergreen-ui';
 import EditableScheduleRow from './EditableScheduleRow';
 
-const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, isStructured }) => {
+const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, layoutPreference }) => {
   const [potentialParentId, setPotentialParentId] = useState(null);
   const containerRef = useRef(null);
 
   const allItems = useMemo(() => {
-    let currentSection = null;
-    let sectionStartIndex = 0;
-    return tasks.map((task, index) => {
-      if (task.is_section) {
-        currentSection = task.text;
-        sectionStartIndex = index;
+    if (layoutPreference === 'category') {
+      const groupedTasks = tasks.reduce((acc, task) => {
+        const category = task.categories[0] || 'Uncategorized';
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(task);
+        return acc;
+      }, {});
+
+      return Object.entries(groupedTasks).flatMap(([category, categoryTasks]) => [
+        {
+          id: `section-${category}`,
+          text: category.charAt(0).toUpperCase() + category.slice(1),
+          is_section: true,
+          type: 'section'
+        },
+        ...categoryTasks.map(task => ({
+          ...task,
+          type: 'task',
+          section: category
+        }))
+      ]);
+    } else {
+      // Existing logic for day_section or priority
+      let currentSection = null;
+      let sectionStartIndex = 0;
+      return tasks.map((task, index) => {
+        if (task.is_section) {
+          currentSection = task.text;
+          sectionStartIndex = index;
+          return {
+            ...task,
+            type: 'section',
+            section: currentSection,
+            sectionIndex: 0
+          };
+        }
         return {
           ...task,
-          type: 'section',
+          type: 'task',
           section: currentSection,
-          sectionIndex: 0
+          sectionIndex: index - sectionStartIndex
         };
-      }
-      return {
-        ...task,
-        type: 'task',
-        section: currentSection,
-        sectionIndex: index - sectionStartIndex
-      };
-    });
-  }, [tasks]);
+      });
+    }
+  }, [tasks, layoutPreference]);
+
+  const isStructured = layoutPreference.startsWith('structured');
 
   const onDragStart = useCallback(() => {
     // We can leave this empty or add any necessary logic for drag start
@@ -67,23 +95,18 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
 
     const reorderedItemWithCategories = {
       ...reorderedItem,
-      categories: reorderedItem.categories || [] // Ensure categories are maintained
+      categories: reorderedItem.categories || []
     };
 
-    // Update the section of the reordered item
     reorderedItemWithCategories.section = newSection;
 
     newItems.splice(destinationIndex, 0, reorderedItemWithCategories);
 
-    // Update section_index for all items
     const updatedItems = newItems.map((item, index) => ({
       ...item,
       section_index: index,
-      categories: item.categories || [] // Ensure categories are maintained for all items
+      categories: item.categories || []
     }));
-
-    // Log only the dragged task with categories
-    console.log('Dragged task:', reorderedItemWithCategories);
 
     onReorderTasks(updatedItems);
   }, [allItems, onReorderTasks]);
@@ -129,7 +152,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
       }}
       className={`editable-schedule-row ${snapshot.isDragging ? 'is-dragging' : ''}`}
     >
-      {item.is_section ? (
+      {item.type === 'section' ? (
         <Heading size={500} marginTop={16} marginBottom={8}>
           {item.text}
         </Heading>
@@ -146,11 +169,9 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
   ), [onUpdateTask, handleDeleteTask, potentialParentId]);
 
   const renderItems = useCallback(() => {
-    if (!isStructured) {
-      return allItems.filter(item => item.type !== 'section');
-    }
+    // Remove this condition to always render sections
     return allItems;
-  }, [allItems, isStructured]);
+  }, [allItems]);
 
   return (
     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
@@ -163,8 +184,8 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, i
             }}
             {...provided.droppableProps}
           >
-            {renderItems().map((item, index) => (
-              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.is_section}>
+            {allItems.map((item, index) => (
+              <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
                 {(provided, snapshot) => renderDraggable({ item, index, snapshot, provided })}
               </Draggable>
             ))}
