@@ -64,79 +64,22 @@ export const extractSchedule = (response) => {
   return '';
 };
 
-export const addTask = async (taskText) => {
-  console.log("Adding new task:", taskText);
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/categorize_task`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ task: taskText })
-    });
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-
-    const data = await response.json();
-    console.log("Response from server:", data);
-
-    return {
-      success: true,
-      category: data.category
-    };
-  } catch (error) {
-    console.error("Error adding task:", error);
-    return {
-      success: false,
-      error: "There was an error adding the task. Please try again."
-    };
-  }
-};
-
-export const updateTask = async (taskText) => {
-  console.log("Updating task:", taskText);
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/categorize_task`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ task: taskText })
-    });
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-
-    const data = await response.json();
-    console.log("Response from server:", data);
-
-    return {
-      success: true,
-      category: data.category
-    };
-  } catch (error) {
-    console.error("Error updating task:", error);
-    return {
-      success: false,
-      error: "There was an error updating the task. Please try again."
-    };
-  }
-};
-
 export const handleAddTask = (setFormData, newTask, setNewTask, toaster) => async () => {
   if (newTask.trim()) {
     try {
       const result = await categorizeTask(newTask);
-      console.log('Categorization result:', result); // Add this line
+      console.log('Categorization result:', result);
+
+      const newTaskObject = {
+        id: uuidv4(),
+        text: newTask.trim(),
+        categories: result.categories || [],
+        completed: false
+      };
 
       setFormData(prevData => ({
         ...prevData,
-        tasks: [...prevData.tasks, result]
+        tasks: [...prevData.tasks, newTaskObject]
       }));
       setNewTask('');
       toaster.success('Task added successfully');
@@ -191,7 +134,7 @@ export const handleDeleteTask = (setFormData, toaster) => (taskId) => {
   toaster.notify('Task deleted');
 };
 
-export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
+export const parseScheduleToTasks = async (scheduleText, inputTasks = [], layoutPreference) => {
   if (!scheduleText || typeof scheduleText !== 'string') {
     console.error('Invalid schedule text:', scheduleText);
     return [];
@@ -214,7 +157,7 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     const trimmedLine = line.trim();
-    if (trimmedLine.match(/^(Morning|Afternoon|Evening)/i)) {
+    if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Arvo|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
       currentSection = trimmedLine;
       sectionStartIndex = index;
       tasks.push({
@@ -230,7 +173,17 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
       });
     } else if (trimmedLine) {
       const indentLevel = line.search(/\S|$/) / 2;
-      const taskText = trimmedLine.replace(/^□ /, '');
+      let taskText = trimmedLine.replace(/^□ /, '');
+      
+      // Extract time if present and layout preference is not untimeboxed
+      let startTime = null;
+      let endTime = null;
+      if (layoutPreference.timeboxed !== 'untimeboxed') {
+        const timeMatch = taskText.match(/^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)/i);
+        if (timeMatch) {
+          [, startTime, endTime, taskText] = timeMatch;
+        }
+      }
 
       // Find matching task with similar keywords
       const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
@@ -254,7 +207,9 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = []) => {
         level: indentLevel,
         section_index: index - sectionStartIndex,
         type: 'task',
-        categories: categories
+        categories: categories,
+        start_time: startTime,
+        end_time: endTime
       };
 
       // Log the created task
