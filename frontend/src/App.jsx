@@ -9,6 +9,8 @@ import Priorties from './pages/Priorties';
 import LayoutPreference from './pages/LayoutPreference';
 import LandingPage from './pages/LandingPage';
 import { submitFormData } from './helper';
+import StructurePreference from './pages/StructurePreference';
+import SubcategoryPreference from './pages/SubcategoryPreference';
 
 function App() {
   const [response, setResponse] = useState(null); // State for storing the response
@@ -22,7 +24,11 @@ function App() {
     tasks: [],
     energy_patterns: [],
     priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
-    layout_preference: { type: "", subcategory: "" }
+    layout_preference: {
+      structure: '',
+      subcategory: '',
+      timeboxed: ''
+    }
   });
 
   const submitForm = () => {
@@ -38,6 +44,8 @@ function App() {
         <Route path="/tasks" element={<Tasks formData={formData} setFormData={setFormData} />} />
         <Route path="/energy-patterns" element={<EnergyPattern formData={formData} setFormData={setFormData} />} />
         <Route path="/priorties" element={<Priorties formData={formData} setFormData={setFormData} />} />
+        <Route path="/structure-preference" element={<StructurePreference formData={formData} setFormData={setFormData} />} />
+        <Route path="/subcategory-preference" element={<SubcategoryPreference formData={formData} setFormData={setFormData} />} />
         <Route path="/layout-preference" element={<LayoutPreference formData={formData} setFormData={setFormData} submitForm={submitForm} />} />
         <Route path="/dashboard" element={<Dashboard formData={formData} setFormData={setFormData} response={response} setResponse={submitForm} />} />
       </Routes>

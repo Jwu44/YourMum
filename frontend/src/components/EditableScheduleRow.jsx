@@ -78,10 +78,10 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
         marginY={4}
         background="tint1"
         borderRadius={4}
-        marginLeft={task.is_subtask ? `${(task.level || 1) * 20}px` : 0} // Update this line
+        marginLeft={task.is_subtask ? `${(task.level || 1) * 20}px` : 0}
         className={`editable-schedule-row ${isDragging ? 'is-dragging' : ''}`}
       >
-        {task.is_subtask && ( // Update this condition
+        {task.is_subtask && (
           <Pane width={16} height={16} marginRight={8} borderLeft="1px solid" borderBottom="1px solid" borderColor="muted" />
         )}
         <Checkbox
@@ -115,6 +115,7 @@ const EditableScheduleRow = ({ task, onUpdateTask, onDeleteTask, isDragging, sho
               textDecoration={task.completed ? 'line-through' : 'none'}
               color={task.completed ? 'muted' : 'default'}
             >
+              {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
               {task.text}
             </Paragraph>
             {!isEditing && task.categories && task.categories.map((category, index) => (

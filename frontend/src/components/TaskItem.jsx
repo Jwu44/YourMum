@@ -81,7 +81,7 @@ const TaskItem = ({ task, onUpdate, onDelete }) => {
         }
       >
         <Pane onClick={toggleCategorySelection} cursor="pointer" marginLeft={8}>
-          {task.categories && task.categories.map((category, index) => (
+          {selectedCategories.map((category, index) => (
             <Badge
               key={index}
               color={getCategoryColor(category)}
@@ -98,7 +98,7 @@ const TaskItem = ({ task, onUpdate, onDelete }) => {
             onClick={toggleCategorySelection}
             cursor="pointer"
           >
-            {task.categories && task.categories.length > 0 ? '+' : 'Add Category'}
+            {selectedCategories.length > 0 ? '+' : 'Add Category'}
           </Badge>
         </Pane>
       </Popover>

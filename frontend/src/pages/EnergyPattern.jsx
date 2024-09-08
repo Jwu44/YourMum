@@ -10,7 +10,7 @@ const EnergyPattern = ({ formData, setFormData }) => {
   const navigate = useNavigate();
 
   const handleNext = () => {
-    navigate('/layout-preference');
+    navigate('/structure-preference');
   };
 
   const handlePrevious = () => {
