@@ -11,9 +11,9 @@ A daily planner powered by Claude-Sonnet 3.5. If only there was a personalised p
 - RESTful API for schedule generation and task categorization
 
 ## Main Dashboard
-V1 - still optimising prompt and making the output more interactable
+V2 - creating a robust RAG that will identify habits and recurring patterns in user's history of schedules
+![image](https://github.com/user-attachments/assets/1c5262a7-d49c-4358-9a33-90f4d0351c84)
 
-![image](https://github.com/user-attachments/assets/94c239f5-5afd-4204-9a73-31347e7dd75d)
 
 # Architecture
 ![image](https://github.com/user-attachments/assets/436dd66c-5144-4b94-8487-e1203336601f)
