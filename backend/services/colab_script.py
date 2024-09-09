@@ -209,96 +209,96 @@ example_schedules = {
 };
 
 def create_prompt_schedule(user_data):
-    try:
-        # Extract user data
-        name = user_data['name']
-        age = user_data['age']
-        work_schedule = f"{user_data['work_start_time']} - {user_data['work_end_time']}"
-        energy_patterns = ', '.join(user_data['energy_patterns'])
-        priorities = user_data['priorities']
-        layout_preference = user_data['layout_preference']
+    # Extract user data
+    name = user_data['name']
+    age = user_data['age']
+    work_schedule = f"{user_data['work_start_time']} - {user_data['work_end_time']}"
+    energy_patterns = ', '.join(user_data['energy_patterns'])
+    priorities = user_data['priorities']
+    layout_preference = user_data['layout_preference']
 
-        # Process tasks
-        tasks = user_data['tasks']
-        categorized_tasks = {
-            'Work': [], 'Exercise': [], 'Relationship': [], 
-            'Fun': [], 'Ambition': []
-        }
-        for task in tasks:
-            for category in task.categories:
-                if category in categorized_tasks:
-                    categorized_tasks[category].append(task.text)
+    # Process tasks
+    tasks = user_data['tasks']
+    categorized_tasks = {
+        'Work': [], 'Exercise': [], 'Relationship': [], 
+        'Fun': [], 'Ambition': []
+    }
+    for task in tasks:
+        for category in task.categories:
+            if category in categorized_tasks:
+                categorized_tasks[category].append(task.text)
 
-        # Convert priorities to a sorted list of tuples (category, rank)
-        priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
-        priority_description = ", ".join([f"{category} (rank {5-rank})" for category, rank in priority_list])
+    # Convert priorities to a sorted list of tuples (category, rank)
+    priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
+    priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
+    print(priority_list)
+    print(priority_description)
+    # Determine the example schedule to use
+    structure = layout_preference['structure']
+    timeboxed = layout_preference['timeboxed']
+    # Construct the example_key based on user preferences
+    if structure == "structured":
+        subcategory = layout_preference['subcategory']
+        print(structure, subcategory, timeboxed)
+        example_key = f"structured-{subcategory}-{timeboxed}"
+    else:  # unstructured
+        example_key = f"unstructured-{timeboxed}"
 
-        # Determine the example schedule to use
-        structure = layout_preference['structure']
-        timeboxed = layout_preference['timeboxed']
+    example_schedule = example_schedules.get(example_key, "No matching example found.")
+    print(example_schedule)
+    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth."""
 
-        # Construct the example_key based on user preferences
-        if structure == "structured":
-            subcategory = layout_preference['subcategory']
-            example_key = f"structured-{subcategory}-{timeboxed}"
-        else:  # unstructured
-            example_key = f"unstructured-{timeboxed}"
+    user_prompt = f"""
+    <context>
+    I need you to create a personalized daily schedule for my client. The schedule should balance work responsibilities with personal priorities, taking into account energy patterns throughout the day. The final output will be used by the client to structure their day effectively.
+    </context>
 
-        example_schedule = example_schedules.get(example_key, "No matching example found.")
-        print(example_schedule)
-        system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth."""
+    <client_info>
+    Name: {name}
+    Age: {age}
+    Work schedule: {work_schedule}
+    Tasks:
+    - Work tasks: {', '.join(categorized_tasks['Work'])}
+    - Exercise tasks: {', '.join(categorized_tasks['Exercise'])}
+    - Relationship tasks: {', '.join(categorized_tasks['Relationship'])}
+    - Fun tasks: {', '.join(categorized_tasks['Fun'])}
+    - Ambition tasks: {', '.join(categorized_tasks['Ambition'])}
+    Energy patterns: {energy_patterns}
+    Priorities outside {work_schedule} (ranked from 1 - highest to 4 - lowest): {priority_description}
+    </client_info>
 
-        user_prompt = f"""
-        <context>
-        I need you to create a personalized daily schedule for my client. The schedule should balance work responsibilities with personal priorities, taking into account energy levels throughout the day. The final output will be used by the client to structure their day effectively.
-        </context>
+    <instructions>
+    1. Analyze the client's information and create a personalized, balanced schedule.
+    2. To prioritise tasks, follow these guidelines:
+    a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
+    b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
+    c. Tasks can have multiple categories. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
+    3. To format the schedule, follow these guidelines:
+    a. Use a {structure} format{f", with {layout_preference['subcategory']} organization" if structure == "structured" else ""}.
+    b. {f"Organize tasks into {layout_preference['subcategory']}" if structure == "structured" else "List tasks in order"}.
+    c. {"Show start and end times for each task" if {timeboxed} else "Do not include specific times for tasks"}.
+    d. Use this example as a reference for the expected layout:
+    {example_schedule}
+    e. Ensure each task in the generated schedule belongs to {name}.
+    4. Edit the language of the schedule by following these guidelines:
+    a. Write in a clear, concise, and conversational tone. Avoid jargon and unnecessary complexity.
+    b. Do not include explanations or notes sections.
+    c. Do not show categories for each task.
+    </instructions>
 
-        <client_info>
-        Name: {name}
-        Age: {age}
-        Work schedule: {work_schedule}
-        Tasks:
-        - Work tasks: {', '.join(categorized_tasks['Work'])}
-        - Exercise tasks: {', '.join(categorized_tasks['Exercise'])}
-        - Relationship tasks: {', '.join(categorized_tasks['Relationship'])}
-        - Fun tasks: {', '.join(categorized_tasks['Fun'])}
-        - Ambition tasks: {', '.join(categorized_tasks['Ambition'])}
-        Energy patterns: {energy_patterns}
-        Priorities outside {work_schedule} (ranked from 4 - highest to 1 - lowest): {priority_description}
-        </client_info>
+    <output_format>
+    Please structure your response as follows:
+    <thinking>
+    [Your step-by-step thought process for creating the schedule]
+    </thinking>
 
-        <instructions>
-        1. Analyze the client's information and create a personalized, balanced schedule.
-        2. To identify and prioritise tasks, follow these guidelines:
-        a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
-        b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
-        c. Tasks can have multiple categories. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
-        3. To format the schedule, follow these guidelines:
-        a. Use a {structure} format{f", with {layout_preference['subcategory']} organization" if structure == "structured" else ""}.
-        b. {f"Organize tasks into {layout_preference['subcategory']}" if structure == "structured" else "List tasks in order"}.
-        c. {"Show start and end times for each task" if timeboxed else "Do not include specific times for tasks"}.
-        d. Use this example as a reference for the expected layout:
-        {example_schedule}
-        e. Ensure each task in the generated schedule belongs to {name}.
-        4. Edit the language of the schedule by following these guidelines:
-        a. Write in a clear, concise, and conversational tone. Avoid jargon and unnecessary complexity.
-        b. Do not include explanations or notes sections.
-        c. Do not show categories for each task.
-        </instructions>
+    <schedule>
+    [The final personalized schedule]
+    </schedule>
+    </output_format>
+    """
 
-        <output_format>
-        Please structure your response as follows:
-        <thinking>
-        [Your step-by-step thought process for creating the schedule]
-        </thinking>
-
-        <schedule>
-        [The final personalized schedule]
-        </schedule>
-        </output_format>
-        """
-
-        return system_prompt, user_prompt
+    return system_prompt, user_prompt
 
 def create_prompt_categorize(task):
     prompt = f"""Given the following 5 categories to an ordinary life:
@@ -436,4 +436,4 @@ def home():
 
 # Start the Flask server in a new thread
 threading.Thread(target=app.run, kwargs={"use_reloader": False, "port": port}).start()
-# app.run(host='0.0.0.0', port=5002, use_reloader=False)
+# app.run(host='0.0.0.0', port=5005, use_reloader=False)
