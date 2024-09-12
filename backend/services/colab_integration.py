@@ -6,7 +6,7 @@ import uuid
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://901a-34-16-174-241.ngrok-free.app" 
+COLAB_BASE_URL = "https://c354-34-85-238-81.ngrok-free.app" 
 
 def process_user_data(user_data):
     colab_url = f"{COLAB_BASE_URL}/process_user_data"
