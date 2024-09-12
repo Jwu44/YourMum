@@ -7,6 +7,19 @@ import OnboardingNav from '../components/OnboardingNav';
 const StructurePreference = ({ formData, setFormData }) => {
   const navigate = useNavigate();
 
+  // Initialize layout_preference if it doesn't exist
+  React.useEffect(() => {
+    if (!formData.layout_preference) {
+      setFormData({
+        ...formData,
+        layout_preference: {
+          structure: 'structured', // Set default value
+          subcategory: ''
+        }
+      });
+    }
+  }, [formData, setFormData]);
+
   const handleInputChange = (event) => {
     const value = event.target.value;
     setFormData(prevData => ({
@@ -28,7 +41,7 @@ const StructurePreference = ({ formData, setFormData }) => {
   };
 
   const handlePrevious = () => {
-    navigate('/tasks'); // Assuming '/tasks' is the previous page
+    navigate('/energy-patterns');
   };
 
   return (

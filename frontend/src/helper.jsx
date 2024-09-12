@@ -48,10 +48,12 @@ export const submitFormData = async (formData) => {
 };
 
 export const extractSchedule = (response) => {  
-  if (typeof response === 'object' && response.schedule) {
-    return response.schedule;
+  // Check if response is an object and has a schedule property
+  if (response && typeof response === 'object' && response.schedule) {
+    return response.schedule; // Return the schedule directly
   }
   
+  // Existing string extraction logic
   if (typeof response === 'string') {
     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
     const match = response.match(scheduleRegex);
@@ -173,7 +175,7 @@ export const parseScheduleToTasks = async (scheduleText, inputTasks = [], layout
       });
     } else if (trimmedLine) {
       const indentLevel = line.search(/\S|$/) / 2;
-      let taskText = trimmedLine.replace(/^□ /, '');
+      let taskText = trimmedLine.replace(/^□ /, '').replace(/^- /, ''); // Remove leading "□ " and "- "
       
       // Extract time if present and layout preference is not untimeboxed
       let startTime = null;

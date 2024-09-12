@@ -7,6 +7,18 @@ import OnboardingNav from '../components/OnboardingNav';
 const LayoutPreference = ({ formData, setFormData, submitForm }) => {
   const navigate = useNavigate();
   
+  // Initialize layout_preference if it doesn't exist
+  React.useEffect(() => {
+    if (!formData.layout_preference) {
+      setFormData({
+        ...formData,
+        layout_preference: {
+          timeboxed: 'timeboxed', // Set default value
+        }
+      });
+    }
+  }, [formData, setFormData]);
+
   const handleInputChange = (event) => {
     const value = event.target.value;
     setFormData(prevData => ({
