@@ -141,7 +141,7 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, l
     }
   }, [allItems, onDeleteTask, onReorderTasks, isStructured]);
 
-  const renderDraggable = useCallback(({ item, index, snapshot, provided }) => (
+  const renderDraggable = useCallback(({ item, snapshot, provided }) => (
     <Pane
       ref={provided.innerRef}
       {...provided.draggableProps}
@@ -168,10 +168,10 @@ const EditableSchedule = ({ tasks, onUpdateTask, onDeleteTask, onReorderTasks, l
     </Pane>
   ), [onUpdateTask, handleDeleteTask, potentialParentId]);
 
-  const renderItems = useCallback(() => {
-    // Remove this condition to always render sections
-    return allItems;
-  }, [allItems]);
+  // const renderItems = useCallback(() => {
+  //   // Remove this condition to always render sections
+  //   return allItems;
+  // }, [allItems]);
 
   return (
     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>

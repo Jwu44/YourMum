@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Heading, Pane, Paragraph } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 import PriosDraggableList from '../components/PriosDraggableList';
 
-const ScoreValues = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+const Priorities = ({ setFormData }) => {
+  const router = useRouter();
   const [priorities, setPriorities] = useState([
     { id: 'health', name: 'Health' },
     { id: 'relationships', name: 'Relationships' },
@@ -22,13 +22,10 @@ const ScoreValues = ({ formData, setFormData }) => {
 
     console.log('Updated priorities ranking:', updatedPriorities);
 
-    setFormData(prevData => {
-      const newData = {
-        ...prevData,
-        priorities: updatedPriorities
-      };
-      return newData;
-    });
+    setFormData(prevData => ({
+      ...prevData,
+      priorities: updatedPriorities
+    }));
   }, [priorities, setFormData]);
 
   const handleReorder = (newPriorities) => {
@@ -36,17 +33,17 @@ const ScoreValues = ({ formData, setFormData }) => {
   };
 
   const handleNext = () => {
-    navigate('/tasks');
+    router.push('/tasks');
   };
 
   const handlePrevious = () => {
-    navigate('/work-times');
+    router.push('/work-times');
   };
 
   return (
     <CenteredPane>
       <Heading size={700} marginBottom={8} textAlign="center">
-        What are your priorties outside of work?
+        What are your priorities outside of work?
       </Heading>
       <Paragraph marginBottom={8} textAlign="center">
         Drag each priority to rank (1 - highest, 4 - lowest)
@@ -59,4 +56,12 @@ const ScoreValues = ({ formData, setFormData }) => {
   );
 };
 
-export default ScoreValues;
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {},
+    },
+  };
+}
+
+export default Priorities;

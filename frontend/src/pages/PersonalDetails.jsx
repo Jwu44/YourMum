@@ -1,17 +1,17 @@
 import React from 'react';
 import { TextInputField, Heading } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { handleSimpleInputChange } from '../helper.jsx';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 
 const Personal = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleInputChange = handleSimpleInputChange(setFormData);
 
   const handleNext = () => {
-    navigate('/work-times');
+    router.push('/work-times');
   };
 
   return (
@@ -36,5 +36,13 @@ const Personal = ({ formData, setFormData }) => {
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {},
+    },
+  };
+}
 
 export default Personal;

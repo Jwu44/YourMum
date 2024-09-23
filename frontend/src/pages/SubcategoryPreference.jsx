@@ -1,18 +1,18 @@
 import React from 'react';
 import { SelectField, Heading } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 
 const SubcategoryPreference = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleNext = () => {
-    navigate('/layout-preference');
+    router.push('/layout-preference');
   };
 
   const handlePrevious = () => {
-    navigate('/structure-preference');
+    router.push('/structure-preference');
   };
 
   const handleInputChange = (event) => {
@@ -49,5 +49,19 @@ const SubcategoryPreference = ({ formData, setFormData }) => {
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {
+        layout_preference: {
+          structure: '',
+          subcategory: '',
+          timeboxed: ''
+        },
+      },
+    },
+  };
+}
 
 export default SubcategoryPreference;

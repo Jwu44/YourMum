@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Pane, Heading, TextInput, toaster, Paragraph } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 import TaskItem from '../components/TaskItem';
 import { handleAddTask, handleUpdateTask, handleDeleteTask } from '../helper';
 
 const Tasks = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [newTask, setNewTask] = useState('');
 
   const addTask = handleAddTask(setFormData, newTask, setNewTask, toaster);
@@ -36,11 +36,11 @@ const Tasks = ({ formData, setFormData }) => {
   };
 
   const handleNext = () => {
-    navigate('/energy-patterns');
+    router.push('/energy-patterns');
   };
 
   const handlePrevious = () => {
-    navigate('/priorties');
+    router.push('/priorities');
   };
 
   return (
@@ -76,5 +76,15 @@ const Tasks = ({ formData, setFormData }) => {
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {
+        tasks: [],
+      },
+    },
+  };
+}
 
 export default Tasks;
