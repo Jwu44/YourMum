@@ -1,24 +1,23 @@
 import React from 'react';
-import { Button, Pane } from 'evergreen-ui';
+import { Button } from '../../components/ui/button'
 
 const NavigationButtons = ({ onBack, onNext }) => (
-  <Pane display="flex" justifyContent="flex-end">
+  <div className="flex justify-end">
     <Button 
       onClick={onBack} 
-      appearance="minimal" 
-      height={32}
-      marginRight={16}
+      variant="ghost"
+      className="h-8 mr-4"
     >
       Back
     </Button>
     <Button 
       onClick={onNext} 
-      appearance="primary" 
-      height={32}
+      variant="default"
+      className="h-8"
     >
       Next
     </Button>
-  </Pane>
+  </div>
 );
 
 export default NavigationButtons;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Pane, Heading, TextInputField, SelectField, Button, Checkbox, RadioGroup } from 'evergreen-ui';
 import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
 import TaskItem from './TaskItem';
-import PriosDraggableList from './PriosDraggableList';
+import PriosDraggableList from '../../components/parts/PriosDraggableList';
 
 const DashboardLeftCol = ({
   formData,

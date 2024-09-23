@@ -1,12 +1,12 @@
 import React from 'react';
 import { Pane, Button, Heading } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 const LandingPage = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleStart = () => {
-    navigate('/personal-details');
+    router.push('/personal-details');
   };
 
   return (

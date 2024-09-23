@@ -1,11 +1,11 @@
 import React from 'react';
 import { RadioGroup, Heading } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 
 const StructurePreference = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Initialize layout_preference if it doesn't exist
   React.useEffect(() => {
@@ -34,9 +34,9 @@ const StructurePreference = ({ formData, setFormData }) => {
 
   const handleNext = () => {
     if (formData.layout_preference.structure === 'structured') {
-      navigate('/subcategory-preference');
+      router.push('/subcategory-preference');
     } else {
-      navigate('/layout-preference');
+      router.push('/layout-preference');
     }
   };
 
@@ -47,7 +47,7 @@ const StructurePreference = ({ formData, setFormData }) => {
   return (
     <CenteredPane>
       <Heading size={700} marginBottom={24} textAlign="center">Customize Your To-Do List</Heading>
-      <Heading size={500} marginBottom={16}>Let's find the perfect to-do list for you. First, tell us about your general preference:</Heading>
+      <p>Let&apos;s understand your preferred daily structure.</p>
       
       <RadioGroup
         label="Day Structure"
@@ -68,5 +68,19 @@ const StructurePreference = ({ formData, setFormData }) => {
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {
+        layout_preference: {
+          structure: '',
+          subcategory: '',
+          timeboxed: ''
+        },
+      },
+    },
+  };
+}
 
 export default StructurePreference;
