@@ -1,12 +1,12 @@
 import React from 'react';
 import { RadioGroup, Heading } from 'evergreen-ui';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 
 const LayoutPreference = ({ formData, setFormData, submitForm }) => {
-  const navigate = useNavigate();
-  
+  const router = useRouter();
+
   // Initialize layout_preference if it doesn't exist
   React.useEffect(() => {
     if (!formData.layout_preference) {
@@ -18,6 +18,9 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
       });
     }
   }, [formData, setFormData]);
+
+  // Use optional chaining and provide default value
+  const timeboxed = formData.layout_preference?.timeboxed || '';
 
   const handleInputChange = (event) => {
     const value = event.target.value;
@@ -32,14 +35,14 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
 
   const handleSubmit = () => {
     submitForm();
-    navigate('/dashboard');
+    router.push('/dashboard');
   };
 
   const handlePrevious = () => {
     if (formData.layout_preference.structure === 'structured') {
-      navigate('/subcategory-preference');
+      router.push('/subcategory-preference');
     } else {
-      navigate('/structure-preference');
+      router.push('/structure-preference');
     }
   };
 
@@ -60,10 +63,24 @@ const LayoutPreference = ({ formData, setFormData, submitForm }) => {
       <OnboardingNav 
         onBack={handlePrevious} 
         onNext={handleSubmit} 
-        disableNext={formData.layout_preference.timeboxed === undefined}
+        disableNext={timeboxed === ''}
       />
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {
+        layout_preference: {
+          structure: '',
+          subcategory: '',
+          timeboxed: ''
+        },
+      },
+    },
+  };
+}
 
 export default LayoutPreference;

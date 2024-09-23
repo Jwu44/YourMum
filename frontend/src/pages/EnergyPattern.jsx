@@ -1,20 +1,20 @@
 import React from 'react';
 import { Pane, Paragraph, Heading, Checkbox } from 'evergreen-ui';
 import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import CenteredPane from '../components/CentredPane';
 import OnboardingNav from '../components/OnboardingNav';
 import { handleEnergyChange } from '../helper'; // Import the function from helper.jsx
 
 const EnergyPattern = ({ formData, setFormData }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleNext = () => {
-    navigate('/structure-preference');
+    router.push('/structure-preference');
   };
 
   const handlePrevious = () => {
-    navigate('/tasks');
+    router.push('/tasks');
   };
 
   const energyOptions = [
@@ -28,7 +28,7 @@ const EnergyPattern = ({ formData, setFormData }) => {
   return (
     <CenteredPane>
       <Pane>
-        <Heading size={700} marginBottom={16}>How's your energy during the day?</Heading>
+        <Heading size={700} marginBottom={16}>How&apos;s your energy during the day?</Heading>
         <Paragraph marginBottom={24}>
           Understanding your unique energy patterns helps us create a schedule that maximizes your productivity.
         </Paragraph>
@@ -63,5 +63,13 @@ const EnergyPattern = ({ formData, setFormData }) => {
     </CenteredPane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {},
+    },
+  };
+}
 
 export default EnergyPattern;

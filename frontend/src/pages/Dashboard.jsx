@@ -10,9 +10,9 @@ import {
   extractSchedule,
   cleanupTasks,
   updatePriorities,
-  handleEnergyChange // Add this import
+  handleEnergyChange 
 } from '../helper';
-import { categorizeTask } from '../api';
+import { categorizeTask } from '../../lib/api';
 import DashboardLeftCol from '../components/DashboardLeftCol';
 import EditableSchedule from '../components/EditableSchedule';
 
@@ -23,7 +23,7 @@ const initialPriorities = [
   { id: 'ambitions', name: 'Ambitions' }
 ];
 
-const Dashboard = ({ formData, setFormData, response, setResponse }) => {
+const Dashboard = ({ formData = {}, setFormData, response, setResponse }) => {
   const [newTask, setNewTask] = useState('');
   const [scheduleDays, setScheduleDays] = useState([]);
   const [priorities, setPriorities] = useState(initialPriorities);
@@ -79,9 +79,9 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
 
       setResponse(scheduleContent);
       
-      const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks, formData.layout_preference);
+      const parsedTasks = await parseScheduleToTasks(scheduleContent, formData.tasks || [], formData.layout_preference);
 
-      const cleanedTasks = await cleanupTasks(parsedTasks, formData.tasks);
+      const cleanedTasks = await cleanupTasks(parsedTasks, formData.tasks || []);
 
       setScheduleDays([cleanedTasks]);
       setCurrentDayIndex(0);
@@ -95,26 +95,25 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   }, [formData, setResponse]);
 
   useEffect(() => {
-    if (response) {
+    if (response && formData) {
       const parsedTasks = parseScheduleToTasks(response);
-      const cleanedTasks = cleanupTasks(parsedTasks, formData.tasks);
+      const cleanedTasks = cleanupTasks(parsedTasks, formData.tasks || []);
       setScheduleDays([cleanedTasks]);
       setCurrentDayIndex(0);
     }
-  }, [response, formData.tasks]);
+  }, [response, formData]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask) => {
-    // If the task text has changed, re-categorize it
-    if (updatedTask.text !== scheduleDays[currentDayIndex].find(task => task.id === updatedTask.id)?.text) {
+    if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
       const categorizedTask = await categorizeTask(updatedTask.text);
       updatedTask.categories = categorizedTask.categories;
     }
 
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
+      newDays[currentDayIndex] = newDays[currentDayIndex]?.map(task => 
         task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
-      );
+      ) || [];
       return newDays;
     });
   }, [currentDayIndex, scheduleDays]);
@@ -122,7 +121,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
   const handleScheduleTaskDelete = useCallback((taskId) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      newDays[currentDayIndex] = newDays[currentDayIndex].filter(task => task.id !== taskId);
+      newDays[currentDayIndex] = newDays[currentDayIndex]?.filter(task => task.id !== taskId) || [];
       return newDays;
     });
   }, [currentDayIndex]);
@@ -145,7 +144,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
       toaster.danger("Invalid schedule data. Please try again.");
       return;
     }
-  
+
     try {
       const result = await generateNextDaySchedule(
         currentSchedule, 
@@ -178,7 +177,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
         onUpdateTask={handleScheduleTaskUpdate}
         onDeleteTask={handleScheduleTaskDelete}
         onReorderTasks={handleScheduleReorder}
-        layoutPreference={formData.layout_preference.subcategory}
+        layoutPreference={formData?.layout_preference?.subcategory || ''}
       />
       <Pane display="flex" justifyContent="space-between" marginTop={16}>
         <Button
@@ -195,7 +194,7 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
         </Button>
       </Pane>
     </Pane>
-  ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay, formData.layout_preference.subcategory]);
+  ), [scheduleDays, currentDayIndex, handlePreviousDay, handleScheduleTaskUpdate, handleScheduleTaskDelete, handleScheduleReorder, handleNextDay, formData?.layout_preference?.subcategory]);
 
   const handleEnergyChangeCallback = useCallback((value) => {
     handleEnergyChange(setFormData)(value);
@@ -203,24 +202,26 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
 
   return (
     <Pane display="flex" height="100vh">
-      <DashboardLeftCol
-        formData={formData}
-        newTask={newTask}
-        setNewTask={setNewTask}
-        priorities={priorities}
-        handleSimpleChange={handleSimpleChange}
-        handleNestedChange={handleNestedChange}
-        updateTask={updateTask}
-        deleteTask={deleteTask}
-        addTask={addTask}
-        handleReorder={handleReorder}
-        submitForm={handleSubmit}
-        isLoading={isLoading}
-        handleEnergyChange={handleEnergyChangeCallback} // Add this prop
-      />
+      {formData && (
+        <DashboardLeftCol
+          formData={formData}
+          newTask={newTask}
+          setNewTask={setNewTask}
+          priorities={priorities}
+          handleSimpleChange={handleSimpleChange}
+          handleNestedChange={handleNestedChange}
+          updateTask={updateTask}
+          deleteTask={deleteTask}
+          addTask={addTask}
+          handleReorder={handleReorder}
+          submitForm={handleSubmit}
+          isLoading={isLoading}
+          handleEnergyChange={handleEnergyChangeCallback}
+        />
+      )}
       <Pane width="70%" padding={16} background="tint2" overflowY="auto">
         <Heading size={700} marginBottom={16}>Generated Schedule</Heading>
-        {scheduleDays.length > 0 && scheduleDays[currentDayIndex].length > 0 ? (
+        {scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
           renderSchedule
         ) : (
           <Heading size={500} marginTop={32}>
@@ -231,5 +232,20 @@ const Dashboard = ({ formData, setFormData, response, setResponse }) => {
     </Pane>
   );
 };
+
+export async function getStaticProps() {
+  return {
+    props: {
+      formData: {
+        tasks: [],
+        layout_preference: { subcategory: '' },
+        energy_patterns: [],
+        priorities: {},
+        // ... other default properties ...
+      },
+      response: null,
+    },
+  };
+}
 
 export default Dashboard;

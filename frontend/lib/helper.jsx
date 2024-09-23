@@ -239,12 +239,13 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
   try {
     // Prepare the data for the API call
     const data = {
-      current_schedule: currentSchedule.map(item => item.text || item),
-      previous_schedules: previousSchedules.map(schedule => schedule.map(item => item.text || item))
+      current_schedule: currentSchedule,
+      previous_schedules: previousSchedules,
+      user_preferences: userData.layout_preference
     };
 
-    // Make the API call to identify recurring tasks
-    const response = await fetch(`${API_BASE_URL}/identify_recurring_tasks`, {
+    // Make the API call to generate the next day's schedule
+    const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -257,110 +258,11 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
     }
 
     const result = await response.json();
-    console.log("Recurring tasks identified:", result.recurring_tasks);
-
-    const { layout_preference } = userData;
-    const isStructured = layout_preference.subcategory.startsWith('structured');
-
-    // Filter out unfinished tasks
-    const unfinishedTasks = currentSchedule.filter(item => item && !item.completed && !item.is_section);
-
-    // Create a map of recurring tasks to their previous sections
-    const recurringTaskSections = new Map();
-    [...previousSchedules, currentSchedule].forEach(schedule => {
-      schedule.forEach(item => {
-        if (item && result.recurring_tasks.includes(item.text)) {
-          recurringTaskSections.set(item.text, item.section);
-        }
-      });
-    });
-
-    // Combine unfinished and recurring tasks, avoiding duplication
-    const combinedTasks = new Map();
-
-    // First, add all unfinished tasks
-    unfinishedTasks.forEach(task => {
-      combinedTasks.set(task.text, { ...task, isRecurring: false });
-    });
-
-    // Then, add recurring tasks that aren't already in the unfinished tasks
-    result.recurring_tasks.forEach(taskText => {
-      if (!combinedTasks.has(taskText)) {
-        const taskSection = recurringTaskSections.get(taskText) || 'morning';
-        combinedTasks.set(taskText, {
-          text: taskText,
-          completed: false,
-          isRecurring: true,
-          section: taskSection
-        });
-      }
-    });
-
-    let newSchedule = [];
-
-    if (isStructured) {
-      const sections = [
-        { id: 'morning', text: 'Morning 🌅', tasks: [] },
-        { id: 'afternoon', text: 'Afternoon 🌇', tasks: [] },
-        { id: 'evening', text: 'Evening 💤', tasks: [] }
-      ];
-
-      // Categorize tasks
-      Array.from(combinedTasks.values()).forEach(task => {
-        const sectionIndex = getSectionIndex(task.section);
-        if (sectionIndex !== -1) {
-          sections[sectionIndex].tasks.push(task);
-        } else {
-          console.warn(`Task "${task.text}" couldn't be assigned to a section. Defaulting to morning.`);
-          sections[0].tasks.push({...task, section: 'morning'});
-        }
-      });
-
-      // Build new schedule
-      sections.forEach(section => {
-        newSchedule.push({
-          id: `section-${section.id}`,
-          text: section.text,
-          is_section: true,
-          section: section.id,
-          parent_id: null,
-          level: 0,
-          section_index: 0,
-          type: 'section'
-        });
-        section.tasks.forEach((task, index) => {
-          newSchedule.push({
-            ...task,
-            id: `task-${section.id}-${index}-next`,
-            completed: false,
-            section: section.id,
-            is_subtask: task.level > 0,
-            is_section: false,
-            parent_id: null,
-            level: task.level || 0,
-            section_index: index,
-            type: 'task'
-          });
-        });
-      });
-    } else {
-      // For unstructured layout, add tasks in their original order
-      newSchedule = Array.from(combinedTasks.values()).map((task, index) => ({
-        ...task,
-        id: `task-${index}-next`,
-        completed: false,
-        is_subtask: task.level > 0,
-        is_section: false,
-        parent_id: null,
-        level: task.level || 0,
-        section_index: index,
-        type: 'task'
-      }));
-    }
+    console.log("Next day schedule generated:", result.schedule);
 
     return {
       success: true,
-      schedule: newSchedule
+      schedule: result.schedule
     };
 
   } catch (error) {
@@ -370,16 +272,6 @@ export const generateNextDaySchedule = async (currentSchedule, userData, previou
       error: "There was an error generating the next day's schedule. Please try again."
     };
   }
-};
-
-// Helper function to get section index (unchanged)
-const getSectionIndex = (section) => {
-  if (!section) return -1;
-  const lowerSection = section.toLowerCase();
-  if (lowerSection.includes('morning')) return 0;
-  if (lowerSection.includes('afternoon')) return 1;
-  if (lowerSection.includes('evening') || lowerSection.includes('night')) return 2;
-  return -1;
 };
 
 export const cleanupTasks = async (parsedTasks, existingTasks) => {
