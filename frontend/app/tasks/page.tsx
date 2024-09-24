@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TypographyH3, TypographyP } from '../fonts/text';
 import { Input } from '@/components/ui/input';
@@ -9,31 +9,34 @@ import { useToast } from "@/hooks/use-toast";
 import CenteredPane from '@/components/parts/CenteredPane';
 import TaskItem from '@/components/parts/TaskItem';
 import { handleAddTask, handleUpdateTask, handleDeleteTask } from '@/lib/helper';
+import { useForm } from '../../lib/FormContext';
+import { Task } from '../../lib/types';
 
-interface Task {
-  id: string;
-  text: string;
-  categories: string[];
-}
-
-interface FormData {
-  tasks?: Task[];
-}
-
-interface TasksProps {
-  formData: FormData;
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
-}
-
-const Tasks: React.FC<TasksProps> = ({ formData = { tasks: [] }, setFormData }) => {
+const Tasks: React.FC = () => {
   const router = useRouter();
   const [newTask, setNewTask] = useState('');
   const { toast } = useToast();
+  const { state, dispatch } = useForm();
+
+  // Ensure tasks is always an array
+  const tasks = Array.isArray(state.tasks) ? state.tasks : [];
+
+  useEffect(() => {
+    if (!Array.isArray(state.tasks)) {
+      dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: [] });
+    }
+  }, [state.tasks, dispatch]);
 
   const addTask = async () => {
     if (newTask.trim()) {
       try {
-        await handleAddTask(setFormData, newTask, setNewTask, toast);
+        const updatedTasks = await handleAddTask(state.tasks, newTask, []);
+        dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
+        setNewTask('');
+        toast({
+          title: "Success",
+          description: "Task added successfully.",
+        });
       } catch (error) {
         console.error("Error adding task:", error);
         toast({
@@ -46,21 +49,22 @@ const Tasks: React.FC<TasksProps> = ({ formData = { tasks: [] }, setFormData }) 
   };
 
   const updateTask = (updatedTask: Task) => {
-    handleUpdateTask(setFormData, toast)(updatedTask);
+    const updatedTasks = handleUpdateTask(state.tasks, updatedTask);
+    dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
+    toast({
+      title: "Success",
+      description: "Task updated successfully.",
+    });
   };
 
-  const updateTaskCategories = (taskId: string, newCategories: string[]) => {
-    setFormData(prevData => ({
-    ...prevData,
-    tasks: (prevData.tasks ?? []).map(task => 
-        task.id === taskId
-        ? { ...task, categories: newCategories }
-        : task
-    )
-    }));
+  const deleteTask = (taskId: string) => {
+    const updatedTasks = handleDeleteTask(state.tasks, taskId);
+    dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
+    toast({
+      title: "Success",
+      description: "Task deleted successfully.",
+    });
   };
-
-  const deleteTask = (taskId: string) => handleDeleteTask(setFormData, toast)(taskId);
 
   const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -70,6 +74,7 @@ const Tasks: React.FC<TasksProps> = ({ formData = { tasks: [] }, setFormData }) 
   };
 
   const handleNext = () => {
+    console.log('Form data:', state);
     router.push('/energy-patterns');
   };
 
@@ -79,33 +84,33 @@ const Tasks: React.FC<TasksProps> = ({ formData = { tasks: [] }, setFormData }) 
 
   return (
     <CenteredPane heading={<TypographyH3 className="mb-2">What tasks do you have today?</TypographyH3>}>
-    <TypographyP className="mb-4">
-      There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work. You can assign multiple categories to each task.
-    </TypographyP>
-    <div className="space-y-2 w-full">
-      {(formData.tasks || []).map((task) => (
-        <TaskItem
-          key={task.id}
-          task={task}
-          onUpdate={updateTask}
-          onDelete={deleteTask}
-        />
-      ))}
-      <div className="flex items-center w-full">
-      <Input
-        placeholder="+ New task"
-        value={newTask}
-        onChange={(e) => setNewTask(e.target.value)}
-        onKeyDown={handleKeyPress}
-        onBlur={addTask}
-        className="w-full"
-        />
+      <TypographyP className="mb-4">
+        There are 5 categories of task: Exercise, Relationships, Fun, Ambition and Work. You can assign multiple categories to each task.
+      </TypographyP>
+      <div className="space-y-2 w-full">
+        {tasks.map((task: Task) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUpdate={updateTask}
+            onDelete={deleteTask}
+          />
+        ))}
+        <div className="flex items-center w-full">
+          <Input
+            placeholder="+ New task"
+            value={newTask}
+            onChange={(e) => setNewTask(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onBlur={addTask}
+            className="w-full"
+          />
+        </div>
       </div>
-    </div>
-    <div className="w-full flex justify-end space-x-2 mt-6">
+      <div className="w-full flex justify-end space-x-2 mt-6">
         <Button onClick={handlePrevious} variant="ghost">Previous</Button>
         <Button onClick={handleNext}>Next</Button>
-    </div>
+      </div>
     </CenteredPane>
   );
 };

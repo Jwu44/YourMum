@@ -1,40 +1,46 @@
 'use client';
 
-import React from 'react';
-import { TypographyH3 } from '../fonts/text';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { TypographyH3 } from '../fonts/text';
 import { Button } from '../../components/ui/button';
 import { TimePickerInput } from '../../components/parts/TimePicker';
 import CenteredPane from '../../components/parts/CenteredPane';
-import { format, setMinutes } from 'date-fns';
+import { useForm } from '../../lib/FormContext';
+import { format, setMinutes, parse } from 'date-fns';
 
 const WorkTimes = () => {
   const router = useRouter();
-  const [formData, setFormData] = React.useState({
-    work_start_time: setMinutes(new Date().setHours(9), 0),
-    work_end_time: setMinutes(new Date().setHours(17), 0),
-  });
+  const { state, dispatch } = useForm();
 
+  useEffect(() => {
+    if (!state.work_start_time) {
+      dispatch({ type: 'UPDATE_FIELD', field: 'work_start_time', value: '9:00AM' });
+    }
+    if (!state.work_end_time) {
+      dispatch({ type: 'UPDATE_FIELD', field: 'work_end_time', value: '5:00PM' });
+    }
+  }, []);
+  
   const handleTimeChange = (name: 'work_start_time' | 'work_end_time') => (newValue: Date | undefined) => {
     if (newValue) {
-      setFormData(prevData => ({
-        ...prevData,
-        [name]: setMinutes(newValue, 0)  // Always set minutes to 00
-      }));
+      const formattedTime = format(setMinutes(newValue, 0), 'h:mma');
+      dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
     }
   };
 
   const handleNext = () => {
-    const formattedData = {
-      work_start_time: format(formData.work_start_time, 'h:mma'),
-      work_end_time: format(formData.work_end_time, 'h:mma'),
-    };
-    console.log(formattedData);
+    console.log('Form data:', state);
     router.push('/priorities');
   };
 
   const handlePrevious = () => {
     router.push('/personal-details');
+  };
+
+  // Parse the time string to Date object for TimePickerInput
+  const parseTime = (timeString: string) => {
+    return parse(timeString, 'h:mma', new Date());
   };
 
   return (
@@ -45,14 +51,14 @@ const WorkTimes = () => {
           <div className="flex items-center space-x-2">
             <TimePickerInput
               picker="hours"
-              date={formData.work_start_time}
+              date={parseTime(state.work_start_time)}
               setDate={handleTimeChange('work_start_time')}
               aria-label="Work Start Time Hours"
             />
             <span>:</span>
             <TimePickerInput
               picker="minutes"
-              date={formData.work_start_time}
+              date={parseTime(state.work_start_time)}
               setDate={handleTimeChange('work_start_time')}
               aria-label="Work Start Time Minutes"
               value="00"
@@ -65,14 +71,14 @@ const WorkTimes = () => {
           <div className="flex items-center space-x-2">
             <TimePickerInput
               picker="hours"
-              date={formData.work_end_time}
+              date={parseTime(state.work_end_time)}
               setDate={handleTimeChange('work_end_time')}
               aria-label="Work End Time Hours"
             />
             <span>:</span>
             <TimePickerInput
               picker="minutes"
-              date={formData.work_end_time}
+              date={parseTime(state.work_end_time)}
               setDate={handleTimeChange('work_end_time')}
               aria-label="Work End Time Minutes"
               value="00"

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CenteredPane from '@/components/parts/CenteredPane';
 import { Reorder, motion } from 'framer-motion';
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
+import { useForm } from '../../lib/FormContext';
 
 interface Priority {
   id: string;
@@ -16,8 +17,11 @@ interface Priority {
   color: string;
 }
 
-interface FormData {
-  priorities: Record<string, number>;
+interface PrioritiesState {
+  health: string;
+  relationships: string;
+  fun_activities: string;
+  ambitions: string;
 }
 
 const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => (
@@ -33,42 +37,41 @@ const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => (
 
 const PriorityRanking: React.FC = () => {
   const router = useRouter();
-  const [formData, setFormData] = useState<FormData>({
-    priorities: {}
+  const { state, dispatch } = useForm();
+
+  const [priorities, setPriorities] = useState<Priority[]>(() => {
+    const defaultPriorities = [
+      { id: 'health', name: 'Health', icon: ActivitySquare, color: 'text-green-500' },
+      { id: 'relationships', name: 'Relationships', icon: Heart, color: 'text-red-500' },
+      { id: 'fun_activities', name: 'Fun Activities', icon: Smile, color: 'text-blue-500' },
+      { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'text-yellow-500' },
+    ];
+
+    if (state.priorities) {
+      return defaultPriorities.sort((a, b) => 
+        Number((state.priorities as PrioritiesState)[a.id as keyof PrioritiesState]) - 
+        Number((state.priorities as PrioritiesState)[b.id as keyof PrioritiesState])
+      );
+    }
+
+    return defaultPriorities;
   });
-
-  const [priorities, setPriorities] = useState<Priority[]>([
-    { id: 'health', name: 'Health', icon: ActivitySquare, color: 'text-green-500' },
-    { id: 'relationships', name: 'Relationships', icon: Heart, color: 'text-red-500' },
-    { id: 'fun_activities', name: 'Fun Activities', icon: Smile, color: 'text-blue-500' },
-    { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'text-yellow-500' },
-  ]);
-
-  const updateFormData = useCallback((updatedPriorities: Record<string, number>) => {
-    setFormData(prevData => ({
-      ...prevData,
-      priorities: updatedPriorities
-    }));
-  }, []);
 
   useEffect(() => {
     const updatedPriorities = priorities.reduce((acc, priority, index) => {
-      acc[priority.id] = index + 1; // Assign values 1, 2, 3, 4 based on position (top to bottom)
+      acc[priority.id] = (index + 1).toString();
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, string>);
 
-    console.log('Updated priorities ranking:', updatedPriorities);
-
-    updateFormData(updatedPriorities);
-  }, [priorities, updateFormData]);
+    dispatch({ type: 'UPDATE_FIELD', field: 'priorities', value: updatedPriorities });
+  }, [priorities, dispatch]);
 
   const handleReorder = (newPriorities: Priority[]) => {
     setPriorities(newPriorities);
   };
 
   const handleNext = () => {
-    // Here you can handle the submission of the form data
-    console.log('Submitting form data:', formData);
+    console.log('Form data:', state);
     router.push('/tasks');
   };
 
