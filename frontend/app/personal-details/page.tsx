@@ -1,23 +1,24 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation'; 
 import { TypographyH3 } from '../fonts/text';
-import { useRouter } from 'next/navigation';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { handleSimpleInputChange } from '../../lib/helper';
 import CenteredPane from '../../components/parts/CenteredPane';
+import { useForm } from '../../lib/FormContext';
 
-const Personal = () => {
+const PersonalDetails: React.FC = () => {
   const router = useRouter();
-  const [formData, setFormData] = React.useState({
-    name: '',
-    age: '',
-  });
+  const { state, dispatch } = useForm();
 
-  const handleInputChange = handleSimpleInputChange(setFormData);
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    dispatch({ type: 'UPDATE_FIELD', field: name, value });
+  };
 
   const handleNext = () => {
+    console.log('Form data:', state);
     router.push('/work-times');
   };
 
@@ -26,14 +27,14 @@ const Personal = () => {
       <div className="w-full space-y-4">
         <Input
           name="name"
-          value={formData.name}
+          value={state.name}
           onChange={handleInputChange}
           placeholder="Name"
         />
         <Input
           name="age"
           type="number"
-          value={formData.age}
+          value={state.age}
           onChange={handleInputChange}
           placeholder="Age"
         />
@@ -45,4 +46,4 @@ const Personal = () => {
   );
 };
 
-export default Personal;
+export default PersonalDetails;

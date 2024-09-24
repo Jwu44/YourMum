@@ -14,7 +14,7 @@ export default function Home() {
             <li><Link href="/priorities">Priorities</Link></li>
             <li><Link href="/structure-preference">Structure Preference</Link></li>
             <li><Link href="/subcategory-preference">Subcategory Preference</Link></li>
-            <li><Link href="/layout-preference">Layout Preference</Link></li>
+            <li><Link href="/timebox-preference">Layout Preference</Link></li>
             <li><Link href="/dashboard">Dashboard</Link></li>
           </ul>
         </nav>
