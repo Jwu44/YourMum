@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import CenteredPane from '@/components/parts/CenteredPane';
 import { useForm } from '../../lib/FormContext';
 
-const LayoutPreference: React.FC = () => {
+const TimeboxPreference: React.FC = () => {
   const router = useRouter();
   const { state, dispatch } = useForm();
 
@@ -89,4 +89,4 @@ const LayoutPreference: React.FC = () => {
   );
 };
 
-export default LayoutPreference;
+export default TimeboxPreference;

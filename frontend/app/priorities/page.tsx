@@ -9,13 +9,7 @@ import CenteredPane from '@/components/parts/CenteredPane';
 import { Reorder, motion } from 'framer-motion';
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
 import { useForm } from '../../lib/FormContext';
-
-interface Priority {
-  id: string;
-  name: string;
-  icon: React.ElementType;
-  color: string;
-}
+import { Priority } from '../../lib/types';
 
 interface PrioritiesState {
   health: string;
