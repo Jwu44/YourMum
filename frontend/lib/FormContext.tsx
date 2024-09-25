@@ -1,19 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { FormData } from './types';
-
-// Utility type for nested update
-type NestedKeyOf<T> = {
-  [K in keyof T & (string | number)]: T[K] extends object
-    ? `${K}` | `${K}.${NestedKeyOf<T[K]>}`
-    : `${K}`
-}[keyof T & (string | number)];
-
-// Define the actions that can be performed on the form data
-type FormAction =
-  | { type: 'UPDATE_FIELD'; field: NestedKeyOf<FormData>; value: any }
-  | { type: 'RESET_FORM' };
+import { FormData, FormAction } from './types';
 
 // Create the initial state
 const initialState: FormData = {
