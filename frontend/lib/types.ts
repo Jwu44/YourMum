@@ -34,3 +34,28 @@ export interface FormData {
   };
   [key: string]: any;
 }
+
+export interface Priority {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  color: string;
+}
+
+// Utility type for nested update
+export type NestedKeyOf<T> = {
+  [K in keyof T & (string | number)]: T[K] extends object
+    ? `${K}` | `${K}.${NestedKeyOf<T[K]>}`
+    : `${K}`
+}[keyof T & (string | number)];
+
+export type FormAction =
+  | { type: 'UPDATE_FIELD'; field: string; value: any }
+  | { type: 'UPDATE_NESTED_FIELD'; field: string; subField: string; value: any }
+  | { type: 'RESET_FORM' };
+
+  export interface LayoutPreference {
+    timeboxed: 'timeboxed' | 'untimeboxed';
+    subcategory: string;
+    structure?: string;
+  }

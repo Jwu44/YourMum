@@ -1,6 +1,6 @@
 import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, FormData } from './types';
+import { Task, FormData, FormAction } from './types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -265,17 +265,16 @@ export const updatePriorities = (
 };
 
 export const handleEnergyChange = (
-  setFormData: React.Dispatch<React.SetStateAction<any>>
+  dispatch: React.Dispatch<FormAction>
 ) => (value: string): void => {
-  setFormData((prevData: FormData) => {
-    const currentPatterns = prevData.energy_patterns || [];
-    const updatedPatterns = currentPatterns.includes(value)
-      ? currentPatterns.filter((pattern: string) => pattern !== value)
-      : [...currentPatterns, value];
-    
-    return {
-      ...prevData,
-      energy_patterns: updatedPatterns
-    };
+  dispatch({
+    type: 'UPDATE_FIELD',
+    field: 'energy_patterns',
+    value: (prevPatterns: string[]) => {
+      const currentPatterns = prevPatterns || [];
+      return currentPatterns.includes(value)
+        ? currentPatterns.filter((pattern: string) => pattern !== value)
+        : [...currentPatterns, value];
+    }
   });
 };
