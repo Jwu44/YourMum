@@ -50,11 +50,11 @@ const EnergyPattern: React.FC = () => {
   };
 
   return (
-    <CenteredPane heading={<TypographyH3 className="mb-2">How's your energy during the day?</TypographyH3>}>
-      <TypographyP className="mb-4">
+    <CenteredPane heading={<TypographyH3>How's your energy during the day?</TypographyH3>}>
+      <TypographyP>
         Understanding your unique energy patterns helps us create a schedule that maximizes your productivity.
       </TypographyP>
-      <TypographyP className="mb-4 text-left">
+      <TypographyP className="mb-2 text-left">
         Select all that apply:
       </TypographyP>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">

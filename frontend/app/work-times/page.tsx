@@ -45,7 +45,7 @@ const WorkTimes = () => {
 
   return (
     <CenteredPane heading={<TypographyH3 className="mb-6">Work Times</TypographyH3>}>
-      <div className="flex justify-center w-full mb-6 space-x-4">
+      <div className="flex justify-center w-full mb-6 space-x-8">
         <div className="w-full max-w-[150px]">
           <label className="block mb-2 text-sm font-medium">Start Time</label>
           <div className="flex items-center space-x-2">

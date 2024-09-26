@@ -265,16 +265,16 @@ export const updatePriorities = (
 };
 
 export const handleEnergyChange = (
-  dispatch: React.Dispatch<FormAction>
+  dispatch: React.Dispatch<FormAction>,
+  currentPatterns: string[]
 ) => (value: string): void => {
+  const updatedPatterns = currentPatterns.includes(value)
+    ? currentPatterns.filter(pattern => pattern !== value)
+    : [...currentPatterns, value];
+  
   dispatch({
     type: 'UPDATE_FIELD',
     field: 'energy_patterns',
-    value: (prevPatterns: string[]) => {
-      const currentPatterns = prevPatterns || [];
-      return currentPatterns.includes(value)
-        ? currentPatterns.filter((pattern: string) => pattern !== value)
-        : [...currentPatterns, value];
-    }
+    value: updatedPatterns
   });
 };

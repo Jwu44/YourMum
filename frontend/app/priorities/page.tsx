@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import CenteredPane from '@/components/parts/CenteredPane';
 import { Reorder, motion } from 'framer-motion';
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
@@ -75,27 +75,22 @@ const PriorityRanking: React.FC = () => {
 
   return (
     <CenteredPane heading={<TypographyH3 className="mb-6">What are your priorities outside of work?</TypographyH3>}>
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Prioritize Your Values</CardTitle>
-          <p className="text-sm text-gray-500">
-            Drag to reorder the cards. The topmost card is your highest priority (1), and the bottom is the lowest (4).
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Reorder.Group axis="y" values={priorities} onReorder={handleReorder}>
-            {priorities.map((item) => (
-              <Reorder.Item key={item.id} value={item}>
-                <DraggableCard item={item} />
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
-          <div className="w-full flex justify-end space-x-2 mt-6">
-            <Button onClick={handlePrevious} variant="ghost">Previous</Button>
-            <Button onClick={handleNext}>Next</Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md mx-auto">
+        <p className="text-sm text-white mb-4">
+          Drag to reorder the cards. The topmost card is your highest priority, and the bottom is the lowest.
+        </p>
+        <Reorder.Group axis="y" values={priorities} onReorder={handleReorder}>
+          {priorities.map((item) => (
+            <Reorder.Item key={item.id} value={item}>
+              <DraggableCard item={item} />
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
+        <div className="w-full flex justify-end space-x-2 mt-6">
+          <Button onClick={handlePrevious} variant="ghost">Previous</Button>
+          <Button onClick={handleNext}>Next</Button>
+        </div>
+      </div>
     </CenteredPane>
   );
 };
