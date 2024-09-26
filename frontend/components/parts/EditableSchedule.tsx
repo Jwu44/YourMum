@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Task } from '../../lib/types';
-import EditableScheduleRow from './EditableScheduleRow';
+import React, { useMemo, useCallback, useState } from 'react';
+import { Pane } from 'evergreen-ui';
 import { TypographyH4 } from '@/app/fonts/text';
+import EditableScheduleRow from './EditableScheduleRow';
+import { Task } from '../../lib/types';
 
 interface EditableScheduleProps {
   tasks: Task[];
@@ -18,54 +19,119 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onReorderTasks, 
   layoutPreference 
 }) => {
-  const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
+  const [potentialParentId, setPotentialParentId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLocalTasks(tasks);
-  }, [tasks]);
+  const memoizedTasks = useMemo(() => {
+    if (layoutPreference === 'category') {
+      const groupedTasks = tasks.reduce((acc: { [key: string]: Task[] }, task) => {
+        const category = task.categories?.[0] || 'Uncategorized';
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(task);
+        return acc;
+      }, {});
 
-  const moveTask = useCallback((dragIndex: number, hoverIndex: number) => {
-    const draggedTask = localTasks[dragIndex];
-    const newTasks = [...localTasks];
+      return Object.entries(groupedTasks)
+        .filter(([category]) => category !== 'Uncategorized')
+        .flatMap(([category, categoryTasks]) => [
+          {
+            id: `section-${category}`,
+            text: category.charAt(0).toUpperCase() + category.slice(1),
+            is_section: true,
+            type: 'section'
+          } as Task,
+          ...categoryTasks.map(task => ({
+            ...task,
+            type: 'task',
+            section: category
+          }))
+        ]);
+    } else {
+      let currentSection: string | null = null;
+      let sectionStartIndex = 0;
+      return tasks.map((task, index) => {
+        if (task.is_section) {
+          currentSection = task.text;
+          sectionStartIndex = index;
+          return {
+            ...task,
+            type: 'section',
+            section: currentSection,
+            sectionIndex: 0
+          };
+        }
+        return {
+          ...task,
+          type: 'task',
+          section: currentSection,
+          sectionIndex: index - sectionStartIndex
+        };
+      });
+    }
+  }, [tasks, layoutPreference]);
+
+  const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean) => {
+    const draggedTask = memoizedTasks[dragIndex];
+    const newTasks = [...memoizedTasks];
     newTasks.splice(dragIndex, 1);
-    newTasks.splice(hoverIndex, 0, draggedTask);
-    setLocalTasks(newTasks);
+
+    const targetTask = newTasks[hoverIndex];
+    if (shouldIndent && !targetTask.is_section && !draggedTask.is_subtask) {
+      draggedTask.is_subtask = true;
+      draggedTask.level = (targetTask.level || 0) + 1;
+      draggedTask.parent_id = targetTask.id;
+      newTasks.splice(hoverIndex + 1, 0, draggedTask);
+    } else {
+      // If the target is a section, always insert after it
+      if (targetTask.is_section) {
+        newTasks.splice(hoverIndex + 1, 0, draggedTask);
+      } else {
+        newTasks.splice(hoverIndex, 0, draggedTask);
+      }
+      // Reset subtask properties if it's not being indented
+      draggedTask.is_subtask = false;
+      draggedTask.level = 0;
+      draggedTask.parent_id = null;
+    }
+
     onReorderTasks(newTasks);
-  }, [localTasks, onReorderTasks]);
+  }, [memoizedTasks, onReorderTasks]);
 
   const handleUpdateTask = useCallback((updatedTask: Task) => {
-    const newTasks = localTasks.map(task => 
+    const newTasks = memoizedTasks.map(task => 
       task.id === updatedTask.id ? updatedTask : task
     );
-    setLocalTasks(newTasks);
     onUpdateTask(updatedTask);
-  }, [localTasks, onUpdateTask]);
+    onReorderTasks(newTasks);
+  }, [memoizedTasks, onUpdateTask, onReorderTasks]);
 
   const handleDeleteTask = useCallback((taskId: string) => {
-    const newTasks = localTasks.filter(task => task.id !== taskId);
-    setLocalTasks(newTasks);
+    const newTasks = memoizedTasks.filter(task => task.id !== taskId && task.parent_id !== taskId);
     onDeleteTask(taskId);
-  }, [localTasks, onDeleteTask]);
+    onReorderTasks(newTasks);
+  }, [memoizedTasks, onDeleteTask, onReorderTasks]);
 
   return (
-    <div>
-      {localTasks.map((task, index) => (
-        task.is_section ? (
-          <TypographyH4 key={task.id} className="mt-3 mb-1">
-            {task.text}
+    <Pane>
+      {memoizedTasks.map((item, index) => (
+        item.type === 'section' ? (
+          <TypographyH4 key={item.id} className="mt-3 mb-1">
+            {item.text}
           </TypographyH4>
         ) : (
           <EditableScheduleRow
-            key={task.id}
-            task={task}
+            key={item.id}
+            task={item}
             index={index}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
             moveTask={moveTask}
+            isSection={item.is_section}
           />
         )
       ))}
-    </div>
+    </Pane>
   );
 };
 
