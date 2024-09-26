@@ -176,7 +176,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           <TypographyH4 className="mb-2">Layout Preferences</TypographyH4>
           {/* Structure */}
           <div className="mb-4">
-            <Label className="mb-2 block">Structure</Label>
+            <Label className="mb-2 block font-bold">Structure</Label>
             <RadioGroup
               value={formData.layout_preference.structure || ''}
               onValueChange={(value) => handleNestedChange({
@@ -214,7 +214,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           {/* Subcategory */}
           {formData.layout_preference.structure === 'structured' && (
             <div className="mb-4">
-              <Label htmlFor="layout_subcategory" className="mb-2 block">Subcategory</Label>
+              <Label htmlFor="layout_subcategory" className="mb-2 block font-bold">Subcategory</Label>
               <Select
                 value={formData.layout_preference.subcategory || ''}
                 onValueChange={(value) => handleNestedChange({
@@ -235,7 +235,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
 
           {/* Timebox */}
           <div className="mb-4">
-            <Label className="mb-2 block">Timebox</Label>
+            <Label className="mb-2 block font-bold">Timebox</Label>
             <RadioGroup
               value={formData.layout_preference.timeboxed || ''}
               onValueChange={(value) => handleNestedChange({
