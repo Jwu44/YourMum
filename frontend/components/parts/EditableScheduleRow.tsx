@@ -13,7 +13,7 @@ interface EditableScheduleRowProps {
   index: number;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
-  moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean) => void;
+  moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => void;
   isSection: boolean;
   children?: React.ReactNode;
 }
@@ -144,11 +144,16 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     e.preventDefault();
     if (isBrowser() && e.dataTransfer) {
       const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-      moveTask(dragIndex, index, dragType === 'indent' && !isSection);
+      if (isSection) {
+        // When dropping on a section, pass the section name
+        moveTask(dragIndex, index, false, task.text);
+      } else {
+        moveTask(dragIndex, index, dragType === 'indent' && !isSection, null);
+      }
     }
     setIsDragTarget(false);
     setDragType(null);
-  }, [index, moveTask, dragType, isSection]);
+  }, [index, moveTask, dragType, isSection, task.text]);
 
   const handleDragEnd = useCallback(() => {
     if (rowRef.current) {
@@ -168,6 +173,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       className={`relative flex items-center p-2 my-1 bg-background rounded ${isSection ? 'cursor-default' : 'cursor-move'}`}
       style={{
         marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
+        minHeight: isSection ? '40px' : 'auto', // Add minimum height for sections
       }}
     >
       <motion.div
@@ -177,14 +183,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         transition={{ duration: 0.2 }}
         className="flex-grow flex items-center"
       >
-        {task.is_subtask && (
-          <div className="w-4 h-4 mr-2 border-l border-b border-muted" />
+        {!isSection && (
+          <>
+            {task.is_subtask && (
+              <div className="w-4 h-4 mr-2 border-l border-b border-muted" />
+            )}
+            <Checkbox
+              checked={task.completed}
+              onCheckedChange={handleToggleComplete}
+              className="mr-2 border-white"
+            />
+          </>
         )}
-        <Checkbox
-          checked={task.completed}
-          onCheckedChange={handleToggleComplete}
-          className="mr-2 border-white"
-        />
         <div className="flex items-center flex-1">
           {isEditing ? (
             <Input
@@ -196,13 +206,17 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               className="flex-1"
             />
           ) : (
-            <span
-              onClick={() => setIsEditing(true)}
-              className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}
-            >
-              {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
-              {task.text}
-            </span>
+            <>
+              {children || (
+                <span
+                  onClick={() => setIsEditing(true)}
+                  className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}
+                >
+                  {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
+                  {task.text}
+                </span>
+              )}
+            </>
           )}
           {!isEditing && task.categories && task.categories.map((category, index) => (
             <Badge
@@ -214,15 +228,17 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             </Badge>
           ))}
         </div>
-        <Button
-          ref={deleteButtonRef}
-          variant="ghost"
-          size="icon"
-          onClick={handleDelete}
-          className="ml-2 hover:bg-red-700"
-        >
-          <Trash2 className="h-4 w-4 text-white" />
-        </Button>
+        {!isSection && (
+          <Button
+            ref={deleteButtonRef}
+            variant="ghost"
+            size="icon"
+            onClick={handleDelete}
+            className="ml-2 hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4 text-white" />
+          </Button>
+        )}
       </motion.div>
       {isDragTarget && (isSection || dragType === 'below') && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
@@ -233,11 +249,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       {isDragTarget && dragType === 'indent' && !task.is_subtask && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
       )}
-      {isDragTarget && isSection && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
-      )}
     </div>
   );
 };
+
 
 export default React.memo(EditableScheduleRow);
