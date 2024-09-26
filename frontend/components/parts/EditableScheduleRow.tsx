@@ -96,10 +96,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({ task, onUpdat
         <Checkbox
           checked={task.completed}
           onCheckedChange={handleToggleComplete}
-          className="mr-2"
+          className="mr-2 border-white"
         />
-        {isEditing ? (
-          <div className="flex items-center flex-1">
+        <div className="flex items-center flex-1">
+          {isEditing ? (
             <Input
               ref={inputRef}
               value={editedText}
@@ -108,18 +108,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({ task, onUpdat
               onKeyDown={handleKeyDown}
               className="flex-1"
             />
-            <Button
-              ref={deleteButtonRef}
-              variant="destructive"
-              size="icon"
-              onClick={handleDelete}
-              className="ml-2"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center flex-1">
+          ) : (
             <span
               onClick={() => setIsEditing(true)}
               className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}
@@ -127,17 +116,26 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({ task, onUpdat
               {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
               {task.text}
             </span>
-            {!isEditing && task.categories && task.categories.map((category, index) => (
-              <Badge
-                key={index}
-                variant={getCategoryColor(category)}
-                className="ml-1"
-              >
-                {category}
-              </Badge>
-            ))}
-          </div>
-        )}
+          )}
+          {!isEditing && task.categories && task.categories.map((category, index) => (
+            <Badge
+              key={index}
+              variant={getCategoryColor(category)}
+              className="ml-1"
+            >
+              {category}
+            </Badge>
+          ))}
+        </div>
+        <Button
+          ref={deleteButtonRef}
+          variant="ghost"
+          size="icon"
+          onClick={handleDelete}
+          className="ml-2 hover:bg-red-700"
+        >
+          <Trash2 className="h-4 w-4 text-white" />
+        </Button>
       </div>
       {showIndicator && (
         <div

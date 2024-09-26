@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TypographyH3, TypographyP } from '../fonts/text';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import CenteredPane from '@/components/parts/CenteredPane';
 import { useForm } from '../../lib/FormContext';
+import { useToast } from "@/hooks/use-toast";
+import { submitFormData, extractSchedule, parseScheduleToTasks, cleanupTasks } from '@/lib/helper';
+import { Task, LayoutPreference } from '../../lib/types';
 
 const TimeboxPreference: React.FC = () => {
-  const router = useRouter();
   const { state, dispatch } = useForm();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
+  const [currentDayIndex, setCurrentDayIndex] = useState(0);
 
   useEffect(() => {
     if (!state.layout_preference?.timeboxed) {
@@ -37,10 +44,58 @@ const TimeboxPreference: React.FC = () => {
     });
   };
 
-  const handleSubmit = () => {
-    console.log('Form data:', state);
+  const handleSubmit = useCallback(async () => {
+    setIsLoading(true);
+    // Navigate to the dashboard page
     router.push('/dashboard');
-  };
+    try {
+      const result = await submitFormData(state);
+      let scheduleContent = extractSchedule(result);
+      console.log("Extracted schedule content:", scheduleContent);
+  
+      if (!scheduleContent) {
+        toast({
+          title: "Error",
+          description: "No valid schedule found in the response",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      dispatch({ type: 'UPDATE_FIELD', field: 'response', value: scheduleContent });
+      
+      toast({
+        title: "Success",
+        description: "Schedule updated successfully",
+      });
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update schedule. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [state, dispatch, toast]);
+  
+  useEffect(() => {
+    const updateSchedule = async () => {
+      if (state.response && state.tasks) {
+        const layoutPreference: LayoutPreference = {
+          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
+          subcategory: state.layout_preference?.subcategory || ''
+        };
+  
+        const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference);
+        const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
+        setScheduleDays([cleanedTasks]);
+        setCurrentDayIndex(0);
+      }
+    };
+    updateSchedule();
+  }, [state.response, state.tasks, state.layout_preference]);
 
   const handlePrevious = () => {
     if (state.layout_preference?.structure === 'structured') {
