@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
 import { Reorder, motion } from 'framer-motion';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import TaskItem from './TaskItem';
 import { Task, FormData, Priority } from '../../lib/types';
+import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
+import { cn } from "@/lib/utils"; 
 
 interface DashboardLeftColProps {
   formData: FormData;
@@ -28,15 +30,33 @@ interface DashboardLeftColProps {
   isLoading: boolean;
 }
 
-const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => (
-  <motion.div layout>
-    <Card className="mb-4 cursor-move bg-gray-800 border-gray-700">
-      <CardHeader className="flex flex-row items-center space-x-4 py-2">
-        <CardTitle className="text-white">{item.name}</CardTitle>
-      </CardHeader>
-    </Card>
-  </motion.div>
-);
+const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => {
+  const getIcon = (id: string) => {
+    switch (id) {
+      case 'health':
+        return <ActivitySquare className="w-4 h-4 text-green-500" />;
+      case 'relationships':
+        return <Heart className="w-4 h-4 text-red-500" />;
+      case 'fun_activities':
+        return <Smile className="w-4 h-4 text-blue-500" />;
+      case 'ambitions':
+        return <Trophy className="w-4 h-4 text-yellow-500" />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <motion.div layout>
+      <Card className="mb-4 cursor-move bg-gray-800 border-gray-700">
+        <CardHeader className="flex flex-row items-center space-x-4 py-2">
+          {getIcon(item.id)}
+          <p className="text-white text-sm">{item.name}</p>
+        </CardHeader>
+      </Card>
+    </motion.div>
+  );
+};
 
 const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
   formData,
@@ -60,6 +80,8 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
     { value: 'peak_evening', label: 'Energy peaks in the evening', icon: Sunset },
     { value: 'low_energy', label: 'Low energy, need help increasing', icon: Moon },
   ];
+
+  const energyPatterns = formData.energy_patterns || [];
 
   return (
     <div className="h-full w-full p-6 bg-gray-900 overflow-y-auto text-white">
@@ -138,7 +160,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
             <div key={option.value} className="flex items-center mb-2">
               <Checkbox
                 id={option.value}
-                checked={(formData.energy_patterns || []).includes(option.value)}
+                checked={energyPatterns.includes(option.value)}
                 onCheckedChange={() => handleEnergyChange(option.value)}
                 className="mr-2 border-white"
               />
@@ -152,26 +174,47 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
 
         <div>
           <TypographyH4 className="mb-2">Layout Preferences</TypographyH4>
-          <RadioGroup
-            value={formData.layout_preference.structure || ''}
-            onValueChange={(value) => handleNestedChange({
-              target: { name: 'layout_preference.structure', value }
-            } as React.ChangeEvent<HTMLInputElement>)}
-            className="space-y-2"
-          >
-            <div className="flex items-center">
-              <RadioGroupItem value="structured" id="structured" className="border-white" />
-              <Label htmlFor="structured" className="ml-2">Structured day with clear sections</Label>
-            </div>
-            <div className="flex items-center">
-              <RadioGroupItem value="unstructured" id="unstructured" className="border-white" />
-              <Label htmlFor="unstructured" className="ml-2">Flexible day without sections</Label>
-            </div>
-          </RadioGroup>
+          {/* Structure */}
+          <div className="mb-4">
+            <Label className="mb-2 block">Structure</Label>
+            <RadioGroup
+              value={formData.layout_preference.structure || ''}
+              onValueChange={(value) => handleNestedChange({
+                target: { name: 'layout_preference.structure', value }
+              } as React.ChangeEvent<HTMLInputElement>)}
+              className="space-y-2"
+            >
+              <div className="flex items-center">
+                <RadioGroupItem 
+                  value="structured" 
+                  id="structured" 
+                  className={cn(
+                    "border-white",
+                    "before:bg-white before:shadow-white",
+                    "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                  )}
+                />
+                <Label htmlFor="structured" className="ml-2">Structured day with clear sections</Label>
+              </div>
+              <div className="flex items-center">
+                <RadioGroupItem 
+                  value="unstructured" 
+                  id="unstructured" 
+                  className={cn(
+                    "border-white",
+                    "before:bg-white before:shadow-white",
+                    "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                  )}
+                />
+                <Label htmlFor="unstructured" className="ml-2">Flexible day without sections</Label>
+              </div>
+            </RadioGroup>
+          </div>
 
+          {/* Subcategory */}
           {formData.layout_preference.structure === 'structured' && (
-            <div className="mt-4">
-              <Label htmlFor="layout_subcategory">Structured Layout Type</Label>
+            <div className="mb-4">
+              <Label htmlFor="layout_subcategory" className="mb-2 block">Subcategory</Label>
               <Select
                 value={formData.layout_preference.subcategory || ''}
                 onValueChange={(value) => handleNestedChange({
@@ -190,23 +233,43 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
             </div>
           )}
 
-          <RadioGroup
-            value={formData.layout_preference.timeboxed || ''}
-            onValueChange={(value) => handleNestedChange({
-              target: { name: 'layout_preference.timeboxed', value }
-            } as React.ChangeEvent<HTMLInputElement>)}
-            className="mt-4 space-y-2"
-          >
-            <div className="flex items-center">
-              <RadioGroupItem value="timeboxed" id="timeboxed" className="border-white" />
-              <Label htmlFor="timeboxed" className="ml-2">Timeboxed tasks</Label>
+          {/* Timebox */}
+          <div className="mb-4">
+            <Label className="mb-2 block">Timebox</Label>
+            <RadioGroup
+              value={formData.layout_preference.timeboxed || ''}
+              onValueChange={(value) => handleNestedChange({
+                target: { name: 'layout_preference.timeboxed', value }
+              } as React.ChangeEvent<HTMLInputElement>)}
+              className="space-y-2"
+            >
+                <div className="flex items-center">
+                  <RadioGroupItem 
+                    value="timeboxed" 
+                    id="timeboxed" 
+                    className={cn(
+                      "border-white",
+                      "before:bg-white before:shadow-white",
+                      "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                    )}
+                  />
+                  <Label htmlFor="timeboxed" className="ml-2">Timeboxed tasks</Label>
+                </div>
+                <div className="flex items-center">
+                  <RadioGroupItem 
+                    value="untimeboxed" 
+                    id="untimeboxed" 
+                    className={cn(
+                      "border-white",
+                      "before:bg-white before:shadow-white",
+                      "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                    )}
+                  />
+                  <Label htmlFor="untimeboxed" className="ml-2">Flexible timing</Label>
+                </div>
+              </RadioGroup>
             </div>
-            <div className="flex items-center">
-              <RadioGroupItem value="untimeboxed" id="untimeboxed" className="border-white" />
-              <Label htmlFor="untimeboxed" className="ml-2">Flexible timing</Label>
-            </div>
-          </RadioGroup>
-        </div>
+          </div>
 
         <Button 
           onClick={submitForm} 

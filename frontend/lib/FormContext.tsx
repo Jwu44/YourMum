@@ -33,6 +33,14 @@ const formReducer = (state: FormData, action: FormAction): FormData => {
   switch (action.type) {
     case 'UPDATE_FIELD':
       return setNestedProperty({...state}, action.field, action.value);
+    case 'UPDATE_NESTED_FIELD':
+      return {
+        ...state,
+        [action.field]: {
+          ...state[action.field],
+          [action.subField]: action.value
+        }
+      };
     case 'RESET_FORM':
       return initialState;
     default:

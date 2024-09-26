@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvided, DraggableStateSnapshot, DroppableProvided, DragUpdate } from 'react-beautiful-dnd';
 import { Pane } from 'evergreen-ui';
-import { TypographyH2 } from '@/app/fonts/text';
+import { TypographyH4 } from '@/app/fonts/text';
 import { Task } from '../../lib/types';
 import EditableScheduleRow from './EditableScheduleRow';
 
@@ -34,19 +34,21 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({ tasks, onUpdateTask
         return acc;
       }, {});
 
-      return Object.entries(groupedTasks).flatMap(([category, categoryTasks]) => [
-        {
-          id: `section-${category}`,
-          text: category.charAt(0).toUpperCase() + category.slice(1),
-          is_section: true,
-          type: 'section'
-        } as Task,
-        ...categoryTasks.map(task => ({
-          ...task,
-          type: 'task',
-          section: category
-        }))
-      ]);
+      return Object.entries(groupedTasks)
+        .filter(([category]) => category !== 'Uncategorized') // Remove Uncategorized category
+        .flatMap(([category, categoryTasks]) => [
+          {
+            id: `section-${category}`,
+            text: category.charAt(0).toUpperCase() + category.slice(1),
+            is_section: true,
+            type: 'section'
+          } as Task,
+          ...categoryTasks.map(task => ({
+            ...task,
+            type: 'task',
+            section: category
+          }))
+        ]);
     } else {
       let currentSection: string | null = null;
       let sectionStartIndex = 0;
@@ -168,20 +170,20 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({ tasks, onUpdateTask
       className={`editable-schedule-row ${snapshot.isDragging ? 'is-dragging' : ''}`}
     >
       {item.type === 'section' ? (
-        <TypographyH2 className="mt-4 mb-2">
+        <TypographyH4 className="mt-3 mb-1">
           {item.text}
-        </TypographyH2>
+        </TypographyH4>
       ) : (
         <EditableScheduleRow
           task={item}
           onUpdateTask={onUpdateTask}
-          onDeleteTask={handleDeleteTask}
+          onDeleteTask={onDeleteTask}
           isDragging={snapshot.isDragging}
           showIndicator={potentialParentId === item.id}
         />
       )}
     </Pane>
-  ), [onUpdateTask, handleDeleteTask, potentialParentId]);
+  ), [onUpdateTask, onDeleteTask, potentialParentId]);
 
   return (
     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
@@ -189,11 +191,11 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({ tasks, onUpdateTask
         {(provided: DroppableProvided) => (
           <Pane
             ref={(el: HTMLDivElement | null) => {
-                provided.innerRef(el);
-                containerRef.current = el;
+              provided.innerRef(el);
+              containerRef.current = el;
             }}
             {...provided.droppableProps}
-            >
+          >
             {allItems.map((item, index) => (
               <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={item.type === 'section'}>
                 {(provided, snapshot) => renderDraggable({ item, snapshot, provided })}

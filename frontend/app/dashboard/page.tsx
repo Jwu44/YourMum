@@ -237,9 +237,9 @@ const Dashboard: React.FC = () => {
       );
       
       if (result.success) {
-  setScheduleDays(prevDays => [...prevDays, result.schedule as Task[]]);
-  setCurrentDayIndex(prevIndex => prevIndex + 1);
-} else {
+        setScheduleDays(prevDays => [...prevDays, result.schedule as Task[]]);
+        setCurrentDayIndex(prevIndex => prevIndex + 1);
+    } else {
         toast({
           title: "Error",
           description: result.error,
@@ -263,12 +263,13 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex]);
 
   const handleEnergyChangeCallback = useCallback((value: string) => {
-    handleEnergyChange(dispatch)(value);
-  }, [dispatch]);
+    const currentPatterns = state.energy_patterns || [];
+    handleEnergyChange(dispatch, currentPatterns)(value);
+  }, [dispatch, state.energy_patterns]);
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
-      <div className="w-full p-6 overflow-y-auto">
+      <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto"> 
         <div className="flex justify-between items-center mb-6">
           <TypographyH3 className="text-white">Generated Schedule</TypographyH3>
           <Sheet>
@@ -295,7 +296,7 @@ const Dashboard: React.FC = () => {
           </Sheet>
         </div>
         {scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
-          <div className="bg-gray-900 p-6 rounded-lg shadow-lg">
+          <div className="rounded-lg shadow-lg px-8 py-6">
             <EditableSchedule
               tasks={scheduleDays[currentDayIndex] || []}
               onUpdateTask={handleScheduleTaskUpdate}
