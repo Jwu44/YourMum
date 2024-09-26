@@ -204,16 +204,10 @@ const Dashboard: React.FC = () => {
     });
   }, [currentDayIndex]);
   
-  const handleScheduleReorder = useCallback((reorderedItems: Task[]) => {
+  const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
-      if (newDays[currentDayIndex]) {
-        newDays[currentDayIndex] = reorderedItems.map((item, index) => ({
-          ...item,
-          is_section: item.type === 'section',
-          section_index: index
-        }));
-      }
+      newDays[currentDayIndex] = reorderedTasks;
       return newDays;
     });
   }, [currentDayIndex]);
@@ -298,10 +292,10 @@ const Dashboard: React.FC = () => {
         {scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
           <div className="rounded-lg shadow-lg px-8 py-6">
             <EditableSchedule
-              tasks={scheduleDays[currentDayIndex] || []}
+              tasks={scheduleDays[currentDayIndex]}
               onUpdateTask={handleScheduleTaskUpdate}
               onDeleteTask={handleScheduleTaskDelete}
-              onReorderTasks={handleScheduleReorder}
+              onReorderTasks={handleReorderTasks}
               layoutPreference={state.layout_preference?.subcategory || ''}
             />
             <div className="flex justify-between mt-6">
