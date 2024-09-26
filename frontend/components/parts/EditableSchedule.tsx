@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Pane } from 'evergreen-ui';
 import { TypographyH4 } from '@/app/fonts/text';
 import EditableScheduleRow from './EditableScheduleRow';
@@ -19,8 +19,6 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onReorderTasks, 
   layoutPreference 
 }) => {
-  const [potentialParentId, setPotentialParentId] = useState<string | null>(null);
-
   const memoizedTasks = useMemo(() => {
     if (layoutPreference === 'category') {
       const groupedTasks = tasks.reduce((acc: { [key: string]: Task[] }, task) => {
@@ -71,28 +69,52 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     }
   }, [tasks, layoutPreference]);
 
-  const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean) => {
+  const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => {
     const draggedTask = memoizedTasks[dragIndex];
     const newTasks = [...memoizedTasks];
     newTasks.splice(dragIndex, 1);
 
-    const targetTask = newTasks[hoverIndex];
-    if (shouldIndent && !targetTask.is_section && !draggedTask.is_subtask) {
-      draggedTask.is_subtask = true;
-      draggedTask.level = (targetTask.level || 0) + 1;
-      draggedTask.parent_id = targetTask.id;
-      newTasks.splice(hoverIndex + 1, 0, draggedTask);
+    if (targetSection) {
+      // Find the index of the section header
+      const sectionIndex = newTasks.findIndex(task => task.is_section && task.text === targetSection);
+      if (sectionIndex !== -1) {
+        // Insert the task right after the section header
+        newTasks.splice(sectionIndex + 1, 0, { 
+          ...draggedTask, 
+          section: targetSection, 
+          is_subtask: false, 
+          level: 0, 
+          parent_id: null,
+          categories: [targetSection] // Update the task's category
+        });
+      } else {
+        // If section not found, add to the end
+        newTasks.push({ 
+          ...draggedTask, 
+          section: targetSection, 
+          is_subtask: false, 
+          level: 0, 
+          parent_id: null,
+          categories: [targetSection] // Update the task's category
+        });
+      }
     } else {
-      // If the target is a section, always insert after it
-      if (targetTask.is_section) {
+      const targetTask = newTasks[hoverIndex];
+      if (shouldIndent && !targetTask.is_section && !draggedTask.is_subtask) {
+        draggedTask.is_subtask = true;
+        draggedTask.level = (targetTask.level || 0) + 1;
+        draggedTask.parent_id = targetTask.id;
         newTasks.splice(hoverIndex + 1, 0, draggedTask);
       } else {
-        newTasks.splice(hoverIndex, 0, draggedTask);
+        if (targetTask.is_section) {
+          newTasks.splice(hoverIndex + 1, 0, draggedTask);
+        } else {
+          newTasks.splice(hoverIndex, 0, draggedTask);
+        }
+        draggedTask.is_subtask = false;
+        draggedTask.level = 0;
+        draggedTask.parent_id = null;
       }
-      // Reset subtask properties if it's not being indented
-      draggedTask.is_subtask = false;
-      draggedTask.level = 0;
-      draggedTask.parent_id = null;
     }
 
     onReorderTasks(newTasks);
@@ -115,21 +137,31 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   return (
     <Pane>
       {memoizedTasks.map((item, index) => (
-        item.type === 'section' ? (
-          <TypographyH4 key={item.id} className="mt-3 mb-1">
-            {item.text}
-          </TypographyH4>
-        ) : (
-          <EditableScheduleRow
-            key={item.id}
-            task={item}
-            index={index}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            moveTask={moveTask}
-            isSection={item.is_section}
-          />
-        )
+        <React.Fragment key={item.id}>
+          {item.type === 'section' ? (
+            <EditableScheduleRow
+              task={item}
+              index={index}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              moveTask={moveTask}
+              isSection={true}
+            >
+              <TypographyH4 className="mt-3 mb-1">
+                {item.text}
+              </TypographyH4>
+            </EditableScheduleRow>
+          ) : (
+            <EditableScheduleRow
+              task={item}
+              index={index}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              moveTask={moveTask}
+              isSection={false}
+            />
+          )}
+        </React.Fragment>
       ))}
     </Pane>
   );
