@@ -136,7 +136,8 @@ const Dashboard: React.FC = () => {
       
       const layoutPreference: LayoutPreference = {
         timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-        subcategory: state.layout_preference?.subcategory || ''
+        subcategory: state.layout_preference?.subcategory || '',
+        structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
       };
   
       const parsedTasks = await parseScheduleToTasks(scheduleContent, state.tasks || [], layoutPreference);
@@ -165,7 +166,8 @@ const Dashboard: React.FC = () => {
       if (state.response && state.tasks) {
         const layoutPreference: LayoutPreference = {
           timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-          subcategory: state.layout_preference?.subcategory || ''
+          subcategory: state.layout_preference?.subcategory || '',
+          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
         };
   
         const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference);
@@ -214,29 +216,33 @@ const Dashboard: React.FC = () => {
 
   const handleNextDay = useCallback(async () => {
     const currentSchedule = scheduleDays[currentDayIndex];
-    if (!Array.isArray(currentSchedule)) {
+    if (!Array.isArray(currentSchedule) || currentSchedule.length === 0) {
       toast({
         title: "Error",
-        description: "Invalid schedule data. Please try again.",
+        description: "Invalid or empty schedule data. Please try again.",
         variant: "destructive",
       });
       return;
     }
-
+  
     try {
       const result = await generateNextDaySchedule(
-        currentSchedule, 
-        state, 
+        currentSchedule,
+        state,
         scheduleDays.slice(0, currentDayIndex + 1)
       );
       
-      if (result.success) {
+      if (result.success && result.schedule) {
         setScheduleDays(prevDays => [...prevDays, result.schedule as Task[]]);
         setCurrentDayIndex(prevIndex => prevIndex + 1);
-    } else {
+        toast({
+          title: "Success",
+          description: "Next day's schedule generated successfully.",
+        });
+      } else {
         toast({
           title: "Error",
-          description: result.error,
+          description: result.error || "Failed to generate next day's schedule. Please try again.",
           variant: "destructive",
         });
       }
@@ -244,11 +250,11 @@ const Dashboard: React.FC = () => {
       console.error("Error generating next day schedule:", error);
       toast({
         title: "Error",
-        description: "Failed to generate next day's schedule. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     }
-  }, [scheduleDays, currentDayIndex, state, toast]);
+  }, [scheduleDays, currentDayIndex, state, toast, generateNextDaySchedule]);
 
   const handlePreviousDay = useCallback(() => {
     if (currentDayIndex > 0) {
@@ -298,17 +304,16 @@ const Dashboard: React.FC = () => {
               onReorderTasks={handleReorderTasks}
               layoutPreference={state.layout_preference?.subcategory || ''}
             />
-            <div className="flex justify-between mt-6">
+            <div className="w-full flex justify-end space-x-2 mt-6">
               <Button
                 onClick={handlePreviousDay}
                 disabled={currentDayIndex === 0}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                variant="ghost"
               >
-                Previous
+                Previous Day
               </Button>
               <Button 
                 onClick={handleNextDay}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Next Day
               </Button>
