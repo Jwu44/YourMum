@@ -90,3 +90,13 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.drawer-background {
+  background-color: #000000;  /* or any color that matches your theme */
+  opacity: 1 !important;
+}
+
+.drawer-content {
+  background-color: #000000;  /* or any color that matches your theme */
+  opacity: 1 !important;
+}
