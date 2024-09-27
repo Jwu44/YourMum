@@ -54,8 +54,8 @@ export type FormAction =
   | { type: 'UPDATE_NESTED_FIELD'; field: string; subField: string; value: any }
   | { type: 'RESET_FORM' };
 
-  export interface LayoutPreference {
-    timeboxed: 'timeboxed' | 'untimeboxed';
-    subcategory: string;
-    structure?: string;
-  }
+export interface LayoutPreference {
+  structure: 'structured' | 'unstructured';
+  subcategory: string;
+  timeboxed: 'timeboxed' | 'untimeboxed';
+}

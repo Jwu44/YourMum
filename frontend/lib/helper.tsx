@@ -1,17 +1,9 @@
 import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, FormData, FormAction } from './types';
+import type { FormData } from './types';
+import { Task, FormAction, LayoutPreference } from './types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
-
-interface LayoutPreference {
-  timeboxed?: string;
-  [key: string]: any;
-}
-
-interface UserData {
-  layout_preference: LayoutPreference;
-}
 
 export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
   (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,36 +187,62 @@ export const parseScheduleToTasks = async (
 
 export const generateNextDaySchedule = async (
   currentSchedule: Task[],
-  userData: UserData,
+  userData: FormData,
   previousSchedules: Task[][] = []
 ): Promise<{ success: boolean; schedule?: Task[]; error?: string }> => {
-  console.log("Generating next day schedule");
+  console.log("Generating next day schedule locally");
 
   try {
-    const data = {
-      current_schedule: currentSchedule,
-      previous_schedules: previousSchedules,
-      user_preferences: userData.layout_preference
-    };
+    // Step 1: Identify unfinished tasks
+    const unfinishedTasks = currentSchedule.filter(task => !task.completed && !task.is_section);
 
-    const response = await fetch(`${API_BASE_URL}/generate_next_day_schedule`, {
+    // Step 2: Identify recurring tasks
+    const recurringTasksResponse = await fetch(`${API_BASE_URL}/identify_recurring_tasks`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_schedule: currentSchedule,
+        previous_schedules: previousSchedules
+      })
     });
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+    if (!recurringTasksResponse.ok) {
+      throw new Error('Failed to identify recurring tasks');
     }
 
-    const result = await response.json();
-    console.log("Next day schedule generated:", result.schedule);
+    const recurringTasksData = await recurringTasksResponse.json();
+    const recurringTasks = recurringTasksData.recurring_tasks;
+
+    // Step 3: Combine unfinished and recurring tasks
+    let combinedTasks = [...unfinishedTasks, ...recurringTasks.filter((task: Task) => 
+      !unfinishedTasks.some(unfinished => unfinished.id === task.id)
+    )];
+
+    // Step 4: Format the next day schedule based on layout preference
+    const layoutPreference: LayoutPreference = {
+      structure: userData.layout_preference.structure as 'structured' | 'unstructured',
+      subcategory: userData.layout_preference.subcategory,
+      timeboxed: userData.layout_preference.timeboxed as 'timeboxed' | 'untimeboxed'
+    };
+    let formattedSchedule: Task[] = [];
+
+    if (layoutPreference.structure === 'structured') {
+      const sections = getSectionsFromCurrentSchedule(currentSchedule);
+      formattedSchedule = formatStructuredSchedule(combinedTasks, sections, layoutPreference);
+    } else {
+      formattedSchedule = formatUnstructuredSchedule(combinedTasks, layoutPreference);
+    }
+
+    // Step 5: Assign time slots if timeboxed
+    if (layoutPreference.timeboxed === 'timeboxed') {
+      formattedSchedule = assignTimeSlots(formattedSchedule, userData.work_start_time, userData.work_end_time);
+    }
+
+    console.log("Next day schedule generated locally:", formattedSchedule);
 
     return {
       success: true,
-      schedule: result.schedule
+      schedule: formattedSchedule
     };
 
   } catch (error) {
@@ -234,6 +252,90 @@ export const generateNextDaySchedule = async (
       error: "There was an error generating the next day's schedule. Please try again."
     };
   }
+};
+
+const getSectionsFromCurrentSchedule = (currentSchedule: Task[]): string[] => {
+  return currentSchedule
+    .filter(task => task.is_section)
+    .map(section => section.text);
+};
+
+const formatStructuredSchedule = (
+  tasks: Task[],
+  sections: string[],
+  layoutPreference: LayoutPreference
+): Task[] => {
+  const formattedSchedule: Task[] = [];
+
+  sections.forEach(section => {
+    formattedSchedule.push({
+      id: `section-${section.toLowerCase().replace(/\s+/g, '-')}`,
+      text: section,
+      is_section: true,
+      type: 'section',
+      completed: false,
+      categories: [],
+      is_subtask: false,
+      section: section,
+      parent_id: null,
+      level: 0,
+      section_index: formattedSchedule.length
+    });
+
+    const sectionTasks = tasks.filter(task => task.section === section);
+    formattedSchedule.push(...sectionTasks);
+  });
+
+  // Add tasks without a section at the end
+  const tasksWithoutSection = tasks.filter(task => !task.section);
+  if (tasksWithoutSection.length > 0) {
+    const lastSection = sections[sections.length - 1] || 'Other Tasks';
+    if (!formattedSchedule.some(task => task.text === lastSection)) {
+      formattedSchedule.push({
+        id: `section-${lastSection.toLowerCase().replace(/\s+/g, '-')}`,
+        text: lastSection,
+        is_section: true,
+        type: 'section',
+        completed: false,
+        categories: [],
+        is_subtask: false,
+        section: lastSection,
+        parent_id: null,
+        level: 0,
+        section_index: formattedSchedule.length
+      });
+    }
+    formattedSchedule.push(...tasksWithoutSection.map(task => ({ ...task, section: lastSection })));
+  }
+
+  return formattedSchedule;
+};
+
+const formatUnstructuredSchedule = (tasks: Task[], layoutPreference: LayoutPreference): Task[] => {
+  return tasks;
+};
+
+const assignTimeSlots = (schedule: Task[], workStartTime: string, workEndTime: string): Task[] => {
+  const workStart = new Date(`1970-01-01T${workStartTime}`);
+  const workEnd = new Date(`1970-01-01T${workEndTime}`);
+  const totalMinutes = (workEnd.getTime() - workStart.getTime()) / 60000;
+  const minutesPerTask = Math.floor(totalMinutes / schedule.filter(task => !task.is_section).length);
+
+  let currentTime = new Date(workStart);
+
+  return schedule.map(task => {
+    if (task.is_section) return task;
+
+    const startTime = currentTime.toTimeString().slice(0, 5);
+    currentTime.setMinutes(currentTime.getMinutes() + minutesPerTask);
+    const endTime = currentTime.toTimeString().slice(0, 5);
+
+    return {
+      ...task,
+      start_time: startTime,
+      end_time: endTime
+    };
+  });
 };
 
 export const cleanupTasks = async (parsedTasks: Task[], existingTasks: Task[]): Promise<Task[]> => {
