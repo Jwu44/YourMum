@@ -7,6 +7,7 @@ export default function Home() {
         <h1>Welcome to Your App</h1>
         <nav>
           <ul>
+            <li><Link href="/home">Home</Link></li>
             <li><Link href="/personal-details">Personal Details</Link></li>
             <li><Link href="/work-times">Work Times</Link></li>
             <li><Link href="/tasks">Tasks</Link></li>

@@ -123,8 +123,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   }, []);
 
   return (
-    <>
-      <motion.div
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div
         ref={rowRef}
         draggable={!isSection && isBrowser()}
         onDragStart={handleDragStart}
@@ -132,10 +137,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
-        transition={{ duration: 0.2 }}
         className={`relative flex items-center p-2 my-1 bg-background rounded ${isSection ? 'cursor-default flex-col items-start' : 'cursor-move'}`}
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
@@ -189,7 +190,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         {isDragTarget && dragType === 'indent' && !task.is_subtask && (
           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
         )}
-      </motion.div>
+      </div>
       {isDrawerOpen && (
         <TaskEditDrawer
           isOpen={isDrawerOpen}
@@ -198,7 +199,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           onUpdateTask={onUpdateTask}
         />
       )}
-    </>
+    </motion.div>
   );
 };
 

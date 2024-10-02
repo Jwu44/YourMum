@@ -214,9 +214,15 @@ export const generateNextDaySchedule = async (
     const recurringTasks = recurringTasksData.recurring_tasks;
 
     // Step 3: Combine unfinished and recurring tasks
-    let combinedTasks = [...unfinishedTasks, ...recurringTasks.filter((task: Task) => 
-      !unfinishedTasks.some(unfinished => unfinished.id === task.id)
-    )];
+    let combinedTasks = [
+      ...unfinishedTasks,
+      ...recurringTasks.map((task: Task) => ({
+        ...task,
+        completed: false // Ensure recurring tasks are set to not completed
+      })).filter((task: Task) => 
+        !unfinishedTasks.some(unfinished => unfinished.id === task.id)
+      )
+    ];
 
     // Step 4: Format the next day schedule based on layout preference
     const layoutPreference: LayoutPreference = {
