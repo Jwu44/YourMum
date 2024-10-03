@@ -50,14 +50,14 @@ def add_task():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/identify_recurring_tasks", methods=["POST"])
-def get_recurring_tasks():
+def recurring_tasks():
     try:
         data = request.json
-        if not data or 'current_schedule' not in data:
-            return jsonify({"error": "No current schedule provided"}), 400
+        if not data or 'current_schedule' not in data or 'previous_schedules' not in data:
+            return jsonify({"error": "Invalid data provided"}), 400
         
         current_schedule = data['current_schedule']
-        previous_schedules = data.get('previous_schedules', [])
+        previous_schedules = data['previous_schedules']
         
         print("Identifying recurring tasks")
         recurring_tasks = identify_recurring_tasks(current_schedule, previous_schedules)

@@ -6,7 +6,7 @@ import uuid
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-COLAB_BASE_URL = "https://c354-34-85-238-81.ngrok-free.app" 
+COLAB_BASE_URL = "https://0609-35-237-247-52.ngrok-free.app" 
 
 def process_user_data(user_data):
     colab_url = f"{COLAB_BASE_URL}/process_user_data"
@@ -61,18 +61,19 @@ def categorize_task(task_text):
 def identify_recurring_tasks(current_schedule, previous_schedules):
     url = f"{COLAB_BASE_URL}/identify_recurring_tasks"
     
+    data = {
+        "current_schedule": current_schedule,
+        "previous_schedules": previous_schedules
+    }
+    
     try:
-        data = {
-            "current_schedule": current_schedule,
-            "previous_schedules": previous_schedules
-        }
         response = requests.post(url, json=data, verify=False)
         
         if response.status_code == 200:
             result = response.json()
             return result.get('recurring_tasks', [])
         else:
-            raise Exception(f"Recurring task identification failed: {response.text}")
+            raise Exception(f"Recurring tasks identification failed: {response.text}")
     
     except requests.exceptions.RequestException as e:
         print(f"Request failed: {e}")
