@@ -1,4 +1,4 @@
-import React, { useState} from 'react';
+import React, { useCallback} from 'react';
 import { TypographyH3, TypographyH4 } from '@/app/fonts/text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,9 @@ import { Sun, Sunrise, Sunset, Moon, Flower } from 'lucide-react';
 import { Reorder, motion } from 'framer-motion';
 import { Card, CardHeader } from '@/components/ui/card';
 import TaskItem from './TaskItem';
-import { Task, FormData, Priority } from '../../lib/types';
+import { Task, Priority } from '../../lib/types';
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
 import { cn } from "@/lib/utils";
-// import { handleSimpleInputChange, handleNestedInputChange } from '@/lib/helper';
 import { useForm } from '../../lib/FormContext';
 
 interface DashboardLeftColProps {
@@ -70,14 +69,13 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
   isLoading
 }) => {
   const { state, dispatch } = useForm();
-  const [localLayoutPreference, setLocalLayoutPreference] = useState(state.layout_preference);
 
   const handleSimpleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     dispatch({ type: 'UPDATE_FIELD', field: name, value });
   };
 
-  const handleNestedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleNestedChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const [category, subCategory] = name.split('.');
     dispatch({ 
@@ -86,7 +84,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
       subField: subCategory,
       value 
     });
-  };
+  }, [dispatch]);
 
   const energyOptions = [
     { value: 'high_all_day', label: 'High-Full of energy during the day', icon: Flower },
