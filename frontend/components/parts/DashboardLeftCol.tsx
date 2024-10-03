@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState} from 'react';
 import { TypographyH3, TypographyH4 } from '@/app/fonts/text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,14 @@ import { Card, CardHeader } from '@/components/ui/card';
 import TaskItem from './TaskItem';
 import { Task, FormData, Priority } from '../../lib/types';
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
-import { cn } from "@/lib/utils"; 
+import { cn } from "@/lib/utils";
+// import { handleSimpleInputChange, handleNestedInputChange } from '@/lib/helper';
+import { useForm } from '../../lib/FormContext';
 
 interface DashboardLeftColProps {
-  formData: FormData;
   newTask: string;
   setNewTask: (task: string) => void;
   priorities: Priority[];
-  handleSimpleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleNestedChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   updateTask: (task: Task) => void;
   deleteTask: (taskId: string) => void;
   addTask: () => void;
@@ -59,12 +58,9 @@ const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => {
 };
 
 const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
-  formData,
   newTask,
   setNewTask,
   priorities,
-  handleSimpleChange,
-  handleNestedChange,
   updateTask,
   deleteTask,
   addTask,
@@ -73,6 +69,25 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
   handleEnergyChange,
   isLoading
 }) => {
+  const { state, dispatch } = useForm();
+  const [localLayoutPreference, setLocalLayoutPreference] = useState(state.layout_preference);
+
+  const handleSimpleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    dispatch({ type: 'UPDATE_FIELD', field: name, value });
+  };
+
+  const handleNestedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const [category, subCategory] = name.split('.');
+    dispatch({ 
+      type: 'UPDATE_NESTED_FIELD', 
+      field: category,
+      subField: subCategory,
+      value 
+    });
+  };
+
   const energyOptions = [
     { value: 'high_all_day', label: 'High-Full of energy during the day', icon: Flower },
     { value: 'peak_morning', label: 'Energy peaks in the morning', icon: Sunrise },
@@ -81,7 +96,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
     { value: 'low_energy', label: 'Low energy, need help increasing', icon: Moon },
   ];
 
-  const energyPatterns = formData.energy_patterns || [];
+  const energyPatterns = state.energy_patterns || [];
 
   return (
     <div className="h-full w-full p-6 bg-gray-900 overflow-y-auto text-white">
@@ -92,7 +107,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           <Input
             id="work_start_time"
             name="work_start_time"
-            value={formData.work_start_time}
+            value={state.work_start_time}
             onChange={handleSimpleChange}
             placeholder="Enter your work start time"
             className="bg-gray-800 text-white border-gray-700"
@@ -103,7 +118,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           <Input
             id="work_end_time"
             name="work_end_time"
-            value={formData.work_end_time}
+            value={state.work_end_time}
             onChange={handleSimpleChange}
             placeholder="Enter your work end time"
             className="bg-gray-800 text-white border-gray-700"
@@ -112,7 +127,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
 
         <div>
           <TypographyH4 className="mb-2">Tasks</TypographyH4>
-          {formData.tasks.map((task: Task) => (
+          {state.tasks.map((task: Task) => (
             <TaskItem
               key={task.id}
               task={task}
@@ -178,7 +193,7 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           <div className="mb-4">
             <Label className="mb-2 block font-bold">Structure</Label>
             <RadioGroup
-              value={formData.layout_preference.structure || ''}
+              value={state.layout_preference.structure || ''}
               onValueChange={(value) => handleNestedChange({
                 target: { name: 'layout_preference.structure', value }
               } as React.ChangeEvent<HTMLInputElement>)}
@@ -212,11 +227,11 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           </div>
 
           {/* Subcategory */}
-          {formData.layout_preference.structure === 'structured' && (
+          {state.layout_preference.structure === 'structured' && (
             <div className="mb-4">
               <Label htmlFor="layout_subcategory" className="mb-2 block font-bold">Subcategory</Label>
               <Select
-                value={formData.layout_preference.subcategory || ''}
+                value={state.layout_preference.subcategory || ''}
                 onValueChange={(value) => handleNestedChange({
                   target: { name: 'layout_preference.subcategory', value }
                 } as React.ChangeEvent<HTMLSelectElement>)}
@@ -237,39 +252,39 @@ const DashboardLeftCol: React.FC<DashboardLeftColProps> = ({
           <div className="mb-4">
             <Label className="mb-2 block font-bold">Timebox</Label>
             <RadioGroup
-              value={formData.layout_preference.timeboxed || ''}
+              value={state.layout_preference.timeboxed || ''}
               onValueChange={(value) => handleNestedChange({
                 target: { name: 'layout_preference.timeboxed', value }
               } as React.ChangeEvent<HTMLInputElement>)}
               className="space-y-2"
             >
-                <div className="flex items-center">
-                  <RadioGroupItem 
-                    value="timeboxed" 
-                    id="timeboxed" 
-                    className={cn(
-                      "border-white",
-                      "before:bg-white before:shadow-white",
-                      "data-[state=checked]:border-white data-[state=checked]:bg-white"
-                    )}
-                  />
-                  <Label htmlFor="timeboxed" className="ml-2">Timeboxed tasks</Label>
-                </div>
-                <div className="flex items-center">
-                  <RadioGroupItem 
-                    value="untimeboxed" 
-                    id="untimeboxed" 
-                    className={cn(
-                      "border-white",
-                      "before:bg-white before:shadow-white",
-                      "data-[state=checked]:border-white data-[state=checked]:bg-white"
-                    )}
-                  />
-                  <Label htmlFor="untimeboxed" className="ml-2">Flexible timing</Label>
-                </div>
-              </RadioGroup>
-            </div>
+              <div className="flex items-center">
+                <RadioGroupItem 
+                  value="timeboxed" 
+                  id="timeboxed" 
+                  className={cn(
+                    "border-white",
+                    "before:bg-white before:shadow-white",
+                    "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                  )}
+                />
+                <Label htmlFor="timeboxed" className="ml-2">Timeboxed tasks</Label>
+              </div>
+              <div className="flex items-center">
+                <RadioGroupItem 
+                  value="untimeboxed" 
+                  id="untimeboxed" 
+                  className={cn(
+                    "border-white",
+                    "before:bg-white before:shadow-white",
+                    "data-[state=checked]:border-white data-[state=checked]:bg-white"
+                  )}
+                />
+                <Label htmlFor="untimeboxed" className="ml-2">Flexible timing</Label>
+              </div>
+            </RadioGroup>
           </div>
+        </div>
 
         <Button 
           onClick={submitForm} 
