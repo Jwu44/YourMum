@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
+import { User, Calendar, CreditCard, Settings, LogOut } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -26,6 +28,14 @@ import DashboardLeftCol from '@/components/parts/DashboardLeftCol';
 import EditableSchedule from '@/components/parts/EditableSchedule';
 import { useForm } from '../../lib/FormContext';
 import { Task, Priority, LayoutPreference } from '../../lib/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const initialPriorities: Priority[] = [
     { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
@@ -253,26 +263,61 @@ const Dashboard: React.FC = () => {
       <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto"> 
         <div className="flex justify-between items-center mb-6">
           <TypographyH3 className="text-white">Generated Schedule</TypographyH3>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline">Edit Inputs</Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0">
-              <DashboardLeftCol
-                {...state}
-                newTask={newTask}
-                setNewTask={setNewTask}
-                priorities={priorities}
-                updateTask={updateTask}
-                deleteTask={deleteTask}
-                addTask={addTask}
-                handleReorder={handleReorder}
-                submitForm={handleSubmit}
-                isLoading={isLoading}
-                handleEnergyChange={handleEnergyChangeCallback}
-              />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center space-x-4">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline">Edit Inputs</Button>
+                </SheetTrigger>
+              <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0">
+                <DashboardLeftCol
+                  {...state}
+                  newTask={newTask}
+                  setNewTask={setNewTask}
+                  priorities={priorities}
+                  updateTask={updateTask}
+                  deleteTask={deleteTask}
+                  addTask={addTask}
+                  handleReorder={handleReorder}
+                  submitForm={handleSubmit}
+                  isLoading={isLoading}
+                  handleEnergyChange={handleEnergyChangeCallback}
+                />
+              </SheetContent>
+            </Sheet>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-10 w-10 cursor-pointer">
+                  <AvatarImage src="/avatar-placeholder.png" alt="User avatar" />
+                  <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-[#1c1c1c] text-white border-gray-700">
+                <DropdownMenuLabel className="font-normal">My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-gray-700" />
+                <DropdownMenuItem className="focus:bg-gray-700">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="focus:bg-gray-700">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <span>Schedules</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="focus:bg-gray-700">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  <span>Subscription</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="focus:bg-gray-700">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-700" />
+                <DropdownMenuItem className="focus:bg-gray-700">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         {scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
           <div className="rounded-lg shadow-lg px-8 py-6">
