@@ -17,7 +17,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onUpdateTask, 
   onDeleteTask, 
   onReorderTasks, 
-  layoutPreference 
+  layoutPreference
 }) => {
   const memoizedTasks = useMemo(() => {
     if (layoutPreference === 'category') {

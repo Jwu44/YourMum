@@ -43,22 +43,6 @@ const Dashboard: React.FC = () => {
   const { state, dispatch } = useForm();
   const { toast } = useToast();
 
-  const handleSimpleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    dispatch({ type: 'UPDATE_FIELD', field: name, value });
-  }, [dispatch]);
-
-  const handleNestedChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    const [category, subCategory] = name.split('.');
-    dispatch({
-      type: 'UPDATE_NESTED_FIELD',
-      field: category,
-      subField: subCategory,
-      value
-    });
-  }, [dispatch]);
-
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
       try {
@@ -116,68 +100,66 @@ const Dashboard: React.FC = () => {
     });
   }, [dispatch]);
 
-  const handleSubmit = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const result = await submitFormData(state);
-      let scheduleContent = extractSchedule(result);
-      console.log("Extracted schedule content:", scheduleContent);
-  
-      if (!scheduleContent) {
-        toast({
-          title: "Error",
-          description: "No valid schedule found in the response",
-          variant: "destructive",
-        });
-        return;
-      }
-  
-      dispatch({ type: 'UPDATE_FIELD', field: 'response', value: scheduleContent });
-      
+// Replace the existing useEffect with this:
+useEffect(() => {
+  const updateSchedule = async () => {
+    if (state.response && state.tasks && !isLoading) {
       const layoutPreference: LayoutPreference = {
         timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
         subcategory: state.layout_preference?.subcategory || '',
         structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
       };
-  
-      const parsedTasks = await parseScheduleToTasks(scheduleContent, state.tasks || [], layoutPreference);
-      const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks || []);
-  
+
+      const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference);
+      const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
       setScheduleDays([cleanedTasks]);
       setCurrentDayIndex(0);
-      toast({
-        title: "Success",
-        description: "Schedule updated successfully",
-      });
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    }
+  };
+  
+  // Only update the schedule when isLoading changes from true to false
+  if (!isLoading) {
+    updateSchedule();
+  }
+}, [isLoading, state.response, state.tasks, state.layout_preference]);
+
+// Modify the handleSubmit function:
+const handleSubmit = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    const result = await submitFormData(state);
+    let scheduleContent = extractSchedule(result);
+    console.log("Extracted schedule content:", scheduleContent);
+
+    if (!scheduleContent) {
       toast({
         title: "Error",
-        description: "Failed to update schedule. Please try again.",
+        description: "No valid schedule found in the response",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  }, [state, dispatch, toast]);
-  
-  useEffect(() => {
-    const updateSchedule = async () => {
-      if (state.response && state.tasks) {
-        const layoutPreference: LayoutPreference = {
-          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-          subcategory: state.layout_preference?.subcategory || '',
-          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
-        };
-  
-        const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference);
-        const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
-        setScheduleDays([cleanedTasks]);
-        setCurrentDayIndex(0);
-      }
-    };
-    updateSchedule();
-  }, [state.response, state.tasks, state.layout_preference]);
+
+    dispatch({ type: 'UPDATE_FIELD', field: 'response', value: scheduleContent });
+    
+    // Remove the immediate schedule update here
+    // The schedule will be updated when isLoading becomes false
+
+    toast({
+      title: "Success",
+      description: "Schedule updated successfully",
+    });
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    toast({
+      title: "Error",
+      description: "Failed to update schedule. Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+}, [state, dispatch, toast]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
@@ -278,12 +260,10 @@ const Dashboard: React.FC = () => {
             </SheetTrigger>
             <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0">
               <DashboardLeftCol
-                formData={state}
+                {...state}
                 newTask={newTask}
                 setNewTask={setNewTask}
                 priorities={priorities}
-                handleSimpleChange={handleSimpleChange}
-                handleNestedChange={handleNestedChange}
                 updateTask={updateTask}
                 deleteTask={deleteTask}
                 addTask={addTask}

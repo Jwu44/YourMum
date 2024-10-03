@@ -109,6 +109,7 @@ export const parseScheduleToTasks = async (
   let taskStack: Task[] = [];
   let tasks: Task[] = [];
   let sectionStartIndex = 0;
+  const taskMap = new Map<string, Task>(); // Use a Map to track unique tasks
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
@@ -142,43 +143,54 @@ export const parseScheduleToTasks = async (
         }
       }
 
-      const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
-      let categories = matchingTask ? matchingTask.categories || [] : [];
+      // Check if the task already exists in the Map
+      if (!taskMap.has(taskText)) {
+        const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
+        let categories = matchingTask ? matchingTask.categories || [] : [];
 
-      if (categories.length === 0) {
-        console.log("no categories found");
-        const categorizedTask = await categorizeTask(taskText);
-        categories = categorizedTask.categories;
+        if (categories.length === 0) {
+          console.log("no categories found");
+          try {
+            const categorizedTask = await categorizeTask(taskText);
+            categories = categorizedTask.categories;
+          } catch (error) {
+            console.error("Error categorizing task:", error);
+            categories = ['Uncategorized'];
+          }
+        }
+
+        const task: Task = {
+          id: uuidv4(),
+          text: taskText,
+          categories: categories,
+          is_subtask: indentLevel > 0,
+          completed: false,
+          is_section: false,
+          section: currentSection,
+          parent_id: null,
+          level: indentLevel,
+          section_index: index - sectionStartIndex,
+          type: 'task',
+          start_time: startTime,
+          end_time: endTime
+        };
+
+        taskMap.set(taskText, task);
+        console.log("Created Task:", task);
+        
+        while (taskStack.length > indentLevel) {
+          taskStack.pop();
+        }
+
+        if (taskStack.length > 0) {
+          task.parent_id = taskStack[taskStack.length - 1].id;
+        }
+
+        taskStack.push(task);
+        tasks.push(task);
+      } else {
+        console.log("Skipped duplicate task:", taskText);
       }
-
-      const task: Task = {
-        id: uuidv4(),
-        text: taskText,
-        categories: categories,
-        is_subtask: indentLevel > 0,
-        completed: false,
-        is_section: false,
-        section: currentSection,
-        parent_id: null,
-        level: indentLevel,
-        section_index: index - sectionStartIndex,
-        type: 'task',
-        start_time: startTime,
-        end_time: endTime
-      };
-
-      console.log("Created Task:", task);
-      
-      while (taskStack.length > indentLevel) {
-        taskStack.pop();
-      }
-
-      if (taskStack.length > 0) {
-        task.parent_id = taskStack[taskStack.length - 1].id;
-      }
-
-      taskStack.push(task);
-      tasks.push(task);
     }
   }
 
