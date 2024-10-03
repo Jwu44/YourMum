@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 import anthropic
 import re
 import uuid
+from fuzzywuzzy import fuzz
 
 class Task:
     def __init__(self, id, text, categories=None):
@@ -29,6 +30,9 @@ class Task:
 
 # Setup app
 app = Flask(__name__)
+
+# Update any base URLs to use the public ngrok URL
+app.config["BASE_URL"] = public_url
 
 # rag examples
 example_schedules = {
@@ -220,7 +224,7 @@ def create_prompt_schedule(user_data):
     # Process tasks
     tasks = user_data['tasks']
     categorized_tasks = {
-        'Work': [], 'Exercise': [], 'Relationship': [], 
+        'Work': [], 'Exercise': [], 'Relationship': [],
         'Fun': [], 'Ambition': []
     }
     for task in tasks:
@@ -231,8 +235,7 @@ def create_prompt_schedule(user_data):
     # Convert priorities to a sorted list of tuples (category, rank)
     priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
     priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
-    print(priority_list)
-    print(priority_description)
+
     # Determine the example schedule to use
     structure = layout_preference['structure']
     timeboxed = layout_preference['timeboxed']
@@ -265,6 +268,10 @@ def create_prompt_schedule(user_data):
     - Ambition tasks: {', '.join(categorized_tasks['Ambition'])}
     Energy patterns: {energy_patterns}
     Priorities outside {work_schedule} (ranked from 1 - highest to 4 - lowest): {priority_description}
+    Schedule preference:
+    - Structure: {structure}
+    - Timeboxed: {timeboxed}
+    - Subcategory: {layout_preference['subcategory']}
     </client_info>
 
     <instructions>
@@ -273,13 +280,11 @@ def create_prompt_schedule(user_data):
     a. Schedule work tasks strictly within {work_schedule} considering {name}'s energy patterns.
     b. Outside work hours {work_schedule}, focus on personal tasks which are classified as either exercise, relationship, fun, or ambition based on how {name} has ranked their priorities and their energy patterns.
     c. Tasks can have multiple categories. Using {priority_description}, prioritise personal tasks with multiple categories accordingly.
-    3. To format the schedule, follow these guidelines:
-    a. Use a {structure} format{f", with {layout_preference['subcategory']} organization" if structure == "structured" else ""}.
-    b. {f"Organize tasks into {layout_preference['subcategory']}" if structure == "structured" else "List tasks in order"}.
-    c. {"Show start and end times for each task" if {timeboxed} else "Do not include specific times for tasks"}.
-    d. Use this example as a reference for the expected layout:
+    3. To format the schedule:
+    a. Use this example as a reference for the expected layout:
     {example_schedule}
-    e. Ensure each task in the generated schedule belongs to {name}.
+    b. Ensure each task in the generated schedule belongs to {name}.
+    c. If the schedule preference is untimeboxed, do not include any specific times for tasks, even in the section text. Simply list the tasks in the order they should be performed.
     4. Edit the language of the schedule by following these guidelines:
     a. Write in a clear, concise, and conversational tone. Avoid jargon and unnecessary complexity.
     b. Do not include explanations or notes sections.
@@ -351,19 +356,102 @@ def categorize_task(prompt):
         categories = ["Work"]
     return categories
 
-def extract_tasks_with_categories(schedule_text):
-    tasks = []
-    for line in schedule_text.split('\n'):
-        if line.strip().startswith('□'):
-            task_text = line.strip()[1:].strip()
-            category_match = re.search(r'\[([^\]]+)\]$', task_text)
-            if category_match:
-                category = category_match.group(1)
-                task_text = task_text[:category_match.start()].strip()
-            else:
-                category = "Uncategorized"
-            tasks.append({"text": task_text, "category": category})
-    return tasks
+def identify_potentially_recurring_tasks(schedule):
+    recurring_indicators = [
+        r'\b(daily|weekly|monthly|every|each)\b',
+        r'\b(routine|usual|regular)\b',
+        r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
+        r'\b\d{1,2}:\d{2}\b',  # Time pattern
+    ]
+    
+    likely_recurring_categories = [
+        'medication', 'meditate', 'exercise', 'jog', 'yoga', 'laundry', 'clean',
+        'meeting', 'email', 'call', 'breakfast', 'lunch', 'dinner', 'wake up',
+        'sleep', 'commute', 'study', 'read', 'journal', 'shower', 'groom'
+    ]
+
+    def calculate_recurrence_probability(task: str, time: str) -> float:
+        probability = 0.0
+        
+        for indicator in recurring_indicators:
+            if re.search(indicator, task, re.IGNORECASE):
+                probability += 0.2
+        
+        for category in likely_recurring_categories:
+            if category in task.lower():
+                probability += 0.15
+        
+        words = task.split()
+        if len(words) <= 3:
+            probability += 0.1
+        
+        if time:
+            probability += 0.1
+        
+        return min(probability, 1.0)
+
+    potentially_recurring = []
+    for task in schedule:
+        prob = calculate_recurrence_probability(task['text'], task.get('time', ''))
+        if prob > 0.3:
+            potentially_recurring.append((task['text'], prob))
+    
+    return sorted(potentially_recurring, key=lambda x: x[1], reverse=True)
+
+def identify_recurring_tasks(current_schedule, previous_schedules):
+    all_schedules = previous_schedules + [current_schedule]
+    task_occurrences = {}
+    recurring_tasks = []
+
+    for schedule in all_schedules:
+        potentially_recurring = identify_potentially_recurring_tasks(schedule)
+        for task, probability in potentially_recurring:
+            task_occurrences[task] = task_occurrences.get(task, 0) + 1
+
+    recurring_threshold = max(len(all_schedules) // 2, 2)  # Ensure at least 2 occurrences
+
+    for task, count in task_occurrences.items():
+        if count >= recurring_threshold:
+            prompt = f"""Given the task "{task}" that appears in {count} out of {len(all_schedules)} daily schedules:
+            1. Analyze if this task is likely to be a recurring daily task.
+            2. Consider factors such as the nature of the task, its frequency, and its importance in a daily routine.
+            3. Provide a yes/no answer followed by a brief explanation.
+            
+            Response format:
+            Recurring: [Yes/No]
+            Explanation: [Your reasoning in one short sentence]"""
+
+            try:
+                response = client.messages.create(
+                    model="claude-3-sonnet-20240229",
+                    max_tokens=100,
+                    temperature=0.2,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                claude_opinion = response.content[0].text.strip()
+                if claude_opinion.lower().startswith("recurring: yes"):
+                    original_task = next((t for t in current_schedule if t['text'] == task), None)
+                    if original_task:
+                        recurring_tasks.append(original_task)
+            except Exception as e:
+                print(f"Error calling Anthropic API for task '{task}': {str(e)}")
+
+    return recurring_tasks
+
+# def extract_tasks_with_categories(schedule_text):
+#     tasks = []
+#     for line in schedule_text.split('\n'):
+#         if line.strip().startswith('□'):
+#             task_text = line.strip()[1:].strip()
+#             category_match = re.search(r'\[([^\]]+)\]$', task_text)
+#             if category_match:
+#                 category = category_match.group(1)
+#                 task_text = task_text[:category_match.start()].strip()
+#             else:
+#                 category = "Uncategorized"
+#             tasks.append({"text": task_text, "category": category})
+#     return tasks
 
 @app.route('/process_user_data', methods=['POST'])
 def process_user_data():
@@ -376,13 +464,10 @@ def process_user_data():
     system_prompt, user_prompt = create_prompt_schedule(user_data)
     response = generate_schedule(system_prompt, user_prompt)
 
-    # Extract tasks with categories from the generated schedule
-    tasks_with_categories = extract_tasks_with_categories(response)
+    # # Extract tasks with categories from the generated schedule
+    # tasks_with_categories = extract_tasks_with_categories(response)
 
-    # Convert Task objects to dictionaries
-    serializable_tasks = [task.to_dict() if isinstance(task, Task) else task for task in tasks_with_categories]
-
-    return jsonify({'schedule': response, 'tasks': serializable_tasks})
+    return jsonify({'schedule': response})
 
 @app.route('/categorize_task', methods=['POST'])
 def process_task():
@@ -392,43 +477,19 @@ def process_task():
     return jsonify({"category": response})
 
 @app.route('/identify_recurring_tasks', methods=['POST'])
-def identify_recurring_tasks():
-    data = request.json
-    current_schedule = data.get('current_schedule', [])
-    previous_schedules = data.get('previous_schedules', [])
+def api_identify_recurring_tasks():
+    try:
+        data = request.json
+        current_schedule = data.get('current_schedule', [])
+        previous_schedules = data.get('previous_schedules', [])
 
-    # Convert Task objects to text
-    current_schedule_text = [task.text if isinstance(task, Task) else task for task in current_schedule]
-    previous_schedules_text = [[task.text if isinstance(task, Task) else task for task in schedule] for schedule in previous_schedules]
+        if not isinstance(current_schedule, list) or not all(isinstance(s, list) for s in previous_schedules):
+            return jsonify({"error": "Invalid input format"}), 400
 
-    schedule_history = [current_schedule_text, *previous_schedules_text]
-    schedule_text = '\n\n'.join(['\n'.join(schedule) for schedule in schedule_history])
-
-
-    prompt = f"""
-    Given the following schedule history, identify recurring tasks that appear to be repetitive, such as waking up, meal times, and break times. Only include tasks that are highly likely to recur daily based on the provided information.
-
-    Schedule History:
-    {schedule_text}
-
-    Please list the recurring tasks.
-    """
-
-    response = client.messages.create(
-        model="claude-3-sonnet-20240229",
-        max_tokens=1000,
-        temperature=0.2,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    recurring_tasks_match = re.search(r'<recurring_tasks>([\s\S]*?)<\/recurring_tasks>', response.content[0].text)
-    if recurring_tasks_match:
-        recurring_tasks = recurring_tasks_match.group(1).strip().split('\n')
+        recurring_tasks = identify_recurring_tasks(current_schedule, previous_schedules)
         return jsonify({"recurring_tasks": recurring_tasks})
-    else:
-        return jsonify({"recurring_tasks": []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/")
 def home():
@@ -436,4 +497,4 @@ def home():
 
 # Start the Flask server in a new thread
 threading.Thread(target=app.run, kwargs={"use_reloader": False, "port": port}).start()
-# app.run(host='0.0.0.0', port=5005, use_reloader=False)
+# app.run(host='0.0.0.0', port=5006, use_reloader=False)
