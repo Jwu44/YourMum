@@ -1,17 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { ActivitySquare, Heart, Smile, Trophy } from 'lucide-react';
-import { User, Calendar, CreditCard, Settings, LogOut } from 'lucide-react';
+import { User, Calendar as CalendarIcon,  CreditCard, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import {
   handleAddTask,
   handleUpdateTask,
@@ -36,6 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar } from '@/components/ui/calendar';
 
 const initialPriorities: Priority[] = [
     { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
@@ -54,6 +60,8 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast();
   const [shouldUpdateSchedule, setShouldUpdateSchedule] = useState(false);
   const [isInitialSchedule, setIsInitialSchedule] = useState(true);
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
@@ -258,16 +266,23 @@ const Dashboard: React.FC = () => {
     handleEnergyChange(dispatch, currentPatterns)(value);
   }, [dispatch, state.energy_patterns]);
 
+  const handleDateSelect = useCallback((newDate: Date | undefined) => {
+    setDate(newDate);
+    setIsDrawerOpen(false);
+    // TODO: Fetch the corresponding schedule for the selected date
+    // This should be implemented based on your backend API
+  }, []);
+
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
       <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto"> 
         <div className="flex justify-between items-center mb-6">
           <TypographyH3 className="text-white">Generated Schedule</TypographyH3>
           <div className="flex items-center space-x-4">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline">Edit Inputs</Button>
-                </SheetTrigger>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline">Edit Inputs</Button>
+              </SheetTrigger>
               <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0">
                 <DashboardLeftCol
                   {...state}
@@ -291,17 +306,69 @@ const Dashboard: React.FC = () => {
                   <AvatarFallback>U</AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-[#1c1c1c] text-white border-gray-700">
+              <DropdownMenuContent
+                className="w-56 bg-[#1c1c1c] text-white border-gray-700"
+                align="end"
+                alignOffset={-5}
+                sideOffset={5}
+              >
                 <DropdownMenuLabel className="font-normal">My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-gray-700" />
                 <DropdownMenuItem className="focus:bg-gray-700">
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="focus:bg-gray-700">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  <span>Schedules</span>
-                </DropdownMenuItem>
+                <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                  <DrawerTrigger asChild>
+                    <DropdownMenuItem
+                      className="focus:bg-gray-700"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setIsDrawerOpen(true);
+                      }}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <span>Schedules</span>
+                    </DropdownMenuItem>
+                  </DrawerTrigger>
+                  <DrawerContent className="bg-[#1c1c1c] text-white border-t border-gray-700">
+                    <div className="flex justify-center items-center min-h-[20vh] py-2">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={handleDateSelect}
+                        initialFocus
+                        className="mx-auto"
+                        classNames={{
+                          months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                          month: "space-y-4",
+                          caption: "flex justify-center pt-1 relative items-center",
+                          caption_label: "text-sm font-medium",
+                          nav: "space-x-1 flex items-center",
+                          nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+                          nav_button_previous: "absolute left-1",
+                          nav_button_next: "absolute right-1",
+                          table: "w-full border-collapse space-y-1",
+                          head_row: "flex",
+                          head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+                          row: "flex w-full mt-2",
+                          cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                          day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+                          day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                          day_today: "bg-accent text-accent-foreground",
+                          day_outside: "text-muted-foreground opacity-50",
+                          day_disabled: "text-muted-foreground opacity-50",
+                          day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                          day_hidden: "invisible",
+                        }}
+                        components={{
+                          IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+                          IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+                        }}
+                      />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
                 <DropdownMenuItem className="focus:bg-gray-700">
                   <CreditCard className="mr-2 h-4 w-4" />
                   <span>Subscription</span>
