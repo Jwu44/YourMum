@@ -62,6 +62,7 @@ const Dashboard: React.FC = () => {
   const [isInitialSchedule, setIsInitialSchedule] = useState(true);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
 
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
@@ -120,27 +121,6 @@ const Dashboard: React.FC = () => {
     });
   }, [dispatch]);
 
-  useEffect(() => {
-    const updateSchedule = async () => {
-      if (state.response && state.tasks && !isLoading && (shouldUpdateSchedule || isInitialSchedule)) {
-        const layoutPreference: LayoutPreference = {
-          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-          subcategory: state.layout_preference?.subcategory || '',
-          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
-        };
-
-        const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference);
-        const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
-        setScheduleDays([cleanedTasks]);
-        setCurrentDayIndex(0);
-        setShouldUpdateSchedule(false);
-        setIsInitialSchedule(false);
-      }
-    };
-    
-    updateSchedule();
-  }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule]);
-
   // Modify the handleSubmit function
   const handleSubmit = useCallback(async () => {
     setIsLoading(true);
@@ -157,6 +137,8 @@ const Dashboard: React.FC = () => {
         });
         return;
       }
+      // Store the scheduleId from the result
+      setScheduleId(result.scheduleId);
 
       dispatch({ type: 'UPDATE_FIELD', field: 'response', value: scheduleContent });
       setShouldUpdateSchedule(true);
@@ -177,6 +159,36 @@ const Dashboard: React.FC = () => {
       setIsLoading(false);
     }
   }, [state, dispatch, toast]);
+
+  useEffect(() => {
+    const updateSchedule = async () => {
+      if (state.response && state.tasks && !isLoading && (shouldUpdateSchedule || isInitialSchedule) && scheduleId) {
+        const layoutPreference: LayoutPreference = {
+          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
+          subcategory: state.layout_preference?.subcategory || '',
+          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
+        };
+
+        try {
+          const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference, scheduleId);
+          const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
+          setScheduleDays([cleanedTasks]);
+          setCurrentDayIndex(0);
+          setShouldUpdateSchedule(false);
+          setIsInitialSchedule(false);
+        } catch (error) {
+          console.error("Error parsing schedule:", error);
+          toast({
+            title: "Error",
+            description: "Failed to parse the schedule. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+    
+    updateSchedule();
+  }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
