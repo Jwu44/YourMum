@@ -2,6 +2,7 @@ import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import type { FormData } from './types';
 import { Task, FormAction, LayoutPreference } from './types';
+import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -89,7 +90,8 @@ export const handleDeleteTask = (tasks: Task[], taskId: string) => {
 export const parseScheduleToTasks = async (
   scheduleText: string,
   inputTasks: Task[] = [],
-  layoutPreference: LayoutPreference
+  layoutPreference: LayoutPreference,
+  scheduleId: string 
 ): Promise<Task[]> => {
   if (!scheduleText || typeof scheduleText !== 'string') {
     console.error('Invalid schedule text:', scheduleText);
@@ -117,6 +119,7 @@ export const parseScheduleToTasks = async (
     if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Arvo|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
       currentSection = trimmedLine;
       sectionStartIndex = index;
+      // Create section
       tasks.push({
         id: uuidv4(),
         text: trimmedLine,
@@ -194,7 +197,31 @@ export const parseScheduleToTasks = async (
     }
   }
 
-  return tasks;
+  const parsedTasks = tasks;  // This is the result of your parsing
+
+  // Send the parsed tasks to the backend
+  try {
+    const response = await fetch(`${API_BASE_URL}/update_parsed_schedule`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        scheduleId: scheduleId,
+        parsedTasks: parsedTasks
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update parsed schedule');
+    }
+
+    console.log("Parsed schedule synced with backend");
+  } catch (error) {
+    console.error("Failed to sync parsed schedule with backend:", error);
+  }
+
+  return parsedTasks;
 };
 
 export const generateNextDaySchedule = async (
