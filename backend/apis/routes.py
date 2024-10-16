@@ -39,6 +39,7 @@ def submit_data():
                     "priorities": user_data.get('priorities', {}),
                     "tasks": user_data.get('tasks', [])
                 },
+                "schedule": colab_response['schedule'],
                 "metadata": {
                     "generatedAt": datetime.now().isoformat(),
                 }
@@ -52,6 +53,7 @@ def submit_data():
                     "userId": user_id,
                     "scheduleId": str(result.inserted_id),
                     "inputs": schedule_document["inputs"],
+                    "schedule": schedule_document["schedule"]
                 }), 201
             else:
                 return jsonify({"error": "Failed to save schedule to database"}), 500

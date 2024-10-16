@@ -3,39 +3,45 @@ from pymongo.errors import ConnectionFailure
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
+# Get MongoDB URI from environment variables
 uri = os.getenv("MONGODB_URI")
+if not uri:
+    raise ValueError("MONGODB_URI environment variable is not set")
+
+# Create a single client instance to be reused
 client = MongoClient(uri)
 
 # Connect to your database
-db = client["YourDaiSchedule"]
+db_name = "YourDaiSchedule"
+db = client[db_name]
 
 def get_database():
     try:
+        # Check connection by pinging the database
         client.admin.command('ping')
-        print("Pinged your deployment. You successfully connected to MongoDB!")
+        print(f"Successfully connected to MongoDB database: {db_name}")
         return db
-    except Exception as e:
-        print(f"An error occurred while connecting to MongoDB: {e}")
-        return None
+    except ConnectionFailure as e:
+        print(f"Failed to connect to MongoDB: {e}")
+        raise
 
 def get_collection(collection_name):
-    db = get_database()
-    if db is not None:
-        return db[collection_name]
-    else:
-        raise Exception("Database connection not established")
+    database = get_database()
+    return database[collection_name]
 
 def get_user_schedules_collection():
-    user_schedules_collection = get_collection('UserSchedules')
-    return user_schedules_collection
+    return get_collection('UserSchedules')
 
 def initialize_db():
     try:
-        # Attempt to connect to the database
-        client.admin.command('ismaster')
-        print("Successfully connected to MongoDB")
+        get_database()
+        print("Database initialized successfully")
     except ConnectionFailure:
-        print("Server not available")
+        print("Failed to initialize database")
         raise
+
+# Initialize the database connection when the module is imported
+initialize_db()
