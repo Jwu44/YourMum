@@ -100,3 +100,28 @@ body {
   background-color: #000000;  /* or any color that matches your theme */
   opacity: 1 !important;
 }
+
+.react-calendar {
+  background-color: #1c1c1c;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.react-calendar__tile--now {
+  background-color: #333;
+}
+
+.react-calendar__tile--active {
+  background-color: #0070f3;
+  color: white;
+}
+
+.react-calendar__navigation button {
+  color: white;
+}
+
+.react-calendar__month-view__weekdays {
+  color: #888;
+}
