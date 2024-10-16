@@ -93,11 +93,13 @@ export const parseScheduleToTasks = async (
   layoutPreference: LayoutPreference,
   scheduleId: string 
 ): Promise<Task[]> => {
+  // Validate input
   if (!scheduleText || typeof scheduleText !== 'string') {
     console.error('Invalid schedule text:', scheduleText);
     return [];
   }
 
+  // Extract schedule content from tags
   const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
   const match = scheduleText.match(scheduleRegex);
   if (!match) {
@@ -107,108 +109,139 @@ export const parseScheduleToTasks = async (
 
   const scheduleContent = match[1].trim();
   const lines = scheduleContent.split('\n');
+
+  // Initialize variables for parsing
   let currentSection = '';
   let taskStack: Task[] = [];
   let tasks: Task[] = [];
   let sectionStartIndex = 0;
-  const taskMap = new Map<string, Task>(); // Use a Map to track unique tasks
+  const taskMap = new Map<string, Task>();
 
+  // Parse each line of the schedule
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     const trimmedLine = line.trim();
+
+    // Check if the line is a section header
     if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Arvo|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
+      // Create a new section task
       currentSection = trimmedLine;
       sectionStartIndex = index;
-      // Create section
-      tasks.push({
-        id: uuidv4(),
-        text: trimmedLine,
-        categories: [],
-        is_subtask: false,
-        completed: false,
-        is_section: true,
-        section: currentSection,
-        parent_id: null,
-        level: 0,
-        section_index: 0,
-        type: 'section'
-      });
+      tasks.push(createSectionTask(trimmedLine, currentSection, sectionStartIndex));
     } else if (trimmedLine) {
-      const indentLevel = line.search(/\S|$/) / 2;
-      let taskText = trimmedLine.replace(/^□ /, '').replace(/^- /, '');
-      
-      let startTime: string | null = null;
-      let endTime: string | null = null;
-      if (layoutPreference.timeboxed !== 'untimeboxed') {
-        const timeMatch = taskText.match(/^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)/i);
-        if (timeMatch) {
-          [, startTime, endTime, taskText] = timeMatch;
-        }
-      }
-
-      // Check if the task already exists in the Map
-      if (!taskMap.has(taskText)) {
-        const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
-        let categories = matchingTask ? matchingTask.categories || [] : [];
-
-        if (categories.length === 0) {
-          console.log("no categories found");
-          try {
-            const categorizedTask = await categorizeTask(taskText);
-            categories = categorizedTask.categories;
-          } catch (error) {
-            console.error("Error categorizing task:", error);
-            categories = ['Uncategorized'];
-          }
-        }
-
-        const task: Task = {
-          id: uuidv4(),
-          text: taskText,
-          categories: categories,
-          is_subtask: indentLevel > 0,
-          completed: false,
-          is_section: false,
-          section: currentSection,
-          parent_id: null,
-          level: indentLevel,
-          section_index: index - sectionStartIndex,
-          type: 'task',
-          start_time: startTime,
-          end_time: endTime
-        };
-
-        taskMap.set(taskText, task);
-        console.log("Created Task:", task);
-        
-        while (taskStack.length > indentLevel) {
-          taskStack.pop();
-        }
-
-        if (taskStack.length > 0) {
-          task.parent_id = taskStack[taskStack.length - 1].id;
-        }
-
-        taskStack.push(task);
+      // Create a new task
+      const task = await createTask(trimmedLine, currentSection, index, sectionStartIndex, inputTasks, layoutPreference);
+      if (task && !taskMap.has(task.text)) {
+        taskMap.set(task.text, task);
+        updateTaskHierarchy(task, taskStack);
         tasks.push(task);
       } else {
-        console.log("Skipped duplicate task:", taskText);
+        console.log("Skipped duplicate task:", trimmedLine);
       }
     }
   }
 
-  const parsedTasks = tasks;  // This is the result of your parsing
+  // Sync parsed schedule with backend
+  await syncParsedScheduleWithBackend(scheduleId, tasks);
 
-  // Send the parsed tasks to the backend
+  return tasks;
+};
+
+const createSectionTask = (text: string, section: string, index: number): Task => ({
+  // Create a task object for a section
+  id: uuidv4(),
+  text,
+  categories: [],
+  is_subtask: false,
+  completed: false,
+  is_section: true,
+  section,
+  parent_id: null,
+  level: 0,
+  section_index: 0,
+  type: 'section'
+});
+
+const createTask = async (
+  line: string,
+  currentSection: string,
+  index: number,
+  sectionStartIndex: number,
+  inputTasks: Task[],
+  layoutPreference: LayoutPreference
+): Promise<Task | null> => {
+  // Calculate indent level
+  const indentLevel = line.search(/\S|$/) / 2;
+  let taskText = line.replace(/^□ /, '').replace(/^- /, '');
+  
+  // Extract time information if layout is timeboxed
+  let startTime: string | null = null;
+  let endTime: string | null = null;
+  if (layoutPreference.timeboxed !== 'untimeboxed') {
+    const timeMatch = taskText.match(/^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)/i);
+    if (timeMatch) {
+      [, startTime, endTime, taskText] = timeMatch;
+    }
+  }
+
+  // Find matching task from input tasks or categorize new task
+  const matchingTask = inputTasks.find(t => t && taskText.toLowerCase().includes(t.text.toLowerCase()));
+  let categories = matchingTask ? matchingTask.categories || [] : [];
+
+  if (categories.length === 0) {
+    try {
+      const categorizedTask = await categorizeTask(taskText);
+      categories = categorizedTask.categories;
+    } catch (error) {
+      console.error("Error categorizing task:", error);
+      categories = ['Uncategorized'];
+    }
+  }
+
+  // Create and return the task object
+  return {
+    id: uuidv4(),
+    text: taskText,
+    categories,
+    is_subtask: indentLevel > 0,
+    completed: false,
+    is_section: false,
+    section: currentSection,
+    parent_id: null,
+    level: indentLevel,
+    section_index: index - sectionStartIndex,
+    type: 'task',
+    start_time: startTime,
+    end_time: endTime
+  };
+};
+
+const updateTaskHierarchy = (task: Task, taskStack: Task[]): void => {
+  // Remove tasks from stack that are at a higher level than the current task
+  while (taskStack.length > task.level) {
+    taskStack.pop();
+  }
+
+  // Set parent_id if there's a parent task
+  if (taskStack.length > 0) {
+    task.parent_id = taskStack[taskStack.length - 1].id;
+  }
+
+  // Add current task to the stack
+  taskStack.push(task);
+};
+
+const syncParsedScheduleWithBackend = async (scheduleId: string, parsedTasks: Task[]): Promise<void> => {
   try {
+    // Send parsed tasks to backend for syncing
     const response = await fetch(`${API_BASE_URL}/update_parsed_schedule`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        scheduleId: scheduleId,
-        parsedTasks: parsedTasks
+        scheduleId,
+        parsedTasks
       })
     });
 
@@ -219,9 +252,8 @@ export const parseScheduleToTasks = async (
     console.log("Parsed schedule synced with backend");
   } catch (error) {
     console.error("Failed to sync parsed schedule with backend:", error);
+    throw error;
   }
-
-  return parsedTasks;
 };
 
 export const generateNextDaySchedule = async (
