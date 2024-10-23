@@ -89,15 +89,8 @@ class Task:
         Set the recurrence for the task.
         
         :param recurrence_type: One of 'daily', 'weekly', 'monthly', 'custom', or None
-        :param custom_pattern: Custom recurrence pattern (only used when recurrence_type is 'custom')
         """
-        if recurrence_type not in ['daily', 'weekly', 'monthly', 'custom', None]:
+        if recurrence_type not in ['daily', 'weekly', 'monthly', None]:
             raise ValueError("Invalid recurrence type")
         
         self.is_recurring = recurrence_type
-        if recurrence_type == 'custom':
-            if not custom_pattern:
-                raise ValueError("Custom recurrence pattern is required for custom recurrence")
-            self.custom_recurrence = custom_pattern
-        else:
-            self.custom_recurrence = None

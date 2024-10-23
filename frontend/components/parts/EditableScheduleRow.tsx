@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -21,119 +21,60 @@ interface EditableScheduleRowProps {
   onDeleteTask: (taskId: string) => void;
   moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => void;
   isSection: boolean;
-  children?: React.ReactNode;
+  children?: React.ReactNode; 
 }
 
-const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
-  task,
+const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({ 
+  task, 
   index,
-  onUpdateTask,
+  onUpdateTask, 
   onDeleteTask,
   moveTask,
   isSection,
   children
 }) => {
-  // State management
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [isDragTarget, setIsDragTarget] = useState(false);
   const [dragType, setDragType] = useState<'above' | 'below' | 'indent' | null>(null);
 
-  // Refs for stable event handling and DOM access
-  const rowRef = useRef<HTMLDivElement>(null);
-  const handlersRef = useRef({
-    onUpdateTask,
-    onDeleteTask,
-    moveTask,
-    task,
-    index
-  });
-
-  // Update refs when props change
-  useEffect(() => {
-    handlersRef.current = {
-      onUpdateTask,
-      onDeleteTask,
-      moveTask,
-      task,
-      index
-    };
-  }, [onUpdateTask, onDeleteTask, moveTask, task, index]);
-
-  // Task update handler with structural property preservation
-  const handleTaskUpdate = useCallback((updatedTask: Task) => {
-    const currentTask = handlersRef.current.task;
-    handlersRef.current.onUpdateTask({
-      ...updatedTask,
-      // Preserve structural properties
-      is_section: currentTask.is_section,
-      type: currentTask.type,
-      section: currentTask.section,
-      section_index: currentTask.section_index,
-      level: currentTask.level,
-      is_subtask: currentTask.is_subtask,
-      parent_id: currentTask.parent_id
-    });
-    setIsDrawerOpen(false);
-  }, []);
-
-  // Task completion toggle handler
-  const handleToggleComplete = useCallback((checked: boolean, e: React.MouseEvent) => {
-    // Prevent event bubbling
-    e?.stopPropagation?.();
-    
-    const currentTask = handlersRef.current.task;
-    // Create a new task object to ensure proper state update
-    const updatedTask = {
-      ...currentTask,
+  const handleToggleComplete = useCallback((checked: boolean) => {
+    const updatedTask = { 
+      ...task, 
       completed: checked,
-      // Preserve all other properties
-      categories: currentTask.categories || [],
-      is_section: currentTask.is_section,
-      type: currentTask.type,
-      section: currentTask.section,
-      section_index: currentTask.section_index,
-      level: currentTask.level,
-      is_subtask: currentTask.is_subtask,
-      parent_id: currentTask.parent_id,
-      id: currentTask.id // Ensure ID is preserved
+      categories: task.categories || []
     };
-    
-    // Call update with the complete task object
-    handlersRef.current.onUpdateTask(updatedTask);
-  }, []);
+    onUpdateTask(updatedTask);
+  }, [onUpdateTask, task]);
 
-  // Edit drawer handlers
   const handleEdit = useCallback(() => {
     setIsDrawerOpen(true);
   }, []);
+
+  const handleDelete = useCallback(() => {
+    onDeleteTask(task.id);
+  }, [onDeleteTask, task.id]);
 
   const handleDrawerClose = useCallback(() => {
     setIsDrawerOpen(false);
   }, []);
 
-  // Delete handler
-  const handleDelete = useCallback(() => {
-    const currentTask = handlersRef.current.task;
-    handlersRef.current.onDeleteTask(currentTask.id);
-  }, []);
-
-  // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     if (isBrowser() && e.dataTransfer) {
-      e.dataTransfer.setData('text/plain', handlersRef.current.index.toString());
+      e.dataTransfer.setData('text/plain', index.toString());
       e.dataTransfer.effectAllowed = 'move';
       if (rowRef.current) {
         rowRef.current.style.opacity = '0.5';
       }
     }
-  }, []);
+  }, [index]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (isBrowser() && e.dataTransfer) {
       e.dataTransfer.dropEffect = 'move';
     }
-
+    
     if (isSection) {
       setDragType('below');
       setIsDragTarget(true);
@@ -165,37 +106,21 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     e.preventDefault();
     if (isBrowser() && e.dataTransfer) {
       const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-      const currentTask = handlersRef.current.task;
-      const currentIndex = handlersRef.current.index;
-      
       if (isSection) {
-        handlersRef.current.moveTask(dragIndex, currentIndex, false, currentTask.text);
+        moveTask(dragIndex, index, false, task.text);
       } else {
-        handlersRef.current.moveTask(
-          dragIndex,
-          currentIndex,
-          dragType === 'indent' && !isSection,
-          null
-        );
+        moveTask(dragIndex, index, dragType === 'indent' && !isSection, null);
       }
     }
     setIsDragTarget(false);
     setDragType(null);
-  }, [isSection, dragType]);
+  }, [index, moveTask, dragType, isSection, task.text]);
 
   const handleDragEnd = useCallback(() => {
     if (rowRef.current) {
       rowRef.current.style.opacity = '1';
     }
-    setIsDragTarget(false);
-    setDragType(null);
   }, []);
-
-  // Reset drag state when task changes
-  useEffect(() => {
-    setIsDragTarget(false);
-    setDragType(null);
-  }, [task]);
 
   return (
     <motion.div
@@ -203,8 +128,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.2 }}
-      key={`${task.id}-${task.text}-${task.completed}`}
-      className="relative" // Add relative positioning
     >
       <div
         ref={rowRef}
@@ -214,112 +137,70 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
-        onClick={(e) => {
-          // Stop click propagation
-          e.stopPropagation();
-        }}
-        className={`
-          relative flex items-center p-2 my-1 bg-background rounded
-          ${isSection ? 'cursor-default flex-col items-start' : 'cursor-move'}
-          hover:bg-accent/50 transition-colors
-        `}
+        className={`relative flex items-center p-2 my-1 bg-background rounded ${isSection ? 'cursor-default flex-col items-start' : 'cursor-move'}`}
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
           minHeight: isSection ? '40px' : 'auto',
-          pointerEvents: 'auto', // Ensure the container receives events
         }}
       >
         {!isSection && (
-          <div className="flex items-center flex-1 pointer-events-auto">
+          <>
             {task.is_subtask && (
-              <div className="w-4 h-4 mr-2 border-l border-b border-muted pointer-events-none" />
+              <div className="w-4 h-4 mr-2 border-l border-b border-muted" />
             )}
             <Checkbox
               checked={task.completed}
-              onCheckedChange={(checked) => {
-                // Explicitly cast to boolean and ensure event isolation
-                const isChecked = Boolean(checked);
-                // Use setTimeout to ensure clean event queue
-                setTimeout(() => handleToggleComplete(isChecked, {} as React.MouseEvent), 0);
-              }}
+              onCheckedChange={handleToggleComplete}
               className="mr-2 border-white"
-              // Add key to ensure proper React reconciliation
-              key={`checkbox-${task.id}`}
-              // Add aria-label for accessibility
-              aria-label={`Mark "${task.text}" as ${task.completed ? 'incomplete' : 'complete'}`}
             />
-            <span 
-              className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}
-              onClick={(e) => e.stopPropagation()} // Prevent click propagation
-            >
-              {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
-              {task.text}
-            </span>
-          </div>
+          </>
         )}
-        
         {isSection ? (
-          <div className="w-full pointer-events-none">
-            <TypographyH4 className="mb-2">
+          <>
+            <TypographyH4 className="w-full mb-2">
               {task.text}
             </TypographyH4>
             <div className="w-full h-px bg-white opacity-50" />
-          </div>
+          </>
         ) : (
-          <div className="pointer-events-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={(e) => e.stopPropagation()} // Prevent click propagation
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={handleEdit}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDelete}>Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <span className={`flex-1 ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+            {task.start_time && task.end_time ? `${task.start_time} - ${task.end_time}: ` : ''}
+            {task.text}
+          </span>
         )}
-
-        {isDragTarget && (
-          <div 
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              borderTop: dragType === 'above' ? '2px solid #3b82f6' : 'none',
-              borderBottom: (dragType === 'below' || dragType === 'indent') ? '2px solid #3b82f6' : 'none',
-            }}
-          />
+        {!isSection && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={handleEdit}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDelete}>Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {isDragTarget && (isSection || dragType === 'below') && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
+        )}
+        {isDragTarget && !isSection && dragType === 'above' && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500" style={{ top: '-2px' }} />
+        )}
+        {isDragTarget && dragType === 'indent' && !task.is_subtask && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" style={{ bottom: '-2px' }} />
         )}
       </div>
-
       {isDrawerOpen && (
         <TaskEditDrawer
           isOpen={isDrawerOpen}
           onClose={handleDrawerClose}
           task={task}
-          onUpdateTask={handleTaskUpdate}
+          onUpdateTask={onUpdateTask}
         />
       )}
     </motion.div>
   );
 };
 
-// Improved memo comparison
-export default React.memo(EditableScheduleRow, (prevProps, nextProps) => {
-  return (
-    prevProps.task.id === nextProps.task.id &&
-    prevProps.task.text === nextProps.task.text &&
-    prevProps.task.completed === nextProps.task.completed &&
-    prevProps.task.is_recurring === nextProps.task.is_recurring &&
-    prevProps.task.custom_recurrence === nextProps.task.custom_recurrence &&
-    prevProps.task.start_time === nextProps.task.start_time &&
-    prevProps.task.end_time === nextProps.task.end_time &&
-    prevProps.index === nextProps.index &&
-    prevProps.isSection === nextProps.isSection &&
-    JSON.stringify(prevProps.task.categories) === JSON.stringify(nextProps.task.categories)
-  );
-});
+export default React.memo(EditableScheduleRow);
