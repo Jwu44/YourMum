@@ -2,7 +2,6 @@ import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import type { FormData } from './types';
 import { Task, FormAction, LayoutPreference } from './types';
-import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -74,7 +73,9 @@ export const handleAddTask = async (tasks: Task[], newTask: string, categories: 
     parent_id: null,
     level: 0,
     section_index: tasks.length,
-    type: "task"
+    type: "task",
+    is_recurring: null,
+    custom_recurrence: null
   };
   return [...tasks, newTaskObject];
 };
@@ -159,7 +160,9 @@ const createSectionTask = (text: string, section: string, index: number): Task =
   parent_id: null,
   level: 0,
   section_index: 0,
-  type: 'section'
+  type: 'section',
+  is_recurring: 'daily',
+  custom_recurrence: null
 });
 
 const createTask = async (
@@ -212,7 +215,9 @@ const createTask = async (
     section_index: index - sectionStartIndex,
     type: 'task',
     start_time: startTime,
-    end_time: endTime
+    end_time: endTime,
+    is_recurring: null, // might need to update
+    custom_recurrence: null 
   };
 };
 
@@ -356,7 +361,9 @@ const formatStructuredSchedule = (
       section: section,
       parent_id: null,
       level: 0,
-      section_index: formattedSchedule.length
+      section_index: formattedSchedule.length,
+      is_recurring: 'daily',
+      custom_recurrence: null 
     });
 
     const sectionTasks = tasks.filter(task => task.section === section);
@@ -379,7 +386,9 @@ const formatStructuredSchedule = (
         section: lastSection,
         parent_id: null,
         level: 0,
-        section_index: formattedSchedule.length
+        section_index: formattedSchedule.length,
+        is_recurring: 'daily',
+      custom_recurrence: null 
       });
     }
     formattedSchedule.push(...tasksWithoutSection.map(task => ({ ...task, section: lastSection })));

@@ -121,12 +121,35 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   }, [memoizedTasks, onReorderTasks]);
 
   const handleUpdateTask = useCallback((updatedTask: Task) => {
-    const newTasks = memoizedTasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    );
+    // Create a new tasks array with accurate updates
+    const newTasks = tasks.map(task => {
+      if (task.id === updatedTask.id) {
+        // Return the updated task with all properties preserved
+        return {
+          ...task,
+          ...updatedTask,
+          // Ensure structural properties are preserved
+          is_section: task.is_section,
+          type: task.type,
+          section: task.section,
+          section_index: task.section_index,
+          level: task.level,
+          is_subtask: task.is_subtask,
+          parent_id: task.parent_id
+        };
+      }
+      // Important: Return the original task for non-matching IDs
+      return task;
+    });
+  
+    // Call the update handlers in sequence
     onUpdateTask(updatedTask);
-    onReorderTasks(newTasks);
-  }, [memoizedTasks, onUpdateTask, onReorderTasks]);
+    
+    // Use setTimeout to ensure state updates are processed in order
+    setTimeout(() => {
+      onReorderTasks(newTasks);
+    }, 0);
+  }, [tasks, onUpdateTask, onReorderTasks]);
 
   const handleDeleteTask = useCallback((taskId: string) => {
     const newTasks = memoizedTasks.filter(task => task.id !== taskId && task.parent_id !== taskId);
@@ -135,36 +158,46 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   }, [memoizedTasks, onDeleteTask, onReorderTasks]);
 
   return (
-    <Pane>
+    <div 
+      className="space-y-1 relative" // Add relative positioning
+      onClick={(e) => e.stopPropagation()} // Stop click propagation at the container level
+    >
       {memoizedTasks.map((item, index) => (
-        <React.Fragment key={item.id}>
-          {item.type === 'section' ? (
-            <EditableScheduleRow
-              task={item}
-              index={index}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              moveTask={moveTask}
-              isSection={true}
-            >
-              <TypographyH4 className="mt-3 mb-1">
+        <React.Fragment key={`${item.id}-${item.completed}-${item.text}`}>
+          <EditableScheduleRow
+            task={item}
+            index={index}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            moveTask={moveTask}
+            isSection={item.type === 'section'}
+          >
+            {item.type === 'section' && (
+              <TypographyH4 className="mt-3 mb-1 pointer-events-none">
                 {item.text}
               </TypographyH4>
-            </EditableScheduleRow>
-          ) : (
-            <EditableScheduleRow
-              task={item}
-              index={index}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              moveTask={moveTask}
-              isSection={false}
-            />
-          )}
+            )}
+          </EditableScheduleRow>
         </React.Fragment>
       ))}
-    </Pane>
+    </div>
   );
 };
 
-export default React.memo(EditableSchedule);
+// Also modify the memo comparison for the main component:
+export default React.memo(EditableSchedule, (prevProps, nextProps) => {
+  // Deep compare tasks with focus on completion status
+  const tasksEqual = prevProps.tasks.every((task, index) => {
+    const nextTask = nextProps.tasks[index];
+    return (
+      task.id === nextTask?.id &&
+      task.completed === nextTask?.completed &&
+      task.text === nextTask?.text
+    );
+  });
+  
+  return (
+    tasksEqual &&
+    prevProps.layoutPreference === nextProps.layoutPreference
+  );
+});

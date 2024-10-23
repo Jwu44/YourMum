@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get MongoDB URI from environment variables
-uri = os.getenv("MONGODB_URI")
+uri = os.getenv("MONGODB_URI") + "&tlsInsecure=true"
 if not uri:
     raise ValueError("MONGODB_URI environment variable is not set")
 

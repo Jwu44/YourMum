@@ -2,7 +2,8 @@ import uuid
 
 class Task:
     def __init__(self, text, categories=None, id=None, is_subtask=False, completed=False, 
-                 is_section=False, section=None, parent_id=None, level=0, section_index=0, type="task"):
+                 is_section=False, section=None, parent_id=None, level=0, section_index=0, 
+                 type="task", is_recurring=None, custom_recurrence=None):
         self.id = id or str(uuid.uuid4())
         self.text = text
         self.categories = set(categories) if categories else set()
@@ -14,6 +15,8 @@ class Task:
         self.level = level
         self.section_index = section_index
         self.type = type
+        self.is_recurring = is_recurring
+        self.custom_recurrence = custom_recurrence
 
     def to_dict(self):
         return {
@@ -27,7 +30,9 @@ class Task:
             "parent_id": self.parent_id,
             "level": self.level,
             "section_index": self.section_index,
-            "type": self.type
+            "type": self.type,
+            "is_recurring": self.is_recurring,
+            "custom_recurrence": self.custom_recurrence
         }
 
     @classmethod
@@ -43,7 +48,9 @@ class Task:
             parent_id=data.get("parent_id"),
             level=data.get("level", 0),
             section_index=data.get("section_index", 0),
-            type=data.get("type", "task")
+            type=data.get("type", "task"),
+            is_recurring=data.get("is_recurring"),
+            custom_recurrence=data.get("custom_recurrence")
         )
 
     def add_category(self, category):
@@ -76,3 +83,21 @@ class Task:
 
     def __repr__(self):
         return self.__str__()
+    
+    def set_recurrence(self, recurrence_type, custom_pattern=None):
+        """
+        Set the recurrence for the task.
+        
+        :param recurrence_type: One of 'daily', 'weekly', 'monthly', 'custom', or None
+        :param custom_pattern: Custom recurrence pattern (only used when recurrence_type is 'custom')
+        """
+        if recurrence_type not in ['daily', 'weekly', 'monthly', 'custom', None]:
+            raise ValueError("Invalid recurrence type")
+        
+        self.is_recurring = recurrence_type
+        if recurrence_type == 'custom':
+            if not custom_pattern:
+                raise ValueError("Custom recurrence pattern is required for custom recurrence")
+            self.custom_recurrence = custom_pattern
+        else:
+            self.custom_recurrence = None

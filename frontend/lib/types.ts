@@ -12,6 +12,8 @@ export interface Task {
   type: string;
   start_time?: string | null;
   end_time?: string | null;
+  is_recurring: 'daily' | 'weekly' | 'monthly' | 'custom' | null;
+  custom_recurrence?: string | null;
 }
   
 export interface FormData {
@@ -52,10 +54,17 @@ export type NestedKeyOf<T> = {
 export type FormAction =
   | { type: 'UPDATE_FIELD'; field: string; value: any }
   | { type: 'UPDATE_NESTED_FIELD'; field: string; subField: string; value: any }
+  | { type: 'UPDATE_TASK'; task: Task }
   | { type: 'RESET_FORM' };
 
 export interface LayoutPreference {
   structure: 'structured' | 'unstructured';
   subcategory: string;
   timeboxed: 'timeboxed' | 'untimeboxed';
+}
+
+// Add a new type for the form context
+export interface FormContextType {
+  state: FormData;
+  dispatch: React.Dispatch<FormAction>;
 }

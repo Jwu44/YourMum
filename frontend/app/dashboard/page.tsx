@@ -191,21 +191,25 @@ const Dashboard: React.FC = () => {
   }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
-    if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
-      const categorizedTask = await categorizeTask(updatedTask.text);
-      updatedTask.categories = categorizedTask.categories;
-    }
-  
+    // Create a new array with the updated task
     setScheduleDays(prevDays => {
       const newDays = [...prevDays];
       if (newDays[currentDayIndex]) {
         newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
-          task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
+          task.id === updatedTask.id ? { ...updatedTask } : task
         );
       }
       return newDays;
     });
-  }, [currentDayIndex, scheduleDays]);
+  
+    // If you're also updating the backend, do it after state update
+    // try {
+    //   await updateTaskInBackend(updatedTask);
+    // } catch (error) {
+    //   console.error('Error updating task:', error);
+    //   // Optionally revert the state if backend update fails
+    // }
+  }, [currentDayIndex]);
 
   const handleScheduleTaskDelete = useCallback((taskId: string) => {
     setScheduleDays(prevDays => {
