@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { FormData, FormAction } from './types';
+import { FormData, FormAction, FormContextType } from './types';
 
 // Create the initial state
 const initialState: FormData = {
@@ -41,6 +41,13 @@ const formReducer = (state: FormData, action: FormAction): FormData => {
           [action.subField]: action.value
         }
       };
+    case 'UPDATE_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map(task => 
+          task.id === action.task.id ? action.task : task
+        )
+      };
     case 'RESET_FORM':
       return initialState;
     default:
@@ -48,11 +55,8 @@ const formReducer = (state: FormData, action: FormAction): FormData => {
   }
 };
 
-// Create the context
-const FormContext = createContext<{
-  state: FormData;
-  dispatch: React.Dispatch<FormAction>;
-} | undefined>(undefined);
+// Update the context creation
+const FormContext = createContext<FormContextType | undefined>(undefined);
 
 // Create a provider component
 export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
