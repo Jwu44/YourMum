@@ -132,3 +132,64 @@ def update_parsed_schedule():
         print("Exception occurred:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    
+@api_bp.route("/update_task", methods=["POST"])
+def update_task():
+    try:
+        data = request.json
+        if not data or 'taskId' not in data:
+            return jsonify({"error": "Invalid data provided"}), 400
+
+        task_id = data['taskId']
+        updates = data['updates']
+        
+        user_schedules = get_user_schedules_collection()
+        
+        # Update the task in all relevant future schedules if it's recurring
+        if updates.get('is_recurring'):
+            result = user_schedules.update_many(
+                {
+                    "tasks.id": task_id,
+                    "date": {"$gte": datetime.now().isoformat()}
+                },
+                {"$set": {"tasks.$": updates}}
+            )
+        else:
+            # Update only the specific task instance
+            result = user_schedules.update_one(
+                {"tasks.id": task_id},
+                {"$set": {"tasks.$": updates}}
+            )
+
+        if result.modified_count > 0:
+            return jsonify({
+                "message": "Task updated successfully",
+                "taskId": task_id,
+                "updates": updates
+            }), 200
+        else:
+            return jsonify({"error": "Task not found or no changes made"}), 404
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/get_recurring_tasks", methods=["GET"])
+def get_recurring_tasks():
+    try:
+        user_schedules = get_user_schedules_collection()
+        recurring_tasks = user_schedules.distinct(
+            "tasks",
+            {
+                "tasks.is_recurring": {"$ne": None},
+                "date": {"$gte": datetime.now().isoformat()}
+            }
+        )
+        
+        return jsonify({
+            "recurring_tasks": recurring_tasks
+        }), 200
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        return jsonify({"error": str(e)}), 500
