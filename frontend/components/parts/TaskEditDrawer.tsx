@@ -1,8 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Task } from '../../lib/types';
+import { X } from 'lucide-react';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from "@/components/ui/select";
 import {
   Drawer,
   DrawerClose,
@@ -11,8 +18,8 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer"
-import { X } from 'lucide-react';
+} from "@/components/ui/drawer";
+import { Task, RecurrenceType, RECURRENCE_OPTIONS } from '../../lib/types';
 
 interface TaskEditDrawerProps {
   isOpen: boolean;
@@ -29,7 +36,30 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   task,
   onUpdateTask,
 }) => {
-  const [editedTask, setEditedTask] = useState<Task>(task);
+  const [editedTask, setEditedTask] = useState<Task>({
+    ...task,
+    is_recurring: task.is_recurring || null,
+  });
+
+  // Add a ref to track if we need cleanup
+  const needsCleanup = useRef(false);
+
+  // Set up on mount and clean up on unmount
+  useEffect(() => {
+    // Store original pointer-events value
+    const originalPointerEvents = document.body.style.pointerEvents;
+    
+    if (isOpen) {
+      needsCleanup.current = true;
+    }
+
+    return () => {
+      if (needsCleanup.current) {
+        document.body.style.pointerEvents = originalPointerEvents || 'auto';
+        needsCleanup.current = false;
+      }
+    };
+  }, [isOpen]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -45,6 +75,15 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }));
   }, []);
 
+  const handleRecurrenceChange = useCallback((value: string) => {
+    // Convert empty string to null, otherwise use the value as RecurrenceType
+    const recurrenceValue = value === 'none' ? null : value as RecurrenceType;
+    setEditedTask(prev => ({
+      ...prev,
+      is_recurring: recurrenceValue
+    }));
+  }, []);
+
   const getCategoryColor = (category: string): string => {
     switch (category) {
       case 'Work': return 'bg-blue-500';
@@ -57,13 +96,43 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   };
 
   const handleSave = useCallback(() => {
-    onUpdateTask(editedTask);
+    try {
+      const updatedTask = {
+        ...editedTask,
+        type: task.type, // Preserve original task type
+        is_section: task.is_section, // Preserve section status
+        id: task.id, // Ensure ID is preserved
+      };
+      onUpdateTask(updatedTask);
+    } finally {
+      onClose();
+    }
+  }, [editedTask, task, onUpdateTask, onClose]);
+
+  // Handle close with proper cleanup
+  const handleClose = useCallback(() => {
+    if (needsCleanup.current) {
+      document.body.style.pointerEvents = 'auto';
+      needsCleanup.current = false;
+    }
     onClose();
-  }, [editedTask, onUpdateTask, onClose]);
+  }, [onClose]);
 
   return (
-    <Drawer open={isOpen} onClose={onClose}>
-      <DrawerContent className="drawer-background drawer-content">
+    <Drawer 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+      modal={true} // Ensure it's modal
+    >
+      <DrawerContent
+        className="fixed inset-y-0 right-0 h-full w-full bg-[#000000] shadow-lg outline-none "
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+          handleClose();
+        }}
+      >
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
             <DrawerTitle>Edit Task</DrawerTitle>
@@ -127,6 +196,29 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 onChange={handleInputChange}
                 className="mt-1"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Recur every...
+              </label>
+              <Select
+                value={editedTask.is_recurring || 'none'}
+                onValueChange={handleRecurrenceChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select recurrence" />
+                </SelectTrigger>
+                <SelectContent className="select-content">
+                  {RECURRENCE_OPTIONS.map((option) => (
+                    <SelectItem 
+                      key={option.value || 'none'} 
+                      value={option.value || 'none'} // Use 'none' instead of empty string
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DrawerFooter>

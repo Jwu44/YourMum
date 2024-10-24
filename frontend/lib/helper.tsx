@@ -1,8 +1,9 @@
 import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import type { FormData } from './types';
-import { Task, FormAction, LayoutPreference } from './types';
-import axios from 'axios';
+import { Task, FormAction, LayoutPreference, RecurrenceType } from './types';
+import { addDays, addWeeks, addMonths } from 'date-fns';
+
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -74,7 +75,8 @@ export const handleAddTask = async (tasks: Task[], newTask: string, categories: 
     parent_id: null,
     level: 0,
     section_index: tasks.length,
-    type: "task"
+    type: "task",
+    is_recurring: null,
   };
   return [...tasks, newTaskObject];
 };
@@ -159,7 +161,8 @@ const createSectionTask = (text: string, section: string, index: number): Task =
   parent_id: null,
   level: 0,
   section_index: 0,
-  type: 'section'
+  type: 'section',
+  is_recurring: 'daily',
 });
 
 const createTask = async (
@@ -212,13 +215,15 @@ const createTask = async (
     section_index: index - sectionStartIndex,
     type: 'task',
     start_time: startTime,
-    end_time: endTime
+    end_time: endTime,
+    is_recurring: null, // might need to update
+ 
   };
 };
 
 const updateTaskHierarchy = (task: Task, taskStack: Task[]): void => {
   // Remove tasks from stack that are at a higher level than the current task
-  while (taskStack.length > task.level) {
+  while (taskStack.length > (task.level ?? 0)) {
     taskStack.pop();
   }
 
@@ -356,7 +361,9 @@ const formatStructuredSchedule = (
       section: section,
       parent_id: null,
       level: 0,
-      section_index: formattedSchedule.length
+      section_index: formattedSchedule.length,
+      is_recurring: 'daily',
+   
     });
 
     const sectionTasks = tasks.filter(task => task.section === section);
@@ -379,7 +386,9 @@ const formatStructuredSchedule = (
         section: lastSection,
         parent_id: null,
         level: 0,
-        section_index: formattedSchedule.length
+        section_index: formattedSchedule.length,
+        is_recurring: 'daily',
+   
       });
     }
     formattedSchedule.push(...tasksWithoutSection.map(task => ({ ...task, section: lastSection })));
@@ -456,4 +465,24 @@ export const handleEnergyChange = (
     field: 'energy_patterns',
     value: updatedPatterns
   });
+};
+
+// Helper function to check if a task should recur on a given date
+export const shouldTaskRecurOnDate = (task: Task, targetDate: Date): boolean => {
+  if (!task.is_recurring) return false;
+
+  const today = new Date();
+  
+  switch (task.is_recurring) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      const nextWeek = addWeeks(today, 1);
+      return targetDate >= nextWeek;
+    case 'monthly':
+      const nextMonth = addMonths(today, 1);
+      return targetDate >= nextMonth;
+    default:
+      return false;
+  }
 };
