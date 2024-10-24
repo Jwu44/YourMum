@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +28,6 @@ import {
   cleanupTasks,
   handleEnergyChange 
 } from '@/lib/helper';
-import { categorizeTask } from '@/lib/api';
 import DashboardLeftCol from '@/components/parts/DashboardLeftCol';
 import EditableSchedule from '@/components/parts/EditableSchedule';
 import { useForm } from '../../lib/FormContext';
@@ -191,12 +190,7 @@ const Dashboard: React.FC = () => {
   }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
-    try {
-      if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
-        const categorizedTask = await categorizeTask(updatedTask.text);
-        updatedTask.categories = categorizedTask.categories;
-      }
-  
+    try {  
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         if (newDays[currentDayIndex]) {
