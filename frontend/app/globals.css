@@ -24,6 +24,18 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  .z-drawer-overlay {
+    z-index: 50;
+  }
+  
+  .z-drawer-content {
+    z-index: 51;
+  }
+  
+  .z-main {
+    z-index: 1;
+  }
 }
 
 @layer base {
@@ -54,6 +66,7 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 20 14.3% 4.1%;
     --foreground: 60 9.1% 97.8%;
@@ -91,16 +104,79 @@ body {
   }
 }
 
+@layer components {
+  .drawer-root {
+    @apply fixed inset-0 z-50;
+  }
+
+  .drawer-background {
+    background-color: hsl(var(--background)); /* Added opacity for darker background */
+    opacity: 1 !important;
+  }
+
+  .drawer-overlay {
+    @apply fixed inset-0 bg-black/40 z-50;
+  }
+
+  .drawer-content {
+    @apply fixed inset-y-0 right-0 z-[51] h-full w-full bg-background/95 shadow-lg outline-none 
+    data-[state=closed]:animate-slideOutRight
+    data-[state=open]:animate-slideInRight;
+    opacity: 1 !important;
+  }
+
+  .main-content {
+    @apply relative z-[1] h-full;
+  }
+
+  .scroll-container {
+    @apply h-full overflow-y-auto overflow-x-hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Custom drawer styles */
 .drawer-background {
-  background-color: #000000;  /* or any color that matches your theme */
+  background-color: hsl(var(--background));
   opacity: 1 !important;
+}
+
+.drawer-overlay {
+  z-index: 50;
 }
 
 .drawer-content {
-  background-color: #000000;  /* or any color that matches your theme */
+  background-color: hsl(var(--background));
   opacity: 1 !important;
+  z-index: 51;
 }
 
+/* Animation keyframes */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Body scroll lock */
+body.drawer-open {
+  overflow: hidden;
+  padding-right: var(--scrollbar-width, 0px);
+}
+
+/* Calendar styles */
 .react-calendar {
   background-color: #1c1c1c;
   color: white;
@@ -124,4 +200,77 @@ body {
 
 .react-calendar__month-view__weekdays {
   color: #888;
+}
+
+/* Ensure proper stacking context for modals */
+.modal-root {
+  position: relative;
+  z-index: 40;
+}
+
+/* Prevent content shifting when modal opens */
+html.modal-open {
+  overflow: hidden;
+}
+
+/* Add smooth transitions for drawer */
+.drawer-transition {
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Prevent text selection during drawer transitions */
+.drawer-content * {
+  user-select: none;
+}
+
+/* Reset text selection after transition */
+.drawer-content[data-state="open"] * {
+  user-select: text;
+}
+
+/* Ensure proper overlay behavior */
+.drawer-overlay[data-state="open"] {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.drawer-overlay[data-state="closed"] {
+  animation: fadeOut 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Ensure body always has pointer events unless explicitly disabled */
+body {
+  pointer-events: auto !important;
+}
+
+/* Only disable pointer events on body when drawer is actually open */
+body[data-state="open"] {
+  pointer-events: none;
+}
+
+/* But keep pointer events enabled for the drawer content */
+.drawer-content {
+  pointer-events: auto !important;
+}
+
+/* Add styles for select dropdown to ensure proper z-index */
+.select-content {
+  z-index: 60 !important; /* Higher than drawer z-index */
 }
