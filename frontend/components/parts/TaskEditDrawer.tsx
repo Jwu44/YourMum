@@ -127,7 +127,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       modal={true} // Ensure it's modal
     >
       <DrawerContent
-        className="fixed inset-y-0 right-0 h-full w-full bg-[#000000] shadow-lg outline-none "
+        className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-[#000000] shadow-lg outline-none "
         onPointerDownOutside={(e) => {
           e.preventDefault();
           handleClose();
