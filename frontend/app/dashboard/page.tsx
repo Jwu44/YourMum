@@ -191,21 +191,30 @@ const Dashboard: React.FC = () => {
   }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
-    if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
-      const categorizedTask = await categorizeTask(updatedTask.text);
-      updatedTask.categories = categorizedTask.categories;
-    }
-  
-    setScheduleDays(prevDays => {
-      const newDays = [...prevDays];
-      if (newDays[currentDayIndex]) {
-        newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
-          task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
-        );
+    try {
+      if (updatedTask.text !== scheduleDays[currentDayIndex]?.find(task => task.id === updatedTask.id)?.text) {
+        const categorizedTask = await categorizeTask(updatedTask.text);
+        updatedTask.categories = categorizedTask.categories;
       }
-      return newDays;
-    });
-  }, [currentDayIndex, scheduleDays]);
+  
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        if (newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
+            task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
+          );
+        }
+        return newDays;
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentDayIndex, scheduleDays, toast]);
 
   const handleScheduleTaskDelete = useCallback((taskId: string) => {
     setScheduleDays(prevDays => {
@@ -287,7 +296,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
-      <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto"> 
+      <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto main-content"> 
         <div className="flex justify-between items-center mb-6">
           <TypographyH3 className="text-white">Generated Schedule</TypographyH3>
           <div className="flex items-center space-x-4">
