@@ -26,7 +26,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
         if (!acc[category]) {
           acc[category] = [];
         }
-        acc[category].push(task);
+        acc[category].push({...task}); // Create new reference
         return acc;
       }, {});
 
@@ -37,7 +37,9 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             id: `section-${category}`,
             text: category.charAt(0).toUpperCase() + category.slice(1),
             is_section: true,
-            type: 'section'
+            type: 'section',
+            categories: [],
+            completed: false
           } as Task,
           ...categoryTasks.map(task => ({
             ...task,
@@ -69,98 +71,105 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     }
   }, [tasks, layoutPreference]);
 
+  const handleUpdateTask = useCallback((updatedTask: Task) => {
+    const taskIndex = memoizedTasks.findIndex(t => t.id === updatedTask.id);
+    if (taskIndex !== -1) {
+      // Create a new array with the updated task
+      const newTasks = memoizedTasks.map(task => 
+        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+      );
+      
+      // Call onUpdateTask before updating the local state
+      onUpdateTask(updatedTask);
+      onReorderTasks(newTasks);
+    }
+  }, [memoizedTasks, onUpdateTask, onReorderTasks]);
+
+  const handleDeleteTask = useCallback((taskId: string) => {
+    const newTasks = memoizedTasks.filter(task => 
+      task.id !== taskId && task.parent_id !== taskId
+    );
+    onDeleteTask(taskId);
+    onReorderTasks(newTasks);
+  }, [memoizedTasks, onDeleteTask, onReorderTasks]);
+
   const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => {
-    const draggedTask = memoizedTasks[dragIndex];
-    const newTasks = [...memoizedTasks];
-    newTasks.splice(dragIndex, 1);
+    const draggedTask = {...memoizedTasks[dragIndex]}; // Create new reference
+    const newTasks = memoizedTasks.filter((_, index) => index !== dragIndex);
 
     if (targetSection) {
-      // Find the index of the section header
-      const sectionIndex = newTasks.findIndex(task => task.is_section && task.text === targetSection);
+      const sectionIndex = newTasks.findIndex(task => 
+        task.is_section && task.text === targetSection
+      );
+      
       if (sectionIndex !== -1) {
-        // Insert the task right after the section header
         newTasks.splice(sectionIndex + 1, 0, { 
           ...draggedTask, 
           section: targetSection, 
           is_subtask: false, 
           level: 0, 
           parent_id: null,
-          categories: [targetSection] // Update the task's category
+          categories: [targetSection]
         });
       } else {
-        // If section not found, add to the end
         newTasks.push({ 
           ...draggedTask, 
           section: targetSection, 
           is_subtask: false, 
           level: 0, 
           parent_id: null,
-          categories: [targetSection] // Update the task's category
+          categories: [targetSection]
         });
       }
     } else {
       const targetTask = newTasks[hoverIndex];
+      const updatedDraggedTask = { ...draggedTask };
+      
       if (shouldIndent && !targetTask.is_section && !draggedTask.is_subtask) {
-        draggedTask.is_subtask = true;
-        draggedTask.level = (targetTask.level || 0) + 1;
-        draggedTask.parent_id = targetTask.id;
-        newTasks.splice(hoverIndex + 1, 0, draggedTask);
+        updatedDraggedTask.is_subtask = true;
+        updatedDraggedTask.level = (targetTask.level || 0) + 1;
+        updatedDraggedTask.parent_id = targetTask.id;
+        newTasks.splice(hoverIndex + 1, 0, updatedDraggedTask);
       } else {
         if (targetTask.is_section) {
-          newTasks.splice(hoverIndex + 1, 0, draggedTask);
+          newTasks.splice(hoverIndex + 1, 0, {
+            ...updatedDraggedTask,
+            is_subtask: false,
+            level: 0,
+            parent_id: null
+          });
         } else {
-          newTasks.splice(hoverIndex, 0, draggedTask);
+          newTasks.splice(hoverIndex, 0, {
+            ...updatedDraggedTask,
+            is_subtask: false,
+            level: 0,
+            parent_id: null
+          });
         }
-        draggedTask.is_subtask = false;
-        draggedTask.level = 0;
-        draggedTask.parent_id = null;
       }
     }
 
     onReorderTasks(newTasks);
   }, [memoizedTasks, onReorderTasks]);
 
-  const handleUpdateTask = useCallback((updatedTask: Task) => {
-    const newTasks = memoizedTasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    );
-    onUpdateTask(updatedTask);
-    onReorderTasks(newTasks);
-  }, [memoizedTasks, onUpdateTask, onReorderTasks]);
-
-  const handleDeleteTask = useCallback((taskId: string) => {
-    const newTasks = memoizedTasks.filter(task => task.id !== taskId && task.parent_id !== taskId);
-    onDeleteTask(taskId);
-    onReorderTasks(newTasks);
-  }, [memoizedTasks, onDeleteTask, onReorderTasks]);
-
   return (
     <Pane>
       {memoizedTasks.map((item, index) => (
-        <React.Fragment key={item.id}>
-          {item.type === 'section' ? (
-            <EditableScheduleRow
-              task={item}
-              index={index}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              moveTask={moveTask}
-              isSection={true}
-            >
+        <React.Fragment key={`${item.id}-${item.type}`}>
+          <EditableScheduleRow
+            task={item}
+            index={index}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            moveTask={moveTask}
+            isSection={item.type === 'section'}
+          >
+            {item.type === 'section' && (
               <TypographyH4 className="mt-3 mb-1">
                 {item.text}
               </TypographyH4>
-            </EditableScheduleRow>
-          ) : (
-            <EditableScheduleRow
-              task={item}
-              index={index}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              moveTask={moveTask}
-              isSection={false}
-            />
-          )}
+            )}
+          </EditableScheduleRow>
         </React.Fragment>
       ))}
     </Pane>

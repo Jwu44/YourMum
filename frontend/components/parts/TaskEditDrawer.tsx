@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,26 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     is_recurring: task.is_recurring || null,
   });
 
+  // Add a ref to track if we need cleanup
+  const needsCleanup = useRef(false);
+
+  // Set up on mount and clean up on unmount
+  useEffect(() => {
+    // Store original pointer-events value
+    const originalPointerEvents = document.body.style.pointerEvents;
+    
+    if (isOpen) {
+      needsCleanup.current = true;
+    }
+
+    return () => {
+      if (needsCleanup.current) {
+        document.body.style.pointerEvents = originalPointerEvents || 'auto';
+        needsCleanup.current = false;
+      }
+    };
+  }, [isOpen]);
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditedTask(prev => ({ ...prev, [name]: value }));
@@ -76,13 +96,43 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   };
 
   const handleSave = useCallback(() => {
-    onUpdateTask(editedTask);
+    try {
+      const updatedTask = {
+        ...editedTask,
+        type: task.type, // Preserve original task type
+        is_section: task.is_section, // Preserve section status
+        id: task.id, // Ensure ID is preserved
+      };
+      onUpdateTask(updatedTask);
+    } finally {
+      onClose();
+    }
+  }, [editedTask, task, onUpdateTask, onClose]);
+
+  // Handle close with proper cleanup
+  const handleClose = useCallback(() => {
+    if (needsCleanup.current) {
+      document.body.style.pointerEvents = 'auto';
+      needsCleanup.current = false;
+    }
     onClose();
-  }, [editedTask, onUpdateTask, onClose]);
+  }, [onClose]);
 
   return (
-    <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="drawer-background drawer-content">
+    <Drawer 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+      modal={true} // Ensure it's modal
+    >
+      <DrawerContent
+        className="fixed inset-y-0 right-0 h-full w-full bg-[#000000] shadow-lg outline-none "
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+          handleClose();
+        }}
+      >
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
             <DrawerTitle>Edit Task</DrawerTitle>
@@ -158,7 +208,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select recurrence" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="select-content">
                   {RECURRENCE_OPTIONS.map((option) => (
                     <SelectItem 
                       key={option.value || 'none'} 
@@ -173,7 +223,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           </div>
           <DrawerFooter>
             <Button onClick={handleSave}>Save</Button>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
           </DrawerFooter>
         </div>
       </DrawerContent>
