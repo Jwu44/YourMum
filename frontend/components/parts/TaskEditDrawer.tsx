@@ -199,7 +199,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">
-                Recur every...
+                Repeat every...
               </label>
               <Select
                 value={editedTask.is_recurring || 'none'}
