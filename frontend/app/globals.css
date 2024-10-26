@@ -119,7 +119,7 @@ body {
   }
 
   .drawer-content {
-    @apply fixed inset-y-0 right-0 z-[51] h-full w-full bg-background/95 shadow-lg outline-none 
+    @apply fixed inset-y-0 right-0 h-[85vh] w-full bg-[#000000] shadow-lg outline-none 
     data-[state=closed]:animate-slideOutRight
     data-[state=open]:animate-slideInRight;
     opacity: 1 !important;
