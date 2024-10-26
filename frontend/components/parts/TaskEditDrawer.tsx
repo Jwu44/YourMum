@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { 
   Select,
   SelectContent,
@@ -19,7 +20,13 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Task, RecurrenceType, RECURRENCE_OPTIONS } from '../../lib/types';
+import { 
+  Task, 
+  RecurrenceType, 
+  WeekDay, 
+  MonthWeek,
+  RECURRENCE_OPTIONS 
+} from '../../lib/types';
 
 interface TaskEditDrawerProps {
   isOpen: boolean;
@@ -36,17 +43,17 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   task,
   onUpdateTask,
 }) => {
-  const [editedTask, setEditedTask] = useState<Task>({
+  // Initialize edited task with proper recurrence type
+  const [editedTask, setEditedTask] = useState<Task>(() => ({
     ...task,
     is_recurring: task.is_recurring || null,
-  });
+  }));
 
-  // Add a ref to track if we need cleanup
+  // Cleanup ref for pointer events
   const needsCleanup = useRef(false);
 
-  // Set up on mount and clean up on unmount
+  // Effect for pointer events cleanup
   useEffect(() => {
-    // Store original pointer-events value
     const originalPointerEvents = document.body.style.pointerEvents;
     
     if (isOpen) {
@@ -61,11 +68,59 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     };
   }, [isOpen]);
 
+  // Get current day of week from task's date or today
+  const getCurrentDayOfWeek = useCallback((): WeekDay => {
+    try {
+      const date = task.start_date ? parseISO(task.start_date) : new Date();
+      return format(date, 'EEEE') as WeekDay;
+    } catch (error) {
+      console.error('Error getting day of week:', error);
+      return format(new Date(), 'EEEE') as WeekDay;
+    }
+  }, [task.start_date]);
+
+  // Get week of month (first, second, third, fourth, last)
+  const getWeekOfMonth = useCallback((): MonthWeek => {
+    try {
+      const date = task.start_date ? parseISO(task.start_date) : new Date();
+      const dayOfMonth = date.getDate();
+      
+      if (dayOfMonth >= 1 && dayOfMonth <= 7) return 'first';
+      if (dayOfMonth >= 8 && dayOfMonth <= 14) return 'second';
+      if (dayOfMonth >= 15 && dayOfMonth <= 21) return 'third';
+      if (dayOfMonth >= 22 && dayOfMonth <= 28) return 'fourth';
+      return 'last';
+    } catch (error) {
+      console.error('Error getting week of month:', error);
+      return 'first';
+    }
+  }, [task.start_date]);
+
+  // Format recurrence label with current day/week
+  const getRecurrenceLabel = useCallback((option: typeof RECURRENCE_OPTIONS[0]): string => {
+    try {
+      if (option.value === 'weekly') {
+        return option.label.replace('{day}', getCurrentDayOfWeek());
+      }
+      if (option.value === 'monthly') {
+        return option.label
+          .replace('{week}', getWeekOfMonth())
+          .replace('{day}', getCurrentDayOfWeek());
+      }
+      return option.label;
+    } catch (error) {
+      console.error('Error formatting recurrence label:', error);
+      return option.label;
+    }
+  }, [getCurrentDayOfWeek, getWeekOfMonth]);
+
+  // Handle input changes for text fields
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditedTask(prev => ({ ...prev, [name]: value }));
   }, []);
 
+  // Handle category selection
   const handleCategorySelect = useCallback((category: string) => {
     setEditedTask(prev => ({
       ...prev,
@@ -75,15 +130,38 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }));
   }, []);
 
+  // Handle recurrence selection
   const handleRecurrenceChange = useCallback((value: string) => {
-    // Convert empty string to null, otherwise use the value as RecurrenceType
-    const recurrenceValue = value === 'none' ? null : value as RecurrenceType;
-    setEditedTask(prev => ({
-      ...prev,
-      is_recurring: recurrenceValue
-    }));
-  }, []);
+    try {
+      if (value === 'none') {
+        setEditedTask(prev => ({
+          ...prev,
+          is_recurring: null
+        }));
+        return;
+      }
 
+      const recurrence: RecurrenceType = {
+        frequency: value as RecurrenceType['frequency'],
+        dayOfWeek: getCurrentDayOfWeek(),
+        weekOfMonth: value === 'monthly' ? getWeekOfMonth() : undefined
+      };
+
+      setEditedTask(prev => ({
+        ...prev,
+        is_recurring: recurrence
+      }));
+    } catch (error) {
+      console.error('Error setting recurrence:', error);
+      // Reset to no recurrence on error
+      setEditedTask(prev => ({
+        ...prev,
+        is_recurring: null
+      }));
+    }
+  }, [getCurrentDayOfWeek, getWeekOfMonth]);
+
+  // Get category color
   const getCategoryColor = (category: string): string => {
     switch (category) {
       case 'Work': return 'bg-blue-500';
@@ -95,21 +173,24 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }
   };
 
+  // Handle save
   const handleSave = useCallback(() => {
     try {
       const updatedTask = {
         ...editedTask,
-        type: task.type, // Preserve original task type
-        is_section: task.is_section, // Preserve section status
-        id: task.id, // Ensure ID is preserved
+        type: task.type,
+        is_section: task.is_section,
+        id: task.id,
       };
       onUpdateTask(updatedTask);
+    } catch (error) {
+      console.error('Error saving task:', error);
     } finally {
       onClose();
     }
   }, [editedTask, task, onUpdateTask, onClose]);
 
-  // Handle close with proper cleanup
+  // Handle close
   const handleClose = useCallback(() => {
     if (needsCleanup.current) {
       document.body.style.pointerEvents = 'auto';
@@ -124,10 +205,10 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       onOpenChange={(open) => {
         if (!open) handleClose();
       }}
-      modal={true} // Ensure it's modal
+      modal={true}
     >
       <DrawerContent
-        className="fixed inset-y-0 right-0 h-full w-full bg-[#000000] shadow-lg outline-none "
+        className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-[#000000] shadow-lg outline-none"
         onPointerDownOutside={(e) => {
           e.preventDefault();
           handleClose();
@@ -138,6 +219,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
             <DrawerTitle>Edit Task</DrawerTitle>
           </DrawerHeader>
           <div className="p-4 space-y-4">
+            {/* Task Name */}
             <div>
               <label htmlFor="text" className="block text-sm font-medium">
                 Task Name
@@ -150,6 +232,8 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 className="mt-1"
               />
             </div>
+
+            {/* Categories */}
             <div>
               <label className="block text-sm font-medium mb-2">
                 Categories
@@ -173,6 +257,8 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Time Fields */}
             <div>
               <label htmlFor="start_time" className="block text-sm font-medium">
                 Start Time
@@ -197,12 +283,16 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 className="mt-1"
               />
             </div>
+
+            {/* Recurrence Selection */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                Recur every...
+                Repeat every...
               </label>
               <Select
-                value={editedTask.is_recurring || 'none'}
+                value={
+                  editedTask.is_recurring?.frequency ?? 'none'
+                }
                 onValueChange={handleRecurrenceChange}
               >
                 <SelectTrigger className="w-full">
@@ -211,16 +301,18 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 <SelectContent className="select-content">
                   {RECURRENCE_OPTIONS.map((option) => (
                     <SelectItem 
-                      key={option.value || 'none'} 
-                      value={option.value || 'none'} // Use 'none' instead of empty string
+                      key={option.value} 
+                      value={option.value}
                     >
-                      {option.label}
+                      {getRecurrenceLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {/* Footer */}
           <DrawerFooter>
             <Button onClick={handleSave}>Save</Button>
           </DrawerFooter>
