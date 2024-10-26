@@ -1,5 +1,3 @@
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'none' | null;
-
 export interface Task {
     id: string;
     text: string;
@@ -14,7 +12,8 @@ export interface Task {
     type?: string;
     start_time?: string | null;
     end_time?: string | null;
-    is_recurring?: RecurrenceType;
+    is_recurring?: RecurrenceType | null;
+    start_date?: string;
 }
 
 export interface FormData {
@@ -70,6 +69,16 @@ export interface FormContextType {
   dispatch: React.Dispatch<FormAction>;
 }
 
+// Add new types for recurrence
+export type WeekDay = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+export type MonthWeek = 'first' | 'second' | 'third' | 'fourth' | 'last';
+
+export type RecurrenceType = {
+  frequency: 'none' | 'daily' | 'weekly' | 'monthly' | null;
+  dayOfWeek?: WeekDay;
+  weekOfMonth?: MonthWeek;
+};
+
 export interface TaskEditFormData {
   text: string;
   categories: string[];
@@ -78,15 +87,9 @@ export interface TaskEditFormData {
   is_recurring: RecurrenceType;
 }
 
-// Add to existing types or create new ones
-export interface RecurrenceOption {
-  value: RecurrenceType;
-  label: string;
-}
-
-export const RECURRENCE_OPTIONS: RecurrenceOption[] = [
-  { value: 'none', label: 'None' },        // Changed from null to 'none'
+export const RECURRENCE_OPTIONS = [
+  { value: 'none', label: "Doesn't repeat" },
   { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' }
+  { value: 'weekly', label: 'Weekly on {day}' }, // Template for weekly
+  { value: 'monthly', label: 'Monthly on the {week} {day}' }, // Template for monthly
 ];

@@ -1,11 +1,12 @@
 import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import type { FormData } from './types';
-import { Task, FormAction, LayoutPreference, RecurrenceType } from './types';
-import { addDays, addWeeks, addMonths } from 'date-fns';
-
+import { Task, FormAction, LayoutPreference, MonthWeek, RecurrenceType  } from './types';
+import { format } from 'date-fns';
 
 const API_BASE_URL = 'http://localhost:8000/api';
+
+const today = new Date().toISOString().split('T')[0];
 
 export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
   (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,6 +78,7 @@ export const handleAddTask = async (tasks: Task[], newTask: string, categories: 
     section_index: tasks.length,
     type: "task",
     is_recurring: null,
+    start_date: today,
   };
   return [...tasks, newTaskObject];
 };
@@ -132,7 +134,7 @@ export const parseScheduleToTasks = async (
       tasks.push(createSectionTask(trimmedLine, currentSection, sectionStartIndex));
     } else if (trimmedLine) {
       // Create a new task
-      const task = await createTask(trimmedLine, currentSection, index, sectionStartIndex, inputTasks, layoutPreference);
+      const task = await createFullTask(trimmedLine, currentSection, index, sectionStartIndex, inputTasks, layoutPreference);
       if (task && !taskMap.has(task.text)) {
         taskMap.set(task.text, task);
         updateTaskHierarchy(task, taskStack);
@@ -162,10 +164,10 @@ const createSectionTask = (text: string, section: string, index: number): Task =
   level: 0,
   section_index: 0,
   type: 'section',
-  is_recurring: 'daily',
+  is_recurring: { frequency: 'daily' },
 });
 
-const createTask = async (
+const createFullTask = async (
   line: string,
   currentSection: string,
   index: number,
@@ -217,7 +219,7 @@ const createTask = async (
     start_time: startTime,
     end_time: endTime,
     is_recurring: null, // might need to update
- 
+    start_date: today,
   };
 };
 
@@ -272,35 +274,92 @@ export const generateNextDaySchedule = async (
     // Step 1: Identify unfinished tasks
     const unfinishedTasks = currentSchedule.filter(task => !task.completed && !task.is_section);
 
-    // Step 2: Identify recurring tasks
-    const recurringTasksResponse = await fetch(`${API_BASE_URL}/identify_recurring_tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        current_schedule: currentSchedule,
-        previous_schedules: previousSchedules
+    // Step 2: Get recurring tasks from both APIs
+    const [recurringTasksResponse, existingRecurringTasksResponse] = await Promise.all([
+      // Get newly identified recurring tasks
+      fetch(`${API_BASE_URL}/identify_recurring_tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_schedule: currentSchedule,
+          previous_schedules: previousSchedules
+        })
+      }),
+      // Get existing recurring tasks from database
+      fetch(`${API_BASE_URL}/get_recurring_tasks`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       })
-    });
+    ]);
 
-    if (!recurringTasksResponse.ok) {
-      throw new Error('Failed to identify recurring tasks');
+    if (!recurringTasksResponse.ok || !existingRecurringTasksResponse.ok) {
+      throw new Error('Failed to fetch recurring tasks');
     }
 
-    const recurringTasksData = await recurringTasksResponse.json();
-    const recurringTasks = recurringTasksData.recurring_tasks;
+    const [recurringTasksData, existingRecurringTasksData] = await Promise.all([
+      recurringTasksResponse.json(),
+      existingRecurringTasksResponse.json()
+    ]);
 
-    // Step 3: Combine unfinished and recurring tasks
-    let combinedTasks = [
+    // Step 3: Process and combine recurring tasks
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    // Process newly identified recurring tasks
+    const newRecurringTasks = recurringTasksData.recurring_tasks.map((task: Task) => ({
+      ...task,
+      is_recurring: { frequency: 'daily' }, // Set recurring type for newly identified tasks
+      completed: false
+    }));
+
+    // Filter existing recurring tasks for tomorrow based on recurrence pattern
+    const existingRecurringTasks = existingRecurringTasksData.recurring_tasks.filter((task: Task) => {
+      if (!task.start_date || !task.is_recurring || typeof task.is_recurring !== 'object') {
+        return false;
+      }
+      
+      const taskDate = new Date(task.start_date);
+      const diffDays = Math.floor((tomorrow.getTime() - taskDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      switch (task.is_recurring.frequency) {
+        case 'daily':
+          return true;
+    
+        case 'weekly':
+          if (!task.is_recurring.dayOfWeek) return false;
+          // Check if tomorrow matches the specified day of week
+          return format(tomorrow, 'EEEE') === task.is_recurring.dayOfWeek;
+    
+        case 'monthly':
+          if (!task.is_recurring.dayOfWeek || !task.is_recurring.weekOfMonth) return false;
+          
+          // Check if tomorrow matches both the week and day
+          const tomorrowDayOfWeek = format(tomorrow, 'EEEE');
+          const tomorrowWeekOfMonth = getWeekOfMonth(tomorrow);
+          
+          return tomorrowDayOfWeek === task.is_recurring.dayOfWeek && 
+                 tomorrowWeekOfMonth === task.is_recurring.weekOfMonth;
+    
+        case 'none':
+        default:
+          return false;
+      }
+    }).map((task: Task) => ({
+      ...task,
+      completed: false,
+      start_date: tomorrowStr // Update date for tomorrow
+    }));
+
+    // Step 4: Combine all tasks, removing duplicates
+    const combinedTasks = [
       ...unfinishedTasks,
-      ...recurringTasks.map((task: Task) => ({
-        ...task,
-        completed: false // Ensure recurring tasks are set to not completed
-      })).filter((task: Task) => 
-        !unfinishedTasks.some(unfinished => unfinished.id === task.id)
-      )
-    ];
+      ...newRecurringTasks,
+      ...existingRecurringTasks
+    ].filter((task, index, self) => 
+      index === self.findIndex(t => t.id === task.id)
+    );
 
-    // Step 4: Format the next day schedule based on layout preference
     const layoutPreference: LayoutPreference = {
       structure: userData.layout_preference.structure as 'structured' | 'unstructured',
       subcategory: userData.layout_preference.subcategory,
@@ -362,8 +421,7 @@ const formatStructuredSchedule = (
       parent_id: null,
       level: 0,
       section_index: formattedSchedule.length,
-      is_recurring: 'daily',
-   
+      is_recurring: { frequency: 'daily' },
     });
 
     const sectionTasks = tasks.filter(task => task.section === section);
@@ -387,7 +445,7 @@ const formatStructuredSchedule = (
         parent_id: null,
         level: 0,
         section_index: formattedSchedule.length,
-        is_recurring: 'daily',
+        is_recurring: { frequency: 'daily' },
    
       });
     }
@@ -469,20 +527,43 @@ export const handleEnergyChange = (
 
 // Helper function to check if a task should recur on a given date
 export const shouldTaskRecurOnDate = (task: Task, targetDate: Date): boolean => {
-  if (!task.is_recurring) return false;
+  if (!task.is_recurring || typeof task.is_recurring !== 'object') return false;
 
   const today = new Date();
+  const taskDate = task.start_date ? new Date(task.start_date) : today;
   
-  switch (task.is_recurring) {
+  switch (task.is_recurring.frequency) {
     case 'daily':
       return true;
+
     case 'weekly':
-      const nextWeek = addWeeks(today, 1);
-      return targetDate >= nextWeek;
+      if (!task.is_recurring.dayOfWeek) return false;
+      // Check if target date falls on the specified day of week
+      return format(targetDate, 'EEEE') === task.is_recurring.dayOfWeek;
+
     case 'monthly':
-      const nextMonth = addMonths(today, 1);
-      return targetDate >= nextMonth;
+      if (!task.is_recurring.dayOfWeek || !task.is_recurring.weekOfMonth) return false;
+      
+      // Check if target date matches the specified week and day
+      const targetDayOfWeek = format(targetDate, 'EEEE');
+      const targetWeekOfMonth = getWeekOfMonth(targetDate);
+      
+      return targetDayOfWeek === task.is_recurring.dayOfWeek && 
+             targetWeekOfMonth === task.is_recurring.weekOfMonth;
+
+    case 'none':
     default:
       return false;
   }
+};
+
+// Helper function to get week of month
+const getWeekOfMonth = (date: Date): MonthWeek => {
+  const dayOfMonth = date.getDate();
+  
+  if (dayOfMonth >= 1 && dayOfMonth <= 7) return 'first';
+  if (dayOfMonth >= 8 && dayOfMonth <= 14) return 'second';
+  if (dayOfMonth >= 15 && dayOfMonth <= 21) return 'third';
+  if (dayOfMonth >= 22 && dayOfMonth <= 28) return 'fourth';
+  return 'last';
 };
