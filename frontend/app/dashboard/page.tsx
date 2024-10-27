@@ -26,7 +26,9 @@ import {
   submitFormData,
   extractSchedule,
   cleanupTasks,
-  handleEnergyChange 
+  handleEnergyChange,
+  loadScheduleForDate,
+  updateScheduleForDate 
 } from '@/lib/helper';
 import DashboardLeftCol from '@/components/parts/DashboardLeftCol';
 import EditableSchedule from '@/components/parts/EditableSchedule';
@@ -62,6 +64,7 @@ const Dashboard: React.FC = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scheduleId, setScheduleId] = useState<string | null>(null);
+  const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
 
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
@@ -189,17 +192,39 @@ const Dashboard: React.FC = () => {
     updateSchedule();
   }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
 
+  // Helper function to get date string for a specific day offset
+  const getDateString = (offset: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    return date.toISOString().split('T')[0];
+  };
+
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
-    try {  
+    try {
+      const currentDate = getDateString(currentDayIndex);
+      
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         if (newDays[currentDayIndex]) {
           newDays[currentDayIndex] = newDays[currentDayIndex].map(task => 
-            task.id === updatedTask.id ? { ...task, ...updatedTask, categories: updatedTask.categories || [] } : task
+            task.id === updatedTask.id ? { ...task, ...updatedTask } : task
           );
         }
         return newDays;
       });
+
+      // Update cache
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache);
+        const updatedTasks = prevCache.get(currentDate)?.map(task =>
+          task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+        ) || [];
+        newCache.set(currentDate, updatedTasks);
+        return newCache;
+      });
+
+      // Persist changes to database
+      await updateScheduleForDate(currentDate, scheduleDays[currentDayIndex]);
     } catch (error) {
       console.error('Error updating task:', error);
       toast({
@@ -229,46 +254,55 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex]);
 
   const handleNextDay = useCallback(async () => {
-    const currentSchedule = scheduleDays[currentDayIndex];
-    if (!Array.isArray(currentSchedule) || currentSchedule.length === 0) {
-      toast({
-        title: "Error",
-        description: "Invalid or empty schedule data. Please try again.",
-        variant: "destructive",
-      });
+    const nextDayDate = getDateString(currentDayIndex + 1);
+    
+    // First check if we have this day's schedule in cache
+    if (scheduleCache.has(nextDayDate)) {
+      setScheduleDays(prevDays => [...prevDays, scheduleCache.get(nextDayDate)!]);
+      setCurrentDayIndex(prevIndex => prevIndex + 1);
       return;
     }
-  
+
     try {
-      const result = await generateNextDaySchedule(
-        currentSchedule,
-        state,
-        scheduleDays.slice(0, currentDayIndex + 1)
-      );
+      // Try to load existing schedule
+      const existingSchedule = await loadScheduleForDate(nextDayDate);
       
-      if (result.success && result.schedule) {
-        setScheduleDays(prevDays => [...prevDays, result.schedule as Task[]]);
-        setCurrentDayIndex(prevIndex => prevIndex + 1);
-        toast({
-          title: "Success",
-          description: "Next day's schedule generated successfully.",
-        });
+      if (existingSchedule.success && existingSchedule.schedule) {
+        // Use existing schedule
+        const nextDaySchedule = existingSchedule.schedule;
+        setScheduleDays(prevDays => [...prevDays, nextDaySchedule]);
+        setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, nextDaySchedule));
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to generate next day's schedule. Please try again.",
-          variant: "destructive",
-        });
+        // Generate new schedule if none exists
+        const currentSchedule = scheduleDays[currentDayIndex];
+        const result = await generateNextDaySchedule(
+          currentSchedule,
+          state,
+          scheduleDays.slice(0, currentDayIndex + 1)
+        );
+        
+        if (result.success && result.schedule) {
+          setScheduleDays(prevDays => [...prevDays, result.schedule!]);
+          setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, result.schedule!));
+        } else {
+          throw new Error(result.error || 'Failed to generate schedule');
+        }
       }
+      
+      setCurrentDayIndex(prevIndex => prevIndex + 1);
+      toast({
+        title: "Success",
+        description: "Next day's schedule loaded successfully.",
+      });
     } catch (error) {
-      console.error("Error generating next day schedule:", error);
+      console.error("Error handling next day:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: "Failed to load next day's schedule. Please try again.",
         variant: "destructive",
       });
     }
-  }, [scheduleDays, currentDayIndex, state, toast, generateNextDaySchedule]);
+  }, [currentDayIndex, scheduleDays, state, toast]);
 
   const handlePreviousDay = useCallback(() => {
     if (currentDayIndex > 0) {

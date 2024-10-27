@@ -2,11 +2,33 @@ import { categorizeTask } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import type { FormData } from './types';
 import { Task, FormAction, LayoutPreference, MonthWeek, RecurrenceType  } from './types';
-import { format } from 'date-fns';
+import { format as dateFormat } from 'date-fns';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
 const today = new Date().toISOString().split('T')[0];
+
+interface ScheduleDocument {
+  date: string;
+  tasks: Task[];
+  userId?: string; // Optional: if you have user authentication
+}
+
+interface ScheduleResponse {
+  _id: string;
+  date: string;
+  tasks: Task[];
+  metadata: {
+    createdAt: string;
+    lastModified: string;
+  };
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 
 export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
   (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,17 +289,70 @@ export const generateNextDaySchedule = async (
   currentSchedule: Task[],
   userData: FormData,
   previousSchedules: Task[][] = []
-): Promise<{ success: boolean; schedule?: Task[]; error?: string }> => {
-  console.log("Generating next day schedule locally");
+): Promise<{ success: boolean; schedule?: Task[]; error?: string; warning?: string }> => {
+  console.log("Starting next day schedule generation process");
 
   try {
-    // Step 1: Identify unfinished tasks
-    const unfinishedTasks = currentSchedule.filter(task => !task.completed && !task.is_section);
+    // Calculate tomorrow's date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    // Step 2: Get recurring tasks from both APIs
+    // First, check if schedule for tomorrow already exists
+    try {
+      const existingSchedule = await loadScheduleForDate(tomorrowStr);
+      if (existingSchedule.success && existingSchedule.schedule) {
+        console.log("Found existing schedule for tomorrow");
+        return existingSchedule;
+      }
+    } catch (error) {
+      console.error("Error checking existing schedule:", error);
+      // Continue with generation if check fails
+    }
+
+    // Step 1: Separate tasks into recurring and non-recurring
+    // Use type predicate for better type safety
+    const isRecurringTask = (task: Task): boolean => 
+      task.is_recurring !== null && 
+      typeof task.is_recurring === 'object' && 
+      'frequency' in task.is_recurring;
+
+    const { recurringTasks, nonRecurringTasks } = currentSchedule.reduce<{
+      recurringTasks: Task[];
+      nonRecurringTasks: Task[];
+    }>(
+      (acc, task) => {
+        if (isRecurringTask(task)) {
+          acc.recurringTasks.push(task);
+        } else if (!task.is_section && !task.completed) {
+          // Only include non-recurring, incomplete tasks
+          acc.nonRecurringTasks.push(task);
+        }
+        return acc;
+      },
+      { recurringTasks: [], nonRecurringTasks: [] }
+    );
+
+    // Step 2: Get recurring tasks from both APIs with timeout and retry logic
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 5000) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    };
+
     const [recurringTasksResponse, existingRecurringTasksResponse] = await Promise.all([
-      // Get newly identified recurring tasks
-      fetch(`${API_BASE_URL}/identify_recurring_tasks`, {
+      fetchWithTimeout(`${API_BASE_URL}/identify_recurring_tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,12 +360,14 @@ export const generateNextDaySchedule = async (
           previous_schedules: previousSchedules
         })
       }),
-      // Get existing recurring tasks from database
-      fetch(`${API_BASE_URL}/get_recurring_tasks`, {
+      fetchWithTimeout(`${API_BASE_URL}/get_recurring_tasks`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       })
-    ]);
+    ]).catch(error => {
+      console.error("Error fetching recurring tasks:", error);
+      throw new Error('Failed to fetch recurring tasks');
+    });
 
     if (!recurringTasksResponse.ok || !existingRecurringTasksResponse.ok) {
       throw new Error('Failed to fetch recurring tasks');
@@ -301,99 +378,184 @@ export const generateNextDaySchedule = async (
       existingRecurringTasksResponse.json()
     ]);
 
-    // Step 3: Process and combine recurring tasks
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    // Step 3: Process recurring tasks for tomorrow using memoization
+    const memoizedGetWeekOfMonth = memoize(getWeekOfMonth);
+    const memoizedFormat = memoize((date: Date, format: string) => dateFormat(date, format));
 
-    // Process newly identified recurring tasks
-    const newRecurringTasks = recurringTasksData.recurring_tasks.map((task: Task) => ({
-      ...task,
-      is_recurring: { frequency: 'daily' }, // Set recurring type for newly identified tasks
-      completed: false
-    }));
+    // Add type guard to check if task has valid recurring properties
+    const isValidRecurringTask = (task: Task): task is Task & { 
+      is_recurring: NonNullable<RecurrenceType> 
+    } => {
+      return task.is_recurring !== null && 
+            task.is_recurring !== undefined && 
+            typeof task.is_recurring === 'object' &&
+            'frequency' in task.is_recurring;
+    };
 
-    // Filter existing recurring tasks for tomorrow based on recurrence pattern
-    const existingRecurringTasks = existingRecurringTasksData.recurring_tasks.filter((task: Task) => {
-      if (!task.start_date || !task.is_recurring || typeof task.is_recurring !== 'object') {
+    // Update the shouldRecurTomorrow function with proper type checking
+    const shouldRecurTomorrow = (task: Task): boolean => {
+      if (!isValidRecurringTask(task)) return false;
+      
+      try {
+        switch (task.is_recurring.frequency) {
+          case 'daily':
+            return true;
+
+          case 'weekly':
+            if (!task.is_recurring.dayOfWeek) return false;
+            return memoizedFormat(tomorrow, 'EEEE') === task.is_recurring.dayOfWeek;
+
+          case 'monthly':
+            if (!task.is_recurring.dayOfWeek || !task.is_recurring.weekOfMonth) return false;
+            const tomorrowDayOfWeek = memoizedFormat(tomorrow, 'EEEE');
+            const tomorrowWeekOfMonth = memoizedGetWeekOfMonth(tomorrow);
+            return tomorrowDayOfWeek === task.is_recurring.dayOfWeek && 
+                  tomorrowWeekOfMonth === task.is_recurring.weekOfMonth;
+
+          default:
+            return false;
+        }
+      } catch (error) {
+        console.error('Error checking recurrence:', error);
         return false;
       }
-      
-      const taskDate = new Date(task.start_date);
-      const diffDays = Math.floor((tomorrow.getTime() - taskDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      switch (task.is_recurring.frequency) {
-        case 'daily':
-          return true;
-    
-        case 'weekly':
-          if (!task.is_recurring.dayOfWeek) return false;
-          // Check if tomorrow matches the specified day of week
-          return format(tomorrow, 'EEEE') === task.is_recurring.dayOfWeek;
-    
-        case 'monthly':
-          if (!task.is_recurring.dayOfWeek || !task.is_recurring.weekOfMonth) return false;
-          
-          // Check if tomorrow matches both the week and day
-          const tomorrowDayOfWeek = format(tomorrow, 'EEEE');
-          const tomorrowWeekOfMonth = getWeekOfMonth(tomorrow);
-          
-          return tomorrowDayOfWeek === task.is_recurring.dayOfWeek && 
-                 tomorrowWeekOfMonth === task.is_recurring.weekOfMonth;
-    
-        case 'none':
-        default:
-          return false;
-      }
-    }).map((task: Task) => ({
-      ...task,
-      completed: false,
-      start_date: tomorrowStr // Update date for tomorrow
-    }));
+    };
 
-    // Step 4: Combine all tasks, removing duplicates
-    const combinedTasks = [
-      ...unfinishedTasks,
-      ...newRecurringTasks,
-      ...existingRecurringTasks
-    ].filter((task, index, self) => 
-      index === self.findIndex(t => t.id === task.id)
-    );
+    // Process tasks in parallel using Promise.all for better performance
+    const [recurringTasksForTomorrow, newRecurringTasks, existingRecurringTasks] = await Promise.all([
+      // Process current schedule's recurring tasks
+      Promise.resolve(recurringTasks
+        .filter(shouldRecurTomorrow)
+        .map(task => ({
+          ...task,
+          id: uuidv4(),
+          completed: false,
+          start_date: tomorrowStr
+        }))),
 
+      // Process newly identified recurring tasks
+      Promise.resolve(recurringTasksData.recurring_tasks
+        .filter((task: Task) => !recurringTasks.some(t => t.text === task.text))
+        .map((task: Task) => ({
+          ...task,
+          id: uuidv4(),
+          is_recurring: { frequency: 'daily' },
+          completed: false,
+          start_date: tomorrowStr
+        }))),
+
+      // Process existing recurring tasks
+      Promise.resolve(existingRecurringTasksData.recurring_tasks
+        .filter((task: Task) => 
+          shouldRecurTomorrow(task) && 
+          !recurringTasks.some(t => t.text === task.text)
+        )
+        .map((task: Task) => ({
+          ...task,
+          id: uuidv4(),
+          completed: false,
+          start_date: tomorrowStr
+        })))
+    ]);
+
+    // Step 4: Combine all tasks efficiently using Set for deduplication
+    const taskSet = new Set<string>();
+    const combinedTasks = [...nonRecurringTasks, ...recurringTasksForTomorrow, 
+      ...newRecurringTasks, ...existingRecurringTasks]
+      .filter(task => {
+        if (taskSet.has(task.text)) return false;
+        taskSet.add(task.text);
+        return true;
+      });
+
+    // Step 5: Format schedule based on layout preference
     const layoutPreference: LayoutPreference = {
       structure: userData.layout_preference.structure as 'structured' | 'unstructured',
       subcategory: userData.layout_preference.subcategory,
       timeboxed: userData.layout_preference.timeboxed as 'timeboxed' | 'untimeboxed'
     };
-    let formattedSchedule: Task[] = [];
 
-    if (layoutPreference.structure === 'structured') {
-      const sections = getSectionsFromCurrentSchedule(currentSchedule);
-      formattedSchedule = formatStructuredSchedule(combinedTasks, sections, layoutPreference);
-    } else {
-      formattedSchedule = formatUnstructuredSchedule(combinedTasks, layoutPreference);
-    }
+    let formattedSchedule = layoutPreference.structure === 'structured'
+      ? formatStructuredSchedule(combinedTasks, getSectionsFromCurrentSchedule(currentSchedule), layoutPreference)
+      : formatUnstructuredSchedule(combinedTasks, layoutPreference);
 
-    // Step 5: Assign time slots if timeboxed
+    // Step 6: Assign time slots if timeboxed
     if (layoutPreference.timeboxed === 'timeboxed') {
-      formattedSchedule = assignTimeSlots(formattedSchedule, userData.work_start_time, userData.work_end_time);
+      formattedSchedule = assignTimeSlots(
+        formattedSchedule, 
+        userData.work_start_time, 
+        userData.work_end_time
+      );
     }
 
-    console.log("Next day schedule generated locally:", formattedSchedule);
+    // Step 7: Save to database with conflict resolution
+    let warning: string | undefined;
+    try {
+      const scheduleDocument: ScheduleDocument = {
+        date: tomorrowStr,
+        tasks: formattedSchedule
+      };
+
+      const saveResponse = await fetch(`${API_BASE_URL}/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduleDocument)
+      });
+
+      if (!saveResponse.ok) {
+        if (saveResponse.status === 409) {
+          // Handle conflict by updating existing schedule
+          const updateResult = await updateScheduleForDate(tomorrowStr, formattedSchedule);
+          if (!updateResult.success) {
+            warning = 'Schedule generated but failed to update existing schedule';
+          }
+        } else {
+          warning = 'Schedule generated but failed to save to database';
+        }
+      }
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      warning = 'Schedule generated but failed to save to database';
+    }
 
     return {
       success: true,
-      schedule: formattedSchedule
+      schedule: formattedSchedule,
+      warning
     };
 
   } catch (error) {
     console.error("Error generating next day schedule:", error);
     return {
       success: false,
-      error: "There was an error generating the next day's schedule. Please try again."
+      error: error instanceof Error ? error.message : "Failed to generate schedule"
     };
   }
 };
+
+// Update the memoize function type to be more flexible with parameter types
+function memoize<TArgs extends any[], TReturn>(
+  fn: (...args: TArgs) => TReturn
+): (...args: TArgs) => TReturn {
+  const cache = new Map<string, TReturn>();
+  return (...args: TArgs): TReturn => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) return cache.get(key)!;
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+// Then use it with proper typing for the format function
+const memoizedFormat = memoize<[Date, string], string>((date: Date, formatStr: string) => 
+  dateFormat(date, formatStr)
+);
+
+// Similarly update getWeekOfMonth memoization
+const memoizedGetWeekOfMonth = memoize<[Date], MonthWeek>((date: Date) => 
+  getWeekOfMonth(date)
+);
 
 const getSectionsFromCurrentSchedule = (currentSchedule: Task[]): string[] => {
   return currentSchedule
@@ -539,13 +701,13 @@ export const shouldTaskRecurOnDate = (task: Task, targetDate: Date): boolean => 
     case 'weekly':
       if (!task.is_recurring.dayOfWeek) return false;
       // Check if target date falls on the specified day of week
-      return format(targetDate, 'EEEE') === task.is_recurring.dayOfWeek;
+      return dateFormat(targetDate, 'EEEE') === task.is_recurring.dayOfWeek;
 
     case 'monthly':
       if (!task.is_recurring.dayOfWeek || !task.is_recurring.weekOfMonth) return false;
       
       // Check if target date matches the specified week and day
-      const targetDayOfWeek = format(targetDate, 'EEEE');
+      const targetDayOfWeek = dateFormat(targetDate, 'EEEE');
       const targetWeekOfMonth = getWeekOfMonth(targetDate);
       
       return targetDayOfWeek === task.is_recurring.dayOfWeek && 
@@ -566,4 +728,106 @@ const getWeekOfMonth = (date: Date): MonthWeek => {
   if (dayOfMonth >= 15 && dayOfMonth <= 21) return 'third';
   if (dayOfMonth >= 22 && dayOfMonth <= 28) return 'fourth';
   return 'last';
+};
+
+// Add new function to load schedule for a specific date
+export const loadScheduleForDate = async (date: string): Promise<{ 
+  success: boolean; 
+  schedule?: Task[]; 
+  error?: string 
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/schedules/${date}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: false, error: 'Schedule not found' };
+      }
+      throw new Error('Failed to fetch schedule');
+    }
+
+    const scheduleData: ScheduleResponse = await response.json();
+    return {
+      success: true,
+      schedule: scheduleData.tasks
+    };
+  } catch (error) {
+    console.error("Error loading schedule:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to load schedule"
+    };
+  }
+};
+
+// Add function to update existing schedule
+export const updateScheduleForDate = async (
+  date: string, 
+  tasks: Task[]
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/schedules/${date}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update schedule');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating schedule:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update schedule"
+    };
+  }
+};
+
+// Add new function to load schedules for a date range
+export const loadSchedulesRange = async (
+  startDate: string,
+  endDate: string
+): Promise<{ 
+  success: boolean; 
+  schedules?: Map<string, Task[]>; 
+  error?: string 
+}> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/schedules/range?start_date=${startDate}&end_date=${endDate}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules');
+    }
+
+    const data = await response.json();
+    const scheduleMap = new Map<string, Task[]>();
+    
+    data.schedules.forEach((schedule: ScheduleResponse) => {
+      const dateStr = schedule.date.split('T')[0];
+      scheduleMap.set(dateStr, schedule.tasks);
+    });
+
+    return {
+      success: true,
+      schedules: scheduleMap
+    };
+  } catch (error) {
+    console.error("Error loading schedules range:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to load schedules"
+    };
+  }
 };
