@@ -4,6 +4,7 @@ from backend.db_config import get_user_schedules_collection
 import traceback
 from datetime import datetime
 from bson import ObjectId
+from datetime import datetime, timedelta
 
 api_bp = Blueprint("api", __name__)
 
@@ -124,7 +125,7 @@ def update_parsed_schedule():
         )
 
         if result.modified_count > 0:
-            return jsonify({"message": "Parsed schedule updated successfully"}), 200
+            return jsonify({"message": "Schedule synced to backend"}), 200
         else:
             return jsonify({"error": "Failed to update parsed schedule"}), 500
 
@@ -137,12 +138,25 @@ def update_parsed_schedule():
 def update_task():
     try:
         data = request.json
-        if not data or 'taskId' not in data:
-            return jsonify({"error": "Invalid data provided"}), 400
+        # Enhanced input validation
+        if not data or not isinstance(data, dict):
+            return jsonify({"error": "Invalid request format"}), 400
+        
+        if 'taskId' not in data or 'updates' not in data:
+            return jsonify({"error": "Missing required fields: taskId or updates"}), 400
 
         task_id = data['taskId']
         updates = data['updates']
         
+        # Validate updates object
+        required_fields = ['type', 'is_section', 'id']
+        if not all(field in updates for field in required_fields):
+            return jsonify({"error": "Missing required task fields"}), 400
+            
+        # Ensure taskId matches the updates.id
+        if task_id != updates['id']:
+            return jsonify({"error": "Task ID mismatch"}), 400
+
         user_schedules = get_user_schedules_collection()
         
         # Update the task in all relevant future schedules if it's recurring
@@ -192,4 +206,164 @@ def get_recurring_tasks():
 
     except Exception as e:
         print("Exception occurred:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/schedules/<date>", methods=["GET"])
+def get_schedule_by_date(date):
+    """Retrieve schedule for a specific date."""
+    try:
+        # Validate date format
+        try:
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+        user_schedules = get_user_schedules_collection()
+        
+        # Find schedule for the specific date
+        schedule = user_schedules.find_one({
+            "date": {
+                "$gte": f"{date}T00:00:00",
+                "$lt": f"{date}T23:59:59"
+            }
+        })
+
+        if schedule:
+            # Convert ObjectId to string for JSON serialization
+            schedule['_id'] = str(schedule['_id'])
+            return jsonify(schedule), 200
+        else:
+            return jsonify({"error": "Schedule not found"}), 404
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/schedules", methods=["POST"])
+def save_schedule():
+    """Save a new schedule."""
+    try:
+        data = request.json
+        if not data or 'date' not in data or 'tasks' not in data:
+            return jsonify({"error": "Missing required fields: date or tasks"}), 400
+
+        user_schedules = get_user_schedules_collection()
+
+        # Check if schedule already exists for this date
+        existing_schedule = user_schedules.find_one({
+            "date": {
+                "$gte": f"{data['date']}T00:00:00",
+                "$lt": f"{data['date']}T23:59:59"
+            }
+        })
+
+        if existing_schedule:
+            return jsonify({"error": "Schedule already exists for this date"}), 409
+
+        # Prepare schedule document
+        schedule_document = {
+            "date": f"{data['date']}T00:00:00",
+            "tasks": data['tasks'],
+            "metadata": {
+                "createdAt": datetime.now().isoformat(),
+                "lastModified": datetime.now().isoformat()
+            }
+        }
+
+        # Add userId if provided
+        if 'userId' in data:
+            schedule_document['userId'] = data['userId']
+
+        result = user_schedules.insert_one(schedule_document)
+
+        if result.inserted_id:
+            schedule_document['_id'] = str(result.inserted_id)
+            return jsonify(schedule_document), 201
+        else:
+            return jsonify({"error": "Failed to save schedule"}), 500
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/schedules/<date>", methods=["PUT"])
+def update_schedule(date):
+    """Update an existing schedule."""
+    try:
+        data = request.json
+        if not data or 'tasks' not in data:
+            return jsonify({"error": "No tasks provided"}), 400
+
+        # Validate date format
+        try:
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+        user_schedules = get_user_schedules_collection()
+
+        # Update the schedule
+        result = user_schedules.update_one(
+            {
+                "date": {
+                    "$gte": f"{date}T00:00:00",
+                    "$lt": f"{date}T23:59:59"
+                }
+            },
+            {
+                "$set": {
+                    "tasks": data['tasks'],
+                    "metadata.lastModified": datetime.now().isoformat()
+                }
+            }
+        )
+
+        if result.modified_count > 0:
+            return jsonify({"message": "Schedule updated successfully"}), 200
+        else:
+            return jsonify({"error": "Schedule not found"}), 404
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/schedules/range", methods=["GET"])
+def get_schedules_range():
+    """Retrieve schedules within a date range."""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        if not start_date or not end_date:
+            return jsonify({"error": "Missing start_date or end_date"}), 400
+
+        # Validate date formats
+        try:
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+        user_schedules = get_user_schedules_collection()
+
+        # Find schedules within the date range
+        schedules = list(user_schedules.find({
+            "date": {
+                "$gte": f"{start_date}T00:00:00",
+                "$lt": f"{end_date}T23:59:59"
+            }
+        }).sort("date", 1))  # Sort by date ascending
+
+        # Convert ObjectIds to strings
+        for schedule in schedules:
+            schedule['_id'] = str(schedule['_id'])
+
+        return jsonify({"schedules": schedules}), 200
+
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
