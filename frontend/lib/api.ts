@@ -1,6 +1,6 @@
 const API_BASE_URL = 'http://localhost:8000/api'; 
 
-export const categorizeTask = async (taskText) => {
+export const categorizeTask = async (taskText:  string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/categorize_task`, {
         method: 'POST',

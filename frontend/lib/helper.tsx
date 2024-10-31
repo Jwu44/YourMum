@@ -463,6 +463,9 @@ export const generateNextDaySchedule = async (
     const combinedTasks = [...nonRecurringTasks, ...recurringTasksForTomorrow, 
       ...newRecurringTasks, ...existingRecurringTasks]
       .filter(task => {
+        // Skip deduplication for section tasks
+        if (task.is_section) return true;
+        // Only deduplicate non-section tasks
         if (taskSet.has(task.text)) return false;
         taskSet.add(task.text);
         return true;
@@ -475,8 +478,20 @@ export const generateNextDaySchedule = async (
       timeboxed: userData.layout_preference.timeboxed as 'timeboxed' | 'untimeboxed'
     };
 
+    // Get sections from current schedule, ensuring uniqueness
+    const currentSections = Array.from(new Set(
+      currentSchedule
+        .filter(task => task.is_section)
+        .map(section => section.text)
+    ));
+
     let formattedSchedule = layoutPreference.structure === 'structured'
-      ? formatStructuredSchedule(combinedTasks, getSectionsFromCurrentSchedule(currentSchedule), layoutPreference)
+      ? formatStructuredSchedule(
+          // Filter out any section tasks from combinedTasks before formatting
+          combinedTasks.filter(task => !task.is_section),
+          currentSections,
+          layoutPreference
+        )
       : formatUnstructuredSchedule(combinedTasks, layoutPreference);
 
     // Step 6: Assign time slots if timeboxed
@@ -749,7 +764,15 @@ export const loadScheduleForDate = async (date: string): Promise<{
       throw new Error('Failed to fetch schedule');
     }
 
-    const scheduleData: ScheduleResponse = await response.json();
+    const scheduleData = await response.json();
+    // Check if tasks exist in the response
+    if (!scheduleData.tasks) {
+      return {
+        success: false,
+        error: 'Invalid schedule data format'
+      };
+    }
+
     return {
       success: true,
       schedule: scheduleData.tasks
