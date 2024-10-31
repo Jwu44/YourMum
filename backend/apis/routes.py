@@ -222,15 +222,15 @@ def get_schedule_by_date(date):
         
         # Find schedule for the specific date
         schedule = user_schedules.find_one({
-            "date": {
-                "$gte": f"{date}T00:00:00",
-                "$lt": f"{date}T23:59:59"
-            }
+            "date": date  # Changed to match exact date string
         })
 
         if schedule:
             # Convert ObjectId to string for JSON serialization
             schedule['_id'] = str(schedule['_id'])
+            # Ensure tasks field exists
+            if 'tasks' not in schedule:
+                schedule['tasks'] = []
             return jsonify(schedule), 200
         else:
             return jsonify({"error": "Schedule not found"}), 404

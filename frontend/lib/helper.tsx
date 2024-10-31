@@ -764,7 +764,15 @@ export const loadScheduleForDate = async (date: string): Promise<{
       throw new Error('Failed to fetch schedule');
     }
 
-    const scheduleData: ScheduleResponse = await response.json();
+    const scheduleData = await response.json();
+    // Check if tasks exist in the response
+    if (!scheduleData.tasks) {
+      return {
+        success: false,
+        error: 'Invalid schedule data format'
+      };
+    }
+
     return {
       success: true,
       schedule: scheduleData.tasks
