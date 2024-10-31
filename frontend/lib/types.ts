@@ -35,6 +35,8 @@ export interface FormData {
     timeboxed: string;
   };
   [key: string]: any;
+  scheduleId?: string;
+  response?: string;
 }
 
 export interface Priority {

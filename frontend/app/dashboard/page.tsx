@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Calendar } from '@/components/ui/calendar';
+import { format as dateFormat } from 'date-fns';
 
 const initialPriorities: Priority[] = [
     { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
@@ -65,6 +66,7 @@ const Dashboard: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
 
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
@@ -164,33 +166,57 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const updateSchedule = async () => {
-      if (state.response && state.tasks && !isLoading && (shouldUpdateSchedule || isInitialSchedule) && scheduleId) {
-        const layoutPreference: LayoutPreference = {
-          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-          subcategory: state.layout_preference?.subcategory || '',
-          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
-        };
-
+      // Only proceed if we haven't processed this schedule yet
+      if (state.response && state.scheduleId && (isInitialSchedule || shouldUpdateSchedule) && !isLoading) {
+        setIsLoading(true);
+        
         try {
-          const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference, scheduleId);
-          const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
-          setScheduleDays([cleanedTasks]);
-          setCurrentDayIndex(0);
-          setShouldUpdateSchedule(false);
-          setIsInitialSchedule(false);
+          const layoutPreference: LayoutPreference = {
+            timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
+            subcategory: state.layout_preference?.subcategory || '',
+            structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
+          };
+  
+          // Use a single call to get parsed tasks
+          const parsedTasks = await parseScheduleToTasks(
+            state.response, 
+            state.tasks || [], 
+            layoutPreference,
+            state.scheduleId
+          );
+          
+          console.log("Parsed tasks:", parsedTasks);
+  
+          // Update schedule state only if we have valid tasks
+          if (Array.isArray(parsedTasks) && parsedTasks.length > 0) {
+            setScheduleDays([parsedTasks]);
+            setCurrentDayIndex(0);
+            setShouldUpdateSchedule(false);
+            setIsInitialSchedule(false);
+          }
+  
         } catch (error) {
-          console.error("Error parsing schedule:", error);
+          console.error("Error updating schedule:", error);
           toast({
             title: "Error",
-            description: "Failed to parse the schedule. Please try again.",
+            description: "Failed to update schedule",
             variant: "destructive",
           });
+        } finally {
+          setIsLoading(false);
         }
       }
     };
-    
+  
     updateSchedule();
-  }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
+  }, [
+    state.response,
+    state.scheduleId,
+    isInitialSchedule,
+    shouldUpdateSchedule,
+    isLoading
+    // Remove other dependencies that might cause unnecessary rerenders
+  ]);
 
   // Helper function to get date string for a specific day offset
   const getDateString = (offset: number): string => {
@@ -203,6 +229,7 @@ const Dashboard: React.FC = () => {
     try {
       const currentDate = getDateString(currentDayIndex);
       
+      // Update local state
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         if (newDays[currentDayIndex]) {
@@ -212,7 +239,7 @@ const Dashboard: React.FC = () => {
         }
         return newDays;
       });
-
+  
       // Update cache
       setScheduleCache(prevCache => {
         const newCache = new Map(prevCache);
@@ -222,9 +249,13 @@ const Dashboard: React.FC = () => {
         newCache.set(currentDate, updatedTasks);
         return newCache;
       });
-
+  
       // Persist changes to database
-      await updateScheduleForDate(currentDate, scheduleDays[currentDayIndex]);
+      const updateResult = await updateScheduleForDate(currentDate, scheduleDays[currentDayIndex]);
+      
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to update schedule');
+      }
     } catch (error) {
       console.error('Error updating task:', error);
       toast({
@@ -315,18 +346,67 @@ const Dashboard: React.FC = () => {
     handleEnergyChange(dispatch, currentPatterns)(value);
   }, [dispatch, state.energy_patterns]);
 
-  const handleDateSelect = useCallback((newDate: Date | undefined) => {
-    setDate(newDate);
-    setIsDrawerOpen(false);
-    // TODO: Fetch the corresponding schedule for the selected date
-    // This should be implemented based on your backend API
-  }, []);
+  const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
+    if (!newDate) {
+      setIsDrawerOpen(false);
+      return;
+    }
+  
+    setIsLoadingSchedule(true);
+    try {
+      const dateStr = newDate.toISOString().split('T')[0];
+      const existingSchedule = await loadScheduleForDate(dateStr);
+      
+      if (existingSchedule.success && existingSchedule.schedule) {
+        // Update schedule in cache
+        setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
+        
+        // Update scheduleDays array with the new schedule
+        setScheduleDays([existingSchedule.schedule]);
+        setCurrentDayIndex(0);
+        setDate(newDate);
+        
+        toast({
+          title: "Success",
+          description: "Schedule loaded successfully",
+        });
+      } else {
+        toast({
+          title: "Notice",
+          description: "No schedule found for selected date",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load schedule",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSchedule(false);
+      setIsDrawerOpen(false);
+    }
+}, [setDate, setIsDrawerOpen, toast]);
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
       <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto main-content"> 
         <div className="flex justify-between items-center mb-6">
-          <TypographyH3 className="text-white">Generated Schedule</TypographyH3>
+        <TypographyH3 className="text-white">
+          {(() => {
+            // Get the current date based on currentDayIndex
+            const currentDate = new Date();
+            currentDate.setDate(currentDate.getDate() + currentDayIndex);
+            
+            // If a specific date is selected from calendar, use that instead
+            const displayDate = date || currentDate;
+            
+            // Format the date as "Monday, January 1"
+            return dateFormat(displayDate, 'EEEE, MMMM d');
+          })()}
+        </TypographyH3>
           <div className="flex items-center space-x-4">
             <Sheet>
               <SheetTrigger asChild>
@@ -429,40 +509,62 @@ const Dashboard: React.FC = () => {
                 <DropdownMenuSeparator className="bg-gray-700" />
                 <DropdownMenuItem className="focus:bg-gray-700">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
+                  <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
-        {scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
-          <div className="rounded-lg shadow-lg px-8 py-6">
-            <EditableSchedule
-              tasks={scheduleDays[currentDayIndex]}
-              onUpdateTask={handleScheduleTaskUpdate}
-              onDeleteTask={handleScheduleTaskDelete}
-              onReorderTasks={handleReorderTasks}
-              layoutPreference={state.layout_preference?.subcategory || ''}
-            />
-            <div className="w-full flex justify-end space-x-2 mt-6">
+  
+        {/* Schedule Display Section */}
+        {isLoadingSchedule ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+          </div>
+        ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
+          <div className="space-y-4">
+            <div className="rounded-lg shadow-lg px-8 py-6">
+              <EditableSchedule
+                tasks={scheduleDays[currentDayIndex]}
+                onUpdateTask={handleScheduleTaskUpdate}
+                onDeleteTask={handleScheduleTaskDelete}
+                onReorderTasks={handleReorderTasks}
+                layoutPreference={state.layout_preference?.subcategory || ''}
+              />
+            </div>
+            
+            {/* Navigation Controls */}
+            <div className="flex justify-between items-center mt-4 px-8">
               <Button
+                variant="outline"
                 onClick={handlePreviousDay}
                 disabled={currentDayIndex === 0}
-                variant="ghost"
+                className="flex items-center space-x-2"
               >
-                Previous Day
+                <ChevronLeft className="h-4 w-4" />
+                <span>Previous Day</span>
               </Button>
-              <Button 
+              <Button
+                variant="outline"
                 onClick={handleNextDay}
+                className="flex items-center space-x-2"
               >
-                Next Day
+                <span>Next Day</span>
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         ) : (
-          <p className="text-lg mt-8 text-gray-300">
-            {state.response ? 'Processing your schedule...' : 'Update your inputs and click "Update Schedule" to generate a schedule'}
-          </p>
+          <div className="flex flex-col items-center justify-center h-64 space-y-4">
+            <p className="text-lg text-gray-300">
+              {state.response ? 'Processing your schedule...' : 'No schedule found for selected date'}
+            </p>
+            {!state.response && (
+              <Button variant="outline" onClick={handleSubmit} disabled={isLoading}>
+                Generate Schedule
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>
