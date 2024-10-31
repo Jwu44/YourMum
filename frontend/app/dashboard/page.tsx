@@ -166,8 +166,18 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const updateSchedule = async () => {
-      // Only proceed if we haven't processed this schedule yet
-      if (state.response && state.scheduleId && (isInitialSchedule || shouldUpdateSchedule) && !isLoading) {
+      // Only proceed if we have a response and scheduleId, and either it's initial or should update
+      if (
+        state.response && 
+        state.scheduleId && 
+        (isInitialSchedule || shouldUpdateSchedule) && 
+        !isLoading
+      ) {
+        // Add this check to prevent duplicate processing
+        if (!isInitialSchedule && !shouldUpdateSchedule) {
+          return;
+        }
+  
         setIsLoading(true);
         
         try {
@@ -177,7 +187,6 @@ const Dashboard: React.FC = () => {
             structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
           };
   
-          // Use a single call to get parsed tasks
           const parsedTasks = await parseScheduleToTasks(
             state.response, 
             state.tasks || [], 
@@ -185,12 +194,10 @@ const Dashboard: React.FC = () => {
             state.scheduleId
           );
           
-          console.log("Parsed tasks:", parsedTasks);
-  
-          // Update schedule state only if we have valid tasks
           if (Array.isArray(parsedTasks) && parsedTasks.length > 0) {
             setScheduleDays([parsedTasks]);
             setCurrentDayIndex(0);
+            // Set both flags to false after successful processing
             setShouldUpdateSchedule(false);
             setIsInitialSchedule(false);
           }
@@ -215,8 +222,8 @@ const Dashboard: React.FC = () => {
     isInitialSchedule,
     shouldUpdateSchedule,
     isLoading
-    // Remove other dependencies that might cause unnecessary rerenders
   ]);
+  
 
   // Helper function to get date string for a specific day offset
   const getDateString = (offset: number): string => {
