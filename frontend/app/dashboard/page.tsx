@@ -166,33 +166,57 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const updateSchedule = async () => {
-      if (state.response && state.tasks && !isLoading && (shouldUpdateSchedule || isInitialSchedule) && scheduleId) {
-        const layoutPreference: LayoutPreference = {
-          timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
-          subcategory: state.layout_preference?.subcategory || '',
-          structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
-        };
-
+      // Only proceed if we haven't processed this schedule yet
+      if (state.response && state.scheduleId && (isInitialSchedule || shouldUpdateSchedule) && !isLoading) {
+        setIsLoading(true);
+        
         try {
-          const parsedTasks = await parseScheduleToTasks(state.response, state.tasks, layoutPreference, scheduleId);
-          const cleanedTasks = await cleanupTasks(parsedTasks, state.tasks);
-          setScheduleDays([cleanedTasks]);
-          setCurrentDayIndex(0);
-          setShouldUpdateSchedule(false);
-          setIsInitialSchedule(false);
+          const layoutPreference: LayoutPreference = {
+            timeboxed: state.layout_preference?.timeboxed === 'timeboxed' ? 'timeboxed' : 'untimeboxed',
+            subcategory: state.layout_preference?.subcategory || '',
+            structure: state.layout_preference?.structure === "structured" ? "structured" : 'unstructured'
+          };
+  
+          // Use a single call to get parsed tasks
+          const parsedTasks = await parseScheduleToTasks(
+            state.response, 
+            state.tasks || [], 
+            layoutPreference,
+            state.scheduleId
+          );
+          
+          console.log("Parsed tasks:", parsedTasks);
+  
+          // Update schedule state only if we have valid tasks
+          if (Array.isArray(parsedTasks) && parsedTasks.length > 0) {
+            setScheduleDays([parsedTasks]);
+            setCurrentDayIndex(0);
+            setShouldUpdateSchedule(false);
+            setIsInitialSchedule(false);
+          }
+  
         } catch (error) {
-          console.error("Error parsing schedule:", error);
+          console.error("Error updating schedule:", error);
           toast({
             title: "Error",
-            description: "Failed to parse the schedule. Please try again.",
+            description: "Failed to update schedule",
             variant: "destructive",
           });
+        } finally {
+          setIsLoading(false);
         }
       }
     };
-    
+  
     updateSchedule();
-  }, [isLoading, state.response, state.tasks, shouldUpdateSchedule, isInitialSchedule, scheduleId, toast]);
+  }, [
+    state.response,
+    state.scheduleId,
+    isInitialSchedule,
+    shouldUpdateSchedule,
+    isLoading
+    // Remove other dependencies that might cause unnecessary rerenders
+  ]);
 
   // Helper function to get date string for a specific day offset
   const getDateString = (offset: number): string => {
@@ -330,29 +354,17 @@ const Dashboard: React.FC = () => {
   
     setIsLoadingSchedule(true);
     try {
-      // Format date to YYYY-MM-DD
       const dateStr = newDate.toISOString().split('T')[0];
-      
-      // Calculate day index relative to today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const diffTime = newDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      // Fetch schedule for selected date
       const existingSchedule = await loadScheduleForDate(dateStr);
       
       if (existingSchedule.success && existingSchedule.schedule) {
         // Update schedule in cache
         setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
         
-        // Update schedule days and current index
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          newDays[diffDays] = existingSchedule.schedule!;
-          return newDays;
-        });
-        setCurrentDayIndex(diffDays);
+        // Update scheduleDays array with the new schedule
+        setScheduleDays([existingSchedule.schedule]);
+        setCurrentDayIndex(0);
+        setDate(newDate);
         
         toast({
           title: "Success",
@@ -375,9 +387,8 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoadingSchedule(false);
       setIsDrawerOpen(false);
-      setDate(newDate);
     }
-  }, [setDate, setIsDrawerOpen, toast]);
+}, [setDate, setIsDrawerOpen, toast]);
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
