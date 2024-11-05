@@ -73,11 +73,9 @@ def add_task():
         if not task_data or 'task' not in task_data:
             return jsonify({"error": "No task provided"}), 400
         
-        print("Task received for categorization:", task_data['task'])
+        print(f"Processing task categorization: {task_data['task']}")
         categorized_task = categorize_task(task_data['task'])
-        print("Categorization result:", categorized_task)
-
-        # Return the entire task dictionary
+        
         return jsonify(categorized_task)
 
     except Exception as e:
