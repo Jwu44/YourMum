@@ -32,7 +32,17 @@ const setNestedProperty = (obj: any, path: string, value: any): any => {
 const formReducer = (state: FormData, action: FormAction): FormData => {
   switch (action.type) {
     case 'UPDATE_FIELD':
+      // Handle the special case for form updates
+      if (action.field === 'formUpdate') {
+        return {
+          ...state,
+          response: action.value.response,
+          scheduleId: action.value.scheduleId
+        };
+      }
+      // Handle regular field updates
       return setNestedProperty({...state}, action.field, action.value);
+      
     case 'UPDATE_NESTED_FIELD':
       return {
         ...state,
@@ -41,6 +51,7 @@ const formReducer = (state: FormData, action: FormAction): FormData => {
           [action.subField]: action.value
         }
       };
+
     case 'UPDATE_TASK':
       return {
         ...state,
@@ -48,8 +59,10 @@ const formReducer = (state: FormData, action: FormAction): FormData => {
           task.id === action.task.id ? action.task : task
         )
       };
+
     case 'RESET_FORM':
       return initialState;
+
     default:
       return state;
   }
