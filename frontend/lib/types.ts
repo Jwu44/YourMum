@@ -53,11 +53,21 @@ export type NestedKeyOf<T> = {
     : `${K}`
 }[keyof T & (string | number)];
 
-export type FormAction =
-  | { type: 'UPDATE_FIELD'; field: string; value: any }
-  | { type: 'UPDATE_NESTED_FIELD'; field: string; subField: string; value: any }
-  | { type: 'UPDATE_TASK'; task: Task }
-  | { type: 'RESET_FORM' };
+export type FormAction = {
+  type: 'UPDATE_FIELD';
+  field: string;
+  value: any;
+} | {
+  type: 'UPDATE_NESTED_FIELD';
+  field: string;
+  subField: string;
+  value: any;
+} | {
+  type: 'UPDATE_TASK';
+  task: Task;
+} | {
+  type: 'RESET_FORM';
+};
 
 export interface LayoutPreference {
   structure: 'structured' | 'unstructured';
