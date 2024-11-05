@@ -71,18 +71,14 @@ const TimeboxPreference: React.FC = () => {
       }
 
       // Update form context
-      await Promise.all([
-        dispatch({ 
-          type: 'UPDATE_FIELD', 
-          field: 'response', 
-          value: scheduleContent 
-        }),
-        dispatch({ 
-          type: 'UPDATE_FIELD', 
-          field: 'scheduleId', 
-          value: result.scheduleId 
-        })
-      ]);
+      dispatch({ 
+        type: 'UPDATE_FIELD', 
+        field: 'formUpdate',
+        value: {
+          response: scheduleContent,
+          scheduleId: result.scheduleId
+        }
+      });
 
       // Verify the updates were successful
       console.log("Updated form state:", state); // Debug log
@@ -92,9 +88,6 @@ const TimeboxPreference: React.FC = () => {
         title: "Success",
         description: "Schedule generated successfully",
       });
-
-      // Add a small delay to ensure state updates are processed
-      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Navigate to dashboard
       router.push('/dashboard');
