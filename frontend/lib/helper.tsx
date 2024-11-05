@@ -90,7 +90,7 @@ export const handleAddTask = async (tasks: Task[], newTask: string, categories: 
   const newTaskObject: Task = {
     id: uuidv4(),
     text: newTask.trim(),
-    categories: result.categories || categories,
+    categories: (result?.categories) || categories,
     is_subtask: false,
     completed: false,
     is_section: false,
@@ -113,6 +113,11 @@ export const handleDeleteTask = (tasks: Task[], taskId: string) => {
   return tasks.filter(task => task.id !== taskId);
 };
 
+// Cache interface for categorization results
+interface CategoryCache {
+  [key: string]: string[];
+}
+
 export const parseScheduleToTasks = async (
   scheduleText: string,
   inputTasks: Task[] = [],
@@ -133,48 +138,114 @@ export const parseScheduleToTasks = async (
     return [];
   }
 
+  // Initialize categorization cache
+  const categoryCache: CategoryCache = {};
+  
+  // Pre-populate cache with existing tasks
+  inputTasks.forEach(task => {
+    if (task.text && task.categories) {
+      categoryCache[task.text.toLowerCase()] = task.categories;
+    }
+  });
+
   const scheduleContent = match[1].trim();
   const lines = scheduleContent.split('\n');
-
-  // Initialize variables for parsing
   let currentSection = '';
   let taskStack: Task[] = [];
   let tasks: Task[] = [];
   let sectionStartIndex = 0;
-  const taskMap = new Map<string, Task>();
+  
+  // Use Set for efficient duplicate checking
+  const processedTasks = new Set<string>();
 
-  // Parse each line of the schedule
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     const trimmedLine = line.trim();
 
-    // Check if the line is a section header
-    if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Arvo|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
-      // Create a new section task
+    if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
       currentSection = trimmedLine;
       sectionStartIndex = index;
       tasks.push(createSectionTask(trimmedLine, currentSection, sectionStartIndex));
     } else if (trimmedLine) {
-      // Create a new task
-      const task = await createFullTask(trimmedLine, currentSection, index, sectionStartIndex, inputTasks, layoutPreference);
-      if (task && !taskMap.has(task.text)) {
-        taskMap.set(task.text, task);
-        updateTaskHierarchy(task, taskStack);
+      const indentLevel = line.search(/\S|$/) / 2;
+      let taskText = trimmedLine.replace(/^□ /, '').replace(/^- /, '');
+      
+      // Extract time information if needed
+      let startTime: string | null = null;
+      let endTime: string | null = null;
+      if (layoutPreference.timeboxed !== 'untimeboxed') {
+        const timeMatch = taskText.match(/^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)/i);
+        if (timeMatch) {
+          [, startTime, endTime, taskText] = timeMatch;
+        }
+      }
+
+      // Skip if we've already processed this task text
+      const taskKey = taskText.toLowerCase();
+      if (!processedTasks.has(taskKey)) {
+        processedTasks.add(taskKey);
+
+        let categories: string[];
+        
+        // Check cache first
+        if (categoryCache[taskKey]) {
+          categories = categoryCache[taskKey];
+        } else {
+          // Only categorize if not in cache
+          try {
+            const result = await categorizeTask(taskText);
+            categories = (result?.categories)|| ['Uncategorized'];
+            // Cache the result
+            categoryCache[taskKey] = categories;
+          } catch (error) {
+            console.error("Error categorizing task:", error);
+            categories = ['Uncategorized'];
+          }
+        }
+
+        const task: Task = {
+          id: uuidv4(),
+          text: taskText,
+          categories,
+          is_subtask: indentLevel > 0,
+          completed: false,
+          is_section: false,
+          section: currentSection,
+          parent_id: null,
+          level: indentLevel,
+          section_index: index - sectionStartIndex,
+          type: 'task',
+          start_time: startTime,
+          end_time: endTime,
+          is_recurring: null,
+          start_date: new Date().toISOString().split('T')[0],
+        };
+
+        // Update task hierarchy
+        while (taskStack.length > indentLevel) {
+          taskStack.pop();
+        }
+        if (taskStack.length > 0) {
+          task.parent_id = taskStack[taskStack.length - 1].id;
+        }
+        taskStack.push(task);
         tasks.push(task);
-      } else {
-        console.log("Skipped duplicate task:", trimmedLine);
       }
     }
   }
 
-  // Sync parsed schedule with backend
-  await syncParsedScheduleWithBackend(scheduleId, tasks);
+  // Sync with backend
+  try {
+    await syncParsedScheduleWithBackend(scheduleId, tasks);
+  } catch (error) {
+    console.error("Failed to sync schedule with backend:", error);
+  }
 
   return tasks;
 };
 
+// Helper function to create section tasks
 const createSectionTask = (text: string, section: string, index: number): Task => ({
-  // Create a task object for a section
   id: uuidv4(),
   text,
   categories: [],
@@ -187,6 +258,7 @@ const createSectionTask = (text: string, section: string, index: number): Task =
   section_index: 0,
   type: 'section',
   is_recurring: { frequency: 'daily' },
+  start_date: new Date().toISOString().split('T')[0],
 });
 
 const createFullTask = async (
@@ -218,7 +290,7 @@ const createFullTask = async (
   if (categories.length === 0) {
     try {
       const categorizedTask = await categorizeTask(taskText);
-      categories = categorizedTask.categories;
+      categories = categorizedTask?.categories;
     } catch (error) {
       console.error("Error categorizing task:", error);
       categories = ['Uncategorized'];
