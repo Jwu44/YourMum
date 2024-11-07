@@ -96,7 +96,13 @@ b. Execute each code block
 c. Copy paste ngrok tunnel into colab_integration.py
 d. Run main script
 ```
-    
+
+### MongoDB commands
+```
+mmongosh mongodb+srv://Jwusterines:<db_password>@cluster1.b4lxs.mongodb.net/
+db.collection_name.deleteMany({})
+```
+
 ### Nginx commands
 ```
 brew services stop nginx
