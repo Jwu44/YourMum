@@ -25,7 +25,6 @@ import {
   generateNextDaySchedule,
   submitFormData,
   extractSchedule,
-  cleanupTasks,
   handleEnergyChange,
   loadScheduleForDate,
   updateScheduleForDate 
@@ -67,6 +66,7 @@ const Dashboard: React.FC = () => {
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const addTask = useCallback(async () => {
     if (newTask.trim()) {
@@ -356,12 +356,21 @@ const Dashboard: React.FC = () => {
   const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
     if (!newDate) {
       setIsDrawerOpen(false);
+      setIsDropdownOpen(false);
       return;
     }
   
     setIsLoadingSchedule(true);
     try {
-      const dateStr = newDate.toISOString().split('T')[0];
+      // Fix: Use local date components instead of toISOString()
+      const year = newDate.getFullYear();
+      const month = String(newDate.getMonth() + 1).padStart(2, '0');
+      const day = String(newDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      console.log('Selected date:', newDate);
+      console.log('Formatted date string:', dateStr);
+      
       const existingSchedule = await loadScheduleForDate(dateStr);
       
       if (existingSchedule.success && existingSchedule.schedule) {
@@ -435,7 +444,7 @@ const Dashboard: React.FC = () => {
                 />
               </SheetContent>
             </Sheet>
-            <DropdownMenu>
+            <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <Avatar className="h-10 w-10 cursor-pointer">
                   <AvatarImage src="/avatar-placeholder.png" alt="User avatar" />

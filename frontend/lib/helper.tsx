@@ -11,7 +11,31 @@ const today = new Date().toISOString().split('T')[0];
 interface ScheduleDocument {
   date: string;
   tasks: Task[];
-  userId?: string; // Optional: if you have user authentication
+  userId: string;
+  inputs: {
+    name: string;
+    age: string;
+    work_start_time: string;
+    work_end_time: string;
+    energy_patterns: string[];
+    layout_preference: {
+      structure: 'structured' | 'unstructured';
+      subcategory: string;
+      timeboxed: 'timeboxed' | 'untimeboxed';
+    };
+    priorities: {
+      health: string;
+      relationships: string;
+      fun_activities: string;
+      ambitions: string;
+    };
+    tasks: string[];
+  };
+  schedule: Task[];
+  metadata?: {
+    createdAt: string;
+    lastModified: string;
+  };
 }
 
 interface ScheduleResponse {
@@ -579,8 +603,28 @@ export const generateNextDaySchedule = async (
     let warning: string | undefined;
     try {
       const scheduleDocument: ScheduleDocument = {
-        date: tomorrowStr,
-        tasks: formattedSchedule
+        date: `${tomorrowStr}T00:00:00`, // Match MongoDB format
+        tasks: formattedSchedule,
+        userId: userData.name, // Add userId from form data
+        inputs: {  // Add inputs from current form data
+          name: userData.name,
+          age: userData.age,
+          work_start_time: userData.work_start_time,
+          work_end_time: userData.work_end_time,
+          energy_patterns: userData.energy_patterns,
+          layout_preference: {
+            structure: userData.layout_preference.structure as 'structured' | 'unstructured',
+            subcategory: userData.layout_preference.subcategory,
+            timeboxed: userData.layout_preference.timeboxed as 'timeboxed' | 'untimeboxed'
+          },
+          priorities: userData.priorities,
+          tasks: userData.tasks.map(task => task.text) 
+        },
+        schedule: formattedSchedule, // Add schedule field
+        metadata: {
+          createdAt: new Date().toISOString(),
+          lastModified: new Date().toISOString()
+        }
       };
 
       const saveResponse = await fetch(`${API_BASE_URL}/schedules`, {

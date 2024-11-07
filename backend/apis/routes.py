@@ -218,17 +218,17 @@ def get_schedule_by_date(date):
 
         user_schedules = get_user_schedules_collection()
         
-        # Find schedule for the specific date
+        # Find schedule for the specific date using date range
         schedule = user_schedules.find_one({
-            "date": date  # Changed to match exact date string
+            "date": {
+                "$gte": f"{date}T00:00:00",
+                "$lt": f"{date}T23:59:59"
+            }
         })
 
         if schedule:
             # Convert ObjectId to string for JSON serialization
             schedule['_id'] = str(schedule['_id'])
-            # Ensure tasks field exists
-            if 'tasks' not in schedule:
-                schedule['tasks'] = []
             return jsonify(schedule), 200
         else:
             return jsonify({"error": "Schedule not found"}), 404
@@ -251,27 +251,26 @@ def save_schedule():
         # Check if schedule already exists for this date
         existing_schedule = user_schedules.find_one({
             "date": {
-                "$gte": f"{data['date']}T00:00:00",
-                "$lt": f"{data['date']}T23:59:59"
+                "$gte": data['date'].split('T')[0] + "T00:00:00",
+                "$lt": data['date'].split('T')[0] + "T23:59:59"
             }
         })
 
         if existing_schedule:
             return jsonify({"error": "Schedule already exists for this date"}), 409
 
-        # Prepare schedule document
+        # Prepare schedule document with all fields
         schedule_document = {
-            "date": f"{data['date']}T00:00:00",
+            "date": data['date'],
             "tasks": data['tasks'],
+            "userId": data.get('userId'),
+            "inputs": data.get('inputs'),
+            "schedule": data.get('schedule'),
             "metadata": {
                 "createdAt": datetime.now().isoformat(),
                 "lastModified": datetime.now().isoformat()
             }
         }
-
-        # Add userId if provided
-        if 'userId' in data:
-            schedule_document['userId'] = data['userId']
 
         result = user_schedules.insert_one(schedule_document)
 
