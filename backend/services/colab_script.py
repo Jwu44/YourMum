@@ -5,7 +5,6 @@ from flask import Flask, request, jsonify
 import anthropic
 import re
 import uuid
-from fuzzywuzzy import fuzz
 
 class Task:
     def __init__(self, id, text, categories=None):
@@ -34,9 +33,13 @@ app = Flask(__name__)
 # Update any base URLs to use the public ngrok URL
 app.config["BASE_URL"] = public_url
 
+# Initialize the Anthropic client
+os.environ["ANTHROPIC_API_KEY"] = "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"
+client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
 # rag examples
 example_schedules = {
-    "structured-day_sections-timeboxed": """
+    "structured-day-sections-timeboxed": """
     Morning 🌞
     □ 7:00am - 7:30am: Wake up and morning routine
     □ 7:30am - 8:00am: Breakfast and check emails
@@ -59,7 +62,7 @@ example_schedules = {
     □ 9:30pm: Bedtime
     """,
 
-    "structured-day_sections-untimeboxed": """
+    "structured-day-sections-untimeboxed": """
     Morning 🌞
     □ Wake up and complete morning routine
     □ Enjoy breakfast while checking and responding to urgent emails
@@ -155,7 +158,7 @@ example_schedules = {
     □ Review and respond to important emails
     □ Work on quarterly report
 
-    Health & Fitness 🏋️‍♀️
+    Health 🏋️‍♀️
     □ 30-minute jog
     □ Prepare healthy lunch
     □ Drink 8 glasses of water throughout the day
@@ -306,17 +309,35 @@ def create_prompt_schedule(user_data):
     return system_prompt, user_prompt
 
 def create_prompt_categorize(task):
-    prompt = f"""Given the following 5 categories to an ordinary life:
-    1. Exercise - such as walking, running, swimming, gym, bouldering etc...
-    2. Relationship - how you spend time with friends and family
-    3. Fun - personal hobbies such as painting, croteching, baking, gaming, etc.., or miscallenous activities like shopping or packing etc...
-    4. Ambition - short term or long term goals someone wants to achieve
-    5. Work - such as going through emails, attending meetings etc... and do not fall in the same category as exercise, relationships, fun or ambitions.
+    prompt = f"""You are an advanced task categorization system designed to help users organize their daily activities. Your goal is to accurately categorize a given task into one or more predefined categories of an ordinary life.
 
-    Categorize the following task: {task}.
+    Here is the task you need to categorize:
+    <task>
+    {{task}}
+    </task>
 
-    Respond only with the category name.
-    The task may belong to multiple categories. Ensure if a task has been categorised as 'Work', then there should be no other category. Respond with a comma-separated list of category names, or 'Work' if no categories apply.
+    Categories:
+    1. Exercise: Physical activities such as walking, running, swimming, gym, bouldering, etc.
+    2. Relationships: Activities involving interaction with friends, family, colleagues, etc.
+    3. Fun: Personal hobbies like painting, crocheting, baking, gaming, etc., or miscellaneous activities like shopping or packing.
+    4. Ambition: Short-term or long-term goals someone wants to achieve.
+    5. Work: Professional activities such as going through emails, attending meetings, etc., that do not fall into the other categories.
+
+    Instructions:
+    1. Analyze the given task, considering its context and potential multiple meanings.
+    2. Categorize the task into one or more of the above categories.
+    3. If the task is categorized as 'Work', it should not be assigned to any other category.
+    4. Provide your analysis and final categorization in a concise, token-efficient manner.
+
+    Before providing your final categorization, wrap your analysis in <categorization_analysis> tags. Consider the task's context, related activities, and potential interpretations to ensure accurate categorization. For each category, explicitly list out potential reasons why the task might fit into that category. This thorough analysis will help ensure no relevant categories are overlooked.
+
+    Output Format:
+    After your analysis, provide the final categorization as a comma-separated list of category names, or just 'Work' if that category applies. For example:
+    - "Exercise, Fun" (for a task that involves both exercise and a hobby)
+    - "Work" (for a task that is solely work-related)
+    - "Relationships, Ambition" (for a task that involves both social interaction and personal goals)
+
+    Please proceed with your analysis and categorization of the given task.
     """
 
     return prompt
@@ -324,7 +345,7 @@ def create_prompt_categorize(task):
 def generate_schedule(system_prompt, user_prompt):
     try:
         response = client.messages.create(
-            model="claude-3-sonnet-20240229",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
             temperature=0.7,
             system=system_prompt,
@@ -339,7 +360,7 @@ def generate_schedule(system_prompt, user_prompt):
 
 def categorize_task(prompt):
     response = client.messages.create(
-        model="claude-3-sonnet-20240229",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=100,
         temperature=0.2,
         messages=[
@@ -363,7 +384,7 @@ def identify_potentially_recurring_tasks(schedule):
         r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
         r'\b\d{1,2}:\d{2}\b',  # Time pattern
     ]
-    
+
     likely_recurring_categories = [
         'medication', 'meditate', 'exercise', 'jog', 'yoga', 'laundry', 'clean',
         'meeting', 'email', 'call', 'breakfast', 'lunch', 'dinner', 'wake up',
@@ -372,22 +393,22 @@ def identify_potentially_recurring_tasks(schedule):
 
     def calculate_recurrence_probability(task: str, time: str) -> float:
         probability = 0.0
-        
+
         for indicator in recurring_indicators:
             if re.search(indicator, task, re.IGNORECASE):
                 probability += 0.2
-        
+
         for category in likely_recurring_categories:
             if category in task.lower():
                 probability += 0.15
-        
+
         words = task.split()
         if len(words) <= 3:
             probability += 0.1
-        
+
         if time:
             probability += 0.1
-        
+
         return min(probability, 1.0)
 
     potentially_recurring = []
@@ -395,7 +416,7 @@ def identify_potentially_recurring_tasks(schedule):
         prob = calculate_recurrence_probability(task['text'], task.get('time', ''))
         if prob > 0.3:
             potentially_recurring.append((task['text'], prob))
-    
+
     return sorted(potentially_recurring, key=lambda x: x[1], reverse=True)
 
 def identify_recurring_tasks(current_schedule, previous_schedules):
@@ -416,14 +437,14 @@ def identify_recurring_tasks(current_schedule, previous_schedules):
             1. Analyze if this task is likely to be a recurring daily task.
             2. Consider factors such as the nature of the task, its frequency, and its importance in a daily routine.
             3. Provide a yes/no answer followed by a brief explanation.
-            
+
             Response format:
             Recurring: [Yes/No]
             Explanation: [Your reasoning in one short sentence]"""
 
             try:
                 response = client.messages.create(
-                    model="claude-3-sonnet-20240229",
+                    model="claude-3-5-sonnet-20241022",
                     max_tokens=100,
                     temperature=0.2,
                     messages=[{"role": "user", "content": prompt}]
@@ -439,20 +460,6 @@ def identify_recurring_tasks(current_schedule, previous_schedules):
 
     return recurring_tasks
 
-# def extract_tasks_with_categories(schedule_text):
-#     tasks = []
-#     for line in schedule_text.split('\n'):
-#         if line.strip().startswith('□'):
-#             task_text = line.strip()[1:].strip()
-#             category_match = re.search(r'\[([^\]]+)\]$', task_text)
-#             if category_match:
-#                 category = category_match.group(1)
-#                 task_text = task_text[:category_match.start()].strip()
-#             else:
-#                 category = "Uncategorized"
-#             tasks.append({"text": task_text, "category": category})
-#     return tasks
-
 @app.route('/process_user_data', methods=['POST'])
 def process_user_data():
     user_data = request.json
@@ -463,9 +470,6 @@ def process_user_data():
 
     system_prompt, user_prompt = create_prompt_schedule(user_data)
     response = generate_schedule(system_prompt, user_prompt)
-
-    # # Extract tasks with categories from the generated schedule
-    # tasks_with_categories = extract_tasks_with_categories(response)
 
     return jsonify({'schedule': response})
 
@@ -480,8 +484,12 @@ def process_task():
 def api_identify_recurring_tasks():
     try:
         data = request.json
+        print("Received data:", data)  # Add this line
         current_schedule = data.get('current_schedule', [])
         previous_schedules = data.get('previous_schedules', [])
+
+        print("Current schedule:", current_schedule)  # Add this line
+        print("Previous schedules:", previous_schedules)  # Add this line
 
         if not isinstance(current_schedule, list) or not all(isinstance(s, list) for s in previous_schedules):
             return jsonify({"error": "Invalid input format"}), 400
@@ -497,4 +505,4 @@ def home():
 
 # Start the Flask server in a new thread
 threading.Thread(target=app.run, kwargs={"use_reloader": False, "port": port}).start()
-# app.run(host='0.0.0.0', port=5006, use_reloader=False)
+# app.run(host='0.0.0.0', port=5007, use_reloader=False)
