@@ -124,36 +124,22 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
         });
       }
     } else {
-      const targetTask = newTasks[hoverIndex];
+      // Get the actual target task based on the hover index
+      const targetTask = newTasks[hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex];
       const updatedDraggedTask = { ...draggedTask };
       
       if (shouldIndent && !targetTask.is_section) {
-        // Calculate the new indentation level
+        // Calculate the new indentation level based on the target task
         const newLevel = Math.min((targetTask.level || 0) + 1, 3); // Limit to 3 levels
         
-        // Check if we're indenting under a task that's already a subtask
-        if (targetTask.is_subtask) {
-          updatedDraggedTask.is_subtask = true;
-          updatedDraggedTask.level = newLevel;
-          updatedDraggedTask.parent_id = targetTask.parent_id;
-        } else {
-          // Indenting under a root-level task
-          updatedDraggedTask.is_subtask = true;
-          updatedDraggedTask.level = 1;
-          updatedDraggedTask.parent_id = targetTask.id;
-        }
+        // Update the dragged task properties
+        updatedDraggedTask.is_subtask = true;
+        updatedDraggedTask.level = newLevel;
+        updatedDraggedTask.parent_id = targetTask.id; // Set parent to the target task
+        updatedDraggedTask.section = targetTask.section;
         
-        // Find the correct position to insert the indented task
-        let insertIndex = hoverIndex + 1;
-        while (
-          insertIndex < newTasks.length && 
-          newTasks[insertIndex].is_subtask &&
-          (newTasks[insertIndex].level || 0) >= newLevel
-        ) {
-          insertIndex++;
-        }
-        
-        newTasks.splice(insertIndex, 0, updatedDraggedTask);
+        // Insert the task immediately after its new parent
+        newTasks.splice(hoverIndex, 0, updatedDraggedTask);
       } else {
         // Handle non-indentation moves
         if (targetTask.is_section) {
@@ -201,7 +187,8 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
     const finalTasks = updateSubtaskParents(newTasks);
     onReorderTasks(finalTasks);
-  }, [memoizedTasks, onReorderTasks]);
+  }, [memoizedTasks, onReorderTasks]); // Added dependency array
+
 
   return (
     <Pane>
