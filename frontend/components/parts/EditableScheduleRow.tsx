@@ -189,13 +189,21 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     e.preventDefault();
     if (isBrowser() && e.dataTransfer) {
       const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      
       if (isSection) {
         moveTask(dragIndex, index, false, task.text);
       } else {
+        // Only indent if we're in indent mode and cursor is past checkbox
         const shouldIndent = dragState.dragType === 'indent' && dragState.cursorPastCheckbox;
-        moveTask(dragIndex, index, shouldIndent, null);
+        
+        // If dropping below, we need to adjust the target index
+        const targetIndex = dragState.dragType === 'below' ? index + 1 : index;
+        
+        moveTask(dragIndex, targetIndex, shouldIndent, null);
       }
     }
+    
+    // Reset drag state
     setDragState({
       isDragTarget: false,
       dragType: null,
@@ -258,7 +266,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 }}
               />
               {index < indicators.length - 1 && (
-                <div className="w-2" /> // 2px spacing between lines
+                <div className="w-1" /> // 2px spacing between lines
               )}
             </React.Fragment>
           ))}
