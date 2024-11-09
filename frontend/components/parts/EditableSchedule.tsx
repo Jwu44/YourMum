@@ -93,6 +93,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     onReorderTasks(newTasks);
   }, [memoizedTasks, onDeleteTask, onReorderTasks]);
 
+  // Enhanced moveTask to handle indentation levels more precisely
   const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => {
     const draggedTask = {...memoizedTasks[dragIndex]}; // Create new reference
     const newTasks = memoizedTasks.filter((_, index) => index !== dragIndex);
@@ -103,6 +104,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       );
       
       if (sectionIndex !== -1) {
+        // When moving to a section, reset indentation
         newTasks.splice(sectionIndex + 1, 0, { 
           ...draggedTask, 
           section: targetSection, 
@@ -125,31 +127,80 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       const targetTask = newTasks[hoverIndex];
       const updatedDraggedTask = { ...draggedTask };
       
-      if (shouldIndent && !targetTask.is_section && !draggedTask.is_subtask) {
-        updatedDraggedTask.is_subtask = true;
-        updatedDraggedTask.level = (targetTask.level || 0) + 1;
-        updatedDraggedTask.parent_id = targetTask.id;
-        newTasks.splice(hoverIndex + 1, 0, updatedDraggedTask);
+      if (shouldIndent && !targetTask.is_section) {
+        // Calculate the new indentation level
+        const newLevel = Math.min((targetTask.level || 0) + 1, 3); // Limit to 3 levels
+        
+        // Check if we're indenting under a task that's already a subtask
+        if (targetTask.is_subtask) {
+          updatedDraggedTask.is_subtask = true;
+          updatedDraggedTask.level = newLevel;
+          updatedDraggedTask.parent_id = targetTask.parent_id;
+        } else {
+          // Indenting under a root-level task
+          updatedDraggedTask.is_subtask = true;
+          updatedDraggedTask.level = 1;
+          updatedDraggedTask.parent_id = targetTask.id;
+        }
+        
+        // Find the correct position to insert the indented task
+        let insertIndex = hoverIndex + 1;
+        while (
+          insertIndex < newTasks.length && 
+          newTasks[insertIndex].is_subtask &&
+          (newTasks[insertIndex].level || 0) >= newLevel
+        ) {
+          insertIndex++;
+        }
+        
+        newTasks.splice(insertIndex, 0, updatedDraggedTask);
       } else {
+        // Handle non-indentation moves
         if (targetTask.is_section) {
+          // When dropping onto a section header, place after it
           newTasks.splice(hoverIndex + 1, 0, {
             ...updatedDraggedTask,
             is_subtask: false,
             level: 0,
-            parent_id: null
+            parent_id: null,
+            section: targetTask.text,
+            categories: [targetTask.text]
           });
         } else {
+          // Maintain the task's current indentation level if it's being moved
+          // within the same parent or to the same level
+          const keepIndentation = 
+            targetTask.parent_id === draggedTask.parent_id ||
+            targetTask.level === draggedTask.level;
+
           newTasks.splice(hoverIndex, 0, {
             ...updatedDraggedTask,
-            is_subtask: false,
-            level: 0,
-            parent_id: null
+            is_subtask: keepIndentation ? draggedTask.is_subtask : false,
+            level: keepIndentation ? draggedTask.level : 0,
+            parent_id: keepIndentation ? draggedTask.parent_id : null
           });
         }
       }
     }
 
-    onReorderTasks(newTasks);
+    // Update parent_id for all affected subtasks
+    const updateSubtaskParents = (tasks: Task[]): Task[] => {
+      const taskMap = new Map<string, Task>();
+      tasks.forEach(task => taskMap.set(task.id, task));
+
+      return tasks.map(task => {
+        if (task.is_subtask && task.parent_id) {
+          const parent = taskMap.get(task.parent_id);
+          if (!parent || parent.level! >= task.level!) {
+            return { ...task, is_subtask: false, level: 0, parent_id: null };
+          }
+        }
+        return task;
+      });
+    };
+
+    const finalTasks = updateSubtaskParents(newTasks);
+    onReorderTasks(finalTasks);
   }, [memoizedTasks, onReorderTasks]);
 
   return (
