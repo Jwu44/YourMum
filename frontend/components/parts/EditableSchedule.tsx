@@ -136,7 +136,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       }
     } else {
       // Get the actual target task based on the hover index
-      const targetTask = newTasks[hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex];
+      const targetTask = memoizedTasks[hoverIndex];
       const updatedDraggedTask = { ...draggedTask };
       
       if (shouldIndent && !targetTask.is_section) {
@@ -150,7 +150,9 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
         updatedDraggedTask.section = targetTask.section;
         
         // Insert the task immediately after its new parent
-        newTasks.splice(hoverIndex, 0, updatedDraggedTask);
+        // FIX: Adjust the insertion index to account for the removed dragged task
+        const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex;
+        newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask);
       } else {
         // Handle non-indentation moves
         if (targetTask.is_section) {

@@ -192,6 +192,3 @@ def get_successful_patterns(
     except Exception as e:
         print(f"Error retrieving decomposition patterns: {e}")
         return []
-
-# Initialize the database connection when the module is imported
-initialize_db()

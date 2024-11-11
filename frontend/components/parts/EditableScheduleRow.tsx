@@ -473,7 +473,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       </div>
 
       {/* Microstep Suggestions */}
-      {/* Microstep Suggestions */}
       {showMicrosteps && suggestedMicrosteps.length > 0 && (
         <MicrostepSuggestions
           microsteps={suggestedMicrosteps}
