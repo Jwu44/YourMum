@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { formatDateToString } from '@/lib/helper';
 
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
@@ -37,6 +38,10 @@ interface DashboardHeaderProps {
     onDateSelect: (date: Date | undefined) => Promise<void>;
     onSubmitForm: () => Promise<void>;
     isLoading: boolean;
+    onNextDay: () => Promise<void>;
+    onPreviousDay: () => void;
+    currentDate: Date | undefined;
+    availableDates: string[];
     dashboardLeftColProps:  {
     newTask: string;
     setNewTask: (task: string) => void;
@@ -62,8 +67,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onDateSelect,
     onSubmitForm,
     isLoading,
+    onNextDay,
+    onPreviousDay,
+    currentDate,
+    availableDates,
     dashboardLeftColProps
   }) => {
+
   // Memoize the date formatting to prevent unnecessary recalculations
   const formattedDate = useCallback(() => {
     try {
@@ -77,48 +87,87 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     }
   }, [currentDayIndex, selectedDate]);
 
+  // Helper function to check if previous day is available
+  const isPreviousDayAvailable = useCallback(() => {
+    if (!currentDate || availableDates.length === 0) return false;
+    const currentDateStr = formatDateToString(currentDate);
+    const currentIndex = availableDates.indexOf(currentDateStr);
+    return currentIndex > 0;
+  }, [currentDate, availableDates]);
+
   return (
     <div className="flex justify-between items-center mb-6">
-      {/* Left section: Title and AI Suggestions */}
+      {/* Left section: Title with navigation and AI Suggestions */}
       <div className="flex items-center gap-4">
-        <TypographyH3 className="text-white">
-          {formattedDate()}
-        </TypographyH3>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onRequestSuggestions}
-          disabled={isLoadingSuggestions}
-          className="h-9 w-9"
-          aria-label="Request AI Suggestions"
-        >
-          {isLoadingSuggestions ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Sparkles className="h-5 w-5" />
-          )}
-        </Button>
+        {/* Date display with navigation chevrons */}
+        <div className="flex items-center gap-2">
+          <TypographyH3 className="text-white">
+            {formattedDate()}
+          </TypographyH3>
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onPreviousDay()}
+              disabled={!isPreviousDayAvailable()}
+              className={`h-9 w-9 transition-opacity ${
+                currentDayIndex === 0 ? 'opacity-50' : 'opacity-100 hover:opacity-80'
+              }`}
+              aria-label="Previous day"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onNextDay()}
+              className="h-9 w-9 hover:opacity-80"
+              aria-label="Next day"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Right section: Profile Dropdown */}
-      <div className="flex items-center space-x-4">
+      {/* Right section: AI Suggestions and Profile Dropdown */}
+        <div className="flex items-center space-x-4">
+        {/* Profile Dropdown */}
         <DropdownMenu 
-          open={isDropdownOpen} 
-          onOpenChange={onDropdownOpenChange}
+            open={isDropdownOpen} 
+            onOpenChange={onDropdownOpenChange}
         >
-          <DropdownMenuTrigger asChild>
-            <Avatar className="h-10 w-10 cursor-pointer">
-              <AvatarImage 
-                src="/avatar-placeholder.png" 
-                alt="User avatar"
-                onError={(e) => {
-                  // Fallback to AvatarFallback on image load error
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
+            <div className="flex items-center space-x-4">
+            {/* AI suggestions button */}
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={onRequestSuggestions}
+                disabled={isLoadingSuggestions}
+                className="h-9 w-9"
+                aria-label="Request AI Suggestions"
+            >
+                {isLoadingSuggestions ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                <Sparkles className="h-5 w-5" />
+                )}
+            </Button>
+
+            {/* Avatar Trigger */}
+            <DropdownMenuTrigger asChild>
+                <Avatar className="h-9 w-9 cursor-pointer">
+                <AvatarImage 
+                    src="/avatar-placeholder.png" 
+                    alt="User avatar"
+                    onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    }}
+                />
+                <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+            </DropdownMenuTrigger>
+            </div>
           <DropdownMenuContent
             className="w-56 bg-[#1c1c1c] text-white border-gray-700"
             align="end"
@@ -177,10 +226,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </DropdownMenuItem>
 
             {/* Additional Menu Items */}
-            <DropdownMenuItem className="focus:bg-gray-700">
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Subscription</span>
-            </DropdownMenuItem>
             <DropdownMenuItem className="focus:bg-gray-700">
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>

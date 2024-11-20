@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // UI Components
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, ChevronRight,  ActivitySquare, Heart, Smile, Trophy  } from 'lucide-react';
+import { Loader2, ActivitySquare, Heart, Smile, Trophy  } from 'lucide-react';
 import FloatingActionButton from '@/components/parts/FloatingActionButton';
 import TaskEditDrawer from '@/components/parts/TaskEditDrawer';
 
@@ -38,7 +38,8 @@ import {
   handleEnergyChange,
   loadScheduleForDate,
   updateScheduleForDate, 
-  fetchAISuggestions
+  fetchAISuggestions,
+  formatDateToString
 } from '@/lib/helper';
 
 
@@ -71,7 +72,8 @@ const Dashboard: React.FC = () => {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [shownSuggestionIds] = useState<Set<string>>(new Set()); // Resets on page refresh
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
-
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  
   const addTask = useCallback(async (taskData?: Partial<Task>) => {
     try {
       // If taskData is provided (from TaskEditDrawer), use its text
@@ -441,6 +443,12 @@ const Dashboard: React.FC = () => {
         }
       }
       
+      // Add the new date to available dates
+      setAvailableDates(prevDates => {
+        const uniqueDates = Array.from(new Set([...prevDates, nextDayDate]));
+        return uniqueDates.sort();
+      });
+      
       setCurrentDayIndex(prevIndex => prevIndex + 1);
       toast({
         title: "Success",
@@ -477,10 +485,7 @@ const Dashboard: React.FC = () => {
   
     setIsLoadingSchedule(true);
     try {
-      const year = newDate.getFullYear();
-      const month = String(newDate.getMonth() + 1).padStart(2, '0');
-      const day = String(newDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = formatDateToString(newDate);
       
       const existingSchedule = await loadScheduleForDate(dateStr);
       
@@ -490,6 +495,12 @@ const Dashboard: React.FC = () => {
         setCurrentDayIndex(0);
         setDate(newDate);
         
+        // Update available dates
+        setAvailableDates(prevDates => {
+          const uniqueDates = Array.from(new Set([...prevDates, dateStr]));
+          return uniqueDates.sort();
+        });
+  
         toast({
           title: "Success",
           description: "Schedule loaded successfully",
@@ -789,6 +800,10 @@ const handleRejectSuggestion = useCallback((suggestionId: string) => {
           onDateSelect={handleDateSelect}
           onSubmitForm={handleSubmit}
           isLoading={isLoading}
+          onNextDay={handleNextDay}
+          onPreviousDay={handlePreviousDay}
+          currentDate={date}
+          availableDates={availableDates}
           dashboardLeftColProps={{
             newTask,
             setNewTask,
@@ -835,30 +850,6 @@ const handleRejectSuggestion = useCallback((suggestionId: string) => {
                 </span>
               </div>
             )}
-  
-            {/* Navigation Controls */}
-            <div className="flex justify-between items-center mt-4 px-8">
-              {/* Previous Day Button */}
-              <Button
-                variant="outline"
-                onClick={handlePreviousDay}
-                disabled={currentDayIndex === 0}
-                className="flex items-center space-x-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span>Previous Day</span>
-              </Button>
-  
-              {/* Next Day Button */}
-              <Button
-                variant="outline"
-                onClick={handleNextDay}
-                className="flex items-center space-x-2"
-              >
-                <span>Next Day</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
         ) : (
           // Empty State
