@@ -1,30 +1,133 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { TypographyH3 } from '../fonts/text';
 import { Button } from '../../components/ui/button';
-import { TimePickerInput } from '../../components/parts/TimePicker';
 import CenteredPane from '../../components/parts/CenteredPane';
 import { useForm } from '../../lib/FormContext';
-import { format, setMinutes, parse } from 'date-fns';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+// Initialize dayjs plugins
+dayjs.extend(customParseFormat);
 
 const WorkTimes = () => {
   const router = useRouter();
   const { state, dispatch } = useForm();
-
-  useEffect(() => {
-    if (!state.work_start_time) {
-      dispatch({ type: 'UPDATE_FIELD', field: 'work_start_time', value: '9:00AM' });
-    }
-    if (!state.work_end_time) {
-      dispatch({ type: 'UPDATE_FIELD', field: 'work_end_time', value: '5:00PM' });
-    }
-  }, []);
   
-  const handleTimeChange = (name: 'work_start_time' | 'work_end_time') => (newValue: Date | undefined) => {
-    if (newValue) {
-      const formattedTime = format(setMinutes(newValue, 0), 'h:mma');
+  // Create MUI theme based on system preference
+  const theme = createTheme({
+    palette: {
+      mode: 'dark', // Force dark mode
+      primary: {
+        main: '#ffffff', // White for dark mode
+      },
+      text: {
+        primary: '#ffffff',
+        secondary: '#ffffff',
+      },
+      background: {
+        paper: '#1a1a1a',
+        default: '#0a0a0a',
+      },
+    },
+    components: {
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            '& .MuiInputBase-root': {
+              color: '#ffffff',
+              borderColor: '#ffffff',
+            },
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                borderColor: 'rgba(255, 255, 255, 0.23)',
+              },
+              '&:hover fieldset': {
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: '#ffffff',
+              },
+            },
+            '& .MuiInputBase-input': {
+              color: '#ffffff',
+            },
+            '& .MuiIconButton-root': {
+              color: '#ffffff',
+            },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            color: '#ffffff',
+          },
+        },
+      },
+      MuiInputLabel: {
+        styleOverrides: {
+          root: {
+            color: '#ffffff',
+          },
+        },
+      },
+      MuiPopper: {
+        styleOverrides: {
+          root: {
+            '& .MuiPaper-root': {
+              backgroundColor: '#1a1a1a',
+              color: '#ffffff',
+            },
+            '& .MuiClock-root': {
+              backgroundColor: '#1a1a1a',
+            },
+            '& .MuiClock-clock': {
+              backgroundColor: '#1a1a1a',
+            },
+            '& .MuiClock-pin': {
+              backgroundColor: '#ffffff',
+            },
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            backgroundColor: '#1a1a1a',
+            '& .MuiClock-root': {
+              backgroundColor: '#1a1a1a',
+            },
+            '& .MuiClock-clock': {
+              backgroundColor: '#1a1a1a',
+            },
+            '& .MuiClock-pin': {
+              backgroundColor: '#ffffff',
+            },
+          },
+        },
+      },
+      MuiTypography: {
+        styleOverrides: {
+          root: {
+            color: '#ffffff',
+          },
+        },
+      },
+    },
+  });
+
+  // Handle time change
+  const handleTimeChange = (name: 'work_start_time' | 'work_end_time') => (newValue: any) => {
+    if (newValue && dayjs.isDayjs(newValue)) {
+      // Format time to 12-hour format with AM/PM using dayjs
+      const formattedTime = newValue.format('h:mmA');
       dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
     }
   };
@@ -38,61 +141,75 @@ const WorkTimes = () => {
     router.push('/personal-details');
   };
 
-  // Parse the time string to Date object for TimePickerInput
-  const parseTime = (timeString: string) => {
-    return parse(timeString, 'h:mma', new Date());
-  };
-
   return (
-    <CenteredPane heading={<TypographyH3 className="mb-6">Work Times</TypographyH3>}>
-      <div className="flex justify-center w-full mb-6 space-x-8">
-        <div className="w-full max-w-[150px]">
-          <label className="block mb-2 text-sm font-medium">Start Time</label>
-          <div className="flex items-center space-x-2">
-            <TimePickerInput
-              picker="hours"
-              date={parseTime(state.work_start_time)}
-              setDate={handleTimeChange('work_start_time')}
-              aria-label="Work Start Time Hours"
-            />
-            <span>:</span>
-            <TimePickerInput
-              picker="minutes"
-              date={parseTime(state.work_start_time)}
-              setDate={handleTimeChange('work_start_time')}
-              aria-label="Work Start Time Minutes"
-              value="00"
-              readOnly
-            />
+    <ThemeProvider theme={theme}>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <CenteredPane heading={<TypographyH3 className="mb-6">Work Times</TypographyH3>}>
+                    {/* Time pickers side by side */}
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block mb-2 text-sm font-medium">Start Time</label>
+              <TimePicker
+                value={state.work_start_time ? dayjs(`2024-01-01 ${state.work_start_time}`) : null}
+                onChange={handleTimeChange('work_start_time')}
+                views={['hours', 'minutes']}
+                ampm={true}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    placeholder: "Select time",
+                    sx: {
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
+                      },
+                      '& .MuiIconButton-root': {
+                        color: '#ffffff',
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+            <div>
+              <label className="block mb-2 text-sm font-medium">End Time</label>
+              <TimePicker
+                value={state.work_end_time ? dayjs(`2024-01-01 ${state.work_end_time}`) : null}
+                onChange={handleTimeChange('work_end_time')}
+                views={['hours', 'minutes']}
+                ampm={true}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    placeholder: "Select time",
+                    sx: {
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
+                      },
+                      '& .MuiIconButton-root': {
+                        color: '#ffffff',
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
           </div>
-        </div>
-        <div className="w-full max-w-[150px]">
-          <label className="block mb-2 text-sm font-medium">End Time</label>
-          <div className="flex items-center space-x-2">
-            <TimePickerInput
-              picker="hours"
-              date={parseTime(state.work_end_time)}
-              setDate={handleTimeChange('work_end_time')}
-              aria-label="Work End Time Hours"
-            />
-            <span>:</span>
-            <TimePickerInput
-              picker="minutes"
-              date={parseTime(state.work_end_time)}
-              setDate={handleTimeChange('work_end_time')}
-              aria-label="Work End Time Minutes"
-              value="00"
-              readOnly
-            />
+
+          {/* Navigation buttons */}
+          <div className="w-full flex justify-end space-x-2 mt-6">
+            <Button onClick={handlePrevious} variant="ghost">Previous</Button>
+            <Button onClick={handleNext}>Next</Button>
           </div>
-        </div>
-      </div>
-      <div className="w-full flex justify-end space-x-2 mt-6">
-        <Button onClick={handlePrevious} variant="ghost">Previous</Button>
-        <Button onClick={handleNext}>Next</Button>
-      </div>
-    </CenteredPane>
+        </CenteredPane>
+      </LocalizationProvider>
+    </ThemeProvider>
   );
-};
+}
 
 export default WorkTimes;
