@@ -1,20 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { TypographyH3 } from '../fonts/text';
-import { Button } from '../../components/ui/button';
-import CenteredPane from '../../components/parts/CenteredPane';
-import { useForm } from '../../lib/FormContext';
+import { TypographyH3, TypographyP } from '../fonts/text';
+import { Button } from '@/components/ui/button';
+import { OnboardingContent } from '@/components/parts/OnboardingContent';
+import { useForm } from '@/lib/FormContext';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 // Initialize dayjs plugins
 dayjs.extend(customParseFormat);
+
+/**
+ * Type definition for time field names
+ * Ensures type safety when handling time changes
+ */
+type TimeFieldName = 'work_start_time' | 'work_end_time';
 
 const WorkTimes = () => {
   const router = useRouter();
@@ -123,93 +129,160 @@ const WorkTimes = () => {
     },
   });
 
-  // Handle time change
-  const handleTimeChange = (name: 'work_start_time' | 'work_end_time') => (newValue: any) => {
-    if (newValue && dayjs.isDayjs(newValue)) {
-      // Format time to 12-hour format with AM/PM using dayjs
-      const formattedTime = newValue.format('h:mmA');
-      dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
+  /**
+   * Memoized time change handler
+   * Validates and formats time input before updating state
+   */
+  const handleTimeChange = useCallback((name: TimeFieldName) => (newValue: any) => {
+    try {
+      if (newValue && dayjs.isDayjs(newValue)) {
+        // Only update if the time is fully selected (both hours and minutes)
+        if (newValue.isValid()) {
+          const formattedTime = newValue.format('h:mmA');
+          dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
+        }
+      }
+    } catch (error) {
+      console.error(`Error updating ${name}:`, error);
     }
-  };
+  }, [dispatch]);
 
-  const handleNext = () => {
+  /**
+   * Navigation handlers
+   * Memoized to prevent unnecessary recreations
+   */
+  const handleNext = useCallback(() => {
+    // Validate times before proceeding
+    if (!state.work_start_time || !state.work_end_time) {
+      console.error('Please select both start and end times');
+      return;
+    }
+
+    // Validate time range
+    const startTime = dayjs(`2024-01-01 ${state.work_start_time}`);
+    const endTime = dayjs(`2024-01-01 ${state.work_end_time}`);
+    
+    if (endTime.isBefore(startTime)) {
+      console.error('End time must be after start time');
+      return;
+    }
+
     console.log('Form data:', state);
     router.push('/priorities');
-  };
+  }, [router, state]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     router.push('/personal-details');
-  };
+  }, [router]);
 
   return (
     <ThemeProvider theme={theme}>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <CenteredPane heading={<TypographyH3 className="mb-6">Work Times</TypographyH3>}>
-                    {/* Time pickers side by side */}
-                    <div className="grid grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block mb-2 text-sm font-medium">Start Time</label>
-              <TimePicker
-                value={state.work_start_time ? dayjs(`2024-01-01 ${state.work_start_time}`) : null}
-                onChange={handleTimeChange('work_start_time')}
-                views={['hours', 'minutes']}
-                ampm={true}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    placeholder: "Select time",
-                    sx: {
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255, 255, 255, 0.23)',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255, 255, 255, 0.5)',
-                      },
-                      '& .MuiIconButton-root': {
-                        color: '#ffffff',
-                      },
-                    },
-                  },
-                }}
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm font-medium">End Time</label>
-              <TimePicker
-                value={state.work_end_time ? dayjs(`2024-01-01 ${state.work_end_time}`) : null}
-                onChange={handleTimeChange('work_end_time')}
-                views={['hours', 'minutes']}
-                ampm={true}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    placeholder: "Select time",
-                    sx: {
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255, 255, 255, 0.23)',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255, 255, 255, 0.5)',
-                      },
-                      '& .MuiIconButton-root': {
-                        color: '#ffffff',
+        <OnboardingContent
+          heading={<TypographyH3>Work Times</TypographyH3>}
+          description={
+            <TypographyP>
+              Let us know your typical work hours so we can optimize your schedule.
+            </TypographyP>
+          }
+        >
+          {/* Main content wrapper */}
+          <div className="space-y-6 w-full">
+            {/* Time pickers container */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Start Time Picker */}
+              <div>
+                <label className="block mb-2 text-sm font-medium">Start Time</label>
+                <TimePicker
+                  value={state.work_start_time ? dayjs(`2024-01-01 ${state.work_start_time}`) : null}
+                  onChange={handleTimeChange('work_start_time')}
+                  views={['hours', 'minutes']}
+                  ampm={true}
+                  closeOnSelect={false}
+                  skipDisabled={true}
+                  defaultValue={null}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      placeholder: "Select start time",
+                      sx: {
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.23)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.5)',
+                        },
+                        '& .MuiIconButton-root': {
+                          color: '#ffffff',
+                        },
                       },
                     },
-                  },
-                }}
-              />
+                    field: {
+                      clearable: true,
+                      onClear: () => dispatch({ type: 'UPDATE_FIELD', field: 'work_start_time', value: null }),
+                    },
+                  }}
+                />
+              </div>
+  
+              {/* End Time Picker */}
+              <div>
+                <label className="block mb-2 text-sm font-medium">End Time</label>
+                <TimePicker
+                  value={state.work_end_time ? dayjs(`2024-01-01 ${state.work_end_time}`) : null}
+                  onChange={handleTimeChange('work_end_time')}
+                  views={['hours', 'minutes']}
+                  ampm={true}
+                  closeOnSelect={false}
+                  skipDisabled={true}
+                  defaultValue={null}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      placeholder: "Select end time",
+                      sx: {
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.23)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.5)',
+                        },
+                        '& .MuiIconButton-root': {
+                          color: '#ffffff',
+                        },
+                      },
+                    },
+                    field: {
+                      clearable: true,
+                      onClear: () => dispatch({ type: 'UPDATE_FIELD', field: 'work_end_time', value: null }),
+                    },
+                  }}
+                />
+              </div>
+            </div>
+  
+            {/* Navigation buttons */}
+            <div className="w-full flex justify-end space-x-2">
+              <Button 
+                onClick={handlePrevious} 
+                variant="ghost"
+                type="button"
+              >
+                Previous
+              </Button>
+              <Button 
+                onClick={handleNext}
+                type="button"
+                disabled={!state.work_start_time || !state.work_end_time}
+              >
+                Next
+              </Button>
             </div>
           </div>
-
-          {/* Navigation buttons */}
-          <div className="w-full flex justify-end space-x-2 mt-6">
-            <Button onClick={handlePrevious} variant="ghost">Previous</Button>
-            <Button onClick={handleNext}>Next</Button>
-          </div>
-        </CenteredPane>
+        </OnboardingContent>
       </LocalizationProvider>
     </ThemeProvider>
   );
-}
+};
 
 export default WorkTimes;
