@@ -133,12 +133,17 @@ const WorkTimes = () => {
    * Memoized time change handler
    * Validates and formats time input before updating state
    */
-  const handleTimeChange = useCallback((name: TimeFieldName) => (newValue: any) => {
+  const handleTimeChange = useCallback((name: TimeFieldName) => (newValue: any, context?: any) => {
     try {
-      if (newValue && dayjs.isDayjs(newValue)) {
-        // Only update if the time is fully selected (both hours and minutes)
-        if (newValue.isValid()) {
-          const formattedTime = newValue.format('h:mmA');
+      if (newValue) {
+        // Handle partial input selections
+        if (dayjs.isDayjs(newValue) && context?.view === 'hours') {
+          const formattedTime = newValue.format('h:mm A');
+          dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
+        }
+        // Handle complete selections
+        if (dayjs.isDayjs(newValue) && newValue.isValid()) {
+          const formattedTime = newValue.format('h:mm A');
           dispatch({ type: 'UPDATE_FIELD', field: name, value: formattedTime });
         }
       }
@@ -201,6 +206,7 @@ const WorkTimes = () => {
                   closeOnSelect={false}
                   skipDisabled={true}
                   defaultValue={null}
+                  disableOpenPicker={false}
                   slotProps={{
                     textField: {
                       fullWidth: true,
