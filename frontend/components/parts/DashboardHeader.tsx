@@ -101,6 +101,22 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       <div className="flex items-center gap-4">
         {/* Date display with navigation chevrons */}
         <div className="flex items-center gap-2">
+          {/* AI suggestions button - Positioned before the date */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRequestSuggestions}
+            disabled={isLoadingSuggestions}
+            className="h-9 w-9"
+            aria-label="Request AI Suggestions"
+          >
+            {isLoadingSuggestions ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Sparkles className="h-5 w-5" />
+            )}
+          </Button>
+  
           <TypographyH3 className="text-white">
             {formattedDate()}
           </TypographyH3>
@@ -129,45 +145,28 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Right section: AI Suggestions and Profile Dropdown */}
-        <div className="flex items-center space-x-4">
+  
+      {/* Right section: Profile Dropdown */}
+      <div className="flex items-center space-x-4">
         {/* Profile Dropdown */}
         <DropdownMenu 
-            open={isDropdownOpen} 
-            onOpenChange={onDropdownOpenChange}
+          open={isDropdownOpen} 
+          onOpenChange={onDropdownOpenChange}
         >
-            <div className="flex items-center space-x-4">
-            {/* AI suggestions button */}
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={onRequestSuggestions}
-                disabled={isLoadingSuggestions}
-                className="h-9 w-9"
-                aria-label="Request AI Suggestions"
-            >
-                {isLoadingSuggestions ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                <Sparkles className="h-5 w-5" />
-                )}
-            </Button>
-
-            {/* Avatar Trigger */}
-            <DropdownMenuTrigger asChild>
-                <Avatar className="h-9 w-9 cursor-pointer">
-                <AvatarImage 
-                    src="/avatar-placeholder.png" 
-                    alt="User avatar"
-                    onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    }}
-                />
-                <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-            </DropdownMenuTrigger>
-            </div>
+          {/* Avatar Trigger */}
+          <DropdownMenuTrigger asChild>
+            <Avatar className="h-9 w-9 cursor-pointer">
+              <AvatarImage 
+                src="/avatar-placeholder.png" 
+                alt="User avatar"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <AvatarFallback>U</AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+  
           <DropdownMenuContent
             className="w-56 bg-[#1c1c1c] text-white border-gray-700"
             align="end"
@@ -184,7 +183,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-
+  
             {/* Edit Schedule Sheet Trigger */}
             <Sheet>
               <SheetTrigger asChild>
@@ -211,7 +210,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 />
               </SheetContent>
             </Sheet>
-
+  
             {/* Calendar Menu Item - Separated from Drawer */}
             <DropdownMenuItem
               className="focus:bg-gray-700"
@@ -224,7 +223,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <CalendarIcon className="mr-2 h-4 w-4" />
               <span>Schedules</span>
             </DropdownMenuItem>
-
+  
             {/* Additional Menu Items */}
             <DropdownMenuItem className="focus:bg-gray-700">
               <Settings className="mr-2 h-4 w-4" />
@@ -237,7 +236,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
+  
         {/* Separate Calendar Drawer */}
         <Drawer 
           open={isCalendarDrawerOpen} 
