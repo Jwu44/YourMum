@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format as dateFormat } from 'date-fns';
 import { Loader2, Sparkles, User, CalendarIcon, CreditCard, Settings, LogOut, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatDateToString } from '@/lib/helper';
+import { formatDateToString, checkScheduleExists } from '@/lib/helper';
 
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
@@ -41,7 +41,6 @@ interface DashboardHeaderProps {
     onNextDay: () => Promise<void>;
     onPreviousDay: () => void;
     currentDate: Date | undefined;
-    availableDates: string[];
     dashboardLeftColProps:  {
     newTask: string;
     setNewTask: (task: string) => void;
@@ -70,30 +69,67 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onNextDay,
     onPreviousDay,
     currentDate,
-    availableDates,
     dashboardLeftColProps
   }) => {
+    // State to track button disabled states
+  const [isPrevDisabled, setIsPrevDisabled] = useState(true);
+  const [isNextDisabled, setIsNextDisabled] = useState(false);
 
   // Memoize the date formatting to prevent unnecessary recalculations
   const formattedDate = useCallback(() => {
     try {
-      const currentDate = new Date();
-      currentDate.setDate(currentDate.getDate() + currentDayIndex);
-      const displayDate = selectedDate || currentDate;
-      return dateFormat(displayDate, 'EEEE, MMMM d');
+      if (!currentDate) return 'Invalid Date';
+      return dateFormat(currentDate, 'EEEE, MMMM d');
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid Date';
     }
-  }, [currentDayIndex, selectedDate]);
+  }, [currentDate]);
 
-  // Helper function to check if previous day is available
-  const isPreviousDayAvailable = useCallback(() => {
-    if (!currentDate || availableDates.length === 0) return false;
-    const currentDateStr = formatDateToString(currentDate);
-    const currentIndex = availableDates.indexOf(currentDateStr);
-    return currentIndex > 0;
-  }, [currentDate, availableDates]);
+  // Memoized function to check if previous day is available
+  const isPreviousDayAvailable = useCallback(async (): Promise<boolean> => {
+    if (!currentDate) return false;
+    
+    const yesterday = new Date(currentDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if yesterday's schedule exists using helper function
+    return await checkScheduleExists(yesterday);
+  }, [currentDate]);
+
+  // Memoized function to check if next day is available
+  const isNextDayAvailable = useCallback(async (): Promise<boolean> => {
+    if (!currentDate) return false;
+    
+    const tomorrow = new Date(currentDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Allow navigation to next day if it's tomorrow (can generate new schedule)
+    const actualTomorrow = new Date();
+    actualTomorrow.setDate(actualTomorrow.getDate() + 1);
+    
+    if (tomorrow.toDateString() === actualTomorrow.toDateString()) {
+      return true;
+    }
+    
+    // Check if next day's schedule exists using helper function
+    return await checkScheduleExists(tomorrow);
+  }, [currentDate]);
+
+  // Effect to update button states
+  useEffect(() => {
+    const updateNavigationStates = async () => {
+      const [prevAvailable, nextAvailable] = await Promise.all([
+        isPreviousDayAvailable(),
+        isNextDayAvailable()
+      ]);
+      
+      setIsPrevDisabled(!prevAvailable);
+      setIsNextDisabled(!nextAvailable);
+    };
+
+    updateNavigationStates();
+  }, [currentDate, isPreviousDayAvailable, isNextDayAvailable]);
 
   return (
     <div className="flex justify-between items-center mb-6">
@@ -120,28 +156,31 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <TypographyH3 className="text-white">
             {formattedDate()}
           </TypographyH3>
-          <div className="flex items-center gap-1 ml-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onPreviousDay()}
-              disabled={!isPreviousDayAvailable()}
-              className={`h-9 w-9 transition-opacity ${
-                currentDayIndex === 0 ? 'opacity-50' : 'opacity-100 hover:opacity-80'
-              }`}
-              aria-label="Previous day"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onNextDay()}
-              className="h-9 w-9 hover:opacity-80"
-              aria-label="Next day"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onPreviousDay()}
+                disabled={isPrevDisabled}
+                className={`h-9 w-9 transition-opacity ${
+                  isPrevDisabled ? 'opacity-50' : 'opacity-100 hover:opacity-80'
+                }`}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onNextDay()}
+                disabled={isNextDisabled}
+                className={`h-9 w-9 transition-opacity ${
+                  isNextDisabled ? 'opacity-50' : 'opacity-100 hover:opacity-80'
+                }`}
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
           </div>
         </div>
       </div>
