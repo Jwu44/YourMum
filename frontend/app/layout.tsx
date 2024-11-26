@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { FormProvider } from "@/lib/FormContext";
-import Image from 'next/image';
 import { OnboardingLayout } from '@/components/parts/OnboardingLayout';
+import { Providers } from './providers';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -32,11 +32,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <FormProvider>
-          <OnboardingLayout>
-            {children}
-          </OnboardingLayout>
-        </FormProvider>
+        <Providers>
+          <FormProvider>
+            <OnboardingLayout>
+              {children}
+            </OnboardingLayout>
+          </FormProvider>
+        </Providers>
       </body>
     </html>
   );

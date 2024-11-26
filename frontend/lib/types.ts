@@ -21,8 +21,7 @@ export interface Task {
 }
 
 export interface FormData {
-  name: string;
-  age: string;
+  user?: UserDocument; 
   work_start_time: string;
   work_end_time: string;
   tasks: Task[];
@@ -171,4 +170,61 @@ export interface GetAISuggestionsResponse {
     generated_at: string;
     count: number;
   };
+}
+
+// Add new user-related interfaces
+export interface UserDocument {
+  googleId: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  role: UserRole;
+  calendarSynced: boolean;
+  lastLogin: string;
+  createdAt: string;
+  metadata?: {
+    lastModified: string;
+  };
+}
+
+export type UserRole = 'free' | 'premium' | 'admin';
+
+export interface AuthResponse {
+  message: string;
+  user: UserDocument;
+  isNewUser?: boolean;
+}
+
+// Backend API response types
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface AuthState {
+  user: UserDocument | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export interface AuthContextType extends AuthState {
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+  clearError: () => void;
+}
+
+// Python backend response types
+export interface PythonBackendResponse<T> {
+  message?: string;
+  error?: string;
+  data?: T;
+  status: 'success' | 'error';
+}
+
+// Session types
+export interface SessionData {
+  token: string;
+  userId: string;
+  expiresAt: number;
 }
