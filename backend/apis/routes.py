@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from backend.services.colab_integration import process_user_data, categorize_task, identify_recurring_tasks, decompose_task, generate_schedule_suggestions
-from backend.db_config import get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection
+from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection
 import traceback
 from bson import ObjectId
 from datetime import datetime, UTC  
@@ -10,6 +10,68 @@ from typing import List, Dict
 import json
 
 api_bp = Blueprint("api", __name__)
+
+@api_bp.route("/user/<user_id>", methods=["GET"])
+def get_user(user_id):
+    try:
+        # Get database instance
+        db = get_database()
+        
+        # Get user collection
+        users = db['users']
+        
+        # Find user by Google ID
+        user = users.find_one({"googleId": user_id})
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+            
+        # Convert ObjectId to string for JSON serialization
+        user['_id'] = str(user['_id'])
+        
+        return jsonify({"user": user}), 200
+        
+    except Exception as e:
+        print(f"Error getting user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/user/<user_id>", methods=["PUT"])
+def update_user(user_id):
+    try:
+        updates = request.json
+        if not updates:
+            return jsonify({"error": "No updates provided"}), 400
+            
+        # Get database instance
+        db = get_database()
+        
+        # Get user collection
+        users = db['users']
+        
+        # Update user document
+        result = users.update_one(
+            {"googleId": user_id},
+            {"$set": {
+                **updates,
+                "lastModified": datetime.now().isoformat()
+            }}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({"error": "User not found"}), 404
+            
+        # Get updated user document
+        updated_user = users.find_one({"googleId": user_id})
+        updated_user['_id'] = str(updated_user['_id'])
+        
+        return jsonify({
+            "message": "User updated successfully",
+            "user": updated_user
+        }), 200
+        
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/submit_data", methods=["POST"])
 def submit_data():

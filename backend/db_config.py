@@ -2,10 +2,10 @@ from pymongo.mongo_client import MongoClient
 from pymongo.errors import ConnectionFailure
 import os
 from dotenv import load_dotenv
-from pymongo import MongoClient
+from pymongo import MongoClient, IndexModel, ASCENDING 
 from pymongo.collection import Collection
-from typing import Dict, Any
-from datetime import datetime
+from typing import Optional, Dict, Any
+from datetime import datetime, timezone
 from .models.ai_suggestions import AI_SUGGESTION_INDEXES
 # Load environment variables
 load_dotenv()
@@ -37,6 +37,10 @@ def get_collection(collection_name: str) -> Collection:
     """Get MongoDB collection by name."""
     database = get_database()
     return database[collection_name]
+
+def get_users_collection() -> Collection:
+    """Get collection for storing user data."""
+    return get_collection('Users')
 
 def get_user_schedules_collection() -> Collection:
     """Get collection for storing user schedules."""
@@ -144,6 +148,26 @@ def initialize_ai_collections():
         print(f"Error initializing AI suggestions collection: {e}")
         raise
 
+def initialize_user_collection():
+    """Initialize the users collection with required indexes."""
+    try:
+        users_collection = get_users_collection()
+
+        # Create indexes for users collection
+        user_indexes = [
+            IndexModel([("googleId", ASCENDING)], unique=True),
+            IndexModel([("email", ASCENDING)], unique=True),
+            IndexModel([("role", ASCENDING)]),  # For future RBAC queries
+            IndexModel([("lastLogin", ASCENDING)])  # For user activity tracking
+        ]
+
+        users_collection.create_indexes(user_indexes)
+        print("Users collection initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing users collection: {e}")
+        raise
+
 def initialize_db():
     """
     Initialize database connection and create necessary indices.
@@ -152,11 +176,76 @@ def initialize_db():
         # Check database connection
         client.admin.command('ismaster')
         print("Successfully connected to MongoDB")
-        # Initialize AI suggestions collection
+        
+        # Initialize all collections
         initialize_ai_collections()
+        initialize_user_collection()  # Add this line
         
         print("Database initialized successfully")
         
     except ConnectionFailure:
         print("Failed to initialize database")
         raise
+
+def get_user_by_google_id(users_collection: Collection, google_id: str) -> Optional[Dict[str, Any]]:
+    """Get user by Google ID with proper error handling."""
+    try:
+        return users_collection.find_one({"googleId": google_id})
+    except Exception as e:
+        print(f"Error retrieving user: {e}")
+        return None
+
+def update_user_login(users_collection: Collection, google_id: str) -> bool:
+    """Update user's last login time and handle errors."""
+    try:
+        result = users_collection.update_one(
+            {"googleId": google_id},
+            {
+                "$set": {
+                    "lastLogin": datetime.now(timezone.utc),
+                    "metadata.lastModified": datetime.now(timezone.utc)
+                }
+            }
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error updating user login: {e}")
+        return False
+
+def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Create or update user with proper validation and error handling."""
+    try:
+        # Prepare user document with required fields
+        user_doc = {
+            "googleId": user_data["googleId"],
+            "email": user_data["email"],
+            "displayName": user_data.get("displayName", ""),
+            "photoURL": user_data.get("photoURL"),
+            "role": user_data.get("role", "free"),
+            "calendarSynced": user_data.get("calendarSynced", False),
+            "lastLogin": datetime.now(timezone.utc),
+            "metadata": {
+                "lastModified": datetime.now(timezone.utc)
+            }
+        }
+
+        # Use upsert to create or update
+        result = users_collection.update_one(
+            {"googleId": user_data["googleId"]},
+            {
+                "$set": user_doc,
+                "$setOnInsert": {
+                    "createdAt": datetime.now(timezone.utc)
+                }
+            },
+            upsert=True
+        )
+
+        if result.upserted_id:
+            return users_collection.find_one({"_id": result.upserted_id})
+        else:
+            return users_collection.find_one({"googleId": user_data["googleId"]})
+
+    except Exception as e:
+        print(f"Error creating/updating user: {e}")
+        return None
