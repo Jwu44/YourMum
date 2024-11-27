@@ -2,11 +2,13 @@ from pymongo.mongo_client import MongoClient
 from pymongo.errors import ConnectionFailure
 import os
 from dotenv import load_dotenv
-from pymongo import MongoClient, IndexModel, ASCENDING 
+from pymongo import MongoClient, IndexModel, ASCENDING, DESCENDING
 from pymongo.collection import Collection
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from .models.ai_suggestions import AI_SUGGESTION_INDEXES
+from .models.calendar_schema import calendar_events_schema
+from .models.user_schema import user_schema_validation
 # Load environment variables
 load_dotenv()
 
@@ -168,25 +170,6 @@ def initialize_user_collection():
         print(f"Error initializing users collection: {e}")
         raise
 
-def initialize_db():
-    """
-    Initialize database connection and create necessary indices.
-    """
-    try:
-        # Check database connection
-        client.admin.command('ismaster')
-        print("Successfully connected to MongoDB")
-        
-        # Initialize all collections
-        initialize_ai_collections()
-        initialize_user_collection()  # Add this line
-        
-        print("Database initialized successfully")
-        
-    except ConnectionFailure:
-        print("Failed to initialize database")
-        raise
-
 def get_user_by_google_id(users_collection: Collection, google_id: str) -> Optional[Dict[str, Any]]:
     """Get user by Google ID with proper error handling."""
     try:
@@ -249,3 +232,111 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
     except Exception as e:
         print(f"Error creating/updating user: {e}")
         return None
+
+def initialize_calendar_collections():
+    """Initialize calendar-related collections and indexes."""
+    try:
+        # Get collections
+        users = get_collection('users')
+        calendar_events = get_calendar_events_collection()
+
+        # Create user calendar indexes
+        user_calendar_indexes = [
+            IndexModel([("calendar.lastSyncTime", DESCENDING)]),
+            IndexModel([("calendar.connected", ASCENDING)]),
+            IndexModel([
+                ("googleId", ASCENDING), 
+                ("calendar.selectedCalendars", ASCENDING)
+            ])
+        ]
+        users.create_indexes(user_calendar_indexes)
+
+        # Create calendar events indexes
+        calendar_event_indexes = [
+            IndexModel([("userId", ASCENDING), ("startTime", ASCENDING)]),
+            IndexModel([("eventId", ASCENDING)], unique=True),
+            IndexModel([("calendarId", ASCENDING)]),
+            IndexModel([("taskId", ASCENDING)]),
+            IndexModel([
+                ("userId", ASCENDING), 
+                ("syncStatus", ASCENDING)
+            ]),
+            IndexModel([
+                ("userId", ASCENDING), 
+                ("startTime", ASCENDING), 
+                ("endTime", ASCENDING)
+            ])
+        ]
+        calendar_events.create_indexes(calendar_event_indexes)
+
+        print("Calendar collections initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing calendar collections: {e}")
+        raise
+
+def get_calendar_events_collection():
+    """Get collection for storing calendar events."""
+    return get_collection('CalendarEvents')
+
+# Helper functions for calendar operations
+def sync_calendar_status(user_id: str, status: str) -> bool:
+    """Update calendar sync status for a user."""
+    try:
+        users = get_collection('users')
+        result = users.update_one(
+            {"googleId": user_id},
+            {
+                "$set": {
+                    "calendar.syncStatus": status,
+                    "calendar.lastSyncTime": datetime.utcnow()
+                }
+            }
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error updating calendar sync status: {e}")
+        return False
+
+def store_calendar_events(events: list) -> bool:
+    """Store calendar events in bulk."""
+    try:
+        calendar_events = get_calendar_events_collection()
+        result = calendar_events.insert_many(events)
+        return len(result.inserted_ids) == len(events)
+    except Exception as e:
+        print(f"Error storing calendar events: {e}")
+        return False
+
+def initialize_db():
+    """Initialize database connection and create necessary collections/indexes."""
+    try:
+        # Check database connection
+        client.admin.command('ismaster')
+        print("Successfully connected to MongoDB")
+
+        # Initialize all collections
+        initialize_ai_collections()
+        initialize_user_collection()
+        initialize_calendar_collections()
+
+        # Create or update collection with schema validation
+        db = get_database()
+        
+        # Setup user collection with schema validation
+        if 'users' not in db.list_collection_names():
+            db.create_collection('users', validator=user_schema_validation)
+        else:
+            db.command('collMod', 'users', validator=user_schema_validation)
+
+        # Setup calendar events collection with schema validation
+        if 'CalendarEvents' not in db.list_collection_names():
+            db.create_collection('CalendarEvents', validator=calendar_events_schema)
+        else:
+            db.command('collMod', 'CalendarEvents', validator=calendar_events_schema)
+
+        print("Database initialized successfully")
+        
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
+        raise

@@ -1,6 +1,4 @@
-import React from 'react';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAnalytics } from "firebase/analytics";
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -9,8 +7,7 @@ import {
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 
-// Your Firebase configuration
-// Get these values from Firebase Console -> Project Settings -> General
+// Your existing Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -20,46 +17,51 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase (only if no apps exist)
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
+
+// Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
-const analytics = getAnalytics(app);
 
-// Configure additional scopes for Google Calendar access
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+// Add required Google Calendar scopes
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');        // Read calendar events
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events.readonly'); // Read event details
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.calendarlist.readonly'); // Read list of calendars
+googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-// Custom hook for auth state
-export const useFirebaseAuth = () => {
-  const [user, setUser] = React.useState(auth.currentUser);
-  const [loading, setLoading] = React.useState(true);
+// Optional: Add settings scope if you want to manage calendar settings
+// googleProvider.addScope('https://www.googleapis.com/auth/calendar.settings.readonly');
 
-  React.useEffect(() => {
-    // Subscribe to auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+// Configure sign in with custom parameters
+googleProvider.setCustomParameters({
+  // Request access to calendars immediately
+  prompt: 'consent',
+  // Include calendar access in initial permissions request
+  access_type: 'offline'
+});
 
-    // Cleanup subscription
-    return () => unsubscribe();
-  }, []);
-
-  return { user, loading };
-};
-
-// Sign in with Google
+// Enhanced sign in function that returns calendar access token
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    // Get Google OAuth access token for Calendar API
+    
+    // Get Google OAuth access token and calendar-specific credentials
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const accessToken = credential?.accessToken;
     
-    // Return both user and access token
+    // Get scopes granted by user
+    const grantedScopes = (result.user as any)._delegate.accessToken?.scope || '';
+    
+    // Check if calendar scope was granted
+    const hasCalendarAccess = grantedScopes.includes('calendar');
+    
     return { 
       user: result.user,
-      accessToken 
+      accessToken,
+      hasCalendarAccess,
+      scopes: grantedScopes
     };
   } catch (error: any) {
     // Handle specific error cases
@@ -70,6 +72,8 @@ export const signInWithGoogle = async () => {
         throw new Error('Sign-in popup was blocked. Please enable popups');
       case 'auth/cancelled-popup-request':
         throw new Error('Another sign-in attempt is in progress');
+      case 'auth/user-disabled':
+        throw new Error('This account has been disabled');
       default:
         console.error('Google sign-in error:', error);
         throw new Error('Failed to sign in with Google');
@@ -77,7 +81,6 @@ export const signInWithGoogle = async () => {
   }
 };
 
-// Sign out
 export const signOut = async () => {
   try {
     await firebaseSignOut(auth);

@@ -1,31 +1,51 @@
-// contexts/AuthContext.tsx
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { auth, signInWithGoogle, signOut } from '@/lib/firebase';
+import { tokenService } from './tokenService';
 import { 
   AuthContextType, 
   AuthState, 
   UserDocument, 
-  ApiResponse, 
-  AuthResponse 
+  CalendarCredentials ,
+  ApiResponse,
+  AuthResponse
 } from '@/lib/types';
 
-// Extend Firebase User type with our custom fields
 interface AuthUserType extends User {
   accessToken?: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface CalendarAuthState {
+  connected: boolean;
+  syncStatus: 'never' | 'in_progress' | 'completed' | 'failed';
+  lastSyncTime: string | null;
+}
+
+// Extended context type to include calendar state
+interface ExtendedAuthContextType extends AuthContextType {
+  calendarState: CalendarAuthState;
+  connectCalendar: () => Promise<void>;
+  disconnectCalendar: () => Promise<void>;
+  refreshCalendarToken: () => Promise<void>;
+}
+
+const AuthContext = createContext<ExtendedAuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Initialize state with typed values
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     loading: true,
     error: null
   });
+  
+  // Add calendar-specific state
+  const [calendarState, setCalendarState] = useState<CalendarAuthState>({
+    connected: false,
+    syncStatus: 'never',
+    lastSyncTime: null
+  });
+
   const router = useRouter();
 
   // Listen for Firebase auth state changes
@@ -35,11 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (firebaseUser) {
           // Get fresh token
           const token = await firebaseUser.getIdToken(true);
-          
-          // Save token to sessionStorage for API calls
           sessionStorage.setItem('authToken', token);
           
-          // Get or create user in MongoDB via Next.js API
+          // Get or create user in MongoDB
           const response = await fetch('/api/auth/user', {
             method: 'POST',
             headers: {
@@ -58,17 +76,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Failed to sync user with database');
           }
 
-          const userData: ApiResponse<UserDocument> = await response.json();
+          const userData = await response.json();
           
-          // Set user in state with proper typing
+          // Update calendar state if credentials exist
+          if (userData.user?.calendar?.credentials) {
+            const calendarTokens = await tokenService.getCalendarTokens(firebaseUser.uid);
+            setCalendarState({
+              connected: !!calendarTokens,
+              syncStatus: userData.user.calendar.syncStatus || 'never',
+              lastSyncTime: userData.user.calendar.lastSyncTime
+            });
+          }
+
           setAuthState(prev => ({
             ...prev,
-            user: userData.data || null
+            user: userData.user
           }));
         } else {
-          // Clear session data on sign out
+          // Clear all session data
           sessionStorage.removeItem('authToken');
+          await tokenService.clearTokens(authState.user?.googleId || '');
           setAuthState(prev => ({ ...prev, user: null }));
+          setCalendarState({
+            connected: false,
+            syncStatus: 'never',
+            lastSyncTime: null
+          });
         }
       } catch (error) {
         console.error('Auth state change error:', error);
@@ -81,41 +114,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Cleanup subscription
     return () => unsubscribe();
   }, []);
 
-  // Token refresh setup - every 30 minutes
+  // Add calendar token refresh interval
   useEffect(() => {
-    if (!authState.user) return;
+    if (!authState.user?.googleId) return;
 
     const refreshInterval = setInterval(async () => {
       try {
-        const firebaseUser = auth.currentUser;
-        if (firebaseUser) {
-          const token = await firebaseUser.getIdToken(true);
-          sessionStorage.setItem('authToken', token);
+        if (await tokenService.needsRefresh(authState.user!.googleId)) {
+          await refreshCalendarToken();
         }
       } catch (error) {
-        console.error('Token refresh error:', error);
-        // Force sign out on token refresh failure
-        handleSignOut();
+        console.error('Calendar token refresh error:', error);
       }
-    }, 30 * 60 * 1000); // 30 minutes
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
     return () => clearInterval(refreshInterval);
   }, [authState.user]);
 
   const handleSignIn = async () => {
-    try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-  
-      // 1. Sign in with Google through Firebase
-      const { user: firebaseUser, accessToken } = await signInWithGoogle();
-      
-      if (!accessToken) {
-        throw new Error('Failed to get access token');
-      }
+  try {
+    setAuthState(prev => ({ ...prev, loading: true, error: null }));
+
+    // 1. Sign in with Google through Firebase
+    const { user: firebaseUser, accessToken, hasCalendarAccess, scopes } = await signInWithGoogle();
+    
+    if (!accessToken) {
+      throw new Error('Failed to get access token');
+    }
+
+    // Store calendar credentials if access was granted
+    if (hasCalendarAccess) {
+      const calendarCreds: CalendarCredentials = {
+        accessToken,
+        refreshToken: firebaseUser.refreshToken,  // Changed from user to firebaseUser
+        expiresAt: Date.now() + 3600000, // 1 hour from now
+        scopes: scopes  // Use the scopes from signInWithGoogle response
+      };
+      await tokenService.storeCalendarTokens(firebaseUser.uid, calendarCreds);
+    }
+
+    // Update calendar state
+    setCalendarState(prev => ({
+      ...prev,
+      connected: hasCalendarAccess
+    }));
   
       // 2. Sync user with backend through Next.js API
       const response = await fetch('/api/auth/user', {
@@ -226,23 +271,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthState(prev => ({ ...prev, error: null }));
   };
 
-  // Construct context value with proper typing
-  const contextValue: AuthContextType = {
+  const connectCalendar = async () => {
+    try {
+      setAuthState(prev => ({ ...prev, loading: true }));
+      // Implement calendar connection logic
+      // This would typically involve requesting calendar permissions
+      // and storing the resulting tokens
+    } catch (error) {
+      console.error('Calendar connection error:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to connect calendar'
+      }));
+    } finally {
+      setAuthState(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const disconnectCalendar = async () => {
+    try {
+      if (!authState.user?.googleId) return;
+      await tokenService.clearTokens(authState.user.googleId);
+      setCalendarState({
+        connected: false,
+        syncStatus: 'never',
+        lastSyncTime: null
+      });
+    } catch (error) {
+      console.error('Calendar disconnect error:', error);
+    }
+  };
+
+  const refreshCalendarToken = async () => {
+    try {
+      if (!authState.user?.googleId) return;
+      const newToken = await tokenService.getValidAccessToken(authState.user.googleId);
+      if (!newToken) {
+        throw new Error('Failed to refresh calendar token');
+      }
+      // Token is automatically stored by the token service
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      // On critical token errors, disconnect calendar
+      await disconnectCalendar();
+    }
+  };
+
+  const value: ExtendedAuthContextType = {
     ...authState,
     signIn: handleSignIn,
     signOut: handleSignOut,
-    clearError
+    clearError: () => setAuthState(prev => ({ ...prev, error: null })),
+    calendarState,
+    connectCalendar,
+    disconnectCalendar,
+    refreshCalendarToken
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Custom hook to use auth context with proper typing
-export function useAuth(): AuthContextType {
+// Updated hook to include calendar functionality
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
