@@ -1,7 +1,5 @@
-// app/api/auth/user/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from './firebase-admin';
+import { auth } from './firebaseAdmin';
 import { cookies } from 'next/headers';
 
 // Your Python backend URL

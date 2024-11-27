@@ -172,6 +172,13 @@ export interface GetAISuggestionsResponse {
   };
 }
 
+export interface CalendarCredentials {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+  scopes: string[];
+}
+
 // Add new user-related interfaces
 export interface UserDocument {
   googleId: string;
@@ -185,6 +192,34 @@ export interface UserDocument {
   metadata?: {
     lastModified: string;
   };
+  calendar?: {
+    connected: boolean;
+    credentials?: CalendarCredentials;
+    lastSyncTime: string | null;
+    syncStatus: 'never' | 'in_progress' | 'completed' | 'failed';
+    selectedCalendars: string[];
+    error: string | null;
+    settings?: {
+      autoSync: boolean;
+      syncFrequency: number;
+      defaultReminders: boolean;
+    };
+  };
+}
+
+export interface CalendarEvent {
+  id: string;
+  calendarId: string;
+  summary: string;
+  description?: string;
+  start: { dateTime: string; timeZone: string; };
+  end: { dateTime: string; timeZone: string; };
+  recurringEventId?: string;
+  status: 'confirmed' | 'tentative' | 'cancelled';
+  created: string;
+  updated: string;
+  creator: { email: string; displayName?: string; };
+  organizer: { email: string; displayName?: string; };
 }
 
 export type UserRole = 'free' | 'premium' | 'admin';
