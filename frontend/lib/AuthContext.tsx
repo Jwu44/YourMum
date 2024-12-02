@@ -3,29 +3,28 @@ import { User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { auth, signInWithGoogle, signOut } from '@/lib/firebase';
 import { tokenService } from './tokenService';
+import { calendarApi } from './calendarApi';
 import { 
   AuthContextType, 
   AuthState, 
   UserDocument, 
-  CalendarCredentials ,
+  CalendarCredentials,
   ApiResponse,
   AuthResponse
 } from '@/lib/types';
 
-interface AuthUserType extends User {
-  accessToken?: string;
-}
-
+// Update interface to include calendar-specific state
 interface CalendarAuthState {
   connected: boolean;
   syncStatus: 'never' | 'in_progress' | 'completed' | 'failed';
   lastSyncTime: string | null;
+  selectedCalendars: string[];
 }
 
 // Extended context type to include calendar state
 interface ExtendedAuthContextType extends AuthContextType {
   calendarState: CalendarAuthState;
-  connectCalendar: () => Promise<void>;
+  connectCalendar: (selectedCalendars: string[]) => Promise<void>;  // Updated signature
   disconnectCalendar: () => Promise<void>;
   refreshCalendarToken: () => Promise<void>;
 }
@@ -43,7 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [calendarState, setCalendarState] = useState<CalendarAuthState>({
     connected: false,
     syncStatus: 'never',
-    lastSyncTime: null
+    lastSyncTime: null,
+    selectedCalendars: []
   });
 
   const router = useRouter();
@@ -76,15 +76,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Failed to sync user with database');
           }
 
-          const userData = await response.json();
+          const userData: AuthResponse = await response.json();
           
           // Update calendar state if credentials exist
           if (userData.user?.calendar?.credentials) {
-            const calendarTokens = await tokenService.getCalendarTokens(firebaseUser.uid);
+            const calendarStatus = await calendarApi.getCalendarStatus(firebaseUser.uid);
             setCalendarState({
-              connected: !!calendarTokens,
-              syncStatus: userData.user.calendar.syncStatus || 'never',
-              lastSyncTime: userData.user.calendar.lastSyncTime
+              connected: true,
+              syncStatus: calendarStatus.syncStatus,
+              lastSyncTime: new Date().toISOString(),
+              selectedCalendars: calendarStatus.selectedCalendars || []
             });
           }
 
@@ -96,21 +97,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Clear all session data
           sessionStorage.removeItem('authToken');
           await tokenService.clearTokens(authState.user?.googleId || '');
-          setAuthState(prev => ({ ...prev, user: null }));
+          
+          setAuthState({
+            user: null,
+            loading: false,
+            error: null
+          });
+          
           setCalendarState({
             connected: false,
             syncStatus: 'never',
-            lastSyncTime: null
+            lastSyncTime: null,
+            selectedCalendars: []
           });
         }
       } catch (error) {
         console.error('Auth state change error:', error);
         setAuthState(prev => ({
           ...prev,
-          error: error instanceof Error ? error.message : 'Authentication error'
+          error: error instanceof Error ? error.message : 'Authentication failed',
+          loading: false
         }));
-      } finally {
-        setAuthState(prev => ({ ...prev, loading: false }));
       }
     });
 
@@ -271,12 +278,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthState(prev => ({ ...prev, error: null }));
   };
 
-  const connectCalendar = async () => {
+  const connectCalendar = async (selectedCalendars: string[]) => {
     try {
       setAuthState(prev => ({ ...prev, loading: true }));
-      // Implement calendar connection logic
-      // This would typically involve requesting calendar permissions
-      // and storing the resulting tokens
+      
+      if (!authState.user?.googleId) {
+        throw new Error('User not authenticated');
+      }
+
+      // First verify permissions
+      const token = await tokenService.getValidAccessToken(authState.user.googleId);
+      if (!token) {
+        throw new Error('No valid calendar token');
+      }
+
+      const permissionsResult = await calendarApi.verifyCalendarPermissions(token);
+      
+      if (!permissionsResult.hasPermissions) {
+        throw new Error('Calendar permissions not granted');
+      }
+
+      // Connect calendar with selected calendars
+      const result = await calendarApi.connectCalendar(
+        authState.user.googleId,
+        selectedCalendars
+      );
+
+      setCalendarState({
+        connected: true,
+        syncStatus: result.status,
+        lastSyncTime: new Date().toISOString(),
+        selectedCalendars
+      });
+
     } catch (error) {
       console.error('Calendar connection error:', error);
       setAuthState(prev => ({
@@ -291,16 +325,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const disconnectCalendar = async () => {
     try {
       if (!authState.user?.googleId) return;
+      
+      await calendarApi.disconnectCalendar(authState.user.googleId);
       await tokenService.clearTokens(authState.user.googleId);
+      
       setCalendarState({
         connected: false,
         syncStatus: 'never',
-        lastSyncTime: null
+        lastSyncTime: null,
+        selectedCalendars: []
       });
     } catch (error) {
       console.error('Calendar disconnect error:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to disconnect calendar'
+      }));
     }
   };
+
+  // Add calendar status polling
+  useEffect(() => {
+    if (!authState.user?.googleId || !calendarState.connected) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await calendarApi.getCalendarStatus(authState.user!.googleId);
+        setCalendarState(prev => ({
+          ...prev,
+          ...status
+        }));
+      } catch (error) {
+        console.error('Calendar status check error:', error);
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [authState.user?.googleId, calendarState.connected]);
+
 
   const refreshCalendarToken = async () => {
     try {

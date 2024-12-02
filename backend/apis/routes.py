@@ -4,7 +4,6 @@ from backend.db_config import get_database, get_user_schedules_collection, store
 import traceback
 from bson import ObjectId
 from datetime import datetime, UTC  
-from pymongo import DESCENDING
 from backend.models.task import Task
 from typing import List, Dict
 import json
@@ -142,27 +141,6 @@ def add_task():
         categorized_task = categorize_task(task_data['task'])
         
         return jsonify(categorized_task)
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/identify_recurring_tasks", methods=["POST"])
-def recurring_tasks():
-    try:
-        data = request.json
-        if not data or 'current_schedule' not in data or 'previous_schedules' not in data:
-            return jsonify({"error": "Invalid data provided"}), 400
-        
-        current_schedule = data['current_schedule']
-        previous_schedules = data['previous_schedules']
-        
-        print("Identifying recurring tasks")
-        recurring_tasks = identify_recurring_tasks(current_schedule, previous_schedules)
-        print("Recurring tasks identified:", recurring_tasks)
-
-        return jsonify({"recurring_tasks": recurring_tasks})
 
     except Exception as e:
         print("Exception occurred:", str(e))
