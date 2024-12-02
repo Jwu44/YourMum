@@ -1,23 +1,24 @@
 export interface Task {
-    id: string;
-    text: string;
-    categories?: string[];
-    completed: boolean;
-    is_subtask?: boolean;
-    is_section?: boolean;
-    section?: string | null;
-    parent_id?: string | null;
-    level?: number;
-    section_index?: number;
-    type?: string;
-    start_time?: string | null;
-    end_time?: string | null;
-    is_recurring?: RecurrenceType | null;
-    start_date?: string;
-    is_microstep?: boolean;
-    rationale?: string;
-    estimated_time?: string;
-    energy_level_required?: 'low' | 'medium' | 'high';
+  id: string;
+  text: string;
+  categories?: string[];
+  completed: boolean;
+  is_subtask?: boolean;
+  is_section?: boolean;
+  section?: string | null;
+  parent_id?: string | null;
+  level?: number;
+  section_index?: number;
+  type?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  is_recurring?: RecurrenceType | null;
+  start_date?: string;
+  is_microstep?: boolean;
+  rationale?: string;
+  estimated_time?: string;
+  energy_level_required?: 'low' | 'medium' | 'high';
+  gcal_event_id?: string; 
 }
 
 export interface FormData {
@@ -263,3 +264,64 @@ export interface SessionData {
   userId: string;
   expiresAt: number;
 }
+
+export interface ScheduleDocument {
+  date: string;
+  tasks: Task[];
+  userId: string;
+  inputs: {
+    name: string;
+    age: string;
+    work_start_time: string;
+    work_end_time: string;
+    energy_patterns: string[];
+    layout_preference: {
+      structure: 'structured' | 'unstructured';
+      subcategory: string;
+      timeboxed: 'timeboxed' | 'untimeboxed';
+    };
+    priorities: Record<string, string>;
+    tasks: string[];
+  };
+  schedule: Task[];
+  metadata: {
+    createdAt: string;
+    lastModified: string;
+    calendarSynced: boolean;
+    totalTasks: number;
+    calendarEvents: number;
+  };
+}
+
+export interface ScheduleResponse {
+  _id: string;
+  date: string;
+  tasks: Task[];
+  metadata: {
+    createdAt: string;
+    lastModified: string;
+  };
+}
+
+export interface TimeSlot {
+  start: string;
+  end: string;
+  isOccupied: boolean;
+}
+
+export interface ScheduleMetadata {
+  totalTasks?: number;
+  calendarEvents?: number;
+  recurringTasks?: number;
+  generatedAt: string;
+  error?: string;
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: { dateTime: string; date?: string };
+  end: { dateTime: string; date?: string };
+  recurrence?: string[];  // RRULE strings from Google Calendar
+}
+
