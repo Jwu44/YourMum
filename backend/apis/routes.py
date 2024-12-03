@@ -1,14 +1,123 @@
 from flask import Blueprint, jsonify, request
-from backend.services.colab_integration import process_user_data, categorize_task, identify_recurring_tasks, decompose_task, generate_schedule_suggestions
-from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection
+from backend.services.colab_integration import process_user_data, categorize_task, decompose_task, generate_schedule_suggestions
+from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user
 import traceback
 from bson import ObjectId
 from datetime import datetime, UTC  
 from backend.models.task import Task
-from typing import List, Dict
+from typing import List, Dict, Any
 import json
 
 api_bp = Blueprint("api", __name__)
+
+@api_bp.route("/auth/user", methods=["POST"])
+def create_or_get_user():
+    """
+    Create or update user after Google authentication.
+    Expects a JSON payload with user data from Google Auth.
+    Returns the user object or error response.
+    """
+    try:
+        # Validate request payload
+        user_data = request.json
+        if not user_data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        # Validate required fields
+        required_fields = ["googleId", "email"]
+        missing_fields = [field for field in required_fields if field not in user_data]
+        if missing_fields:
+            return jsonify({
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+
+        # Get database instance and users collection
+        db = get_database()
+        users = db['users']
+
+        # Prepare calendar settings based on hasCalendarAccess
+        has_calendar_access = user_data.get('hasCalendarAccess', False)
+        calendar_settings = {
+            "connected": has_calendar_access,
+            "lastSyncTime": None,
+            "syncStatus": "never",
+            "selectedCalendars": [],
+            "error": None,
+            "settings": {
+                "autoSync": True,
+                "syncFrequency": 15,  # minutes
+                "defaultReminders": True
+            }
+        }
+
+        # Prepare user data with all required fields
+        processed_user_data = {
+            "googleId": user_data["googleId"],
+            "email": user_data["email"],
+            "displayName": user_data.get("displayName", ""),
+            "photoURL": user_data.get("photoURL"),
+            "role": "free",  # Default role for new users
+            "calendarSynced": has_calendar_access,
+            "lastLogin": datetime.now(UTC), 
+            "calendar": calendar_settings,
+            "metadata": {
+                "lastModified": datetime.now(UTC)  # Use UTC here as well
+            }
+        }
+
+        # Create or update user using the utility function
+        user = create_or_update_user(users, processed_user_data)
+        
+        if not user:
+            return jsonify({
+                "error": "Failed to create or update user"
+            }), 500
+
+        # Convert ObjectId to string and dates to ISO format for JSON serialization
+        serialized_user = process_user_for_response(user)
+
+        return jsonify({
+            "user": serialized_user,
+            "message": "User successfully created/updated"
+        }), 200
+
+    except Exception as e:
+        # Log the full error traceback for debugging
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e)
+        }), 500
+
+def process_user_for_response(user: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process user document for JSON response.
+    Converts ObjectId to string and datetime objects to ISO format.
+    """
+    processed_user = dict(user)  # Create a copy to avoid modifying the original
+    
+    # Convert ObjectId to string
+    if '_id' in processed_user:
+        processed_user['_id'] = str(processed_user['_id'])
+    
+    # Convert datetime objects to ISO format strings
+    date_fields = ['lastLogin', 'createdAt', 'lastModified']
+    for field in date_fields:
+        if field in processed_user:
+            if isinstance(processed_user[field], datetime):
+                processed_user[field] = processed_user[field].isoformat()
+    
+    # Process nested datetime objects in metadata
+    if 'metadata' in processed_user and 'lastModified' in processed_user['metadata']:
+        if isinstance(processed_user['metadata']['lastModified'], datetime):
+            processed_user['metadata']['lastModified'] = processed_user['metadata']['lastModified'].isoformat()
+    
+    # Process calendar lastSyncTime if it exists
+    if 'calendar' in processed_user and 'lastSyncTime' in processed_user['calendar']:
+        if isinstance(processed_user['calendar']['lastSyncTime'], datetime):
+            processed_user['calendar']['lastSyncTime'] = processed_user['calendar']['lastSyncTime'].isoformat()
+    
+    return processed_user
 
 @api_bp.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):

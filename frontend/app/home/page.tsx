@@ -1,11 +1,31 @@
+'use client';
 import React from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { TypographyH1, TypographyH2, TypographyH3, TypographyH4, TypographyP } from '../fonts/text';
 import { Laptop, Brain, Calendar } from 'lucide-react';
 
 const HomePage: React.FC = () => {
+  const router = useRouter();
+  const { user, signIn } = useAuth();
+
+  const handleGetStarted = async () => {
+    try {
+      if (user) {
+        // If user is already logged in, go to dashboard
+        router.push('/dashboard');
+      } else {
+        // Use the AuthContext's signIn function
+        await signIn();
+        // The redirect and subsequent navigation will be handled by AuthContext
+      }
+    } catch (error) {
+      console.error('Failed to start authentication:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[hsl(248,18%,4%)] text-white">
       <header className="w-full max-w-4xl mx-auto p-6 flex justify-between items-center">
@@ -14,9 +34,12 @@ const HomePage: React.FC = () => {
           <Button variant="link" className="text-white">Features</Button>
           <Button variant="link" className="text-white">Pricing</Button>
           <Button variant="link" className="text-white">Support</Button>
-          <Link href="/personal-details" passHref>
-            <Button variant="outline">Get Started</Button>
-          </Link>
+          <Button 
+            variant="outline"
+            onClick={handleGetStarted}
+          >
+            Get Started
+          </Button>
         </nav>
       </header>
 
@@ -24,7 +47,9 @@ const HomePage: React.FC = () => {
         <section className="text-center py-20">
           <TypographyH1 className="mb-4">Your AI-Powered Personal Task Assistant</TypographyH1>
           <TypographyP className="mb-8">Intelligent to-do lists that adapt to your work style</TypographyP>
-          <Button size="lg">Start Organizing</Button>
+          <Button size="lg" onClick={handleGetStarted}>
+            Start Organizing
+          </Button>
         </section>
 
         <section className="py-16">

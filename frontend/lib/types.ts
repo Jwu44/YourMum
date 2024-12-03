@@ -322,6 +322,6 @@ export interface GoogleCalendarEvent {
   summary: string;
   start: { dateTime: string; date?: string };
   end: { dateTime: string; date?: string };
-  recurrence?: string[];  // RRULE strings from Google Calendar
+  recurrence?: string[]; 
 }
 

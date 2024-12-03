@@ -2,10 +2,12 @@ import { initializeApp, getApps } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,  // Changed from signInWithPopup
+  getRedirectResult,   // Added to handle redirect results
   signOut as firebaseSignOut 
 } from 'firebase/auth';
+
+import { CalendarCredentials } from './types';
 
 // Your existing Firebase configuration
 const firebaseConfig = {
@@ -36,47 +38,88 @@ googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
 // Configure sign in with custom parameters
 googleProvider.setCustomParameters({
-  // Request access to calendars immediately
-  prompt: 'consent',
+  // Force account selection every time
+  prompt: 'select_account',
   // Include calendar access in initial permissions request
   access_type: 'offline'
 });
 
-// Enhanced sign in function that returns calendar access token
+// Enhanced sign in function that initiates redirect to Google sign-in page
 export const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    // Redirect to Google sign-in page
+    await signInWithRedirect(auth, googleProvider);
+  } catch (error: any) {
+    console.error('Google sign-in redirect error:', error);
+    throw new Error('Failed to initiate Google sign-in');
+  }
+};
+
+// New function to handle redirect result
+export const handleRedirectResult = async () => {
+  try {
+    // Get the result of the redirect operation
+    const result = await getRedirectResult(auth);
+    
+    // If no result, user hasn't completed sign-in yet
+    if (!result) return null;
     
     // Get Google OAuth access token and calendar-specific credentials
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const accessToken = credential?.accessToken;
     
-    // Get scopes granted by user
-    const grantedScopes = (result.user as any)._delegate.accessToken?.scope || '';
+    if (!accessToken) {
+      console.error('No access token received from Google');
+      throw new Error('Failed to get access token');
+    }
+
+        // Get scopes granted by user from the credential
+    // Cast credential to any to access non-standard properties
+    const grantedScopes = ((credential as any)?.scope as string) || '';
     
-    // Check if calendar scope was granted
-    const hasCalendarAccess = grantedScopes.includes('calendar');
+    // Convert space-separated scope string to array for type compatibility
+    const scopesArray = grantedScopes.split(' ');
+    
+    // Check if calendar scope was granted - check for specific calendar scopes
+    const hasCalendarAccess = scopesArray.some((scope: string) => 
+      scope.includes('calendar.readonly') || 
+      scope.includes('calendar.events.readonly') ||
+      scope.includes('calendar.calendarlist.readonly')
+    );
+    
+    // Create properly typed calendar credentials
+    const calendarCredentials: CalendarCredentials = {
+      accessToken,
+      expiresAt: Date.now() + 3600 * 1000, // Set expiration to 1 hour from now
+      scopes: scopesArray
+    };
+    
+    // Log for debugging
+    console.log('Auth Result:', {
+      user: result.user,
+      hasToken: Boolean(accessToken),
+      scopes: scopesArray,
+      hasCalendarAccess
+    });
     
     return { 
       user: result.user,
-      accessToken,
+      credentials: calendarCredentials,
       hasCalendarAccess,
       scopes: grantedScopes
     };
   } catch (error: any) {
+    console.error('Full redirect result error:', error);
     // Handle specific error cases
     switch (error.code) {
-      case 'auth/popup-closed-by-user':
-        throw new Error('Sign-in cancelled by user');
-      case 'auth/popup-blocked':
-        throw new Error('Sign-in popup was blocked. Please enable popups');
-      case 'auth/cancelled-popup-request':
-        throw new Error('Another sign-in attempt is in progress');
+      case 'auth/account-exists-with-different-credential':
+        throw new Error('Account exists with different credentials');
       case 'auth/user-disabled':
         throw new Error('This account has been disabled');
+      case 'auth/operation-not-allowed':
+        throw new Error('Google sign-in is not enabled');
       default:
-        console.error('Google sign-in error:', error);
-        throw new Error('Failed to sign in with Google');
+        throw new Error(error.message || 'Failed to complete Google sign-in');
     }
   }
 };
