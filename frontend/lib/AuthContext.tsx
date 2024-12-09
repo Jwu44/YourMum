@@ -48,55 +48,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleAuthRedirect = async () => {
       try {
-        const result = await handleRedirectResult();
-        if (result) {
-          // User successfully signed in
-          const token = await result.user.getIdToken(true);
-          sessionStorage.setItem('authToken', token);
-          
-          // Store calendar access token if available
-          if (result.credentials) {
-            await tokenService.storeCalendarTokens(
-              result.user.uid, 
-              result.credentials
-            );
-          }
-          
-          // Get or create user in MongoDB
-          const response = await fetch('/api/auth/user', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              googleId: result.user.uid,
-              email: result.user.email,
-              displayName: result.user.displayName,
-              photoURL: result.user.photoURL,
-              hasCalendarAccess: Boolean(result.credentials) // Update based on actual credentials
-            })
-          });
-    
-          if (!response.ok) {
-            throw new Error('Failed to sync user with database');
-          }
-    
-          const userData = await response.json();
-          
-          setAuthState({
-            user: userData.user,
-            loading: false,
-            error: null
-          });
-    
-          // Only redirect if we have a user
-          if (userData.user) {
-            router.push('/work-times');
-          }
+        // Add detailed URL logging
+        const url = window.location.href;
+        console.log("Current URL:", url);
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        
+        console.log("URL Parameters:", Object.fromEntries(urlParams.entries()));
+        console.log("Hash Parameters:", Object.fromEntries(hashParams.entries()));
+        
+        // Check for auth parameters in both query and hash
+        const isAuthRedirect = urlParams.has('code') || 
+                             urlParams.has('state') || 
+                             urlParams.has('auth_type') ||
+                             hashParams.has('access_token') ||
+                             hashParams.has('id_token');
+
+        console.log("Is auth redirect?", isAuthRedirect);
+        
+        if (!isAuthRedirect) {
+          console.log("Not in auth redirect flow");
+          return;
         }
+  
+        setAuthState(prev => ({ ...prev, loading: true }));
+        console.log("Starting redirect result handling...");
+        
+        const result = await handleRedirectResult();
+        
+        if (!result) {
+          console.log("No redirect result to process");
+          setAuthState(prev => ({ ...prev, loading: false }));
+          return;
+        }
+  
+        const token = await result.user.getIdToken(true);
+        sessionStorage.setItem('authToken', token);
+        
+        if (result.credentials) {
+          await tokenService.storeCalendarTokens(
+            result.user.uid, 
+            result.credentials
+          );
+        }
+  
+        console.log("Making API request to create/update user");
+        const response = await fetch('/api/auth/user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            googleId: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+            hasCalendarAccess: Boolean(result.credentials)
+          })
+        });
+  
+        if (!response.ok) {
+          throw new Error('Failed to sync user with database');
+        }
+  
+        const userData = await response.json();
+        
+        setAuthState({
+          user: userData.user,
+          loading: false,
+          error: null
+        });
+  
+        router.push('/work-times');
+  
       } catch (error) {
-        console.error('Auth redirect result error:', error);
+        console.error('Auth redirect error:', error);
         setAuthState(prev => ({
           ...prev,
           loading: false,
@@ -104,10 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     };
-
+  
     handleAuthRedirect();
   }, [router]);
-
   // Add calendar token refresh interval
   useEffect(() => {
     if (!authState.user?.googleId) return;
@@ -127,10 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignIn = async () => {
     try {
+      console.log("Starting sign-in process...");
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
+      
+      // Add logging before sign-in
+      console.log("Initiating Google sign-in...");
       await signInWithGoogle();
-      // The redirect will happen here, and the rest will be handled
-      // by the redirect handler when the user returns
+      console.log("Sign-in initiated, redirect should occur..."); // This might not print due to redirect
+      
     } catch (error) {
       console.error('Sign-in error:', error);
       setAuthState(prev => ({
@@ -145,6 +176,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       try {
         if (firebaseUser) {
+          console.log("Firebase user details:", {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email
+          });
           // User is signed in, handle the auth state
           const token = await firebaseUser.getIdToken(true);
           sessionStorage.setItem('authToken', token);

@@ -18,6 +18,8 @@ def create_or_get_user():
     Returns the user object or error response.
     """
     try:
+        print("Received authentication request. Headers:", request.headers)
+        print("Request body:", request.get_json(silent=True))
         # Validate request payload
         user_data = request.json
         if not user_data:
