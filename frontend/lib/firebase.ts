@@ -2,8 +2,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect,  // Changed from signInWithPopup
-  getRedirectResult,   // Added to handle redirect results
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 
@@ -26,6 +26,14 @@ const auth = getAuth(app);
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
 
+// Define return type interface
+interface RedirectResult {
+  user: any;
+  credentials: CalendarCredentials;
+  hasCalendarAccess: boolean;
+  scopes: string;
+}
+
 // Add required Google Calendar scopes
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');        // Read calendar events
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.events.readonly'); // Read event details
@@ -37,34 +45,44 @@ googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 // googleProvider.addScope('https://www.googleapis.com/auth/calendar.settings.readonly');
 
 // Configure sign in with custom parameters
+// Let Firebase handle the redirect URI internally
 googleProvider.setCustomParameters({
-  // Force account selection every time
-  prompt: 'select_account',
-  // Include calendar access in initial permissions request
-  access_type: 'offline'
+  prompt: 'select_account',  // Force account selection every time
+  access_type: 'offline'     // Request refresh token for long-term access
 });
 
 // Enhanced sign in function that initiates redirect to Google sign-in page
 export const signInWithGoogle = async () => {
   try {
-    // Redirect to Google sign-in page
+    // Clear any existing auth states
+    sessionStorage.clear();
+
+    console.log("Initiating Google sign-in with config:", {
+      scopes: googleProvider.getScopes()
+    });
+
+    // Initiate the redirect sign-in
     await signInWithRedirect(auth, googleProvider);
   } catch (error: any) {
-    console.error('Google sign-in redirect error:', error);
-    throw new Error('Failed to initiate Google sign-in');
+    console.error('Google sign-in error:', error);
+    throw error;
   }
 };
 
-// New function to handle redirect result
-export const handleRedirectResult = async () => {
+// Function to handle redirect result
+export const handleRedirectResult = async (): Promise<RedirectResult | null> => {
   try {
-    // Get the result of the redirect operation
+    console.log("Getting redirect result...");
+    
+    // Get the redirect result from Firebase
     const result = await getRedirectResult(auth);
     
-    // If no result, user hasn't completed sign-in yet
-    if (!result) return null;
-    
-    // Get Google OAuth access token and calendar-specific credentials
+    if (!result) {
+      console.log("No redirect result - user hasn't completed sign-in");
+      return null;
+    }
+
+    // Get Google OAuth access token from the credential
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const accessToken = credential?.accessToken;
     
@@ -73,57 +91,41 @@ export const handleRedirectResult = async () => {
       throw new Error('Failed to get access token');
     }
 
-        // Get scopes granted by user from the credential
-    // Cast credential to any to access non-standard properties
+    // Get scopes granted by the user
     const grantedScopes = ((credential as any)?.scope as string) || '';
-    
-    // Convert space-separated scope string to array for type compatibility
     const scopesArray = grantedScopes.split(' ');
     
-    // Check if calendar scope was granted - check for specific calendar scopes
-    const hasCalendarAccess = scopesArray.some((scope: string) => 
-      scope.includes('calendar.readonly') || 
-      scope.includes('calendar.events.readonly') ||
-      scope.includes('calendar.calendarlist.readonly')
-    );
-    
-    // Create properly typed calendar credentials
-    const calendarCredentials: CalendarCredentials = {
-      accessToken,
-      expiresAt: Date.now() + 3600 * 1000, // Set expiration to 1 hour from now
-      scopes: scopesArray
-    };
-    
-    // Log for debugging
-    console.log('Auth Result:', {
-      user: result.user,
+    console.log("Auth successful:", {
+      uid: result.user.uid,
+      email: result.user.email,
       hasToken: Boolean(accessToken),
-      scopes: scopesArray,
-      hasCalendarAccess
+      scopes: scopesArray
     });
-    
+
+    // Return the authentication result with necessary information
     return { 
       user: result.user,
-      credentials: calendarCredentials,
-      hasCalendarAccess,
+      credentials: {
+        accessToken,
+        expiresAt: Date.now() + 3600 * 1000, // Token expires in 1 hour
+        scopes: scopesArray
+      },
+      hasCalendarAccess: scopesArray.some(scope => 
+        scope.includes('calendar')),
       scopes: grantedScopes
     };
+
   } catch (error: any) {
-    console.error('Full redirect result error:', error);
-    // Handle specific error cases
-    switch (error.code) {
-      case 'auth/account-exists-with-different-credential':
-        throw new Error('Account exists with different credentials');
-      case 'auth/user-disabled':
-        throw new Error('This account has been disabled');
-      case 'auth/operation-not-allowed':
-        throw new Error('Google sign-in is not enabled');
-      default:
-        throw new Error(error.message || 'Failed to complete Google sign-in');
-    }
+    console.error('Redirect result error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
   }
 };
 
+// Sign out function
 export const signOut = async () => {
   try {
     await firebaseSignOut(auth);
@@ -133,4 +135,5 @@ export const signOut = async () => {
   }
 };
 
+// Export auth and app instances for use in other parts of the application
 export { auth, app };
