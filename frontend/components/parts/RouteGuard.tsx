@@ -1,7 +1,7 @@
 'use client';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 
 // Add paths that don't require authentication
 const publicPaths = ['/', '/home'];
@@ -11,18 +11,34 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const isAuthRedirect = useCallback(() => {
+    const url = window.location.href;
+    return url.includes('auth/handler') || 
+           url.includes('accounts.google.com') || 
+           url.includes('code=') || 
+           url.includes('state=');
+  }, []);
+  
   useEffect(() => {
-    if (!loading) {  // Only run after initial auth check
+    if (!loading) {
       const isPublicPath = publicPaths.includes(pathname);
-      const isAuthRedirect = window.location.href.includes('accounts.google.com');
+      const inAuthFlow = isAuthRedirect();
       
-      // Don't redirect if we're in the middle of auth flow
-      if (!user && !isPublicPath && !isAuthRedirect) {
+      console.log("RouteGuard State:", {
+        user,
+        loading,
+        pathname,
+        isPublicPath,
+        inAuthFlow,
+        currentUrl: window.location.href
+      });
+      
+      // Don't redirect if in auth flow
+      if (!user && !isPublicPath && !inAuthFlow) {
         router.push('/home');
       }
     }
-  }, [user, loading, pathname, router]);
-
+  }, [user, loading, pathname, router, isAuthRedirect]);
   // Show loading state while checking authentication
   if (loading) {
     return (
