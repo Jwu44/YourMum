@@ -44,13 +44,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const router = useRouter();
-
+  
   useEffect(() => {
+    // Add a flag to prevent duplicate processing
+    let isProcessing = false;
+  
     const handleAuthRedirect = async () => {
+      // Prevent duplicate processing
+      if (isProcessing) return;
+      isProcessing = true;
+  
       try {
         // Add detailed URL logging
         const url = window.location.href;
-        console.log("Current URL:", url);
+        console.log("Checking auth redirect:", url);
         
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
@@ -64,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                              urlParams.has('auth_type') ||
                              hashParams.has('access_token') ||
                              hashParams.has('id_token');
-
+  
         console.log("Is auth redirect?", isAuthRedirect);
         
         if (!isAuthRedirect) {
@@ -130,11 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loading: false,
           error: error instanceof Error ? error.message : 'Authentication error'
         }));
+      } finally {
+        isProcessing = false;
       }
     };
   
     handleAuthRedirect();
-  }, [router]);
+  
+    // Cleanup function to prevent memory leaks and stale processing
+    return () => {
+      isProcessing = false;
+    };
+  }, [router]); // Only re-run effect if router changes
+
   // Add calendar token refresh interval
   useEffect(() => {
     if (!authState.user?.googleId) return;
