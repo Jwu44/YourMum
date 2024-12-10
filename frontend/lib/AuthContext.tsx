@@ -44,190 +44,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const router = useRouter();
-  
+  const processed = React.useRef(false);
+
+  // Single source of truth for authentication flow
   useEffect(() => {
-    // Add a flag to prevent duplicate processing
-    let isProcessing = false;
-  
-    const handleAuthRedirect = async () => {
-      // Prevent duplicate processing
-      if (isProcessing) return;
-      isProcessing = true;
-  
+    const handleRedirectAuth = async () => {
       try {
-        // Add detailed URL logging
-        const url = window.location.href;
-        console.log("Checking auth redirect:", url);
+        if (processed.current) return;
+        processed.current = true;
+
+        console.log("Starting handleRedirectAuth"); // Add this
+        console.log("Getting redirect result..."); // Add this
+        const redirectResult = await handleRedirectResult();
+        console.log("Redirect result:", redirectResult); // Add this
         
-        const urlParams = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
-        
-        console.log("URL Parameters:", Object.fromEntries(urlParams.entries()));
-        console.log("Hash Parameters:", Object.fromEntries(hashParams.entries()));
-        
-        // Check for auth parameters in both query and hash
-        const isAuthRedirect = urlParams.has('code') || 
-                             urlParams.has('state') || 
-                             urlParams.has('auth_type') ||
-                             hashParams.has('access_token') ||
-                             hashParams.has('id_token');
-  
-        console.log("Is auth redirect?", isAuthRedirect);
-        
-        if (!isAuthRedirect) {
-          console.log("Not in auth redirect flow");
-          return;
-        }
-  
-        setAuthState(prev => ({ ...prev, loading: true }));
-        console.log("Starting redirect result handling...");
-        
-        const result = await handleRedirectResult();
-        
-        if (!result) {
-          console.log("No redirect result to process");
-          setAuthState(prev => ({ ...prev, loading: false }));
-          return;
-        }
-  
-        const token = await result.user.getIdToken(true);
-        sessionStorage.setItem('authToken', token);
-        
-        if (result.credentials) {
-          await tokenService.storeCalendarTokens(
-            result.user.uid, 
-            result.credentials
+        if (redirectResult) {
+          console.log("Processing redirect result");
+          // Store calendar tokens if available
+          if (redirectResult.credentials) {
+            await tokenService.storeCalendarTokens(
+              redirectResult.user.uid,
+              redirectResult.credentials
+            );
+          }
+          
+          // Create/update user in database
+          await syncUserWithDatabase(
+            redirectResult.user,
+            redirectResult.hasCalendarAccess
           );
+          
+          // Navigate to work-times page
+          router.push('/work-times');
         }
-  
-        console.log("Making API request to create/update user");
-        const response = await fetch('/api/auth/user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            googleId: result.user.uid,
-            email: result.user.email,
-            displayName: result.user.displayName,
-            photoURL: result.user.photoURL,
-            hasCalendarAccess: Boolean(result.credentials)
-          })
-        });
-  
-        if (!response.ok) {
-          throw new Error('Failed to sync user with database');
-        }
-  
-        const userData = await response.json();
-        
-        setAuthState({
-          user: userData.user,
-          loading: false,
-          error: null
-        });
-  
-        router.push('/work-times');
-  
       } catch (error) {
-        console.error('Auth redirect error:', error);
+        console.error('Redirect handling error:', error);
         setAuthState(prev => ({
           ...prev,
           loading: false,
           error: error instanceof Error ? error.message : 'Authentication error'
         }));
-      } finally {
-        isProcessing = false;
       }
     };
-  
-    handleAuthRedirect();
-  
-    // Cleanup function to prevent memory leaks and stale processing
+
+    // Check for redirect result on mount
+    handleRedirectAuth();
+
     return () => {
-      isProcessing = false;
+      processed.current = false;
     };
-  }, [router]); // Only re-run effect if router changes
+  }, [router]);
 
-  // Add calendar token refresh interval
-  useEffect(() => {
-    if (!authState.user?.googleId) return;
-
-    const refreshInterval = setInterval(async () => {
-      try {
-        if (await tokenService.needsRefresh(authState.user!.googleId)) {
-          await refreshCalendarToken();
-        }
-      } catch (error) {
-        console.error('Calendar token refresh error:', error);
-      }
-    }, 5 * 60 * 1000); // Check every 5 minutes
-
-    return () => clearInterval(refreshInterval);
-  }, [authState.user]);
-
-  const handleSignIn = async () => {
-    try {
-      console.log("Starting sign-in process...");
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
-      // Add logging before sign-in
-      console.log("Initiating Google sign-in...");
-      await signInWithGoogle();
-      console.log("Sign-in initiated, redirect should occur..."); // This might not print due to redirect
-      
-    } catch (error) {
-      console.error('Sign-in error:', error);
-      setAuthState(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to sign in'
-      }));
-    }
-  };
-  // Listen for Firebase auth state changes
+  // Firebase auth state listener - remains separate to handle ongoing auth state
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          console.log("Firebase user details:", {
+          console.log("Firebase auth state changed - user signed in:", {
             uid: firebaseUser.uid,
             email: firebaseUser.email
           });
-          // User is signed in, handle the auth state
-          const token = await firebaseUser.getIdToken(true);
-          sessionStorage.setItem('authToken', token);
           
-          // Get or create user in MongoDB
-          const response = await fetch('/api/auth/user', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              googleId: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to sync user with database');
-          }
-
-          const userData: AuthResponse = await response.json();
-          
-          setAuthState({
-            user: userData.user,
-            loading: false,
-            error: null
-          });
-
+          // Only sync with database if not handling redirect
+          await syncUserWithDatabase(firebaseUser);
         } else {
-          // No user is signed in - just update state without redirect
+          console.log("Firebase auth state changed - user signed out");
           setAuthState({
             user: null,
             loading: false,
@@ -246,6 +127,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe();
   }, []);
+
+  // Enhanced syncUserWithDatabase function
+  const syncUserWithDatabase = async (
+    firebaseUser: {
+      uid: string;
+      email: string | null;
+      displayName: string | null;
+      photoURL: string | null;
+      getIdToken: (forceRefresh: boolean) => Promise<string>;
+    },
+    hasCalendarAccess: boolean = false
+  ): Promise<void> => {
+    try {
+      const token = await firebaseUser.getIdToken(true);
+      sessionStorage.setItem('authToken', token);
+
+      const response = await fetch('/api/auth/user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          googleId: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+          hasCalendarAccess
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to sync user with database: ${response.statusText}`);
+      }
+
+      const userData: AuthResponse = await response.json();
+      
+      setAuthState({
+        user: userData.user,
+        loading: false,
+        error: null
+      });
+
+      if (hasCalendarAccess) {
+        setCalendarState(prev => ({
+          ...prev,
+          connected: true,
+          syncStatus: 'completed',
+          lastSyncTime: new Date().toISOString()
+        }));
+      }
+    } catch (error) {
+      console.error('Database sync error:', error);
+      throw new Error(
+        error instanceof Error 
+          ? `Failed to sync user: ${error.message}`
+          : 'Failed to sync user with database'
+      );
+    }
+  };
+
+  // Enhanced sign-in handler with better error handling
+  const handleSignIn = async () => {
+    try {
+      console.log("Starting sign-in process...");
+      setAuthState(prev => ({ ...prev, loading: true, error: null }));
+      
+      // Clear any existing auth state
+      await signOut();
+      
+      // Initiate Google sign-in
+      console.log("Initiating Google sign-in...");
+      await signInWithGoogle();
+      
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      setAuthState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error 
+          ? error.message 
+          : 'Failed to sign in'
+      }));
+      
+      // Re-throw error for component handling
+      throw error;
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -343,6 +312,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     }
   };
+  // Add calendar token refresh interval
+  useEffect(() => {
+    if (!authState.user?.googleId) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        if (await tokenService.needsRefresh(authState.user!.googleId)) {
+          await refreshCalendarToken();
+        }
+      } catch (error) {
+        console.error('Calendar token refresh error:', error);
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, [authState.user]);
 
   // Add calendar status polling
   useEffect(() => {
