@@ -10,6 +10,8 @@ import {
   AuthResponse
 } from '@/lib/types';
 
+const API_BASE_URL = 'http://localhost:8000/api';
+
 // Update interface to include calendar-specific state
 interface CalendarAuthState {
   connected: boolean;
@@ -143,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await firebaseUser.getIdToken(true);
       sessionStorage.setItem('authToken', token);
 
-      const response = await fetch('/api/auth/user', {
+      const response = await fetch(`${API_BASE_URL}/auth/user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

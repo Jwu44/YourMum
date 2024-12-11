@@ -52,12 +52,18 @@ def create_or_get_user():
             }
         }
 
-        # Prepare user data with all required fields
+        # Ensure displayName is never None/null
+        display_name = user_data.get("displayName")
+        if not display_name:
+            # Fall back to email username if displayName is not provided
+            display_name = user_data["email"].split('@')[0]
+
+        # Prepare user data with all required fields and ensure no null values
         processed_user_data = {
             "googleId": user_data["googleId"],
             "email": user_data["email"],
-            "displayName": user_data.get("displayName", ""),
-            "photoURL": user_data.get("photoURL"),
+            "displayName": display_name,  # Use processed display_name
+            "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
             "role": "free",  # Default role for new users
             "calendarSynced": has_calendar_access,
             "lastLogin": datetime.now(UTC), 

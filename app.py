@@ -7,17 +7,23 @@ from backend.db_config import initialize_db
 
 sys.path.append("./backend")
 
-app = Flask(__name__)
-CORS(app)
-app.register_blueprint(api_bp, url_prefix='/api')
-app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
+def create_app():
+    """Factory function to create Flask application"""
+    app = Flask(__name__)
+    CORS(app)
+    
+    # Register blueprints
+    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
+    
+    # Initialize database connection only once
+    with app.app_context():
+        initialize_db()
 
-# Initialize database connection
-initialize_db()
+    return app
 
-@app.route('/')  # Define a route for the root URL '/'
-def hello():
-    return "Hello world!"
+# Create app instance
+app = create_app()
 
 if __name__ == '__main__':
     app.run(host="localhost", port=8000, debug=True)
