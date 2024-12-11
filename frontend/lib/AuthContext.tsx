@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (processed.current) return;
         processed.current = true;
 
-        console.log("Starting handleRedirectAuth"); // Add this
-        console.log("Getting redirect result..."); // Add this
+        console.log("Checking for redirect authentication...");
+        console.log("Current URL:", window.location.href);
         const redirectResult = await handleRedirectResult();
         console.log("Redirect result:", redirectResult); // Add this
         
