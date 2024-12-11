@@ -4,6 +4,7 @@ import {
   GoogleAuthProvider, 
   signInWithRedirect,
   getRedirectResult,
+  connectAuthEmulator,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 
@@ -21,9 +22,14 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-console.log("Firebase initialized:", !!app);
 const auth = getAuth(app);
-console.log("Auth initialized:", !!auth);
+
+// Connect to emulator if in development
+if (process.env.NODE_ENV === 'development') {
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  console.log('Connected to Auth Emulator');
+}
+;
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
 
