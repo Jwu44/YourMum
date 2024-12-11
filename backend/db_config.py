@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from .models.ai_suggestions import AI_SUGGESTION_INDEXES
 from .models.calendar_schema import calendar_events_schema
 from .models.user_schema import user_schema_validation
+from functools import lru_cache
+
 # Load environment variables
 load_dotenv()
 
@@ -24,12 +26,20 @@ client = MongoClient(uri)
 db_name = "YourDaiSchedule"
 db = client[db_name]
 
+# Add this flag near the top of the file
+_db_initialized = False
+
+# Modify get_database to cache the connection
+@lru_cache(maxsize=1)
 def get_database():
     """Get MongoDB database instance with connection check."""
     try:
         # Check connection by pinging the database
         client.admin.command('ping')
-        print(f"Successfully connected to MongoDB database: {db_name}")
+        # Only print on first connection
+        if not hasattr(get_database, '_connected'):
+            print(f"Successfully connected to MongoDB database: {db_name}")
+            get_database._connected = True
         return db
     except ConnectionFailure as e:
         print(f"Failed to connect to MongoDB: {e}")
@@ -42,7 +52,7 @@ def get_collection(collection_name: str) -> Collection:
 
 def get_users_collection() -> Collection:
     """Get collection for storing user data."""
-    return get_collection('Users')
+    return get_collection('users')
 
 def get_user_schedules_collection() -> Collection:
     """Get collection for storing user schedules."""
@@ -310,7 +320,12 @@ def store_calendar_events(events: list) -> bool:
 
 def initialize_db():
     """Initialize database connection and create necessary collections/indexes."""
+    global _db_initialized
+    
     try:
+        # Skip initialization if already done
+        if _db_initialized:
+            return
         # Check database connection
         client.admin.command('ismaster')
         print("Successfully connected to MongoDB")
