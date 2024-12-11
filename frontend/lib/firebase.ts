@@ -12,7 +12,7 @@ import { CalendarCredentials } from './types';
 // Your existing Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: 'yourdai.firebaseapp.com',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
@@ -70,11 +70,10 @@ export const signInWithGoogle = async () => {
       throw new Error('Firebase configuration is missing');
     }
 
-    console.log("Auth config:", {
-      currentDomain: window.location.hostname,
-      providerId: googleProvider.providerId,
-      scopes: Array.from(googleProvider.getScopes()),
-      redirectUri: auth.config.authDomain
+    console.log("Auth domain check:", {
+      configuredDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      currentUrl: window.location.href,
+      authDomain: auth.config.authDomain
     });
 
     // Initiate the redirect sign-in
@@ -108,8 +107,8 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
   try {
     console.log("Getting redirect result...");
     
-    // Get the redirect result from Firebase
     const result = await getRedirectResult(auth);
+    console.log("Raw redirect result:", result ? "exists" : "null");
     
     if (!result) {
       console.log("No redirect result - user hasn't completed sign-in");
