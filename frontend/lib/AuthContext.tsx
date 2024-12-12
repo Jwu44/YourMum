@@ -141,53 +141,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     hasCalendarAccess: boolean = false
   ): Promise<void> => {
-    try {
-      const token = await firebaseUser.getIdToken(true);
-      sessionStorage.setItem('authToken', token);
+      try {
+          const token = await firebaseUser.getIdToken(true);
+          sessionStorage.setItem('authToken', token);
 
-      const response = await fetch(`${API_BASE_URL}/auth/user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          googleId: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          hasCalendarAccess
-        })
-      });
+          // First sync the user
+          const response = await fetch(`${API_BASE_URL}/auth/user`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                  googleId: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
+                  photoURL: firebaseUser.photoURL || '',
+                  hasCalendarAccess
+              })
+          });
 
-      if (!response.ok) {
-        throw new Error(`Failed to sync user with database: ${response.statusText}`);
+          if (!response.ok) {
+              throw new Error(`Failed to sync user with database: ${response.statusText}`);
+          }
+
+          const userData: AuthResponse = await response.json();
+
+          // Check if user has any schedules
+          const schedulesResponse = await fetch(`${API_BASE_URL}/user/${firebaseUser.uid}/has-schedules`, {
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          });
+
+          if (!schedulesResponse.ok) {
+              throw new Error('Failed to check user schedules');
+          }
+
+          const { hasSchedules } = await schedulesResponse.json();
+
+          setAuthState({
+              user: userData.user,
+              loading: false,
+              error: null
+          });
+          console.log(hasSchedules)
+          // Redirect based on schedule existence
+          if (!hasSchedules) {
+              router.push('/work-times');
+          } else {
+              router.push('/dashboard');
+          }
+
+          if (hasCalendarAccess) {
+              setCalendarState(prev => ({
+                  ...prev,
+                  connected: true,
+                  syncStatus: 'completed',
+                  lastSyncTime: new Date().toISOString()
+              }));
+          }
+      } catch (error) {
+          console.error('Database sync error:', error);
+          throw new Error(
+              error instanceof Error 
+                  ? `Failed to sync user: ${error.message}`
+                  : 'Failed to sync user with database'
+          );
       }
-
-      const userData: AuthResponse = await response.json();
-      
-      setAuthState({
-        user: userData.user,
-        loading: false,
-        error: null
-      });
-
-      if (hasCalendarAccess) {
-        setCalendarState(prev => ({
-          ...prev,
-          connected: true,
-          syncStatus: 'completed',
-          lastSyncTime: new Date().toISOString()
-        }));
-      }
-    } catch (error) {
-      console.error('Database sync error:', error);
-      throw new Error(
-        error instanceof Error 
-          ? `Failed to sync user: ${error.message}`
-          : 'Failed to sync user with database'
-      );
-    }
   };
 
   // Enhanced sign-in handler with better error handling
@@ -221,6 +242,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignOut = async () => {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
+      
+      // Call Firebase sign out
+      await signOut();
+        
+      // Clear ALL storage
+      sessionStorage.clear();
+      localStorage.clear(); // Add this to clear Firebase auth persistence
       
       // Call Firebase sign out
       await signOut();

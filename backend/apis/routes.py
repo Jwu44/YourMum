@@ -524,6 +524,27 @@ def get_schedules_range():
         print("Exception occurred:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    
+@api_bp.route("/user/<user_id>/has-schedules", methods=["GET"])
+def check_user_schedules(user_id):
+    """Check if a user has any schedules."""
+    try:
+        user_schedules = get_user_schedules_collection()
+        
+        # Check for at least one schedule
+        schedule_exists = user_schedules.find_one(
+            {"userId": user_id},
+            {"_id": 1}  # Only retrieve ID for performance
+        ) is not None
+        
+        return jsonify({
+            "hasSchedules": schedule_exists
+        }), 200
+        
+    except Exception as e:
+        print("Exception occurred:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/tasks/decompose", methods=["POST"])
 def api_decompose_task():
