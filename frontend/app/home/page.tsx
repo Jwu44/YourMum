@@ -1,6 +1,5 @@
 'use client';
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,23 +7,44 @@ import { TypographyH1, TypographyH2, TypographyH3, TypographyH4, TypographyP } f
 import { Laptop, Brain, Calendar } from 'lucide-react';
 
 const HomePage: React.FC = () => {
-  const router = useRouter();
-  const { user, signIn } = useAuth();
-
+  const { user, signIn, signOut } = useAuth(); 
+  const API_BASE_URL = 'http://localhost:8000/api';
   const handleGetStarted = async () => {
     try {
-      if (user) {
-        // If user is already logged in, go to dashboard
-        router.push('/dashboard');
-      } else {
-        // Use the AuthContext's signIn function
-        await signIn();
-        // The redirect and subsequent navigation will be handled by AuthContext
-      }
+        if (user) {
+            // First verify if user exists in MongoDB
+            const userResponse = await fetch(`${API_BASE_URL}/user/${user.googleId}`, {
+                headers: {
+                    'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`
+                }
+            });
+
+            // If user doesn't exist in MongoDB, sign them out first
+            if (userResponse.status === 404) {
+                console.log('User not found in MongoDB, signing out...');
+                await signOut();
+                // After signout, trigger sign in
+                await signIn();
+                return;
+            }
+
+            // User exists, let AuthContext handle schedule check and redirection
+            await signIn();
+        } else {
+            // Use the AuthContext's signIn function
+            await signIn();
+            // The redirect will be handled by AuthContext after sign-in
+        }
     } catch (error) {
-      console.error('Failed to start authentication:', error);
+        console.error('Failed to start authentication:', error);
+        // If there's an error, attempt to sign out and clean up
+        try {
+            await signOut();
+        } catch (signOutError) {
+            console.error('Failed to sign out after error:', signOutError);
+        }
     }
-  };
+};
 
   return (
     <div className="min-h-screen bg-[hsl(248,18%,4%)] text-white">
