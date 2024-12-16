@@ -25,11 +25,19 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // Connect to emulator if in development
-if (process.env.NODE_ENV === 'development') {
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-  console.log('Connected to Auth Emulator');
-}
-;
+// if (process.env.NODE_ENV === 'development') {
+//   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+//   console.log('Connected to Auth Emulator');
+// }
+// ;
+
+const getRedirectUrl = (): string => {
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:8001';
+  }
+  return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
+};
+
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
 
@@ -60,8 +68,9 @@ googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 // Configure sign in with custom parameters
 // Let Firebase handle the redirect URI internally
 googleProvider.setCustomParameters({
-  prompt: 'select_account',  // Force account selection every time
-  access_type: 'offline'     // Request refresh token for long-term access
+  prompt: 'select_account',
+  access_type: 'offline',
+  redirect_uri: getRedirectUrl() // Add this line
 });
 
 // Enhanced sign in function with better error handling and logging
