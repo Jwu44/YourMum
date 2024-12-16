@@ -213,3 +213,56 @@
 
 Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
  
+[debug] [2024-12-16T00:54:49.119Z] ----------------------------------------------------------------------
+[debug] [2024-12-16T00:54:49.127Z] Command:       /opt/homebrew/Cellar/node/23.1.0_1/bin/node /opt/homebrew/bin/firebase emulators:start
+[debug] [2024-12-16T00:54:49.127Z] CLI Version:   13.28.0
+[debug] [2024-12-16T00:54:49.127Z] Platform:      darwin
+[debug] [2024-12-16T00:54:49.128Z] Node Version:  v23.1.0
+[debug] [2024-12-16T00:54:49.128Z] Time:          Mon Dec 16 2024 11:54:49 GMT+1100 (Australian Eastern Daylight Time)
+[debug] [2024-12-16T00:54:49.128Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2024-12-16T00:54:49.180Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2024-12-16T00:54:49.181Z] > authorizing via signed-in user (justin.wu4444@gmail.com)
+[info] i  emulators: Starting emulators: auth, hosting {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, hosting"}}
+[debug] [2024-12-16T00:54:50.060Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2024-12-16T00:54:50.060Z] [auth] Authentication Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[warn] ⚠  hosting: Hosting Emulator unable to start on port 5001, starting on 5002 instead. {"metadata":{"emulator":{"name":"hosting"},"message":"Hosting Emulator unable to start on port 5001, starting on 5002 instead."}}
+[debug] [2024-12-16T00:54:50.060Z] [hosting] Hosting Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2024-12-16T00:54:50.060Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"hosting":[{"address":"127.0.0.1","family":"IPv4","port":5002}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2024-12-16T00:54:50.093Z] [hub] writing locator at /var/folders/zg/m39m5_zd7tx0hq_rxg13glsh0000gn/T/hub-yourdai.json
+[debug] [2024-12-16T00:54:52.562Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:52.562Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:52.562Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/yourdai/sites 
+[debug] [2024-12-16T00:54:53.994Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/yourdai/sites 200
+[debug] [2024-12-16T00:54:53.994Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/yourdai/sites {"sites":[{"name":"projects/yourdai/sites/yourdai","defaultUrl":"https://yourdai.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2024-12-16T00:54:53.994Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:53.994Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:53.994Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/yourdai/webApps/-/config [none]
+[debug] [2024-12-16T00:54:55.072Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/yourdai/webApps/-/config 200
+[debug] [2024-12-16T00:54:55.072Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/yourdai/webApps/-/config {"projectId":"yourdai","appId":"1:246264772427:web:bdb0f4b687ee5440511ace","storageBucket":"yourdai.firebasestorage.app","apiKey":"AIzaSyDwtW6LWOo9eFGa_Y7jux0P3Zml-IEzxGc","authDomain":"yourdai.firebaseapp.com","messagingSenderId":"246264772427","measurementId":"G-MEKF41R3KH"}
+[debug] [2024-12-16T00:54:55.078Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:55.078Z] Checked if tokens are valid: true, expires at: 1734313533088
+[debug] [2024-12-16T00:54:55.078Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/yourdai [none]
+[debug] [2024-12-16T00:54:55.561Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/yourdai 200
+[debug] [2024-12-16T00:54:55.561Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/yourdai {"projectId":"yourdai","projectNumber":"246264772427","displayName":"yourdAI","name":"projects/yourdai","resources":{"hostingSite":"yourdai"},"state":"ACTIVE","etag":"1_a8edb146-a961-4ad8-a66b-5c40514b9fdd"}
+[info] i  hosting[yourdai]: Serving hosting files from: public {"metadata":{"emulator":{"name":"hosting"},"message":"Serving hosting files from: \u001b[1mpublic\u001b[22m"}}
+[info] ✔  hosting[yourdai]: Local server: http://127.0.0.1:5002 {"metadata":{"emulator":{"name":"hosting"},"message":"Local server: \u001b[4m\u001b[1mhttp://127.0.0.1:5002\u001b[22m\u001b[24m"}}
+[debug] [2024-12-16T00:54:55.666Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┬────────────────────────────┐
+│ Emulator       │ Host:Port      │ View in Emulator UI        │
+├────────────────┼────────────────┼────────────────────────────┤
+│ Authentication │ 127.0.0.1:9099 │ http://127.0.0.1:4000/auth │
+├────────────────┼────────────────┼────────────────────────────┤
+│ Hosting        │ 127.0.0.1:5002 │ n/a                        │
+└────────────────┴────────────────┴────────────────────────────┘
+  Emulator Hub running at 127.0.0.1:4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
