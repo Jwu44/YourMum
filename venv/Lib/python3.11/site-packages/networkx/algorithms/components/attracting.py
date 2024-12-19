@@ -10,7 +10,7 @@ __all__ = [
 
 
 @not_implemented_for("undirected")
-@nx._dispatchable
+@nx._dispatch
 def attracting_components(G):
     """Generates the attracting components in `G`.
 
@@ -54,7 +54,7 @@ def attracting_components(G):
 
 
 @not_implemented_for("undirected")
-@nx._dispatchable
+@nx._dispatch
 def number_attracting_components(G):
     """Returns the number of attracting components in `G`.
 
@@ -83,7 +83,7 @@ def number_attracting_components(G):
 
 
 @not_implemented_for("undirected")
-@nx._dispatchable
+@nx._dispatch
 def is_attracting_component(G):
     """Returns True if `G` consists of a single attracting component.
 
