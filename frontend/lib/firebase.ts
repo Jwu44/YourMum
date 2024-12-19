@@ -8,7 +8,7 @@ import {
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 
-import { CalendarCredentials } from './types';
+import { RedirectResult } from './types';
 
 // Your existing Firebase configuration
 const firebaseConfig = {
@@ -31,29 +31,17 @@ const auth = getAuth(app);
 // }
 // ;
 
+// Update getRedirectUrl to handle development environment properly
 const getRedirectUrl = (): string => {
   if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:8001';
+    // Use HTTPS localhost
+    return 'https://localhost:8001';
   }
   return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
 };
 
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
-
-// Enhanced RedirectResult interface with more specific types
-interface RedirectResult {
-  user: {
-    uid: string;
-    email: string | null;
-    displayName: string | null;
-    photoURL: string | null;
-    getIdToken: (forceRefresh: boolean) => Promise<string>;
-  };
-  credentials: CalendarCredentials;
-  hasCalendarAccess: boolean;
-  scopes: string[];  // Changed from string to string[] for better typing
-}
 
 // Add required Google Calendar scopes
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');        // Read calendar events
@@ -62,57 +50,35 @@ googleProvider.addScope('https://www.googleapis.com/auth/calendar.calendarlist.r
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-// Optional: Add settings scope if you want to manage calendar settings
-// googleProvider.addScope('https://www.googleapis.com/auth/calendar.settings.readonly');
-
-// Configure sign in with custom parameters
-// Let Firebase handle the redirect URI internally
+// Configure Google Provider
 googleProvider.setCustomParameters({
   prompt: 'select_account',
   access_type: 'offline',
-  redirect_uri: getRedirectUrl() // Add this line
+  redirect_uri: getRedirectUrl()
 });
 
 // Enhanced sign in function with better error handling and logging
 export const signInWithGoogle = async () => {
   try {
-    // Clear any existing auth states and tokens
     sessionStorage.clear();
-    await firebaseSignOut(auth).catch(() => {}); // Silent cleanup
+    await firebaseSignOut(auth).catch(() => {});
 
-    // Validate required environment variables
-    if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-      throw new Error('Firebase configuration is missing');
-    }
-
-    console.log("Auth domain check:", {
-      configuredDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      currentUrl: window.location.href,
+    // Log the current configuration
+    console.log('Auth Configuration:', {
+      currentEnvironment: process.env.NODE_ENV,
+      redirectUrl: getRedirectUrl(),
       authDomain: auth.config.authDomain
     });
 
-    // Initiate the redirect sign-in
+    // Override auth domain for development
+    // if (process.env.NODE_ENV === 'development') {
+    //   auth.config.authDomain = 'localhost:8001';
+    // }
+
     await signInWithRedirect(auth, googleProvider);
-    console.log({auth});
-    console.log({googleProvider});
-    console.log("i'm gey")
     return true;
   } catch (error: any) {
-    console.error('Google sign-in error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // Enhanced error handling with specific error types
-    if (error.code === 'auth/popup-blocked') {
-      throw new Error('Sign-in popup was blocked. Please allow popups and try again.');
-    } else if (error.code === 'auth/cancelled-popup-request') {
-      throw new Error('Sign-in was cancelled.');
-    } else if (error.code === 'auth/network-request-failed') {
-      throw new Error('Network error. Please check your connection and try again.');
-    }
-    
+    console.error('Google sign-in error:', error);
     throw error;
   }
 };
@@ -121,9 +87,10 @@ export const signInWithGoogle = async () => {
 export const handleRedirectResult = async (): Promise<RedirectResult | null> => {
   try {
     console.log("Getting redirect result...");
+    console.log("Current URL:", window.location.href);
     
     const result = await getRedirectResult(auth);
-    console.log("Raw redirect result:", result ? "exists" : "null");
+    console.log("Redirect result:", result ? "exists" : "null");
     
     if (!result) {
       console.log("No redirect result - user hasn't completed sign-in");

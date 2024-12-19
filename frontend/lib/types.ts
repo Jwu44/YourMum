@@ -325,3 +325,16 @@ export interface GoogleCalendarEvent {
   recurrence?: string[]; 
 }
 
+export interface RedirectResult {
+  user: {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    getIdToken: (forceRefresh: boolean) => Promise<string>;
+  };
+  credentials: CalendarCredentials;
+  hasCalendarAccess: boolean;
+  scopes: string[];  // Changed from string to string[] for better typing
+}
+
