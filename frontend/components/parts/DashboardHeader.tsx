@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { format as dateFormat } from 'date-fns';
-import { Loader2, Sparkles, User, CalendarIcon, CreditCard, Settings, LogOut, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { Loader2, Sparkles, User, CalendarIcon, Settings, LogOut, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 
 // UI Components
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatDateToString, checkScheduleExists } from '@/lib/helper';
+import { checkScheduleExists } from '@/lib/helper';
 import { useAuth } from '@/lib/AuthContext';
 
 // Custom Components
@@ -27,7 +27,6 @@ import DashboardLeftCol from './DashboardLeftCol';
 import { FormData, Priority, Task } from '@/lib/types';
 
 interface DashboardHeaderProps {
-    currentDayIndex: number;
     selectedDate: Date | undefined;
     isLoadingSuggestions: boolean;
     isCalendarDrawerOpen: boolean;  // Updated prop name
@@ -55,7 +54,6 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
-    currentDayIndex,
     selectedDate,
     isLoadingSuggestions,
     isCalendarDrawerOpen,     // Updated from isDrawerOpen
@@ -328,8 +326,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   day_hidden: "invisible",
                 }}
                 components={{
-                  IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-                  IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+                  IconLeft: () => <ChevronLeft className="h-4 w-4" />,
+                  IconRight: () => <ChevronRight className="h-4 w-4" />,
                 }}
               />
             </div>
