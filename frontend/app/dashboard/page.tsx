@@ -63,7 +63,6 @@ const Dashboard: React.FC = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
   const [isCalendarDrawerOpen, setIsCalendarDrawerOpen] = useState(false);
-  const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -204,7 +203,7 @@ const Dashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const result = await submitFormData(state);
-      let scheduleContent = extractSchedule(result);
+      const scheduleContent = extractSchedule(result);
       console.log("Extracted schedule content:", scheduleContent);
 
       if (!scheduleContent) {
@@ -215,8 +214,6 @@ const Dashboard: React.FC = () => {
         });
         return;
       }
-      // Store the scheduleId from the result
-      setScheduleId(result.scheduleId);
 
       dispatch({ type: 'UPDATE_FIELD', field: 'response', value: scheduleContent });
       setShouldUpdateSchedule(true);
@@ -295,7 +292,12 @@ const Dashboard: React.FC = () => {
     state.scheduleId,
     isInitialSchedule,
     shouldUpdateSchedule,
-    isLoading
+    isLoading,
+    state.layout_preference?.structure,
+    state.layout_preference?.subcategory,
+    state.layout_preference?.timeboxed,
+    state.tasks,
+    toast
   ]);
   
 
@@ -393,7 +395,7 @@ const Dashboard: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, toast]);
+  }, [currentDayIndex, scheduleDays, toast, scheduleCache]);
 
   const handleScheduleTaskDelete = useCallback((taskId: string) => {
     setScheduleDays(prevDays => {
@@ -608,29 +610,6 @@ const handleRequestSuggestions = useCallback(async () => {
   toast
 ]);
 
-// Distribute suggestions between tasks when suggestions change
-useEffect(() => {
-  if (!suggestions.length) return;
-
-  const currentSchedule = scheduleDays[currentDayIndex];
-  if (!currentSchedule) return;
-
-  // Create a new map for suggestions
-  const newSuggestionsMap = new Map<string, AISuggestion[]>();
-  
-  suggestions.forEach(suggestion => {
-    const relevantTaskId = findRelevantTaskForSuggestion(suggestion, currentSchedule);
-    
-    if (!newSuggestionsMap.has(relevantTaskId)) {
-      newSuggestionsMap.set(relevantTaskId, []);
-    }
-    newSuggestionsMap.get(relevantTaskId)!.push(suggestion);
-  });
-
-  setSuggestionsMap(newSuggestionsMap);
-}, [suggestions, currentDayIndex, scheduleDays]);
-
-
 // Helper function to find relevant task for a suggestion
 const findRelevantTaskForSuggestion = useCallback((
   suggestion: AISuggestion, 
@@ -659,6 +638,75 @@ const findRelevantTaskForSuggestion = useCallback((
     default:
       // Default to schedule start
       return 'schedule-start';
+  }
+}, []);
+
+// Distribute suggestions between tasks when suggestions change
+useEffect(() => {
+  if (!suggestions.length) return;
+
+  const currentSchedule = scheduleDays[currentDayIndex];
+  if (!currentSchedule) return;
+
+  // Create a new map for suggestions
+  const newSuggestionsMap = new Map<string, AISuggestion[]>();
+  
+  suggestions.forEach(suggestion => {
+    const relevantTaskId = findRelevantTaskForSuggestion(suggestion, currentSchedule);
+    
+    if (!newSuggestionsMap.has(relevantTaskId)) {
+      newSuggestionsMap.set(relevantTaskId, []);
+    }
+    newSuggestionsMap.get(relevantTaskId)!.push(suggestion);
+  });
+
+  setSuggestionsMap(newSuggestionsMap);
+}, [suggestions, currentDayIndex, scheduleDays, findRelevantTaskForSuggestion]);
+
+// Helper function to find the best index to insert a suggestion
+const findTargetIndexForSuggestion = useCallback((
+  suggestion: AISuggestion, 
+  schedule: Task[]
+): number => {
+  // First try to find a task with matching categories
+  const categoryMatchIndex = schedule.findIndex(task => 
+    task.categories?.some(category => 
+      suggestion.categories.includes(category)
+    )
+  );
+  
+  if (categoryMatchIndex !== -1) {
+    // Insert after the matching task
+    return categoryMatchIndex + 1;
+  }
+
+  // If no category match, use suggestion type to determine placement
+  switch (suggestion.type) {
+    case 'Energy Optimization':
+      // Place near the start of the day
+      return 0;
+    
+    case 'Priority Rebalancing':
+      // Find first high-priority task
+      const priorityIndex = schedule.findIndex(task => 
+        task.categories?.includes('high-priority')
+      );
+      return priorityIndex !== -1 ? priorityIndex : 0;
+    
+    case 'Time Management':
+      // Place in the middle of the schedule
+      return Math.floor(schedule.length / 2);
+    
+    case 'Task Structure':
+      // Place near related tasks if possible
+      const structureIndex = schedule.findIndex(task => 
+        task.text.toLowerCase().includes(suggestion.text.toLowerCase())
+      );
+      return structureIndex !== -1 ? structureIndex + 1 : schedule.length;
+    
+    default:
+      // Default to end of schedule
+      return schedule.length;
   }
 }, []);
 
@@ -697,11 +745,9 @@ const handleAcceptSuggestion = useCallback(async (suggestion: AISuggestion) => {
     updatedSchedule.splice(targetIndex, 0, newTask);
     
     // Recalculate section_index for affected tasks
-    let currentSection = null;
     let sectionStartIndex = 0;
     updatedSchedule.forEach((task, index) => {
       if (task.is_section) {
-        currentSection = task.text;
         sectionStartIndex = index;
       }
       if (!task.is_section) {
@@ -748,7 +794,7 @@ const handleAcceptSuggestion = useCallback(async (suggestion: AISuggestion) => {
       variant: "destructive",
     });
   }
-}, [currentDayIndex, scheduleDays, toast]);
+}, [currentDayIndex, scheduleDays, toast, findTargetIndexForSuggestion]);
 
 // Handle suggestion rejection
 const handleRejectSuggestion = useCallback((suggestionId: string) => {
@@ -765,53 +811,6 @@ const handleRejectSuggestion = useCallback((suggestionId: string) => {
     return newMap;
   });
 }, []);
-
-  // Helper function to find the best index to insert a suggestion
-  const findTargetIndexForSuggestion = useCallback((
-    suggestion: AISuggestion, 
-    schedule: Task[]
-  ): number => {
-    // First try to find a task with matching categories
-    const categoryMatchIndex = schedule.findIndex(task => 
-      task.categories?.some(category => 
-        suggestion.categories.includes(category)
-      )
-    );
-    
-    if (categoryMatchIndex !== -1) {
-      // Insert after the matching task
-      return categoryMatchIndex + 1;
-    }
-
-    // If no category match, use suggestion type to determine placement
-    switch (suggestion.type) {
-      case 'Energy Optimization':
-        // Place near the start of the day
-        return 0;
-      
-      case 'Priority Rebalancing':
-        // Find first high-priority task
-        const priorityIndex = schedule.findIndex(task => 
-          task.categories?.includes('high-priority')
-        );
-        return priorityIndex !== -1 ? priorityIndex : 0;
-      
-      case 'Time Management':
-        // Place in the middle of the schedule
-        return Math.floor(schedule.length / 2);
-      
-      case 'Task Structure':
-        // Place near related tasks if possible
-        const structureIndex = schedule.findIndex(task => 
-          task.text.toLowerCase().includes(suggestion.text.toLowerCase())
-        );
-        return structureIndex !== -1 ? structureIndex + 1 : schedule.length;
-      
-      default:
-        // Default to end of schedule
-        return schedule.length;
-    }
-  }, []);
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
