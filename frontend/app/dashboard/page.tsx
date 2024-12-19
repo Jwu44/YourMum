@@ -817,7 +817,6 @@ const handleRejectSuggestion = useCallback((suggestionId: string) => {
       <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto main-content"> 
         {/* Header Component */}
         <DashboardHeader
-          currentDayIndex={currentDayIndex}
           selectedDate={date}
           isLoadingSuggestions={isLoadingSuggestions}
           isCalendarDrawerOpen={isCalendarDrawerOpen}  // Updated prop name

@@ -52,7 +52,7 @@ const EnergyPattern: React.FC = () => {
   
   return (
     <OnboardingContent
-      heading={<TypographyH3>How's your energy during the day?</TypographyH3>}
+    heading={<TypographyH3>How&apos;s your energy during the day?</TypographyH3>}
       description={
         <TypographyP>
           Understanding your unique energy patterns helps us create a schedule that maximizes your productivity.

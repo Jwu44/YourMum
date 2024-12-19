@@ -87,7 +87,7 @@ const StructurePreference: React.FC = () => {
       heading={<TypographyH3>Customize Your To-Do List</TypographyH3>}
       description={
         <TypographyP>
-          Let's understand your preferred daily structure.
+          Let&apos;s understand your preferred daily structure.
         </TypographyP>
       }
     >
