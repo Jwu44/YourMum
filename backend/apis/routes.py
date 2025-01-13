@@ -3,7 +3,7 @@ from backend.services.colab_integration import process_user_data, categorize_tas
 from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user
 import traceback
 from bson import ObjectId
-from datetime import datetime, UTC  
+from datetime import datetime, timezone 
 from backend.models.task import Task
 from typing import List, Dict, Any
 import json
@@ -66,10 +66,10 @@ def create_or_get_user():
             "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
             "role": "free",  # Default role for new users
             "calendarSynced": has_calendar_access,
-            "lastLogin": datetime.now(UTC), 
+            "lastLogin": datetime.now(timezone.utc), 
             "calendar": calendar_settings,
             "metadata": {
-                "lastModified": datetime.now(UTC)  # Use UTC here as well
+                "lastModified": datetime.now(timezone.utc)  # Use timezone.utc here as well
             }
         }
 
@@ -613,7 +613,7 @@ def api_store_microstep_feedback():
             'microstep_id': data['microstep_id'],
             'accepted': data['accepted'],
             'completion_order': data.get('completion_order'),  # Optional field
-            'timestamp': datetime.utcnow().isoformat()  # Add timestamp
+            'timestamp': datetime.timezone.utcnow().isoformat()  # Add timestamp
         }
 
         # Store feedback in database
@@ -656,7 +656,7 @@ def submit_microstep_feedback():
         
         # Add timestamp if not provided
         if 'timestamp' not in feedback_data:
-            feedback_data['timestamp'] = datetime.utcnow().isoformat()
+            feedback_data['timestamp'] = datetime.timezone.utcnow().isoformat()
             
         # Store feedback
         success = store_microstep_feedback(feedback_data)
@@ -762,7 +762,7 @@ def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) ->
                 "user_id": user_id,
                 "date": date,
                 **suggestion,
-               "created_at": datetime.now(UTC).isoformat() 
+               "created_at": datetime.now(timezone.utc).isoformat() 
             }
             suggestions_to_store.append(suggestion_doc)
         
