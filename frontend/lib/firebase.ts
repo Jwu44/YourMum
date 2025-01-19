@@ -1,10 +1,11 @@
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, FirebaseError } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
   signInWithRedirect,
   getRedirectResult,
-  connectAuthEmulator,
+  OAuthCredential,
+  // connectAuthEmulator,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
 
@@ -77,9 +78,14 @@ export const signInWithGoogle = async () => {
 
     await signInWithRedirect(auth, googleProvider);
     return true;
-  } catch (error: any) {
-    console.error('Google sign-in error:', error);
-    throw error;
+  } catch (error: unknown) {
+    if (error instanceof FirebaseError) {
+      console.error('Google sign-in error:', error);
+      throw error;
+    }
+    // Handle non-Firebase errors
+    console.error('Unexpected error during sign-in:', error);
+    throw new Error('Failed to sign in with Google');
   }
 };
 
@@ -111,7 +117,7 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
     }
 
     // Get and validate scopes granted by the user
-    const grantedScopes = ((credential as any)?.scope as string) || '';
+    const grantedScopes = ((credential as OAuthCredential & { scope?: string })?.scope) || '';
     const scopesArray = grantedScopes.split(' ').filter(Boolean); // Remove empty strings
     
     // Validate required scopes
@@ -158,23 +164,27 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       scopes: scopesArray
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Redirect result error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
+      code: error instanceof FirebaseError ? error.code : 'unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     });
 
     // Enhanced error handling with specific error types
-    if (error.code === 'auth/credential-already-in-use') {
-      throw new Error('This Google account is already linked to another user.');
-    } else if (error.code === 'auth/operation-not-allowed') {
-      throw new Error('Google sign-in is not enabled. Please contact support.');
-    } else if (error.code === 'auth/invalid-credential') {
-      throw new Error('The sign-in credential is invalid. Please try again.');
+    if (error instanceof FirebaseError) {
+      if (error.code === 'auth/credential-already-in-use') {
+        throw new Error('This Google account is already linked to another user.');
+      } else if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('Google sign-in is not enabled. Please contact support.');
+      } else if (error.code === 'auth/invalid-credential') {
+        throw new Error('The sign-in credential is invalid. Please try again.');
+      }
+      throw error;
     }
 
-    throw error;
+    // Handle non-Firebase errors
+    throw new Error('Failed to handle redirect result');
   }
 };
 
@@ -184,11 +194,11 @@ export const signOut = async () => {
     await firebaseSignOut(auth);
     // Clear any stored tokens or state
     sessionStorage.clear();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sign out error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
+      code: error instanceof FirebaseError ? error.code : 'unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     });
     throw new Error('Failed to sign out. Please try again.');
   }
