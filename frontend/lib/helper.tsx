@@ -134,9 +134,9 @@ export const parseScheduleToTasks = async (
 
   const scheduleContent = match[1].trim();
   const lines = scheduleContent.split('\n');
-  let currentSection = '';
-  let taskStack: Task[] = [];
-  let tasks: Task[] = [];
+  const taskStack: Task[] = [];
+  const tasks: Task[] = [];
+  let currentSection = '';;
   let sectionStartIndex = 0;
   
   // Use Set for efficient duplicate checking
@@ -149,7 +149,7 @@ export const parseScheduleToTasks = async (
     if (trimmedLine.match(/^(Early Morning|Morning|Afternoon|Evening|Work Day|Night|High|Medium|Low|Fun|Ambition|Relationships|Work|Exercise)/i)) {
       currentSection = trimmedLine;
       sectionStartIndex = index;
-      tasks.push(createSectionTask(trimmedLine, currentSection, sectionStartIndex));
+      tasks.push(createSectionTask(trimmedLine, currentSection));
     } else if (trimmedLine) {
       const indentLevel = line.search(/\S|$/) / 2;
       let taskText = trimmedLine.replace(/^□ /, '').replace(/^- /, '');
@@ -229,7 +229,7 @@ export const parseScheduleToTasks = async (
 };
 
 // Helper function to create section tasks
-const createSectionTask = (text: string, section: string, index: number): Task => ({
+const createSectionTask = (text: string, section: string ): Task => ({
   id: uuidv4(),
   text,
   categories: [],
@@ -299,8 +299,7 @@ const isValidRecurringTask = (task: Task): task is Task & {
 
 export const generateNextDaySchedule = async (
   currentSchedule: Task[],
-  userData: FormData,
-  previousSchedules: Task[][] = []
+  userData: FormData
 ): Promise<{
   success: boolean;
   schedule?: Task[];
@@ -508,8 +507,7 @@ export const generateNextDaySchedule = async (
     let formattedSchedule = layoutPreference.structure === 'structured'
       ? formatStructuredSchedule(
           combinedTasks.filter(task => !task.is_section),
-          currentSections,
-          layoutPreference
+          currentSections
         )
       : formatUnstructuredSchedule(combinedTasks, layoutPreference);
     // Step 7: Assign time slots if needed
@@ -631,7 +629,6 @@ const parseTimeString = (timeStr: string): number => {
 const formatStructuredSchedule = (
   tasks: Task[],
   sections: string[],
-  layoutPreference: LayoutPreference
 ): Task[] => {
   // First, sort calendar events by start time to handle overlapping events
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -761,11 +758,6 @@ const assignTimeSlots = (
   const tasksWithExistingTimes = schedule.filter(task => 
     !task.is_section && !task.gcal_event_id && task.start_time && task.end_time
   );
-  const sectionTasks = schedule.filter(task => task.is_section);
-
-  // Create array of available time slots
-  const workStart = parseTimeString(workStartTime);
-  const workEnd = parseTimeString(workEndTime);
   
   // Initialize available time slots
   let availableSlots: TimeSlot[] = [{
@@ -914,9 +906,6 @@ export const handleEnergyChange = (
 // Helper function to check if a task should recur on a given date
 export const shouldTaskRecurOnDate = (task: Task, targetDate: Date): boolean => {
   if (!task.is_recurring || typeof task.is_recurring !== 'object') return false;
-
-  const today = new Date();
-  const taskDate = task.start_date ? new Date(task.start_date) : today;
   
   switch (task.is_recurring.frequency) {
     case 'daily':
@@ -1292,7 +1281,6 @@ const convertGCalEventToTask = async (
     const eventName = event.summary;
     const eventStart = new Date(event.start.dateTime);
     const eventEnd = new Date(event.end.dateTime);
-    const targetDateObj = new Date(targetDate);
     
     // Adjust times for events spanning days
     let startTime: string | undefined;
