@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { FormData, FormAction, FormContextType } from './types';
+import { FormData, FormAction, FormContextType, Task } from './types';
 
 // Create the initial state
 const initialState: FormData = {
@@ -25,11 +25,20 @@ const initialState: FormData = {
   }
 };
 
+type FormDataValue = string | string[] | Record<string, string> | Task[];
+
 // Helper function to set nested properties
-const setNestedProperty = (obj: any, path: string, value: any): any => {
+const setNestedProperty = (
+  obj: FormData,
+  path: string,
+  value: FormDataValue
+): FormData => {
   const keys = path.split('.');
   const lastKey = keys.pop()!;
-  const lastObj = keys.reduce((obj, key) => obj[key] = obj[key] || {}, obj);
+  const lastObj = keys.reduce((current: any, key: string) => {
+    current[key] = current[key] || {};
+    return current[key];
+  }, obj);
   lastObj[lastKey] = value;
   return obj;
 };
