@@ -48,9 +48,15 @@ export const submitFormData = async (formData: FormData) => {
   }
 };
 
-export const extractSchedule = (response: any): string => {
-  if (response && typeof response === 'object' && response.schedule) {
-    return response.schedule;
+export const extractSchedule = (response: ScheduleResponse | string): string => {
+  if (response && typeof response === 'object' && 'tasks' in response) {
+    // Convert tasks array to schedule string format
+    return response.tasks
+      .map(task => {
+        const indent = '  '.repeat(task.level || 0);
+        return `${indent}${task.is_section ? task.text : `- ${task.text}`}`;
+      })
+      .join('\n');
   }
   
   if (typeof response === 'string') {
