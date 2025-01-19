@@ -43,7 +43,7 @@ async function verifyAuthAndGetUser(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Verify the Firebase token and get user data
-    const { token, decodedToken } = await verifyAuthAndGetUser(request);
+    const { token } = await verifyAuthAndGetUser(request);
     const userData = await request.json();
 
     // Validate required fields
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Sign out
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     // Clear the session cookie
     cookies().delete('session');
