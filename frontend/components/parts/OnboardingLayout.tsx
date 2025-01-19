@@ -53,7 +53,7 @@ export const OnboardingLayout: React.FC<{ children: React.ReactNode }> = ({ chil
   const handleBack = useCallback(() => {
     const currentStepNumber = ONBOARDING_ROUTES[pathname as OnboardingRoute];
     const previousRoute = Object.entries(ONBOARDING_ROUTES)
-      .find(([_, step]) => step === currentStepNumber - 1)?.[0];
+      .find(([route]) => ONBOARDING_ROUTES[route as OnboardingRoute] === currentStepNumber - 1)?.[0];
     
     if (previousRoute) {
       router.push(previousRoute);
