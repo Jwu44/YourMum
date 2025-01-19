@@ -17,9 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import TaskEditDrawer from './TaskEditDrawer';
 import { Task } from '../../lib/types';
 import { 
-  handleMicrostepDecomposition, 
-  handleMicrostepSelection,
-  checkTaskCompletion 
+  handleMicrostepDecomposition
 } from '../../lib/helper';
 import { isBrowser } from '../../lib/utils';
 

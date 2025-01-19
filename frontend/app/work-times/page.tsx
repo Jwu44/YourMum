@@ -13,8 +13,6 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { ProtectedRoute } from '@/components/parts/ProtectedRoute';
-import { PickerChangeHandlerContext } from '@mui/x-date-pickers/models';
-import { TimeValidationError } from '@mui/x-date-pickers';
 
 // Initialize dayjs plugins
 dayjs.extend(customParseFormat);
@@ -137,8 +135,7 @@ const WorkTimes = () => {
    * Validates and formats time input before updating state
    */
   const handleTimeChange = useCallback((name: TimeFieldName) => (
-    newValue: dayjs.Dayjs | null,
-    context?: PickerChangeHandlerContext<TimeValidationError>
+    newValue: dayjs.Dayjs | null
   ) => {
     try {
       if (newValue) {
