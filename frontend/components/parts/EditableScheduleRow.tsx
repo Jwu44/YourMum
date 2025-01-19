@@ -53,9 +53,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onUpdateTask, 
   onDeleteTask,
   moveTask,
-  isSection,
-  children,
-  allTasks
+  isSection
 }) => {
   // Local UI states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -167,7 +165,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const mouseY = e.clientY - rect.top;
       const threshold = rect.height / 3;
 
-      let newDragState: DragState = {
+      const newDragState: DragState = {
         isDragTarget: true,
         dragType: null,
         indentationLevel: maxIndentLevel,
