@@ -1,4 +1,4 @@
-import { CalendarConnection } from '@/components/CalendarConnection';
+import { CalendarConnection } from '@/components/parts/CalendarConnection';
 
 export default function SettingsPage() {
   return (
