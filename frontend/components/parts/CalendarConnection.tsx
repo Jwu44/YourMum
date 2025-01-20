@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { calendarApi } from '@/lib/calendarApi';
+import { tokenService } from '@/lib/tokenService';
 
 interface Calendar {
   id: string;
@@ -9,7 +10,7 @@ interface Calendar {
 }
 
 export function CalendarConnection() {
-  const { authState, calendarState, connectCalendar, disconnectCalendar } = useAuth();
+  const { user, calendarState, connectCalendar, disconnectCalendar } = useAuth();
   const [availableCalendars, setAvailableCalendars] = useState<Calendar[]>([]);
   const [selectedCalendars, setSelectedCalendars] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,17 +20,20 @@ export function CalendarConnection() {
     async function fetchAvailableCalendars() {
       try {
         setLoading(true);
-        const token = await tokenService.getValidAccessToken(authState.user!.googleId);
+        const token = await tokenService.getValidAccessToken(user!.googleId);
         if (!token) return;
 
         const result = await calendarApi.verifyCalendarPermissions(token);
-        setAvailableCalendars(result.availableCalendars);
-        
-        // Auto-select primary calendar
-        const primaryCalendar = result.availableCalendars.find(cal => cal.primary);
-        if (primaryCalendar) {
-          setSelectedCalendars([primaryCalendar.id]);
+        if (result.availableCalendars) {
+          setAvailableCalendars(result.availableCalendars);
+          
+          // Auto-select primary calendar
+          const primaryCalendar = result.availableCalendars.find(cal => cal.primary);
+          if (primaryCalendar) {
+            setSelectedCalendars([primaryCalendar.id]);
+          }
         }
+        
       } catch (error) {
         console.error('Error fetching calendars:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch calendars');
@@ -38,10 +42,10 @@ export function CalendarConnection() {
       }
     }
 
-    if (authState.user && !calendarState.connected) {
+    if (user && !calendarState.connected) {
       fetchAvailableCalendars();
     }
-  }, [authState.user, calendarState.connected]);
+  }, [user, calendarState.connected]);
 
   const handleCalendarSelect = (calendarId: string) => {
     setSelectedCalendars(prev => 
@@ -60,7 +64,7 @@ export function CalendarConnection() {
     }
   };
 
-  if (!authState.user) {
+  if (!user) {
     return null;
   }
 
