@@ -440,8 +440,7 @@ const Dashboard: React.FC = () => {
         const currentSchedule = scheduleDays[currentDayIndex];
         const result = await generateNextDaySchedule(
           currentSchedule,
-          state,
-          scheduleDays.slice(0, currentDayIndex + 1)
+          state
         );
         
         if (result.success && result.schedule) {
