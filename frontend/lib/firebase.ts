@@ -126,9 +126,6 @@ export const signInWithGoogle = async () => {
       throw new Error('Firebase auth domain not configured');
     }
 
-    // Set the redirect URL to the Firebase auth domain
-    const redirectUrl = new URL(`https://${firebaseAuthDomain}`);
-
     // Update the provider config
     googleProvider.setCustomParameters({
       prompt: 'select_account',
