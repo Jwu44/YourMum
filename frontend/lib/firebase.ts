@@ -33,11 +33,25 @@ const auth = getAuth(app);
 // ;
 
 /**
+ * Check if code is running in browser environment
+ * Returns true if window is defined (client-side)
+ */
+export const isBrowser = (): boolean => {
+  return typeof window !== 'undefined';
+};
+
+/**
  * Get the appropriate redirect URL based on environment and context.
  * Handles preview deployments, development, and production environments.
  */
 const getRedirectUrl = (): string => {
   try {
+    // Check if we're in the browser environment
+    if (!isBrowser()) {
+      // Return null or default value when running server-side
+      return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
+    }
+
     // Get the current hostname and full URL for logging
     const currentHostname = window.location.hostname;
     const currentUrl = window.location.href;
@@ -56,7 +70,7 @@ const getRedirectUrl = (): string => {
 
     // For local development
     if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:8000';
+      return 'http://localhost:3000';
     }
 
     // For production
@@ -69,8 +83,8 @@ const getRedirectUrl = (): string => {
     return `https://${prodDomain}`;
   } catch (error) {
     console.error('Error determining redirect URL:', error);
-    // Fallback to current origin as last resort
-    return window.location.origin;
+    // Fallback to auth domain as last resort
+    return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
   }
 };
 
@@ -98,6 +112,12 @@ googleProvider.setCustomParameters({
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting sign-in process...");
+
+    // Check if in browser environment
+    if (!isBrowser()) {
+      throw new Error('Sign in can only be initiated in browser environment');
+    }
+
     sessionStorage.clear();
     await firebaseSignOut(auth).catch(() => {});
 
@@ -108,7 +128,6 @@ export const signInWithGoogle = async () => {
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      // Set redirect to our auth handler instead of Firebase's
       redirect_uri: `${currentUrl}/auth/handler`
     });
 

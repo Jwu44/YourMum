@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { handleRedirectResult } from '@/lib/firebase';
+import { isBrowser } from '@/lib/utils';
 import type { RedirectResult } from '@/lib/types';
 
 export default function AuthHandler(): JSX.Element {
@@ -17,6 +18,11 @@ export default function AuthHandler(): JSX.Element {
 
     const processRedirect = async () => {
       try {
+        // Ensure we're in browser environment
+        if (!isBrowser()) {
+          throw new Error('Auth handler must run in browser environment');
+        }
+
         console.log("Processing auth redirect...");
         console.log("URL parameters:", new URLSearchParams(window.location.search));
 
