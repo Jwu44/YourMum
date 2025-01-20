@@ -7,7 +7,8 @@ import { calendarApi } from './calendarApi';
 import { 
   AuthContextType, 
   AuthState,  
-  AuthResponse
+  AuthResponse,
+  UserDocument
 } from '@/lib/types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -22,8 +23,11 @@ interface CalendarAuthState {
 
 // Extended context type to include calendar state
 interface ExtendedAuthContextType extends AuthContextType {
+  user: UserDocument | null;
+  loading: boolean;
+  error: string | null;
   calendarState: CalendarAuthState;
-  connectCalendar: (selectedCalendars: string[]) => Promise<void>;  // Updated signature
+  connectCalendar: (selectedCalendars: string[]) => Promise<void>;
   disconnectCalendar: () => Promise<void>;
   refreshCalendarToken: () => Promise<void>;
 }
