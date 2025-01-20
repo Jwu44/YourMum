@@ -509,7 +509,7 @@ export const generateNextDaySchedule = async (
           combinedTasks.filter(task => !task.is_section),
           currentSections
         )
-      : formatUnstructuredSchedule(combinedTasks, layoutPreference);
+      : formatUnstructuredSchedule(combinedTasks);
     // Step 7: Assign time slots if needed
     if (layoutPreference.timeboxed === 'timeboxed') {
       formattedSchedule = assignTimeSlots(
@@ -714,8 +714,7 @@ const formatStructuredSchedule = (
 };
 
 const formatUnstructuredSchedule = (
-  tasks: Task[],
-  layoutPreference: LayoutPreference
+  tasks: Task[]
 ): Task[] => {
   // Sort tasks: calendar events first (sorted by time), then other tasks
   return tasks
