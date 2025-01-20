@@ -112,8 +112,7 @@ googleProvider.setCustomParameters({
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting sign-in process...");
-
-    // Check if in browser environment
+    
     if (!isBrowser()) {
       throw new Error('Sign in can only be initiated in browser environment');
     }
@@ -121,22 +120,32 @@ export const signInWithGoogle = async () => {
     sessionStorage.clear();
     await firebaseSignOut(auth).catch(() => {});
 
-    // Get the current URL for dynamic redirect
-    const currentUrl = window.location.origin;
-    
-    // Update the redirect URL in the provider
+    // Important: Use Firebase domain for auth handling
+    const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    if (!firebaseAuthDomain) {
+      throw new Error('Firebase auth domain not configured');
+    }
+
+    // Set the redirect URL to the Firebase auth domain
+    const redirectUrl = new URL(`https://${firebaseAuthDomain}`);
+
+    // Update the provider config
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      redirect_uri: `${currentUrl}/auth/handler`
+      // Use Firebase's auth handler
+      redirect_uri: `https://${firebaseAuthDomain}/__/auth/handler`,
+      // Set where to redirect after auth completes
+      state: JSON.stringify({
+        returnTo: window.location.origin + '/work-times'
+      })
     });
 
-    // Configure auth instance
-    auth.config.authDomain = window.location.host;
-
+    // Log configuration for debugging
     console.log('Auth Configuration:', {
-      redirectUrl: `${currentUrl}/auth/handler`,
-      authDomain: auth.config.authDomain
+      firebaseAuthDomain,
+      redirectUri: `https://${firebaseAuthDomain}/__/auth/handler`,
+      returnTo: window.location.origin + '/work-times'
     });
 
     await signInWithRedirect(auth, googleProvider);
