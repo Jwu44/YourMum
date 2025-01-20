@@ -32,58 +32,101 @@ const auth = getAuth(app);
 // }
 // ;
 
-// Update getRedirectUrl to handle development environment properly
+/**
+ * Get the appropriate redirect URL based on environment and context.
+ * Handles preview deployments, development, and production environments.
+ */
 const getRedirectUrl = (): string => {
-  if (process.env.NODE_ENV === 'development') {
-    // Use HTTPS localhost
-    return 'https://localhost:8001';
+  try {
+    // Get the current hostname and full URL for logging
+    const currentHostname = window.location.hostname;
+    const currentUrl = window.location.href;
+    
+    console.log('Determining redirect URL:', {
+      hostname: currentHostname,
+      fullUrl: currentUrl,
+      nodeEnv: process.env.NODE_ENV,
+      vercelUrl: process.env.NEXT_PUBLIC_VERCEL_URL
+    });
+
+    // For Vercel preview deployments
+    if (currentHostname.includes('vercel.app')) {
+      return `https://${currentHostname}`;
+    }
+
+    // For local development
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:8000';
+    }
+
+    // For production
+    const prodDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    if (!prodDomain) {
+      console.error('Production domain not configured');
+      throw new Error('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is not configured');
+    }
+
+    return `https://${prodDomain}`;
+  } catch (error) {
+    console.error('Error determining redirect URL:', error);
+    // Fallback to current origin as last resort
+    return window.location.origin;
   }
-  return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
 };
 
-// Configure Google Auth Provider with Calendar scopes
+// Update the Google Provider configuration while preserving existing scopes
 const googleProvider = new GoogleAuthProvider();
 
-// Add required Google Calendar scopes
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');        // Read calendar events
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.events.readonly'); // Read event details
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.calendarlist.readonly'); // Read list of calendars
+// Preserve existing scopes
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.calendarlist.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-// Configure Google Provider
+// Update custom parameters with enhanced error handling
 googleProvider.setCustomParameters({
   prompt: 'select_account',
   access_type: 'offline',
-  redirect_uri: getRedirectUrl()
+  redirect_uri: `${getRedirectUrl()}/auth/handler`,
+  // Add additional security parameters
+  state: crypto.randomUUID(), // Prevent CSRF attacks
+  include_granted_scopes: 'true' // Ensure we get all granted scopes
 });
 
 // Enhanced sign in function with better error handling and logging
 export const signInWithGoogle = async () => {
   try {
+    console.log("Starting sign-in process...");
     sessionStorage.clear();
     await firebaseSignOut(auth).catch(() => {});
 
-    // Log the current configuration
+    // Get the current URL for dynamic redirect
+    const currentUrl = window.location.origin;
+    
+    // Update the redirect URL in the provider
+    googleProvider.setCustomParameters({
+      prompt: 'select_account',
+      access_type: 'offline',
+      // Set redirect to our auth handler instead of Firebase's
+      redirect_uri: `${currentUrl}/auth/handler`
+    });
+
+    // Configure auth instance
+    auth.config.authDomain = window.location.host;
+
     console.log('Auth Configuration:', {
-      currentEnvironment: process.env.NODE_ENV,
-      redirectUrl: getRedirectUrl(),
+      redirectUrl: `${currentUrl}/auth/handler`,
       authDomain: auth.config.authDomain
     });
 
-    // Override auth domain for development
-    // if (process.env.NODE_ENV === 'development') {
-    //   auth.config.authDomain = 'localhost:8001';
-    // }
-
     await signInWithRedirect(auth, googleProvider);
     return true;
-  } catch (error: unknown) {
+  } catch (error) {
     if (error instanceof FirebaseError) {
       console.error('Google sign-in error:', error);
       throw error;
     }
-    // Handle non-Firebase errors
     console.error('Unexpected error during sign-in:', error);
     throw new Error('Failed to sign in with Google');
   }
