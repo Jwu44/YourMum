@@ -1,53 +1,42 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { handleRedirectResult } from '@/lib/firebase';
-import { isBrowser } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function AuthHandler() {
   const router = useRouter();
-  const redirectAttempted = useRef(false);
+  const { loading, error } = useAuth();
 
   useEffect(() => {
-    if (!isBrowser() || redirectAttempted.current) return;
-    redirectAttempted.current = true;
+    // handleRedirectResult is now handled in AuthContext
+    // This component just needs to show loading/error states
 
-    const processAuth = async () => {
-      try {
-        const result = await handleRedirectResult();
-        if (result) {
-          // Get return URL from state if present
-          let returnTo = '/work-times'; // default
-          try {
-            const state = JSON.parse(
-              decodeURIComponent(
-                new URLSearchParams(window.location.search).get('state') || '{}'
-              )
-            );
-            if (state.returnTo) {
-              returnTo = state.returnTo;
-            }
-          } catch (e) {
-            console.error('Error parsing state:', e);
-          }
+    if (error) {
+      console.error('Auth handler error:', error);
+      router.push('/home?error=' + encodeURIComponent(error));
+    }
+  }, [error, router]);
 
-          router.push(returnTo);
-        } else {
-          router.push('/home');
-        }
-      } catch (error) {
-        console.error('Auth handling error:', error);
-        router.push('/home');
-      }
-    };
+  if (loading) {
+    return (
+      <div className="auth-loading">
+        <p>Completing sign in...</p>
+        {/* Add your loading spinner component */}
+      </div>
+    );
+  }
 
-    processAuth();
-  }, [router]);
+  if (error) {
+    return (
+      <div className="auth-error">
+        <p>Failed to complete sign in</p>
+        <button onClick={() => router.push('/home')}>
+          Return Home
+        </button>
+      </div>
+    );
+  }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
-    </div>
-  );
+  return null;
 }

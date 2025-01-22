@@ -30,116 +30,213 @@ const auth = getAuth(app);
 //   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
 //   console.log('Connected to Auth Emulator');
 // }
-// ;
 
 /**
  * Check if code is running in browser environment
- * Returns true if window is defined (client-side)
+ * @returns boolean indicating if window is defined
  */
 export const isBrowser = (): boolean => {
   return typeof window !== 'undefined';
 };
 
 /**
- * Get the appropriate redirect URL based on environment and context.
- * Handles preview deployments, development, and production environments.
+ * Manages authentication state and URL handling across the auth flow
+ * Provides methods for state generation, storage, and validation
+ */
+class AuthStateManager {
+  private static readonly STATE_KEY = 'firebase_auth_state';
+  private static readonly RETURN_URL_KEY = 'firebase_auth_return_url';
+  private static readonly STATE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  
+  /**
+   * Generates and stores a new auth state token
+   * @returns string UUID for state verification
+   */
+  static generateState(): string {
+    const state = crypto.randomUUID();
+    if (isBrowser()) {
+      const stateData = {
+        value: state,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this.STATE_KEY, JSON.stringify(stateData));
+    }
+    return state;
+  }
+
+  /**
+   * Retrieves stored state if valid and not expired
+   * @returns string | null Stored state or null if invalid/expired
+   */
+  static getStoredState(): string | null {
+    try {
+      if (!isBrowser()) return null;
+      
+      const storedData = localStorage.getItem(this.STATE_KEY);
+      if (!storedData) return null;
+
+      const { value, timestamp } = JSON.parse(storedData);
+      
+      // Check if state has expired
+      if (Date.now() - timestamp > this.STATE_TIMEOUT) {
+        this.clearState();
+        return null;
+      }
+
+      return value;
+    } catch (error) {
+      console.error('Error retrieving stored state:', error);
+      this.clearState();
+      return null;
+    }
+  }
+
+  /**
+   * Clears all auth-related storage
+   */
+  static clearState(): void {
+    if (isBrowser()) {
+      localStorage.removeItem(this.STATE_KEY);
+      localStorage.removeItem(this.RETURN_URL_KEY);
+    }
+  }
+
+  /**
+   * Stores return URL for post-auth redirect
+   * @param url - URL to redirect to after auth
+   */
+  static storeReturnUrl(url: string): void {
+    if (isBrowser()) {
+      localStorage.setItem(this.RETURN_URL_KEY, url);
+    }
+  }
+
+  /**
+   * Retrieves stored return URL
+   * @returns string | null Stored URL or null
+   */
+  static getReturnUrl(): string | null {
+    return isBrowser() ? localStorage.getItem(this.RETURN_URL_KEY) : null;
+  }
+
+  /**
+   * Validates the authentication state from URL parameters
+   * Handles both Firebase and Google auth state formats
+   * @param urlParams - URL search parameters
+   * @returns boolean indicating if state is valid
+   */
+  static validateState(urlParams: URLSearchParams): boolean {
+    try {
+      // Get state from URL, handling both Firebase and Google auth formats
+      const returnedState = urlParams.get('state') || 
+                          urlParams.get('firebase_auth_state');
+      
+      const storedState = this.getStoredState();
+      
+      console.log('Auth State Validation:', {
+        returnedState,
+        storedState,
+        urlParams: Object.fromEntries(urlParams.entries())
+      });
+
+      // If no stored state, might be initial auth request
+      if (!storedState) return true;
+
+      // If we have stored state, must match returned state
+      return storedState === returnedState;
+    } catch (error) {
+      console.error('Error validating auth state:', error);
+      return false;
+    }
+  }
+}
+
+/**
+ * Get redirect URL based on environment and context
+ * Handles development, preview, and production environments
+ * @returns string URL for auth redirect
+ * @throws Error if Firebase auth domain is not configured
  */
 const getRedirectUrl = (): string => {
   try {
-    // Check if we're in the browser environment
     if (!isBrowser()) {
       return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
     }
 
-    // Always use Firebase auth domain for auth handling
     const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
     if (!firebaseAuthDomain) {
       throw new Error('Firebase auth domain not configured');
     }
 
-    // Get the return URL (where to redirect after auth)
-    let returnUrl;
-    if (process.env.NODE_ENV === 'development') {
-      returnUrl = 'http://localhost:8000';
-    } else {
-      // For preview and production, use the current URL
-      returnUrl = window.location.origin;
+    // Store current URL as return destination
+    const currentUrl = window.location.origin;
+    AuthStateManager.storeReturnUrl(currentUrl);
+
+    // For preview deployments, ensure domain is authorized
+    if (currentUrl.includes('vercel.app')) {
+      console.log('Vercel preview deployment detected:', {
+        currentUrl,
+        firebaseAuthDomain,
+        nodeEnv: process.env.NODE_ENV
+      });
     }
 
-    // Store the return URL in localStorage before redirect
-    if (isBrowser()) {
-      localStorage.setItem('authReturnUrl', returnUrl);
-    }
-
-    // Always return Firebase auth domain
     return `https://${firebaseAuthDomain}`;
   } catch (error) {
     console.error('Error determining redirect URL:', error);
-    return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
+    throw error;
   }
 };
 
-// Update the Google Provider configuration while preserving existing scopes
+// Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
 
-// Preserve existing scopes
+// Add required Google Calendar scopes
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/calendar.calendarlist.readonly');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-// Update custom parameters with enhanced error handling
-googleProvider.setCustomParameters({
-  prompt: 'select_account',
-  access_type: 'offline',
-  redirect_uri: `${getRedirectUrl()}/auth/handler`,
-  // Add additional security parameters
-  state: crypto.randomUUID(), // Prevent CSRF attacks
-  include_granted_scopes: 'true' // Ensure we get all granted scopes
-});
-
-// Enhanced sign in function with better error handling and logging
+/**
+ * Enhanced sign-in with Google
+ * Handles state management and includes comprehensive error handling
+ * @returns Promise<boolean> indicating success
+ * @throws Error if sign-in fails
+ */
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting sign-in process...");
-    console.log('Local storage on sign-in:', {
-      contents: { ...localStorage }
-    });
+    
     if (!isBrowser()) {
       throw new Error('Sign in can only be initiated in browser environment');
     }
 
-    // Clear only auth-related storage
-    localStorage.removeItem('firebase:authUser');
+    // Clear any existing auth state and sign out
+    AuthStateManager.clearState();
     await firebaseSignOut(auth).catch(() => {});
 
-    const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-    if (!firebaseAuthDomain) {
-      throw new Error('Firebase auth domain not configured');
-    }
-
-    // Store current timestamp as state
-    const stateToken = Date.now().toString();
-    localStorage.setItem('authState', stateToken);
-
-    // Update the provider config
+    const state = AuthStateManager.generateState();
+    
+    // Update the provider config with enhanced security parameters
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      redirect_uri: `https://${firebaseAuthDomain}/__/auth/handler`,
-      state: stateToken
+      redirect_uri: `${getRedirectUrl()}/__/auth/handler`,
+      state,
+      include_granted_scopes: 'true'
     });
 
     console.log('Auth Configuration:', {
-      firebaseAuthDomain,
-      redirectUri: `https://${firebaseAuthDomain}/__/auth/handler`,
-      stateToken
+      redirectUri: `${getRedirectUrl()}/__/auth/handler`,
+      state,
+      timestamp: new Date().toISOString()
     });
 
     await signInWithRedirect(auth, googleProvider);
     return true;
   } catch (error) {
+    AuthStateManager.clearState(); // Clean up on error
     if (error instanceof FirebaseError) {
       console.error('Google sign-in error:', error);
       throw error;
@@ -149,24 +246,28 @@ export const signInWithGoogle = async () => {
   }
 };
 
-// Enhanced redirect result handler with better type safety and error handling
+/**
+ * Handle redirect result with enhanced error handling and state validation
+ * @returns Promise<RedirectResult | null> Auth result or null if no redirect
+ * @throws Error if redirect handling fails or state is invalid
+ */
 export const handleRedirectResult = async (): Promise<RedirectResult | null> => {
   try {
+    console.log("Getting redirect result...");
+    console.log("Current URL:", window.location.href);
+    
     const urlParams = new URLSearchParams(window.location.search);
-    console.log('Auth state check:', {
-      storedState: localStorage.getItem('authState'),
-      returnedState: urlParams.get('state')
-    });
-    // Verify state token
-    const stateToken = localStorage.getItem('authState');
-    const returnedState = urlParams.get('state');
-
-    if (!stateToken || stateToken !== returnedState) {
-      console.error('State mismatch or missing');
+    
+    // Validate state before proceeding
+    if (!AuthStateManager.validateState(urlParams)) {
+      console.error('Invalid authentication state');
+      AuthStateManager.clearState();
       throw new Error('Invalid authentication state');
     }
 
     const result = await getRedirectResult(auth);
+    console.log("Redirect result:", result ? "exists" : "null");
+    
     if (!result) {
       console.log("No redirect result - user hasn't completed sign-in");
       return null;
@@ -187,7 +288,7 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
 
     // Get and validate scopes granted by the user
     const grantedScopes = ((credential as OAuthCredential & { scope?: string })?.scope) || '';
-    const scopesArray = grantedScopes.split(' ').filter(Boolean); // Remove empty strings
+    const scopesArray = grantedScopes.split(' ').filter(Boolean);
     
     // Validate required scopes
     const requiredScopes = [
@@ -207,6 +308,12 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       });
     }
 
+    // Get return URL before clearing state
+    const returnUrl = AuthStateManager.getReturnUrl();
+    
+    // Clear auth state after successful authentication
+    AuthStateManager.clearState();
+
     console.log("Auth successful:", {
       uid: result.user.uid,
       email: result.user.email,
@@ -215,14 +322,9 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       hasRequiredScopes
     });
 
-    // Clear auth state after successful authentication
-    localStorage.removeItem('authState');
-
-    // Get stored return URL
-    const returnUrl = localStorage.getItem('authReturnUrl');
+    // Handle redirect to return URL if available
     if (returnUrl) {
       window.location.href = `${returnUrl}/work-times`;
-      localStorage.removeItem('authReturnUrl');
     }
 
     // Return the authentication result with necessary information
@@ -243,37 +345,28 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       scopes: scopesArray
     };
 
-  } catch (error: unknown) {
+  } catch (error) {
+    AuthStateManager.clearState(); // Clean up on error
     console.error('Redirect result error:', {
       code: error instanceof FirebaseError ? error.code : 'unknown',
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     });
 
-    // Enhanced error handling with specific error types
-    if (error instanceof FirebaseError) {
-      if (error.code === 'auth/credential-already-in-use') {
-        throw new Error('This Google account is already linked to another user.');
-      } else if (error.code === 'auth/operation-not-allowed') {
-        throw new Error('Google sign-in is not enabled. Please contact support.');
-      } else if (error.code === 'auth/invalid-credential') {
-        throw new Error('The sign-in credential is invalid. Please try again.');
-      }
-      throw error;
-    }
-
-    // Handle non-Firebase errors
-    throw new Error('Failed to handle redirect result');
+    throw error instanceof Error ? error : new Error('Failed to handle redirect result');
   }
 };
 
-// Enhanced sign out function with better error handling
+/**
+ * Enhanced sign out function with better error handling
+ * Clears all auth state and session data
+ * @throws Error if sign out fails
+ */
 export const signOut = async () => {
   try {
     await firebaseSignOut(auth);
-    // Clear any stored tokens or state
-    sessionStorage.clear();
-  } catch (error: unknown) {
+    AuthStateManager.clearState();
+  } catch (error) {
     console.error('Sign out error:', {
       code: error instanceof FirebaseError ? error.code : 'unknown',
       message: error instanceof Error ? error.message : 'Unknown error',

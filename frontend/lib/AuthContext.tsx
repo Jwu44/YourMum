@@ -1,14 +1,15 @@
 "use client"; 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, signInWithGoogle, signOut, handleRedirectResult } from '@/lib/firebase';
+import { auth, signInWithGoogle, signOut, handleRedirectResult, isBrowser } from '@/lib/firebase';
 import { tokenService } from './tokenService';
 import { calendarApi } from './calendarApi';
 import { 
   AuthContextType, 
   AuthState,  
   AuthResponse,
-  UserDocument
+  UserDocument,
+  FirebaseUser
 } from '@/lib/types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -50,55 +51,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const router = useRouter();
-  const processed = React.useRef(false);
 
-  // Single source of truth for authentication flow
+  // Remove processed.current as it's handled by AuthStateManager now
   useEffect(() => {
     const handleRedirectAuth = async () => {
       try {
-        if (processed.current) return;
-        processed.current = true;
-
         console.log("Checking for redirect authentication...");
-        console.log("Current URL:", window.location.href);
+        
+        // Clear any existing error state before handling redirect
+        setAuthState(prev => ({ ...prev, error: null }));
+        
         const redirectResult = await handleRedirectResult();
-        console.log("Redirect result:", redirectResult); // Add this
         
         if (redirectResult) {
           console.log("Processing redirect result");
-          // Store calendar tokens if available
-          if (redirectResult.credentials) {
-            await tokenService.storeCalendarTokens(
-              redirectResult.user.uid,
-              redirectResult.credentials
+          
+          try {
+            // Store calendar tokens if available
+            if (redirectResult.credentials) {
+              await tokenService.storeCalendarTokens(
+                redirectResult.user.uid,
+                redirectResult.credentials
+              );
+            }
+            
+            // Create/update user in database
+            await syncUserWithDatabase(
+              redirectResult.user,
+              redirectResult.hasCalendarAccess
             );
+            
+            // State updates will trigger necessary redirects
+          } catch (syncError) {
+            console.error('Error during post-redirect sync:', syncError);
+            setAuthState(prev => ({
+              ...prev,
+              loading: false,
+              error: syncError instanceof Error ? 
+                syncError.message : 
+                'Failed to complete authentication'
+            }));
           }
-          
-          // Create/update user in database
-          await syncUserWithDatabase(
-            redirectResult.user,
-            redirectResult.hasCalendarAccess
-          );
-          
-          // Navigate to work-times page
-          router.push('/work-times');
         }
       } catch (error) {
         console.error('Redirect handling error:', error);
         setAuthState(prev => ({
           ...prev,
           loading: false,
-          error: error instanceof Error ? error.message : 'Authentication error'
+          error: error instanceof Error ? 
+            error.message : 
+            'Authentication error'
         }));
+        
+        // Redirect to home on auth error
+        router.push('/home');
       }
     };
 
-    // Check for redirect result on mount
-    handleRedirectAuth();
-
-    return () => {
-      processed.current = false;
-    };
+    // Only handle redirect in browser environment
+    if (isBrowser()) {
+      handleRedirectAuth();
+    }
   }, [router]);
 
   // Firebase auth state listener - remains separate to handle ongoing auth state
@@ -136,83 +149,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Enhanced syncUserWithDatabase function
   const syncUserWithDatabase = async (
-    firebaseUser: {
-      uid: string;
-      email: string | null;
-      displayName: string | null;
-      photoURL: string | null;
-      getIdToken: (forceRefresh: boolean) => Promise<string>;
-    },
+    firebaseUser: FirebaseUser,  // Use the proper type
     hasCalendarAccess: boolean = false
   ): Promise<void> => {
-      try {
-          const token = await firebaseUser.getIdToken(true);
-          sessionStorage.setItem('authToken', token);
-
-          // First sync the user
-          const response = await fetch(`${API_BASE_URL}/auth/user`, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                  googleId: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
-                  photoURL: firebaseUser.photoURL || '',
-                  hasCalendarAccess
-              })
-          });
-
-          if (!response.ok) {
-              throw new Error(`Failed to sync user with database: ${response.statusText}`);
-          }
-
-          const userData: AuthResponse = await response.json();
-
-          // Check if user has any schedules
-          const schedulesResponse = await fetch(`${API_BASE_URL}/user/${firebaseUser.uid}/has-schedules`, {
-              headers: {
-                  'Authorization': `Bearer ${token}`
-              }
-          });
-
-          if (!schedulesResponse.ok) {
-              throw new Error('Failed to check user schedules');
-          }
-
-          const { hasSchedules } = await schedulesResponse.json();
-
-          setAuthState({
-              user: userData.user,
-              loading: false,
-              error: null
-          });
-          console.log(hasSchedules)
-          // Redirect based on schedule existence
-          if (!hasSchedules) {
-              router.push('/work-times');
-          } else {
-              router.push('/dashboard');
-          }
-
-          if (hasCalendarAccess) {
-              setCalendarState(prev => ({
-                  ...prev,
-                  connected: true,
-                  syncStatus: 'completed',
-                  lastSyncTime: new Date().toISOString()
-              }));
-          }
-      } catch (error) {
-          console.error('Database sync error:', error);
-          throw new Error(
-              error instanceof Error 
-                  ? `Failed to sync user: ${error.message}`
-                  : 'Failed to sync user with database'
-          );
+    try {
+      // Get fresh token
+      const token = await firebaseUser.getIdToken(true);
+      
+      // Store token securely
+      if (isBrowser()) {
+        sessionStorage.setItem('authToken', token);
       }
+
+      // Sync user with database
+      const response = await fetch(`${API_BASE_URL}/auth/user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          googleId: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || '',
+          photoURL: firebaseUser.photoURL || '',
+          hasCalendarAccess
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to sync user with database: ${response.statusText}`);
+      }
+
+      const userData: AuthResponse = await response.json();
+
+      // Check schedule status with error handling
+      try {
+        const schedulesResponse = await fetch(
+          `${API_BASE_URL}/user/${firebaseUser.uid}/has-schedules`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }
+        );
+
+        if (!schedulesResponse.ok) {
+          throw new Error('Failed to check user schedules');
+        }
+
+        const { hasSchedules } = await schedulesResponse.json();
+
+        // Update auth state before navigation
+        setAuthState({
+          user: userData.user,
+          loading: false,
+          error: null
+        });
+
+        // Navigate based on schedule existence
+        router.push(hasSchedules ? '/dashboard' : '/work-times');
+
+      } catch (scheduleError) {
+        console.error('Schedule check error:', scheduleError);
+        // Default to work-times on error
+        router.push('/work-times');
+      }
+
+      // Update calendar state if needed
+      if (hasCalendarAccess) {
+        setCalendarState(prev => ({
+          ...prev,
+          connected: true,
+          syncStatus: 'completed',
+          lastSyncTime: new Date().toISOString()
+        }));
+      }
+
+    } catch (error) {
+      console.error('Database sync error:', error);
+      throw new Error(
+        error instanceof Error 
+          ? `Failed to sync user: ${error.message}`
+          : 'Failed to sync user with database'
+      );
+    }
   };
 
   // Enhanced sign-in handler with better error handling
@@ -221,11 +240,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Starting sign-in process...");
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
       
-      // Clear any existing auth state
-      await signOut();
-      
-      // Initiate Google sign-in
-      console.log("Initiating Google sign-in...");
       await signInWithGoogle();
       
     } catch (error) {
@@ -238,7 +252,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : 'Failed to sign in'
       }));
       
-      // Re-throw error for component handling
       throw error;
     }
   };
@@ -247,37 +260,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
       
-      // Call Firebase sign out
-      await signOut();
-        
-      // Clear ALL storage
-      sessionStorage.clear();
-      localStorage.clear(); // Add this to clear Firebase auth persistence
-      
-      // Call Firebase sign out
+      // Sign out from Firebase
       await signOut();
       
-      // Clear auth state
+      // Clear all storage
+      if (isBrowser()) {
+        sessionStorage.clear();
+        localStorage.clear();
+      }
+      
+      // Reset auth state
       setAuthState({
         user: null,
         loading: false,
         error: null
       });
       
-      // Clear session storage
-      sessionStorage.removeItem('authToken');
-      sessionStorage.removeItem('userId');
+      // Reset calendar state
+      setCalendarState({
+        connected: false,
+        syncStatus: 'never',
+        lastSyncTime: null,
+        selectedCalendars: []
+      });
       
-      // Redirect to home
+      // Navigate to home
       router.push('/');
     } catch (error) {
       console.error('Sign out error:', error);
       setAuthState(prev => ({
         ...prev,
+        loading: false,
         error: error instanceof Error ? error.message : 'Failed to sign out'
       }));
-    } finally {
-      setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
 
