@@ -157,28 +157,28 @@ class AuthStateManager {
  * @returns string URL for auth redirect
  * @throws Error if Firebase auth domain is not configured
  */
-const getRedirectUrl = (): string => {
-  try {
-    if (!isBrowser()) {
-      return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
-    }
+// const getRedirectUrl = (): string => {
+//   try {
+//     if (!isBrowser()) {
+//       return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
+//     }
 
-    const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-    if (!firebaseAuthDomain) {
-      throw new Error('Firebase auth domain not configured');
-    }
+//     const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+//     if (!firebaseAuthDomain) {
+//       throw new Error('Firebase auth domain not configured');
+//     }
 
-    // Store current URL as return destination
-    const currentUrl = window.location.origin;
-    AuthStateManager.storeReturnUrl(currentUrl);
+//     // Store current URL as return destination
+//     const currentUrl = window.location.origin;
+//     AuthStateManager.storeReturnUrl(currentUrl);
 
-    // Always use Firebase auth domain for the redirect
-    return `https://${firebaseAuthDomain}`;
-  } catch (error) {
-    console.error('Error determining redirect URL:', error);
-    throw error;
-  }
-};
+//     // Always use Firebase auth domain for the redirect
+//     return `https://${firebaseAuthDomain}`;
+//   } catch (error) {
+//     console.error('Error determining redirect URL:', error);
+//     throw error;
+//   }
+// };
 
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
