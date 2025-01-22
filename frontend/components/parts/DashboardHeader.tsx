@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { checkScheduleExists } from '@/lib/helper';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/auth/AuthContext';
 
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
