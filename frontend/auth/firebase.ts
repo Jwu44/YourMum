@@ -100,11 +100,19 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
     
     const urlParams = new URLSearchParams(window.location.search);
     
-    // Validate state before proceeding
-    if (!AuthStateManager.validateState(urlParams)) {
-      console.error('Invalid authentication state');
-      AuthStateManager.clearState();
-      throw new Error('Invalid authentication state');
+    // Add more context to state validation
+    const isValidState = AuthStateManager.validateState(urlParams);
+    console.log('State validation result:', isValidState);
+    
+    if (!isValidState) {
+      // Check if we're in an expected redirect flow
+      if (window.location.pathname.includes('/__/auth/handler')) {
+        console.log('Proceeding with auth handler despite state mismatch');
+      } else {
+        console.error('Invalid authentication state');
+        AuthStateManager.clearState();
+        throw new Error('Invalid authentication state');
+      }
     }
 
     const result = await getRedirectResult(auth);
