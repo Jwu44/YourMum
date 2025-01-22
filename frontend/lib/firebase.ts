@@ -103,7 +103,9 @@ googleProvider.setCustomParameters({
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting sign-in process...");
-    
+    console.log('Local storage on sign-in:', {
+      contents: { ...localStorage }
+    });
     if (!isBrowser()) {
       throw new Error('Sign in can only be initiated in browser environment');
     }
@@ -150,11 +152,13 @@ export const signInWithGoogle = async () => {
 // Enhanced redirect result handler with better type safety and error handling
 export const handleRedirectResult = async (): Promise<RedirectResult | null> => {
   try {
-    console.log("Getting redirect result...");
-    
+    const urlParams = new URLSearchParams(window.location.search);
+    console.log('Auth state check:', {
+      storedState: localStorage.getItem('authState'),
+      returnedState: urlParams.get('state')
+    });
     // Verify state token
     const stateToken = localStorage.getItem('authState');
-    const urlParams = new URLSearchParams(window.location.search);
     const returnedState = urlParams.get('state');
 
     if (!stateToken || stateToken !== returnedState) {
@@ -220,7 +224,7 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       window.location.href = `${returnUrl}/work-times`;
       localStorage.removeItem('authReturnUrl');
     }
-    
+
     // Return the authentication result with necessary information
     return { 
       user: {
