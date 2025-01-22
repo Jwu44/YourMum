@@ -48,42 +48,33 @@ const getRedirectUrl = (): string => {
   try {
     // Check if we're in the browser environment
     if (!isBrowser()) {
-      // Return null or default value when running server-side
       return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
     }
 
-    // Get the current hostname and full URL for logging
-    const currentHostname = window.location.hostname;
-    const currentUrl = window.location.href;
-    
-    console.log('Determining redirect URL:', {
-      hostname: currentHostname,
-      fullUrl: currentUrl,
-      nodeEnv: process.env.NODE_ENV,
-      vercelUrl: process.env.NEXT_PUBLIC_VERCEL_URL
-    });
-
-    // For Vercel preview deployments
-    if (currentHostname.includes('vercel.app')) {
-      return `https://${currentHostname}`;
+    // Always use Firebase auth domain for auth handling
+    const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    if (!firebaseAuthDomain) {
+      throw new Error('Firebase auth domain not configured');
     }
 
-    // For local development
+    // Get the return URL (where to redirect after auth)
+    let returnUrl;
     if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:3000';
+      returnUrl = 'http://localhost:8000';
+    } else {
+      // For preview and production, use the current URL
+      returnUrl = window.location.origin;
     }
 
-    // For production
-    const prodDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-    if (!prodDomain) {
-      console.error('Production domain not configured');
-      throw new Error('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is not configured');
+    // Store the return URL in localStorage before redirect
+    if (isBrowser()) {
+      localStorage.setItem('authReturnUrl', returnUrl);
     }
 
-    return `https://${prodDomain}`;
+    // Always return Firebase auth domain
+    return `https://${firebaseAuthDomain}`;
   } catch (error) {
     console.error('Error determining redirect URL:', error);
-    // Fallback to auth domain as last resort
     return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
   }
 };
@@ -117,32 +108,31 @@ export const signInWithGoogle = async () => {
       throw new Error('Sign in can only be initiated in browser environment');
     }
 
-    sessionStorage.clear();
+    // Clear only auth-related storage
+    localStorage.removeItem('firebase:authUser');
     await firebaseSignOut(auth).catch(() => {});
 
-    // Important: Use Firebase domain for auth handling
     const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
     if (!firebaseAuthDomain) {
       throw new Error('Firebase auth domain not configured');
     }
 
+    // Store current timestamp as state
+    const stateToken = Date.now().toString();
+    localStorage.setItem('authState', stateToken);
+
     // Update the provider config
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      // Use Firebase's auth handler
       redirect_uri: `https://${firebaseAuthDomain}/__/auth/handler`,
-      // Set where to redirect after auth completes
-      state: JSON.stringify({
-        returnTo: window.location.origin + '/work-times'
-      })
+      state: stateToken
     });
 
-    // Log configuration for debugging
     console.log('Auth Configuration:', {
       firebaseAuthDomain,
       redirectUri: `https://${firebaseAuthDomain}/__/auth/handler`,
-      returnTo: window.location.origin + '/work-times'
+      stateToken
     });
 
     await signInWithRedirect(auth, googleProvider);
@@ -161,11 +151,18 @@ export const signInWithGoogle = async () => {
 export const handleRedirectResult = async (): Promise<RedirectResult | null> => {
   try {
     console.log("Getting redirect result...");
-    console.log("Current URL:", window.location.href);
     
+    // Verify state token
+    const stateToken = localStorage.getItem('authState');
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnedState = urlParams.get('state');
+
+    if (!stateToken || stateToken !== returnedState) {
+      console.error('State mismatch or missing');
+      throw new Error('Invalid authentication state');
+    }
+
     const result = await getRedirectResult(auth);
-    console.log("Redirect result:", result ? "exists" : "null");
-    
     if (!result) {
       console.log("No redirect result - user hasn't completed sign-in");
       return null;
@@ -214,6 +211,16 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       hasRequiredScopes
     });
 
+    // Clear auth state after successful authentication
+    localStorage.removeItem('authState');
+
+    // Get stored return URL
+    const returnUrl = localStorage.getItem('authReturnUrl');
+    if (returnUrl) {
+      window.location.href = `${returnUrl}/work-times`;
+      localStorage.removeItem('authReturnUrl');
+    }
+    
     // Return the authentication result with necessary information
     return { 
       user: {
