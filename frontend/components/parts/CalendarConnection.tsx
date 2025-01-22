@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/auth/AuthContext';
 import { calendarApi } from '@/lib/calendarApi';
-import { tokenService } from '@/lib/tokenService';
+import { tokenService } from '@/auth/tokenService';
 
 interface Calendar {
   id: string;

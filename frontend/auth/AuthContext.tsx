@@ -1,9 +1,9 @@
 "use client"; 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, signInWithGoogle, signOut, handleRedirectResult, isBrowser } from '@/lib/firebase';
+import { auth, signInWithGoogle, signOut, handleRedirectResult, isBrowser } from './firebase';
 import { tokenService } from './tokenService';
-import { calendarApi } from './calendarApi';
+import { calendarApi } from '../lib/calendarApi';
 import { 
   AuthContextType, 
   AuthState,  
