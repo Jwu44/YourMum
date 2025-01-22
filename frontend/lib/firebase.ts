@@ -172,13 +172,9 @@ const getRedirectUrl = (): string => {
     const currentUrl = window.location.origin;
     AuthStateManager.storeReturnUrl(currentUrl);
 
-    // For preview deployments, ensure domain is authorized
-    if (currentUrl.includes('vercel.app')) {
-      console.log('Vercel preview deployment detected:', {
-        currentUrl,
-        firebaseAuthDomain,
-        nodeEnv: process.env.NODE_ENV
-      });
+    // For preview deployments, use the current origin instead of Firebase domain
+    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
+      return currentUrl;
     }
 
     return `https://${firebaseAuthDomain}`;
@@ -217,18 +213,19 @@ export const signInWithGoogle = async () => {
     await firebaseSignOut(auth).catch(() => {});
 
     const state = AuthStateManager.generateState();
+    const redirectUrl = getRedirectUrl();
     
     // Update the provider config with enhanced security parameters
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      redirect_uri: `${getRedirectUrl()}/__/auth/handler`,
+      redirect_uri: `${redirectUrl}/__/auth/handler`,  // Use dynamic redirect URL
       state,
       include_granted_scopes: 'true'
     });
 
     console.log('Auth Configuration:', {
-      redirectUri: `${getRedirectUrl()}/__/auth/handler`,
+      redirectUri: `${redirectUrl}/__/auth/handler`,
       state,
       timestamp: new Date().toISOString()
     });
