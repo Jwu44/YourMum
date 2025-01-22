@@ -172,11 +172,7 @@ const getRedirectUrl = (): string => {
     const currentUrl = window.location.origin;
     AuthStateManager.storeReturnUrl(currentUrl);
 
-    // For preview deployments, use the current origin instead of Firebase domain
-    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
-      return currentUrl;
-    }
-
+    // Always use Firebase auth domain for the redirect
     return `https://${firebaseAuthDomain}`;
   } catch (error) {
     console.error('Error determining redirect URL:', error);
@@ -213,21 +209,13 @@ export const signInWithGoogle = async () => {
     await firebaseSignOut(auth).catch(() => {});
 
     const state = AuthStateManager.generateState();
-    const redirectUrl = getRedirectUrl();
     
     // Update the provider config with enhanced security parameters
     googleProvider.setCustomParameters({
       prompt: 'select_account',
       access_type: 'offline',
-      redirect_uri: `${redirectUrl}/__/auth/handler`,  // Use dynamic redirect URL
       state,
       include_granted_scopes: 'true'
-    });
-
-    console.log('Auth Configuration:', {
-      redirectUri: `${redirectUrl}/__/auth/handler`,
-      state,
-      timestamp: new Date().toISOString()
     });
 
     await signInWithRedirect(auth, googleProvider);
