@@ -8,8 +8,9 @@ import {
   // connectAuthEmulator,
   signOut as firebaseSignOut 
 } from 'firebase/auth';
+import AuthStateManager from './AuthStateManager';
 
-import { RedirectResult } from './types';
+import { RedirectResult } from '../lib/types';
 
 // Your existing Firebase configuration
 const firebaseConfig = {
@@ -24,161 +25,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
-// Connect to emulator if in development
-// if (process.env.NODE_ENV === 'development') {
-//   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-//   console.log('Connected to Auth Emulator');
-// }
-
-/**
- * Check if code is running in browser environment
- * @returns boolean indicating if window is defined
- */
-export const isBrowser = (): boolean => {
-  return typeof window !== 'undefined';
-};
-
-/**
- * Manages authentication state and URL handling across the auth flow
- * Provides methods for state generation, storage, and validation
- */
-class AuthStateManager {
-  private static readonly STATE_KEY = 'firebase_auth_state';
-  private static readonly RETURN_URL_KEY = 'firebase_auth_return_url';
-  private static readonly STATE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  
-  /**
-   * Generates and stores a new auth state token
-   * @returns string UUID for state verification
-   */
-  static generateState(): string {
-    const state = crypto.randomUUID();
-    if (isBrowser()) {
-      const stateData = {
-        value: state,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(this.STATE_KEY, JSON.stringify(stateData));
-    }
-    return state;
-  }
-
-  /**
-   * Retrieves stored state if valid and not expired
-   * @returns string | null Stored state or null if invalid/expired
-   */
-  static getStoredState(): string | null {
-    try {
-      if (!isBrowser()) return null;
-      
-      const storedData = localStorage.getItem(this.STATE_KEY);
-      if (!storedData) return null;
-
-      const { value, timestamp } = JSON.parse(storedData);
-      
-      // Check if state has expired
-      if (Date.now() - timestamp > this.STATE_TIMEOUT) {
-        this.clearState();
-        return null;
-      }
-
-      return value;
-    } catch (error) {
-      console.error('Error retrieving stored state:', error);
-      this.clearState();
-      return null;
-    }
-  }
-
-  /**
-   * Clears all auth-related storage
-   */
-  static clearState(): void {
-    if (isBrowser()) {
-      localStorage.removeItem(this.STATE_KEY);
-      localStorage.removeItem(this.RETURN_URL_KEY);
-    }
-  }
-
-  /**
-   * Stores return URL for post-auth redirect
-   * @param url - URL to redirect to after auth
-   */
-  static storeReturnUrl(url: string): void {
-    if (isBrowser()) {
-      localStorage.setItem(this.RETURN_URL_KEY, url);
-    }
-  }
-
-  /**
-   * Retrieves stored return URL
-   * @returns string | null Stored URL or null
-   */
-  static getReturnUrl(): string | null {
-    return isBrowser() ? localStorage.getItem(this.RETURN_URL_KEY) : null;
-  }
-
-  /**
-   * Validates the authentication state from URL parameters
-   * Handles both Firebase and Google auth state formats
-   * @param urlParams - URL search parameters
-   * @returns boolean indicating if state is valid
-   */
-  static validateState(urlParams: URLSearchParams): boolean {
-    try {
-      // Get state from URL, handling both Firebase and Google auth formats
-      const returnedState = urlParams.get('state') || 
-                          urlParams.get('firebase_auth_state');
-      
-      const storedState = this.getStoredState();
-      
-      console.log('Auth State Validation:', {
-        returnedState,
-        storedState,
-        urlParams: Object.fromEntries(urlParams.entries())
-      });
-
-      // If no stored state, might be initial auth request
-      if (!storedState) return true;
-
-      // If we have stored state, must match returned state
-      return storedState === returnedState;
-    } catch (error) {
-      console.error('Error validating auth state:', error);
-      return false;
-    }
-  }
-}
-
-/**
- * Get redirect URL based on environment and context
- * Handles development, preview, and production environments
- * @returns string URL for auth redirect
- * @throws Error if Firebase auth domain is not configured
- */
-// const getRedirectUrl = (): string => {
-//   try {
-//     if (!isBrowser()) {
-//       return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '';
-//     }
-
-//     const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-//     if (!firebaseAuthDomain) {
-//       throw new Error('Firebase auth domain not configured');
-//     }
-
-//     // Store current URL as return destination
-//     const currentUrl = window.location.origin;
-//     AuthStateManager.storeReturnUrl(currentUrl);
-
-//     // Always use Firebase auth domain for the redirect
-//     return `https://${firebaseAuthDomain}`;
-//   } catch (error) {
-//     console.error('Error determining redirect URL:', error);
-//     throw error;
-//   }
-// };
 
 // Configure Google Auth Provider with Calendar scopes
 const googleProvider = new GoogleAuthProvider();
@@ -208,8 +54,19 @@ export const signInWithGoogle = async () => {
     AuthStateManager.clearState();
     await firebaseSignOut(auth).catch(() => {});
 
+    // Generate and store state
     const state = AuthStateManager.generateState();
     
+    // Store current URL as return destination
+    const currentUrl = window.location.origin;
+    AuthStateManager.storeReturnUrl(currentUrl);
+
+    console.log('Starting auth with state:', {
+      state,
+      returnUrl: currentUrl,
+      timestamp: new Date().toISOString()
+    });
+
     // Update the provider config with enhanced security parameters
     googleProvider.setCustomParameters({
       prompt: 'select_account',
@@ -294,7 +151,7 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
     }
 
     // Get return URL before clearing state
-    const returnUrl = AuthStateManager.getReturnUrl();
+    const returnUrl = AuthStateManager.getReturnUrl() || window.location.origin;
     
     // Clear auth state after successful authentication
     AuthStateManager.clearState();
@@ -304,13 +161,9 @@ export const handleRedirectResult = async (): Promise<RedirectResult | null> => 
       email: result.user.email,
       hasToken: Boolean(accessToken),
       scopes: scopesArray,
-      hasRequiredScopes
+      hasRequiredScopes,
+      returnUrl
     });
-
-    // Handle redirect to return URL if available
-    if (returnUrl) {
-      window.location.href = `${returnUrl}/work-times`;
-    }
 
     // Return the authentication result with necessary information
     return { 
@@ -360,6 +213,11 @@ export const signOut = async () => {
     throw new Error('Failed to sign out. Please try again.');
   }
 };
+
+export const isBrowser = (): boolean => {
+  return typeof window !== 'undefined';
+};
+
 
 // Export auth and app instances for use in other parts of the application
 export { auth, app };

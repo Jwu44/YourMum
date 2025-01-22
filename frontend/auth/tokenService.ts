@@ -1,5 +1,5 @@
 import { encrypt, decrypt } from './encryption';  // We'll create this next
-import { CalendarCredentials } from './types';
+import { CalendarCredentials } from '../lib/types';
 
 const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiration
 
