@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from '@/lib/AuthContext';
+import { AuthProvider } from '@/auth/AuthContext';
 import { RouteGuard } from '@/components/parts/RouteGuard';
 import { OnboardingLayout } from '@/components/parts/OnboardingLayout';
 import { FormProvider } from "@/lib/FormContext";

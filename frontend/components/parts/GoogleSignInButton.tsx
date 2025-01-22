@@ -1,4 +1,4 @@
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/auth/AuthContext';
 
 export function GoogleSignInButton() {
   const { signIn } = useAuth();
