@@ -338,3 +338,10 @@ export interface RedirectResult {
   scopes: string[];  // Changed from string to string[] for better typing
 }
 
+export interface FirebaseUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  getIdToken: (forceRefresh: boolean) => Promise<string>;
+}
