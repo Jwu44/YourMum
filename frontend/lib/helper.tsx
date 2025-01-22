@@ -714,7 +714,7 @@ const formatStructuredSchedule = (
 };
 
 const formatUnstructuredSchedule = (
-  tasks: Task[]
+  tasks: Task[],
 ): Task[] => {
   // Sort tasks: calendar events first (sorted by time), then other tasks
   return tasks
