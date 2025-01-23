@@ -1,11 +1,11 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getAnalytics } from 'firebase/analytics';
+// import { getAnalytics } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDwtWGLWO09eFGa-Y7juxOP3Zml-IEzxGC",
+  apiKey: "AIzaSyDwtW6LWOo9eFGa_Y7jux0P3Zml-IEzxGc",
   authDomain: "yourdai.firebaseapp.com",
   projectId: "yourdai",
   storageBucket: "yourdai.firebasestorage.app",
@@ -18,11 +18,11 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Initialize Analytics only in browser environment
-let analytics;
-if (typeof window !== 'undefined') {
-  // We can enable this later when needed
-  // analytics = getAnalytics(app);
-}
+// // Initialize Analytics only in browser environment
+// let analytics;
+// if (typeof window !== 'undefined') {
+//   // We can enable this later when needed
+//   // analytics = getAnalytics(app);
+// }
 
 export { app, auth };
