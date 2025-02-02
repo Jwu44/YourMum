@@ -2,3 +2,15 @@ node_modules
 .envvenv/
 venv/
 *.so
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+.env
+.env.local
+__pycache__/
+*.pyc
+logs/
+*.py[cod]

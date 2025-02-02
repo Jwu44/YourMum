@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // import { getAnalytics } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
@@ -17,6 +17,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+auth.settings.appVerificationDisabledForTesting = true;  // Only in development
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({
+    prompt: 'select_account'
+});
+
 
 // // Initialize Analytics only in browser environment
 // let analytics;
