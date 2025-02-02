@@ -3,7 +3,7 @@ import { auth } from '../auth/firebaseAdmin';
 import { cookies } from 'next/headers';
 
 // Your Python backend URL
-const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_PYTHON_BACKEND_URL || 'http://localhost:8000';
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Helper function to send requests to Python backend
 async function fetchFromPythonBackend(endpoint: string, options: RequestInit) {

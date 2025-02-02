@@ -4,7 +4,7 @@ import { Task, ScheduleDocument, ScheduleResponse, ScheduleMetadata, TimeSlot, G
 import { format as dateFormat } from 'date-fns';
 import memoize from 'lodash/memoize'
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const today = new Date().toISOString().split('T')[0];
 

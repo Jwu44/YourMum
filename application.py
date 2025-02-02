@@ -29,6 +29,7 @@ def create_app(testing=False):
     CORS(app, resources={
         r"/*": {
             "origins": [
+                "https://yourd-7vd5a8r5m-jwu44s-projects.vercel.app/",
                 os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000'),  # Vercel frontend URL
                 "http://localhost:3000"  # Local development
             ],
