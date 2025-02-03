@@ -29,13 +29,14 @@ def create_app(testing=False):
     CORS(app, resources={
         r"/*": {
             "origins": [
-                "https://yourd-7vd5a8r5m-jwu44s-projects.vercel.app/",
+                "https://yourd-ami3ekhsk-jwu44s-projects.vercel.app",
                 os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000'),  # Vercel frontend URL
                 "http://localhost:3000"  # Local development
             ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Content-Range", "X-Total-Count"]
+            "expose_headers": ["Content-Range", "X-Total-Count"],
+            "supports_credentials": True 
         }
     })
     
@@ -64,17 +65,8 @@ if __name__ == '__main__':
     # Get port from environment variable with fallback
     port = int(os.getenv('PORT', 8000))
     
-    # In development, use debug mode and localhost
-    if os.getenv('FLASK_ENV') == 'development':
-        application.run(
-            host="localhost",
-            port=port,
-            debug=True
-        )
-    else:
-        # In production, bind to all interfaces
-        application.run(
-            host="0.0.0.0",  # Bind to all interfaces for AWS
-            port=port,
-            debug=False
-        )
+    # In production (AWS EB), always bind to all interfaces
+    application.run(
+        host="0.0.0.0",  # Always bind to all interfaces for AWS
+        port=port
+    )
