@@ -46,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           // Send user data to your backend
           const idToken = await user.getIdToken();
-          const response = await fetch('/api/auth/user', {
+          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
+          const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
