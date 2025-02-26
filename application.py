@@ -27,16 +27,10 @@ def create_app(testing=False):
 
     # Configure CORS for production
     CORS(app, resources={
-        r"/*": {
-            "origins": [
-                "https://yourd-ami3ekhsk-jwu44s-projects.vercel.app",
-                os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000'),  # Vercel frontend URL
-                "http://localhost:3000"  # Local development
-            ],
+        r"/api/*": {
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourd-8vrttwfyo-jwu44s-projects.vercel.app").split(","),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Content-Range", "X-Total-Count"],
-            "supports_credentials": True 
+            "allow_headers": ["Content-Type", "Authorization"]
         }
     })
     
