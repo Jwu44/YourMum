@@ -18,6 +18,7 @@ from typing import List, Dict, Any, Tuple
 from cachetools import TTLCache, LRUCache
 from backend.models.task import Task
 from dotenv import load_dotenv
+
 # Load environment variables from .env file
 load_dotenv()
 
