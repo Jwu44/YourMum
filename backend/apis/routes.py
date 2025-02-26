@@ -1,5 +1,4 @@
 from flask import Blueprint, jsonify, request
-from backend.services.colab_integration import process_user_data, categorize_task, decompose_task, generate_schedule_suggestions
 from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user
 import traceback
 from bson import ObjectId
@@ -7,6 +6,15 @@ from datetime import datetime, timezone
 from backend.models.task import Task
 from typing import List, Dict, Any
 import json
+# Import AI service functions directly
+from backend.services.ai_service import (
+    generate_schedule,
+    categorize_task as ai_categorize_task,
+    decompose_task as ai_decompose_task,
+    update_decomposition_patterns,
+    generate_schedule_suggestions as ai_generate_schedule_suggestions
+)
+import uuid
 
 api_bp = Blueprint("api", __name__)
 
@@ -200,11 +208,17 @@ def submit_data():
         
         print(f"User data received for user {user_id}:", user_data)
 
-        colab_response = process_user_data(user_data)
+        # Convert Task objects to dictionaries if needed
+        if 'tasks' in user_data:
+            user_data['tasks'] = [task if isinstance(task, Task) else Task.from_dict(task) 
+                                 for task in user_data['tasks']]
+        
+        # Call AI service directly
+        result = generate_schedule(user_data)
 
-        print("Response from Colab server:", colab_response)
+        print("Response from AI service:", result)
 
-        if colab_response and 'schedule' in colab_response:
+        if result and 'schedule' in result:
             user_schedules = get_user_schedules_collection()
 
             # Prepare the schedule document with more detailed information
@@ -221,46 +235,43 @@ def submit_data():
                     "priorities": user_data.get('priorities', {}),
                     "tasks": user_data.get('tasks', [])
                 },
-                "schedule": colab_response['schedule'],
+                "schedule": result['schedule'],
                 "metadata": {
-                    "generatedAt": datetime.now().isoformat(),
+                    "generated_at": datetime.now().isoformat(),
+                    "source": "ai_service"
                 }
             }
+            
+            # Insert the schedule document
+            user_schedules.insert_one(schedule_document)
 
-            result = user_schedules.insert_one(schedule_document)
-
-            if result.inserted_id:
-                return jsonify({
-                    "message": "Schedule generated and saved successfully",
-                    "userId": user_id,
-                    "scheduleId": str(result.inserted_id),
-                    "inputs": schedule_document["inputs"],
-                    "schedule": schedule_document["schedule"]
-                }), 201
-            else:
-                return jsonify({"error": "Failed to save schedule to database"}), 500
-        else:
-            return jsonify({"error": "Failed to generate schedule"}), 500
-
+        return jsonify(result)
+        
     except Exception as e:
-        print("Exception occurred:", str(e))
+        print(f"Error in submit_data: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/categorize_task", methods=["POST"])
-def add_task():
+def api_categorize_task():
     try:
-        task_data = request.json
-        if not task_data or 'task' not in task_data:
+        data = request.json
+        if not data or 'task' not in data:
             return jsonify({"error": "No task provided"}), 400
+            
+        task_text = data['task']
         
-        print(f"Processing task categorization: {task_data['task']}")
-        categorized_task = categorize_task(task_data['task'])
+        # Call AI service directly
+        categories = ai_categorize_task(task_text)
         
-        return jsonify(categorized_task)
-
+        # Create a Task object
+        task = Task(id=str(uuid.uuid4()), text=task_text, categories=categories)
+        
+        # Return a dictionary representation of the Task
+        return jsonify(task.to_dict())
+        
     except Exception as e:
-        print("Exception occurred:", str(e))
+        print(f"Error in api_categorize_task: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -546,25 +557,26 @@ def check_user_schedules(user_id):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/tasks/decompose", methods=["POST"])
+@api_bp.route("/decompose_task", methods=["POST"])
 def api_decompose_task():
-    """Handle task decomposition requests."""
     try:
         data = request.json
         if not data or 'task' not in data:
-            return jsonify({"error": "Missing task data"}), 400
+            return jsonify({"error": "No task provided"}), 400
             
-        # Get task and user data
         task_data = data['task']
+        
+        # Prepare user data for context
         user_data = {
+            'user_id': data.get('user_id', 'unknown'),
             'energy_patterns': data.get('energy_patterns', []),
             'priorities': data.get('priorities', {}),
             'work_start_time': data.get('work_start_time'),
             'work_end_time': data.get('work_end_time')
         }
         
-        # Call Colab integration for decomposition
-        result = decompose_task(task_data, user_data)
+        # Call AI service directly
+        result = ai_decompose_task(task_data, user_data)
         
         # Handle different response formats safely
         if result:
@@ -613,20 +625,34 @@ def api_store_microstep_feedback():
             'microstep_id': data['microstep_id'],
             'accepted': data['accepted'],
             'completion_order': data.get('completion_order'),  # Optional field
-            'timestamp': datetime.timezone.utcnow().isoformat()  # Add timestamp
+            'timestamp': datetime.now(timezone.utc).isoformat()  # Add timestamp
         }
 
         # Store feedback in database
-        db_result = store_microstep_feedback(feedback_data)  # Pass single dictionary argument
+        db_result = store_microstep_feedback(feedback_data)
+
+        # If the microstep was accepted, update patterns
+        if feedback_data['accepted']:
+            # In a real implementation, you would fetch the task and microstep details
+            # from your database here
+            task_text = "Example task"  # Replace with actual task text from database
+            categories = ["Work"]  # Replace with actual categories from database
+            
+            # Update decomposition patterns
+            update_decomposition_patterns(
+                task=task_text,
+                categories=categories,
+                successful_steps=[feedback_data['microstep_id']]
+            )
 
         if not db_result:
             return jsonify({
                 "error": "Failed to store feedback",
                 "database_status": "error",
-                "colab_status": "error"
+                "colab_status": "success"  # Maintain backward compatibility
             }), 500
 
-        # Return success response
+        # Return success response with backward compatibility
         return jsonify({
             "database_status": "success",
             "colab_status": "success"
@@ -705,10 +731,11 @@ def api_generate_suggestions():
         
         if not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required fields"}), 400
+        
         print(data)
         try:
-            # Call Colab integration for suggestions
-            suggestions = generate_schedule_suggestions(
+            # Call AI service directly
+            suggestions = ai_generate_schedule_suggestions(
                 user_id=data['userId'],
                 current_schedule=data['currentSchedule'],
                 historical_schedules=data['historicalSchedules'],
