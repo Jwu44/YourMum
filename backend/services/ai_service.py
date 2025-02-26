@@ -17,10 +17,13 @@ import anthropic
 from typing import List, Dict, Any, Tuple
 from cachetools import TTLCache, LRUCache
 from backend.models.task import Task
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize the Anthropic client
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "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")
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+client = anthropic.Anthropic(api_key=anthropic_api_key)
 
 # Add cache for decomposition results (TTL of 24 hours, max 1000 entries)
 decomposition_cache = TTLCache(maxsize=1000, ttl=86400)
