@@ -28,7 +28,7 @@ def create_app(testing=False):
     # Configure CORS for production
     CORS(app, resources={
         r"/api/*": {
-            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourd-ecpiv4pk8-jwu44s-projects.vercel.app/").split(","),
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app").split(","),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
         }
