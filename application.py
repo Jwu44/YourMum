@@ -28,9 +28,31 @@ def create_app(testing=False):
     # Configure CORS for production
     CORS(app, resources={
         r"/api/*": {
-            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app").split(","),
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,http://localhost:3000").split(","),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type", "X-CSRFToken"]
+        }
+    })
+    
+    # Add CORS for OAuth endpoints if they're not under /api/
+    CORS(app, resources={
+        r"/auth/*": {
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,http://localhost:3000").split(","),
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type", "X-CSRFToken"]
+        }
+    })
+    
+    # Add a global CORS fallback for other routes
+    CORS(app, resources={
+        r"/*": {
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,http://localhost:3000").split(","),
+            "methods": ["GET", "OPTIONS"],
+            "supports_credentials": True
         }
     })
     
