@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from './firebase';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { auth, provider } from './firebase';
+import { GoogleAuthProvider, signInWithPopup, getRedirectResult } from 'firebase/auth';
 import { AuthContextType } from '@/lib/types';
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -113,27 +113,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Also add logging to the signIn function
-const signIn = async (redirectTo = '/work-times') => {
-  try {
-    setError(null);
-    console.log("Starting sign in process, redirect destination:", redirectTo);
-    
-    // Store the intended destination to access after redirect completes
-    localStorage.setItem('authRedirectDestination', redirectTo);
-    console.log("Stored redirect destination in localStorage");
-    
-    const provider = new GoogleAuthProvider();
-    // Replace popup with redirect
-    console.log("Initiating signInWithRedirect");
-    await signInWithRedirect(auth, provider);
-    // The result will be handled in useEffect with getRedirectResult
-    console.log("signInWithRedirect called"); // This might not show if redirect happens immediately
-  } catch (error) {
-    console.error('Sign in error:', error);
-    setError('Failed to sign in with Google');
-    throw error;
-  }
-};
+  const signIn = async (redirectTo = '/work-times') => {
+    try {
+      setError(null);
+      console.log("Starting sign in process, redirect destination:", redirectTo);
+      
+      // Store the intended destination to access after authentication completes
+      localStorage.setItem('authRedirectDestination', redirectTo);
+      console.log("Stored redirect destination in localStorage");
+      
+      console.log("Initiating signInWithPopup");
+      const result = await signInWithPopup(auth, provider);
+      console.log("Sign in successful:", result.user ? `${result.user.displayName} (${result.user.email})` : "No user");
+      
+      // The user state will be updated by the onAuthStateChanged listener,
+      // but we can navigate right away since we have confirmation of success
+      const intendedRoute = localStorage.getItem('authRedirectDestination') || '/work-times';
+      console.log("Navigating to:", intendedRoute);
+      localStorage.removeItem('authRedirectDestination');
+      window.location.href = intendedRoute;
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError('Failed to sign in with Google');
+      throw error;
+    }
+  };
 
   // Sign out
   const signOut = async () => {
