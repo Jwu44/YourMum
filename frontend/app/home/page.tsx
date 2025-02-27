@@ -9,11 +9,9 @@ import { Laptop, Brain, Calendar } from 'lucide-react';
 
 const HomePage: React.FC = () => {
   const { signIn } = useAuth();
-  const router = useRouter();
   const handleGetStarted = async () => {
     try {
-      await signIn();
-      router.push('/work-times');
+      await signIn('/work-times');
     } catch (error) {
       console.error('Sign in error:', error);
     }

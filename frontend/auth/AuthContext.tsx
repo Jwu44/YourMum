@@ -4,24 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { AuthContextType } from '@/lib/types';
 
-// Define types for our context
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  error: string | null;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-// Create the context with a default value
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  error: null,
-  signIn: async () => {},
-  signOut: async () => {},
-});
+const AuthContext = createContext<AuthContextType | null>(null);
 
 // Custom hook to use the auth context
 export const useAuth = () => {
@@ -78,9 +63,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signIn = async () => {
+  // Add this to your useEffect to handle the redirect result
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // User successfully signed in after redirect
+          console.log("Redirect sign-in successful");
+          
+          // Get the intended destination from localStorage (if set)
+          const intendedRoute = localStorage.getItem('authRedirectDestination');
+          
+          // Clear the stored route regardless of what happens next
+          localStorage.removeItem('authRedirectDestination');
+          
+          // Navigate to the intended route if one was saved, otherwise default to /work-times
+          if (intendedRoute) {
+            window.location.href = intendedRoute;
+          } else {
+            window.location.href = '/work-times';
+          }
+        }
+      } catch (error) {
+        console.error("Redirect sign-in error:", error);
+        setError('Failed to sign in with Google');
+      }
+    };
+    
+    handleRedirectResult();
+  }, []);
+
+  const signIn = async (redirectTo = '/work-times') => {
     try {
       setError(null);
+      
+      // Store the intended destination to access after redirect completes
+      localStorage.setItem('authRedirectDestination', redirectTo);
+      
       const provider = new GoogleAuthProvider();
       // Replace popup with redirect
       await signInWithRedirect(auth, provider);
@@ -91,24 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   };
-  
-  // Add this to your useEffect to handle the redirect result
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          // User successfully signed in after redirect
-          console.log("Redirect sign-in successful");
-        }
-      } catch (error) {
-        console.error("Redirect sign-in error:", error);
-        setError('Failed to sign in with Google');
-      }
-    };
-    
-    handleRedirectResult();
-  }, []);
 
   // Sign out
   const signOut = async () => {
@@ -122,8 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const value = {
-    user,
+  const value: AuthContextType = {
+    user,                // Add this to satisfy AuthState
+    currentUser: user,   // This is your renamed property
     loading,
     error,
     signIn,
