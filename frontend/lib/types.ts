@@ -1,3 +1,5 @@
+import { User } from 'firebase/auth';
+
 export interface Task {
   id: string;
   text: string;
@@ -239,15 +241,15 @@ export interface ApiResponse<T> {
 }
 
 export interface AuthState {
-  user: UserDocument | null;
+  user: User | null;
   loading: boolean;
   error: string | null;
 }
 
 export interface AuthContextType extends AuthState {
-  signIn: () => Promise<void>;
+  currentUser: User | null;
+  signIn: (redirectTo?: string) => Promise<void>; // Updated to accept optional parameter
   signOut: () => Promise<void>;
-  clearError: () => void;
 }
 
 // Python backend response types
