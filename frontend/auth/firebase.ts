@@ -10,8 +10,8 @@ const firebaseConfig = {
   projectId: "yourdai",
   storageBucket: "yourdai.firebasestorage.app",
   messagingSenderId: "246264772427",
-  appId: "1:246264772427:web:bdb0f4b687ee544051ace",
-  measurementId: "G-MEKF4YR3KH"
+  appId: "1:246264772427:web:bdb0f4b687ee5440511ace",
+  measurementId: "G-MEKF41R3KH"
 };
 
 // Initialize Firebase
