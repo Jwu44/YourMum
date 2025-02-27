@@ -27,48 +27,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("Setting up auth state change listener");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
+      
+      // Set user state immediately to prevent UI blocking
+      setUser(user);
+      setLoading(false);
+      
       if (user) {
-        // If user exists, store in state
-        setUser(user);
+        // If user exists, try to store in backend but don't block UI on this
         try {
-          // Send user data to your backend
+          // Send user data to your backend with a timeout
           const idToken = await user.getIdToken();
           console.log("Got ID token, sending to backend");
           const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
           console.log("API URL:", apiUrl);
           
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-              googleId: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-              hasCalendarAccess: false, // Default value
-            }),
-          });
-  
-          console.log("Backend response status:", response.status);
-          if (!response.ok) {
-            console.error('Failed to store user in database');
-            const errorText = await response.text();
-            console.error('Error details:', errorText);
-          } else {
-            console.log("User successfully stored in database");
+          // Add timeout to prevent hanging forever
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({
+                googleId: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                hasCalendarAccess: false, // Default value
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            console.log("Backend response status:", response.status);
+            if (!response.ok) {
+              console.error('Failed to store user in database');
+              const errorText = await response.text();
+              console.error('Error details:', errorText);
+            } else {
+              console.log("User successfully stored in database");
+            }
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+              console.error('API request timed out after 10 seconds');
+            } else {
+              console.error('Error making API request:', fetchError);
+            }
           }
         } catch (error) {
           console.error('Error storing user:', error);
         }
-      } else {
-        setUser(null);
       }
-      setLoading(false);
     });
-
+  
     // Cleanup subscription
     return () => unsubscribe();
   }, []);
