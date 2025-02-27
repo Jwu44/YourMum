@@ -296,60 +296,60 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     return null;
   }, [dragState]);
 
-    // Handle microstep decomposition of a task
-    const handleDecompose = useCallback(async () => {
-      // Guard clause - only proceed if decomposition is allowed and not already in progress
-      if (!canDecompose || isDecomposing) return;
-  
-      try {
-        // Set loading state and clear any existing microsteps
-        setIsDecomposing(true);
-        setShowMicrosteps(false);
-  
-        // Get microstep texts from backend
-        const microstepTexts = await handleMicrostepDecomposition(task, formData);
-        
-        // Convert microstep texts into full Task objects
-        // Updated to handle both string array and object array responses
-        const microstepTasks = microstepTexts.map((step: string | { text: string }) => {
-          const text = typeof step === 'string' ? step : step.text;
-          return {
-            id: crypto.randomUUID(), // Generate unique ID for each microstep
-            text: text, // The microstep text from backend
-            is_microstep: true, // Mark as microstep
-            completed: false,
-            is_section: false,
-            section: task.section, // Inherit section from parent
-            parent_id: task.id, // Link to parent task
-            level: (task.level || 0) + 1, // Indent one level from parent
-            type: 'microstep',
-            categories: task.categories || [] // Inherit categories from parent
-          };
-        });
-  
-        // Update UI with new microsteps
-        setSuggestedMicrosteps(microstepTasks);
-        setShowMicrosteps(true);
-        
-        // Show success message
-        toast({
-          title: "Success",
-          description: "Select which microsteps to add",
-        });
-        
-      } catch (error) {
-        // Handle and display any errors
-        console.error('Error decomposing task:', error);
-        toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to decompose task",
-          variant: "destructive",
-        });
-      } finally {
-        // Reset loading state regardless of outcome
-        setIsDecomposing(false);
-      }
-    }, [canDecompose, task, formData, toast]);
+  // Handle microstep decomposition of a task
+  const handleDecompose = useCallback(async () => {
+    // Guard clause - only proceed if decomposition is allowed and not already in progress
+    if (!canDecompose || isDecomposing) return;
+
+    try {
+      // Set loading state and clear any existing microsteps
+      setIsDecomposing(true);
+      setShowMicrosteps(false);
+
+      // Get microstep texts from backend
+      const microstepTexts = await handleMicrostepDecomposition(task, formData);
+      
+      // Convert microstep texts into full Task objects
+      // Updated to handle both string array and object array responses
+      const microstepTasks = microstepTexts.map((step: string | { text: string }) => {
+        const text = typeof step === 'string' ? step : step.text;
+        return {
+          id: crypto.randomUUID(), // Generate unique ID for each microstep
+          text: text, // The microstep text from backend
+          is_microstep: true, // Mark as microstep
+          completed: false,
+          is_section: false,
+          section: task.section, // Inherit section from parent
+          parent_id: task.id, // Link to parent task
+          level: (task.level || 0) + 1, // Indent one level from parent
+          type: 'microstep',
+          categories: task.categories || [] // Inherit categories from parent
+        };
+      });
+
+      // Update UI with new microsteps
+      setSuggestedMicrosteps(microstepTasks);
+      setShowMicrosteps(true);
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Select which microsteps to add",
+      });
+      
+    } catch (error) {
+      // Handle and display any errors
+      console.error('Error decomposing task:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to decompose task",
+        variant: "destructive",
+      });
+    } finally {
+      // Reset loading state regardless of outcome
+      setIsDecomposing(false);
+    }
+  }, [canDecompose, task, formData, toast, isDecomposing]);
 
   // Update the handleMicrostepAccept function to properly create and add the subtask
   const handleMicrostepAccept = useCallback(async (microstep: Task) => {

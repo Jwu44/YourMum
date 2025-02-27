@@ -2,7 +2,6 @@
 import React from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { Button } from "@/components/ui/button";
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { TypographyH1, TypographyH2, TypographyH3, TypographyH4, TypographyP } from '../fonts/text';
 import { Laptop, Brain, Calendar } from 'lucide-react';

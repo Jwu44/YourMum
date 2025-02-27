@@ -395,7 +395,7 @@ const Dashboard: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, toast, scheduleCache]);
+  }, [currentDayIndex, scheduleDays, toast]);
 
   const handleScheduleTaskDelete = useCallback((taskId: string) => {
     setScheduleDays(prevDays => {
@@ -425,7 +425,7 @@ const Dashboard: React.FC = () => {
       setCurrentDayIndex(prevIndex => prevIndex + 1);
       return;
     }
-
+  
     try {
       // Try to load existing schedule
       const existingSchedule = await loadScheduleForDate(nextDayDate);
@@ -472,7 +472,7 @@ const Dashboard: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, state, toast]);
+  }, [currentDayIndex, scheduleDays, state, toast, scheduleCache]);
 
   const handlePreviousDay = useCallback(() => {
     if (currentDayIndex > 0) {
