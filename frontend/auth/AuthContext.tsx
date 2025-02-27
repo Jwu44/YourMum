@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 
 // Define types for our context
 interface AuthContextType {
@@ -78,19 +78,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Sign in with Google
   const signIn = async () => {
     try {
       setError(null);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      // Note: We don't need to manually set the user here as it will be handled by onAuthStateChanged
+      // Replace popup with redirect
+      await signInWithRedirect(auth, provider);
+      // The result will be handled in useEffect with getRedirectResult
     } catch (error) {
       console.error('Sign in error:', error);
       setError('Failed to sign in with Google');
-      throw error; // Let the calling component handle the error if needed
+      throw error;
     }
   };
+  
+  // Add this to your useEffect to handle the redirect result
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // User successfully signed in after redirect
+          console.log("Redirect sign-in successful");
+        }
+      } catch (error) {
+        console.error("Redirect sign-in error:", error);
+        setError('Failed to sign in with Google');
+      }
+    };
+    
+    handleRedirectResult();
+  }, []);
 
   // Sign out
   const signOut = async () => {
