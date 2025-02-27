@@ -49,7 +49,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   const isCreateMode = !task;
 
   // Initialize empty task state with all required fields
-  const getEmptyTask = (): Task => ({
+  const getEmptyTask = useCallback((): Task => ({
     id: '',
     text: '',
     type: 'task',
@@ -66,7 +66,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     section_index: 0,
     start_date: currentDate,
     energy_level_required: 'medium'
-  });
+  }), [currentDate]);
 
   // Initialize state with either empty task or existing task
   const [editedTask, setEditedTask] = useState<Task>(() => {
@@ -100,7 +100,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     if (isOpen && isCreateMode) {
       setEditedTask(getEmptyTask());
     }
-  }, [isOpen, isCreateMode, currentDate]);
+  }, [isOpen, isCreateMode, currentDate, getEmptyTask]);
 
   // Get current day of week from task's date or today
   const getCurrentDayOfWeek = useCallback((): WeekDay => {
@@ -227,7 +227,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       setEditedTask(getEmptyTask());
       onClose();
     }
-  }, [editedTask, isCreateMode, onCreateTask, onUpdateTask, onClose]);
+  }, [editedTask, isCreateMode, onCreateTask, onUpdateTask, onClose, getEmptyTask]);
 
   // Handle close with form reset
   const handleClose = useCallback(() => {
@@ -237,7 +237,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }
     setEditedTask(getEmptyTask());
     onClose();
-  }, [onClose]);
+  }, [onClose, getEmptyTask]);
 
   return (
     <Drawer 
