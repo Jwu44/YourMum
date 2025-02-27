@@ -6,7 +6,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDwtW6LWOo9eFGa_Y7jux0P3Zml-IEzxGc",
-  authDomain: "yourdai.app",
+  authDomain: "yourdai.firebaseapp.com",
   projectId: "yourdai",
   storageBucket: "yourdai.firebasestorage.app",
   messagingSenderId: "246264772427",
@@ -18,10 +18,15 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-auth.settings.appVerificationDisabledForTesting = true;  // Only in development
+// Only disable app verification in development
+if (process.env.NODE_ENV === 'development') {
+  auth.settings.appVerificationDisabledForTesting = true;
+  console.log("Firebase app verification disabled for testing (development mode)");
+}
+
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({
     prompt: 'select_account'
 });
 
-export { app, auth };
+export { app, auth, provider };
