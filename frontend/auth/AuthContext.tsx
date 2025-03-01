@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Send user data to your backend with a timeout
           const idToken = await user.getIdToken();
           console.log("Got ID token, sending to backend");
-          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/auth/user`; 
+          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
           console.log("API URL:", apiUrl);
           
           // Add timeout to prevent hanging forever
