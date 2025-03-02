@@ -33,83 +33,111 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         
         if (user) {
-          // If user exists, try to store in backend but don't block UI on this
           try {
-            // Send user data to your backend with a timeout
+            // Get the token
             const idToken = await user.getIdToken();
-            console.log("Got ID token, sending to backend");
-            const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
+            console.log("Got ID token");
+            
+            // Test the base domain first
+            try {
+              console.log("Testing base domain...");
+              const baseResponse = await fetch('https://yourdai.be', {
+                method: 'GET',
+                mode: 'no-cors' // Try with no-cors to at least verify connectivity
+              });
+              console.log("Base domain response type:", baseResponse.type);
+            } catch (baseError) {
+              console.error("Base domain test failed:", baseError);
+            }
+            
+            // Test API root
+            try {
+              console.log("Testing API root...");
+              const apiRootResponse = await fetch('https://yourdai.be/api', {
+                method: 'GET',
+                mode: 'no-cors'
+              });
+              console.log("API root response type:", apiRootResponse.type);
+            } catch (apiRootError) {
+              console.error("API root test failed:", apiRootError);
+            }
+            
+            // Try the actual endpoint with a timeout
+            console.log("Testing actual endpoint...");
+            const apiUrl = 'https://yourdai.be/api/auth/user';
             console.log("API URL:", apiUrl);
             
-            // Increase timeout and implement retry logic
-            const maxRetries = 3;
-            let retryCount = 0;
-            let success = false;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
             
-            while (retryCount < maxRetries && !success) {
-              // Increase timeout to 20 seconds
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+            try {
+              // First try a GET request to see if the endpoint exists
+              console.log("Trying GET request to endpoint...");
+              const getResponse = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${idToken}`
+                },
+                signal: controller.signal
+              }).catch(e => {
+                console.error("GET request failed:", e);
+                return null;
+              });
               
+              if (getResponse) {
+                console.log("GET response status:", getResponse.status);
+              }
+              
+              // Now try the POST request
+              console.log("Trying POST request to endpoint...");
+              const userData = {
+                googleId: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                hasCalendarAccess: false
+              };
+              
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify(userData),
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
+              
+              console.log("POST response status:", response.status);
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error details:', errorText);
+              } else {
+                console.log("User successfully stored in database");
+              }
+            } catch (fetchError) {
+              clearTimeout(timeoutId);
+              console.error('Fetch error:', fetchError);
+              
+              // Try alternative API URL formats
+              console.log("Trying alternative API URL formats...");
+              
+              // Try with api subdomain
               try {
-                console.log(`API request attempt ${retryCount + 1} of ${maxRetries}`);
-                const response = await fetch(apiUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                  },
-                  body: JSON.stringify({
-                    googleId: user.uid,
-                    email: user.email,
-                    displayName: user.displayName,
-                    photoURL: user.photoURL,
-                    hasCalendarAccess: false, // Default value
-                  }),
-                  signal: controller.signal
+                console.log("Trying api.yourdai.be...");
+                const altResponse = await fetch(`https://api.yourdai.be/auth/user`, {
+                  method: 'GET',
+                  mode: 'no-cors'
                 });
-                
-                clearTimeout(timeoutId);
-                
-                console.log("Backend response status:", response.status);
-                if (!response.ok) {
-                  console.error('Failed to store user in database');
-                  const errorText = await response.text();
-                  console.error('Error details:', errorText);
-                  // If we get an actual error response (not a timeout), don't retry
-                  if (response.status !== 408 && response.status !== 504) {
-                    break;
-                  }
-                } else {
-                  console.log("User successfully stored in database");
-                  success = true;
-                }
-              } catch (fetchError) {
-                clearTimeout(timeoutId);
-                if (fetchError instanceof Error) {
-                  if (fetchError.name === 'AbortError') {
-                    console.error(`API request timed out after 20 seconds (attempt ${retryCount + 1} of ${maxRetries})`);
-                  } else {
-                    console.error('Error making API request:', fetchError);
-                  }
-                }
+                console.log("Alternative domain response type:", altResponse.type);
+              } catch (altError) {
+                console.error("Alternative domain test failed:", altError);
               }
-              
-              if (!success && retryCount < maxRetries - 1) {
-                // Exponential backoff: wait longer between each retry
-                const backoffTime = Math.pow(2, retryCount) * 1000;
-                console.log(`Retrying in ${backoffTime/1000} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, backoffTime));
-              }
-              
-              retryCount++;
-            }
-            
-            if (!success) {
-              console.error(`Failed to store user after ${maxRetries} attempts`);
             }
           } catch (error) {
-            console.error('Error storing user:', error);
+            console.error('Error in auth flow:', error);
           }
         }
       });
