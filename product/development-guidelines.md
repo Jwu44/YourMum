@@ -1,6 +1,8 @@
 # General Development Rules
 - Use task-based development approach
-- For each task: write tests, implement code, run tests
+- Before implementing code:
+    - If requirements for a task in backlog.md are unclear or you feel like you don't have full context, keep asking necessary clarifying questions until confident.
+<!-- - For each task: write tests, implement code, run tests -->
 - When implementing code:
     - Document complex logic with inline comments
     - Modular architecture with clear separation of concerns
@@ -12,11 +14,11 @@
         - Performance optimization
         - Best practices for [language/framework]
         - Generate the code with clear comments explaining the logic.
-- When tests pass:
+<!-- - When tests pass:
   - Update backlog.md (mark task as complete)
   - Update memory.md with current state
   - Fix any warnings/errors
-  - Stop and open a new chat for next task
+  - Stop and open a new chat for next task -->
 
 ## Frontend Development Rules (TypeScript/React)
 - Use TypeScript strict mode with proper interface/type definitions

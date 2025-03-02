@@ -18,14 +18,46 @@ import uuid
 
 api_bp = Blueprint("api", __name__)
 
-@api_bp.route("/auth/user", methods=["POST"])
+@api_bp.route("/auth/user", methods=["POST", "GET"])
 def create_or_get_user():
     """
     Create or update user after Google authentication.
-    Expects a JSON payload with user data from Google Auth.
-    Returns the user object or error response.
+    POST: Create/update user with Google Auth data
+    GET: Return user info if Authorization header is provided, otherwise return API info
     """
     try:
+        # Handle GET requests (for browser direct access or health checks)
+        if request.method == "GET":
+            # Check if Authorization header is provided
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                # Extract token and get user ID (implementation depends on your auth system)
+                # This is a simplified example - you'll need to implement token verification
+                token = auth_header.split(' ')[1]
+                # Get user based on verified token
+                # user = get_user_from_token(token)  # You would implement this function
+                
+                # For now, return a placeholder response
+                return jsonify({
+                    "message": "Authentication required",
+                    "details": "Please use POST method with user credentials to create or update user"
+                }), 200
+            else:
+                # No auth header, return API info
+                return jsonify({
+                    "endpoint": "/api/auth/user",
+                    "methods": ["GET", "POST"],
+                    "description": "User authentication endpoint",
+                    "POST_parameters": {
+                        "googleId": "string (required)",
+                        "email": "string (required)",
+                        "displayName": "string",
+                        "photoURL": "string",
+                        "hasCalendarAccess": "boolean"
+                    }
+                }), 200
+        
+        # Handle POST requests (existing functionality)
         print("Received authentication request. Headers:", request.headers)
         print("Request body:", request.get_json(silent=True))
         # Validate request payload
