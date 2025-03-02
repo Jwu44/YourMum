@@ -30,7 +30,7 @@ def create_app(testing=False):
         r"/api/*": {
             "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(","),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             "supports_credentials": True,
             "expose_headers": ["Content-Type", "X-CSRFToken"]
         }
@@ -41,7 +41,7 @@ def create_app(testing=False):
         r"/auth/*": {
             "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(","),
             "methods": ["GET", "POST", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             "supports_credentials": True,
             "expose_headers": ["Content-Type", "X-CSRFToken"]
         }
@@ -52,6 +52,7 @@ def create_app(testing=False):
         r"/*": {
             "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(","),
             "methods": ["GET", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             "supports_credentials": True
         }
     })
