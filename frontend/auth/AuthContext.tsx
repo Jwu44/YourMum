@@ -42,28 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
           console.log("API Base URL from env:", apiBaseUrl);
           
-          // Try a direct health check first
-          try {
-            console.log("Testing API health endpoint...");
-            const healthResponse = await fetch(`${apiBaseUrl}`, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json'
-              },
-              mode: 'cors'
-            });
-            console.log("Health endpoint status:", healthResponse.status);
-            console.log("Health endpoint content type:", healthResponse.headers.get('content-type'));
-            try {
-              const healthData = await healthResponse.json();
-              console.log("Health data:", healthData);
-            } catch (e) {
-              console.error("Could not parse health response as JSON", e);
-            }
-          } catch (healthError) {
-            console.error("Health check failed:", healthError);
-          }
-          
           // Now try the user endpoint
           const apiUrl = `${apiBaseUrl}/api/auth/user`;
           console.log("Attempting to store user at:", apiUrl);
