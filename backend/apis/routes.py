@@ -22,6 +22,28 @@ import uuid
 
 api_bp = Blueprint("api", __name__)
 
+# Add a global CORS handler for the API blueprint
+@api_bp.after_request
+def add_cors_headers(response):
+    """Add CORS headers to all API responses"""
+    # Get origin from the request
+    origin = request.headers.get('Origin')
+    
+    # Check if origin is allowed
+    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
+                             "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(",")
+    
+    # If origin is in the allowed list, add CORS headers
+    if origin in allowed_origins:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', 
+                           'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+        response.headers.add('Access-Control-Allow-Methods', 
+                           'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    
+    return response
+
 if not firebase_admin._apps:
     # Use environment variable or path to service account credentials
     cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH', 'path/to/serviceAccountKey.json')
@@ -86,13 +108,23 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         traceback.print_exc()
         return None
     
-@api_bp.route("/auth/user", methods=["POST", "GET"])
+@api_bp.route("/auth/user", methods=["POST", "GET", "OPTIONS"])
 def create_or_get_user():
     """
     Create or update user after Google authentication.
     POST: Create/update user with Google Auth data
     GET: Return user info if Authorization header is provided, otherwise return API info
+    OPTIONS: Handle preflight requests for CORS
     """
+    # Handle OPTIONS request (preflight) for CORS
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", request.headers.get("Origin", "*"))
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Max-Age", "3600")
+        return response
+        
     try:
         # Handle GET requests (for browser direct access or health checks)
         if request.method == "GET":
@@ -121,7 +153,7 @@ def create_or_get_user():
                 # No auth header, return API info
                 return jsonify({
                     "endpoint": "/api/auth/user",
-                    "methods": ["GET", "POST"],
+                    "methods": ["GET", "POST", "OPTIONS"],
                     "description": "User authentication endpoint",
                     "GET_parameters": {
                         "Authorization": "Bearer <firebase_id_token> (required in header)"
