@@ -22,73 +22,101 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle Firebase auth state changes
-  useEffect(() => {
-    console.log("Setting up auth state change listener");
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
-      
-      // Set user state immediately to prevent UI blocking
-      setUser(user);
-      setLoading(false);
-      
-      if (user) {
-        // If user exists, try to store in backend but don't block UI on this
-        try {
-          // Send user data to your backend with a timeout
-          const idToken = await user.getIdToken();
-          console.log("Got ID token, sending to backend");
-          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
-          console.log("API URL:", apiUrl);
-          
-          // Add timeout to prevent hanging forever
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
+    // Handle Firebase auth state changes
+    useEffect(() => {
+      console.log("Setting up auth state change listener");
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
+        
+        // Set user state immediately to prevent UI blocking
+        setUser(user);
+        setLoading(false);
+        
+        if (user) {
+          // If user exists, try to store in backend but don't block UI on this
           try {
-            const response = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`,
-              },
-              body: JSON.stringify({
-                googleId: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                hasCalendarAccess: false, // Default value
-              }),
-              signal: controller.signal
-            });
+            // Send user data to your backend with a timeout
+            const idToken = await user.getIdToken();
+            console.log("Got ID token, sending to backend");
+            const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/user`; 
+            console.log("API URL:", apiUrl);
             
-            clearTimeout(timeoutId);
+            // Increase timeout and implement retry logic
+            const maxRetries = 3;
+            let retryCount = 0;
+            let success = false;
             
-            console.log("Backend response status:", response.status);
-            if (!response.ok) {
-              console.error('Failed to store user in database');
-              const errorText = await response.text();
-              console.error('Error details:', errorText);
-            } else {
-              console.log("User successfully stored in database");
+            while (retryCount < maxRetries && !success) {
+              // Increase timeout to 20 seconds
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+              
+              try {
+                console.log(`API request attempt ${retryCount + 1} of ${maxRetries}`);
+                const response = await fetch(apiUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                  },
+                  body: JSON.stringify({
+                    googleId: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL,
+                    hasCalendarAccess: false, // Default value
+                  }),
+                  signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                console.log("Backend response status:", response.status);
+                if (!response.ok) {
+                  console.error('Failed to store user in database');
+                  const errorText = await response.text();
+                  console.error('Error details:', errorText);
+                  // If we get an actual error response (not a timeout), don't retry
+                  if (response.status !== 408 && response.status !== 504) {
+                    break;
+                  }
+                } else {
+                  console.log("User successfully stored in database");
+                  success = true;
+                }
+              } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError instanceof Error) {
+                  if (fetchError.name === 'AbortError') {
+                    console.error(`API request timed out after 20 seconds (attempt ${retryCount + 1} of ${maxRetries})`);
+                  } else {
+                    console.error('Error making API request:', fetchError);
+                  }
+                }
+              }
+              
+              if (!success && retryCount < maxRetries - 1) {
+                // Exponential backoff: wait longer between each retry
+                const backoffTime = Math.pow(2, retryCount) * 1000;
+                console.log(`Retrying in ${backoffTime/1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, backoffTime));
+              }
+              
+              retryCount++;
             }
-          } catch (fetchError) {
-            clearTimeout(timeoutId);
-            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-              console.error('API request timed out after 10 seconds');
-            } else {
-              console.error('Error making API request:', fetchError);
+            
+            if (!success) {
+              console.error(`Failed to store user after ${maxRetries} attempts`);
             }
+          } catch (error) {
+            console.error('Error storing user:', error);
           }
-        } catch (error) {
-          console.error('Error storing user:', error);
         }
-      }
-    });
-  
-    // Cleanup subscription
-    return () => unsubscribe();
-  }, []);
+      });
+    
+      // Cleanup subscription
+      return () => unsubscribe();
+    }, []);
 
   // Add this to your useEffect to handle the redirect result
   useEffect(() => {
