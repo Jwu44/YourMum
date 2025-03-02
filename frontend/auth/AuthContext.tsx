@@ -22,130 +22,108 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-    // Handle Firebase auth state changes
-    useEffect(() => {
-      console.log("Setting up auth state change listener");
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
-        
-        // Set user state immediately to prevent UI blocking
-        setUser(user);
-        setLoading(false);
-        
-        if (user) {
+      // Handle Firebase auth state changes
+  useEffect(() => {
+    console.log("Setting up auth state change listener");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
+      
+      // Set user state immediately to prevent UI blocking
+      setUser(user);
+      setLoading(false);
+      
+      if (user) {
+        try {
+          // Get the token
+          const idToken = await user.getIdToken();
+          console.log("Got ID token");
+          
+          // Check if NEXT_PUBLIC_API_URL is set correctly
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
+          console.log("API Base URL from env:", apiBaseUrl);
+          
+          // Try a direct health check first
           try {
-            // Get the token
-            const idToken = await user.getIdToken();
-            console.log("Got ID token");
-            
-            // Test the base domain first
+            console.log("Testing API health endpoint...");
+            const healthResponse = await fetch(`${apiBaseUrl}`, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json'
+              },
+              mode: 'cors'
+            });
+            console.log("Health endpoint status:", healthResponse.status);
+            console.log("Health endpoint content type:", healthResponse.headers.get('content-type'));
             try {
-              console.log("Testing base domain...");
-              const baseResponse = await fetch('https://yourdai.be', {
-                method: 'GET',
-                mode: 'no-cors' // Try with no-cors to at least verify connectivity
-              });
-              console.log("Base domain response type:", baseResponse.type);
-            } catch (baseError) {
-              console.error("Base domain test failed:", baseError);
+              const healthData = await healthResponse.json();
+              console.log("Health data:", healthData);
+            } catch (e) {
+              console.error("Could not parse health response as JSON", e);
             }
-            
-            // Test API root
-            try {
-              console.log("Testing API root...");
-              const apiRootResponse = await fetch('https://yourdai.be/api', {
-                method: 'GET',
-                mode: 'no-cors'
-              });
-              console.log("API root response type:", apiRootResponse.type);
-            } catch (apiRootError) {
-              console.error("API root test failed:", apiRootError);
-            }
-            
-            // Try the actual endpoint with a timeout
-            console.log("Testing actual endpoint...");
-            const apiUrl = 'https://yourdai.be/api/auth/user';
-            console.log("API URL:", apiUrl);
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-            
-            try {
-              // First try a GET request to see if the endpoint exists
-              console.log("Trying GET request to endpoint...");
-              const getResponse = await fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${idToken}`
-                },
-                signal: controller.signal
-              }).catch(e => {
-                console.error("GET request failed:", e);
-                return null;
-              });
-              
-              if (getResponse) {
-                console.log("GET response status:", getResponse.status);
-              }
-              
-              // Now try the POST request
-              console.log("Trying POST request to endpoint...");
-              const userData = {
-                googleId: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                hasCalendarAccess: false
-              };
-              
-              const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify(userData),
-                signal: controller.signal
-              });
-              
-              clearTimeout(timeoutId);
-              
-              console.log("POST response status:", response.status);
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Error details:', errorText);
-              } else {
-                console.log("User successfully stored in database");
-              }
-            } catch (fetchError) {
-              clearTimeout(timeoutId);
-              console.error('Fetch error:', fetchError);
-              
-              // Try alternative API URL formats
-              console.log("Trying alternative API URL formats...");
-              
-              // Try with api subdomain
-              try {
-                console.log("Trying api.yourdai.be...");
-                const altResponse = await fetch(`https://api.yourdai.be/auth/user`, {
-                  method: 'GET',
-                  mode: 'no-cors'
-                });
-                console.log("Alternative domain response type:", altResponse.type);
-              } catch (altError) {
-                console.error("Alternative domain test failed:", altError);
-              }
-            }
-          } catch (error) {
-            console.error('Error in auth flow:', error);
+          } catch (healthError) {
+            console.error("Health check failed:", healthError);
           }
+          
+          // Now try the user endpoint
+          const apiUrl = `${apiBaseUrl}/api/auth/user`;
+          console.log("Attempting to store user at:", apiUrl);
+          
+          // Create a longer timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            console.error("Request to user endpoint timed out after 20 seconds");
+            controller.abort();
+          }, 20000);
+          
+          // Try to store the user, but don't block the UI flow
+          fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              googleId: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              hasCalendarAccess: false
+            }),
+            signal: controller.signal
+          })
+          .then(response => {
+            clearTimeout(timeoutId);
+            console.log("User endpoint status:", response.status);
+            if (!response.ok) {
+              return response.text().then(text => {
+                console.error('Error storing user:', text);
+                throw new Error(text);
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log("User stored successfully:", data);
+          })
+          .catch(error => {
+            // Only log the error but don't prevent the user from using the app
+            console.error("Error storing user (non-blocking):", error);
+            
+            // Fall back to using the application without server-side user storage
+            console.log("Continuing without server-side user storage");
+          });
+          
+          // Continue authentication flow without waiting for user storage
+          console.log("Authentication completed successfully");
+        } catch (error) {
+          console.error("Authentication process error:", error);
         }
-      });
-    
-      // Cleanup subscription
-      return () => unsubscribe();
-    }, []);
-
+      }
+    });
+  
+    // Cleanup subscription
+    return () => unsubscribe();
+  }, []);
   // Add this to your useEffect to handle the redirect result
   useEffect(() => {
     const handleRedirectResult = async () => {
