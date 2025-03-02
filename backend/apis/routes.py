@@ -33,14 +33,19 @@ def add_cors_headers(response):
     allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
                              "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(",")
     
-    # If origin is in the allowed list, add CORS headers
+    # If origin is in the allowed list, add CORS headers (only if not already present)
     if origin in allowed_origins:
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 
-                           'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-        response.headers.add('Access-Control-Allow-Methods', 
-                           'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        # Only add headers if they don't already exist
+        if 'Access-Control-Allow-Origin' not in response.headers:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+        if 'Access-Control-Allow-Headers' not in response.headers:
+            response.headers.add('Access-Control-Allow-Headers', 
+                               'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+        if 'Access-Control-Allow-Methods' not in response.headers:
+            response.headers.add('Access-Control-Allow-Methods', 
+                               'GET, POST, PUT, DELETE, OPTIONS')
+        if 'Access-Control-Allow-Credentials' not in response.headers:
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
     
     return response
 
