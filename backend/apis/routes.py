@@ -4,8 +4,12 @@ import traceback
 from bson import ObjectId
 from datetime import datetime, timezone 
 from backend.models.task import Task
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 import json
+import firebase_admin
+from firebase_admin import auth as firebase_auth
+from firebase_admin import credentials
+import os
 # Import AI service functions directly
 from backend.services.ai_service import (
     generate_schedule,
@@ -18,6 +22,70 @@ import uuid
 
 api_bp = Blueprint("api", __name__)
 
+if not firebase_admin._apps:
+    # Use environment variable or path to service account credentials
+    cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH', 'path/to/serviceAccountKey.json')
+    try:
+        # Try to initialize with credentials file
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        # Fallback to default credentials (for production environment)
+        print(f"Warning: Using default credentials. Error: {e}")
+        firebase_admin.initialize_app()
+
+def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Verify a Firebase ID token and return the decoded token.
+    
+    Args:
+        token: The Firebase ID token to verify
+        
+    Returns:
+        The decoded token payload or None if verification fails
+    """
+    try:
+        # Verify the token
+        decoded_token = firebase_auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        print(f"Token verification error: {e}")
+        traceback.print_exc()
+        return None
+
+def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Get user data from database using a verified Firebase token.
+    
+    Args:
+        token: The Firebase ID token
+        
+    Returns:
+        User document from database or None if not found
+    """
+    try:
+        # Verify the token first
+        decoded_token = verify_firebase_token(token)
+        if not decoded_token:
+            return None
+            
+        # Extract user ID (Firebase UID)
+        user_id = decoded_token.get('uid')
+        if not user_id:
+            return None
+            
+        # Get database instance
+        db = get_database()
+        users = db['users']
+        
+        # Find user by Google ID (which is the Firebase UID)
+        user = users.find_one({"googleId": user_id})
+        return user
+    except Exception as e:
+        print(f"Error getting user from token: {e}")
+        traceback.print_exc()
+        return None
+    
 @api_bp.route("/auth/user", methods=["POST", "GET"])
 def create_or_get_user():
     """
@@ -31,23 +99,33 @@ def create_or_get_user():
             # Check if Authorization header is provided
             auth_header = request.headers.get('Authorization')
             if auth_header and auth_header.startswith('Bearer '):
-                # Extract token and get user ID (implementation depends on your auth system)
-                # This is a simplified example - you'll need to implement token verification
+                # Extract token
                 token = auth_header.split(' ')[1]
-                # Get user based on verified token
-                # user = get_user_from_token(token)  # You would implement this function
                 
-                # For now, return a placeholder response
-                return jsonify({
-                    "message": "Authentication required",
-                    "details": "Please use POST method with user credentials to create or update user"
-                }), 200
+                # Get user based on verified token
+                user = get_user_from_token(token)
+                
+                if user:
+                    # Process user for JSON serialization
+                    serialized_user = process_user_for_response(user)
+                    return jsonify({
+                        "user": serialized_user,
+                        "authenticated": True
+                    }), 200
+                else:
+                    return jsonify({
+                        "error": "Authentication failed",
+                        "message": "Invalid token or user not found"
+                    }), 401
             else:
                 # No auth header, return API info
                 return jsonify({
                     "endpoint": "/api/auth/user",
                     "methods": ["GET", "POST"],
                     "description": "User authentication endpoint",
+                    "GET_parameters": {
+                        "Authorization": "Bearer <firebase_id_token> (required in header)"
+                    },
                     "POST_parameters": {
                         "googleId": "string (required)",
                         "email": "string (required)",
