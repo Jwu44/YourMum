@@ -1,9 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  images: {
-    unoptimized: true
-  },
   // Keep your existing rewrites if needed for development
   async rewrites() {
     if (process.env.NODE_ENV === 'development') {
