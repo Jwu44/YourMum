@@ -7,7 +7,7 @@ Steps to replicate:
 4. Bug: Access https://yourdai.be/api/auth/user to create and store user
 
 Expected outcome: 
-- api should be accessible, not blocked by cars
+- api should be accessible, not blocked by cors. 
 - user is created and stored in the "users" table in mongodb
 
 Notes:
