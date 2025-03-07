@@ -73,5 +73,11 @@
   "glob": "^11.0.1",
   "@humanwhocodes/object-schema": "npm:@eslint/object-schema@latest",
   "@humanwhocodes/config-array": "npm:@eslint/config-array@latest"
+  },
+  "overrides": {
+    "inflight": "npm:lru-cache@^11.0.2",
+    "glob": "^11.0.1",
+    "@humanwhocodes/object-schema": "npm:@eslint/object-schema@latest",
+    "@humanwhocodes/config-array": "npm:@eslint/config-array@latest"
   }
 }
