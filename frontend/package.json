@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node server.mjs",
     "build": "next build",
+    "export": "next export",
     "deploy": "next build && firebase deploy --only hosting",
     "start": "NODE_ENV=production node server.mjs",
     "lint": "next lint",
