@@ -31,7 +31,7 @@ export const submitFormData = async (formData: FormData) => {
   console.log("Form Data Before Submission:", formData);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/submit_data`, {
+    const response = await fetch(`${API_BASE_URL}/api/submit_data`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)

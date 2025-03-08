@@ -14,7 +14,7 @@ export const categorizeTask = async (taskText: string) => {
     // Create new promise for categorization
     const categorizationPromise = (async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/categorize_task`, {
+            const response = await fetch(`${API_BASE_URL}/api/categorize_task`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
