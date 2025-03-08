@@ -13,10 +13,10 @@ import os
 # Import AI service functions directly
 from backend.services.ai_service import (
     generate_schedule,
-    categorize_task as ai_categorize_task,
-    decompose_task as ai_decompose_task,
+    categorize_task,
+    decompose_task,
     update_decomposition_patterns,
-    generate_schedule_suggestions as ai_generate_schedule_suggestions
+    generate_schedule_suggestions
 )
 import uuid
 
@@ -399,11 +399,8 @@ def submit_data():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/categorize_task", methods=["POST", "OPTIONS"])
+@api_bp.route("/categorize_task", methods=["POST"])
 def api_categorize_task():
-    # Handle OPTIONS request (preflight) for CORS
-    if request.method == "OPTIONS":
-        return jsonify({"status": "ok"}), 200
     try:
         data = request.json
         if not data or 'task' not in data:
@@ -412,7 +409,7 @@ def api_categorize_task():
         task_text = data['task']
         
         # Call AI service directly
-        categories = ai_categorize_task(task_text)
+        categories = categorize_task(task_text)
         
         # Create a Task object
         task = Task(id=str(uuid.uuid4()), text=task_text, categories=categories)
@@ -726,7 +723,7 @@ def api_decompose_task():
         }
         
         # Call AI service directly
-        result = ai_decompose_task(task_data, user_data)
+        result = decompose_task(task_data, user_data)
         
         # Handle different response formats safely
         if result:
@@ -885,7 +882,7 @@ def api_generate_suggestions():
         print(data)
         try:
             # Call AI service directly
-            suggestions = ai_generate_schedule_suggestions(
+            suggestions = generate_schedule_suggestions(
                 user_id=data['userId'],
                 current_schedule=data['currentSchedule'],
                 historical_schedules=data['historicalSchedules'],

@@ -6,8 +6,6 @@ This module provides direct access to AI services for:
 - Task categorization
 - Task decomposition
 - Schedule suggestions
-
-It replaces the external API calls to Colab with local function calls.
 """
 
 import os
