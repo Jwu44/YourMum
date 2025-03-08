@@ -19,7 +19,9 @@ export const categorizeTask = async (taskText: string) => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ task: taskText })
+                body: JSON.stringify({ task: taskText }),
+                // Add credentials to ensure cookies are sent with the request if needed
+                credentials: 'include'
             });
 
             if (!response.ok) {
