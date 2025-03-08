@@ -368,18 +368,7 @@ def submit_data():
 
         # Ensure tasks are properly serialized before processing
         if 'tasks' in user_data:
-            # Convert any Task objects to dictionaries
-            serialized_tasks = []
-            for task in user_data['tasks']:
-                if isinstance(task, Task):
-                    serialized_tasks.append(task.to_dict())
-                elif isinstance(task, dict):
-                    serialized_tasks.append(task)
-                else:
-                    # Handle unexpected types
-                    print(f"Warning: Unexpected task type: {type(task)}")
-                    continue
-            user_data['tasks'] = serialized_tasks
+            user_data['tasks'] = serialize_tasks(user_data['tasks'])
         
         # Call AI service directly
         result = generate_schedule(user_data)
@@ -387,6 +376,9 @@ def submit_data():
         print("Response from AI service:", result)
 
         if result and 'schedule' in result:
+            # Serialize any Task objects in the schedule
+            serialized_schedule = serialize_tasks(result['schedule'])
+            
             user_schedules = get_user_schedules_collection()
 
             # Prepare the schedule document with more detailed information
@@ -401,9 +393,9 @@ def submit_data():
                     "energy_patterns": user_data.get('energy_patterns', []),
                     "layout_preference": user_data.get('layout_preference', {}),
                     "priorities": user_data.get('priorities', {}),
-                    "tasks": user_data.get('tasks', [])  # Now contains only dictionaries
+                    "tasks": user_data.get('tasks', [])
                 },
-                "schedule": result['schedule'],
+                "schedule": serialized_schedule,
                 "metadata": {
                     "generated_at": datetime.now().isoformat(),
                     "source": "ai_service"
@@ -976,3 +968,25 @@ def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) ->
         print(f"Error storing suggestions: {e}")
         # Return original suggestions if storage fails
         return suggestions
+
+def serialize_tasks(tasks_list):
+    """
+    Convert Task objects to dictionaries for MongoDB storage.
+    
+    Args:
+        tasks_list: List of tasks (can be Task objects or dictionaries)
+        
+    Returns:
+        List of task dictionaries suitable for MongoDB storage
+    """
+    serialized_tasks = []
+    for task in tasks_list:
+        if isinstance(task, Task):
+            serialized_tasks.append(task.to_dict())
+        elif isinstance(task, dict):
+            serialized_tasks.append(task)
+        else:
+            # Handle unexpected types
+            print(f"Warning: Unexpected task type: {type(task)}")
+            continue
+    return serialized_tasks
