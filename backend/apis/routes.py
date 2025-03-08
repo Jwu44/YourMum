@@ -366,10 +366,20 @@ def submit_data():
         
         print(f"User data received for user {user_id}:", user_data)
 
-        # Convert Task objects to dictionaries if needed
+        # Ensure tasks are properly serialized before processing
         if 'tasks' in user_data:
-            user_data['tasks'] = [task if isinstance(task, Task) else Task.from_dict(task) 
-                                 for task in user_data['tasks']]
+            # Convert any Task objects to dictionaries
+            serialized_tasks = []
+            for task in user_data['tasks']:
+                if isinstance(task, Task):
+                    serialized_tasks.append(task.to_dict())
+                elif isinstance(task, dict):
+                    serialized_tasks.append(task)
+                else:
+                    # Handle unexpected types
+                    print(f"Warning: Unexpected task type: {type(task)}")
+                    continue
+            user_data['tasks'] = serialized_tasks
         
         # Call AI service directly
         result = generate_schedule(user_data)
@@ -391,7 +401,7 @@ def submit_data():
                     "energy_patterns": user_data.get('energy_patterns', []),
                     "layout_preference": user_data.get('layout_preference', {}),
                     "priorities": user_data.get('priorities', {}),
-                    "tasks": user_data.get('tasks', [])
+                    "tasks": user_data.get('tasks', [])  # Now contains only dictionaries
                 },
                 "schedule": result['schedule'],
                 "metadata": {
