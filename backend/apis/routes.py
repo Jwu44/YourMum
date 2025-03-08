@@ -33,20 +33,31 @@ def add_cors_headers(response):
     allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
                              "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(",")
     
-    # If origin is in the allowed list, add CORS headers (only if not already present)
+    # If origin is in the allowed list, add CORS headers
     if origin in allowed_origins:
-        # Only add headers if they don't already exist
-        if 'Access-Control-Allow-Origin' not in response.headers:
-            response.headers.add('Access-Control-Allow-Origin', origin)
-        if 'Access-Control-Allow-Headers' not in response.headers:
-            response.headers.add('Access-Control-Allow-Headers', 
-                               'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-        if 'Access-Control-Allow-Methods' not in response.headers:
-            response.headers.add('Access-Control-Allow-Methods', 
-                               'GET, POST, PUT, DELETE, OPTIONS')
-        if 'Access-Control-Allow-Credentials' not in response.headers:
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', 
+                           'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+        response.headers.add('Access-Control-Allow-Methods', 
+                           'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
     
+    return response
+
+# Add a global OPTIONS request handler for all routes
+@api_bp.route('/<path:path>', methods=['OPTIONS'])
+@api_bp.route('/', methods=['OPTIONS'])
+def handle_options_requests(path=None):
+    """
+    Handle OPTIONS preflight requests for all API routes.
+    
+    Args:
+        path: Optional path parameter for route matching
+        
+    Returns:
+        JSON response with 200 OK status for preflight requests
+    """
+    response = jsonify({"status": "ok"})
     return response
 
 if not firebase_admin._apps:
