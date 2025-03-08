@@ -399,8 +399,11 @@ def submit_data():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/categorize_task", methods=["POST"])
+@api_bp.route("/categorize_task", methods=["POST", "OPTIONS"])
 def api_categorize_task():
+    # Handle OPTIONS request (preflight) for CORS
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
     try:
         data = request.json
         if not data or 'task' not in data:
