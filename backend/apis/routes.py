@@ -969,24 +969,26 @@ def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) ->
         # Return original suggestions if storage fails
         return suggestions
 
-def serialize_tasks(tasks_list):
+def serialize_tasks(data):
     """
-    Convert Task objects to dictionaries for MongoDB storage.
+    Recursively convert Task objects to dictionaries throughout a data structure.
+    Works with lists, dictionaries, and individual items.
     
     Args:
-        tasks_list: List of tasks (can be Task objects or dictionaries)
+        data: Any data structure that might contain Task objects
         
     Returns:
-        List of task dictionaries suitable for MongoDB storage
+        The data structure with all Task objects converted to dictionaries
     """
-    serialized_tasks = []
-    for task in tasks_list:
-        if isinstance(task, Task):
-            serialized_tasks.append(task.to_dict())
-        elif isinstance(task, dict):
-            serialized_tasks.append(task)
-        else:
-            # Handle unexpected types
-            print(f"Warning: Unexpected task type: {type(task)}")
-            continue
-    return serialized_tasks
+    if isinstance(data, Task):
+        # If it's a Task object, convert to dictionary
+        return data.to_dict()
+    elif isinstance(data, list):
+        # If it's a list, process each item
+        return [serialize_tasks(item) for item in data]
+    elif isinstance(data, dict):
+        # If it's a dictionary, process each value
+        return {key: serialize_tasks(value) for key, value in data.items()}
+    else:
+        # Return other types unchanged (int, str, bool, etc.)
+        return data
