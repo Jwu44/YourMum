@@ -367,7 +367,12 @@ def submit_data():
 
         print("Response from AI service:", result)
 
-        if result and 'schedule' in result:
+        # Ensure the result is properly formatted for the frontend
+        if isinstance(result, dict) and 'schedule' in result:
+            # If schedule is a string (formatted text), wrap it with <schedule> tags
+            if isinstance(result['schedule'], str):
+                result['schedule'] = f"<schedule>{result['schedule']}</schedule>"
+            
             user_schedules = get_user_schedules_collection()
 
             # Prepare the schedule document with more detailed information
@@ -396,6 +401,18 @@ def submit_data():
             
             # Insert the schedule document
             user_schedules.insert_one(schedule_document)
+        else:
+            # If result doesn't have the expected structure, format it properly
+            if isinstance(result, str):
+                result = {
+                    "success": True,
+                    "schedule": f"<schedule>{result}</schedule>"
+                }
+            else:
+                result = {
+                    "success": False,
+                    "error": "Invalid schedule format from AI service"
+                }
 
         return jsonify(result)
         
