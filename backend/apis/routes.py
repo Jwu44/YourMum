@@ -365,59 +365,19 @@ def submit_data():
         
         # Call AI service directly
         result = generate_schedule(user_data)
-
         print("Response from AI service:", result)
-
-        # Ensure the result is properly formatted for frontend
-        formatted_response = {}
         
-        if isinstance(result, str):
-            # If result is a plain string, wrap it with <schedule> tags if not already present
-            if "<schedule>" not in result:
-                formatted_response = {
-                    "success": True,
-                    "schedule": f"<schedule>{result}</schedule>"
-                }
-            else:
-                formatted_response = {
-                    "success": True,
-                    "schedule": result
-                }
-        elif isinstance(result, dict):
-            # If result is already a dict, ensure it has the proper structure
-            if "schedule" in result:
-                # If schedule is a string without tags, add them
-                if isinstance(result["schedule"], str) and "<schedule>" not in result["schedule"]:
-                    result["schedule"] = f"<schedule>{result['schedule']}</schedule>"
-                formatted_response = result
-            else:
-                # Dict without a schedule property
-                formatted_response = {
-                    "success": False,
-                    "error": "Invalid schedule format"
-                }
-        else:
-            # Unexpected result type
-            formatted_response = {
-                "success": False,
-                "error": "Invalid response format from AI service"
-            }
+        if not result.get("success", False):
+            return jsonify(result), 400
         
         # Store the schedule in the database
         try:
             user_schedules = get_user_schedules_collection()
             
-            # Prepare the schedule document
-            schedule_content = formatted_response.get("schedule", "")
-            if isinstance(schedule_content, str) and "<schedule>" in schedule_content:
-                # Extract schedule content from tags
-                schedule_match = re.search(r'<schedule>([\s\S]*?)</schedule>', schedule_content)
-                if schedule_match:
-                    schedule_text = schedule_match.group(1).strip()
-                else:
-                    schedule_text = schedule_content
-            else:
-                schedule_text = str(schedule_content)
+            # Extract schedule content from tags for storage
+            schedule_content = result.get("schedule", "")
+            schedule_match = re.search(r'<schedule>([\s\S]*?)</schedule>', schedule_content)
+            schedule_text = schedule_match.group(1).strip() if schedule_match else schedule_content
             
             # Create schedule document
             schedule_document = {
@@ -433,15 +393,22 @@ def submit_data():
             
             # Serialize any Task objects and insert into database
             schedule_document = serialize_tasks(schedule_document)
-            user_schedules.insert_one(schedule_document)
+            result = user_schedules.insert_one(schedule_document)
+            
+            # Add the document ID to the response
+            response_data = {
+                "success": True,
+                "schedule": result.get("schedule"),
+                "scheduleId": str(result.inserted_id)
+            }
             
             print("Schedule saved to database successfully")
+            return jsonify(response_data)
             
         except Exception as db_error:
             print(f"Error saving schedule to database: {str(db_error)}")
-            # Continue to return the response even if DB save fails
-        
-        return jsonify(formatted_response)
+            # Still return the schedule even if DB save fails
+            return jsonify(result)
         
     except Exception as e:
         print(f"Error in submit_data: {str(e)}")

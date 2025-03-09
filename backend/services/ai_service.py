@@ -504,7 +504,7 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         user_data: Dictionary containing user preferences and tasks
         
     Returns:
-        Dictionary containing the generated schedule
+        Dictionary containing the generated schedule with consistent format
     """
     try:
         # Convert Task objects to dictionaries if needed
@@ -533,24 +533,29 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Extract schedule from response
         schedule_text = response.content[0].text
-
-        # Extract only the content between <schedule> tags
+        
+        # Extract content between <schedule> tags
         schedule_match = re.search(r'<schedule>([\s\S]*?)<\/schedule>', schedule_text)
         if schedule_match:
             schedule_content = schedule_match.group(1).strip()
-            # Return the schedule with tags to ensure frontend can parse it correctly
-            return {"schedule": f"<schedule>{schedule_content}</schedule>"}
+            return {
+                "success": True,
+                "schedule": f"<schedule>{schedule_content}</schedule>"
+            }
         else:
             print("No <schedule> tags found in AI response")
-            # Fallback to returning the full text if no schedule tags are found
-            return {"schedule": schedule_text}
-        
-        # Return the schedule
-        return {"schedule": schedule_text}
+            return {
+                "success": False,
+                "error": "No schedule found in AI response",
+                "raw_response": schedule_text
+            }
         
     except Exception as e:
         print(f"Error generating schedule: {str(e)}")
-        raise
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 def categorize_task(task_text: str) -> List[str]:
     """
