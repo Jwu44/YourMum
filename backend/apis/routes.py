@@ -10,6 +10,7 @@ import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
 import os
+import re
 # Import AI service functions directly
 from backend.services.ai_service import (
     generate_schedule,
@@ -367,59 +368,85 @@ def submit_data():
 
         print("Response from AI service:", result)
 
-        # Ensure the result is properly formatted for the frontend
-        if isinstance(result, dict) and 'schedule' in result:
-            # If schedule is a string (formatted text), wrap it with <schedule> tags
-            if isinstance(result['schedule'], str):
-                result['schedule'] = f"<schedule>{result['schedule']}</schedule>"
-            
-            user_schedules = get_user_schedules_collection()
-
-            # Prepare the schedule document with more detailed information
-            schedule_document = {
-                "userId": user_id,
-                "date": datetime.now().isoformat(),
-                "inputs": {
-                    "name": user_data.get('name'),
-                    "age": user_data.get('age'),
-                    "work_start_time": user_data.get('work_start_time'),
-                    "work_end_time": user_data.get('work_end_time'),
-                    "energy_patterns": user_data.get('energy_patterns', []),
-                    "layout_preference": user_data.get('layout_preference', {}),
-                    "priorities": user_data.get('priorities', {}),
-                    "tasks": user_data.get('tasks', [])
-                },
-                "schedule": result['schedule'],
-                "metadata": {
-                    "generated_at": datetime.now().isoformat(),
-                    "source": "ai_service"
-                }
-            }
-            
-            # Serialize the entire document to ensure all Task objects are converted
-            schedule_document = serialize_tasks(schedule_document)
-            
-            # Insert the schedule document
-            user_schedules.insert_one(schedule_document)
-        else:
-            # If result doesn't have the expected structure, format it properly
-            if isinstance(result, str):
-                result = {
+        # Ensure the result is properly formatted for frontend
+        formatted_response = {}
+        
+        if isinstance(result, str):
+            # If result is a plain string, wrap it with <schedule> tags if not already present
+            if "<schedule>" not in result:
+                formatted_response = {
                     "success": True,
                     "schedule": f"<schedule>{result}</schedule>"
                 }
             else:
-                result = {
-                    "success": False,
-                    "error": "Invalid schedule format from AI service"
+                formatted_response = {
+                    "success": True,
+                    "schedule": result
                 }
-
-        return jsonify(result)
+        elif isinstance(result, dict):
+            # If result is already a dict, ensure it has the proper structure
+            if "schedule" in result:
+                # If schedule is a string without tags, add them
+                if isinstance(result["schedule"], str) and "<schedule>" not in result["schedule"]:
+                    result["schedule"] = f"<schedule>{result['schedule']}</schedule>"
+                formatted_response = result
+            else:
+                # Dict without a schedule property
+                formatted_response = {
+                    "success": False,
+                    "error": "Invalid schedule format"
+                }
+        else:
+            # Unexpected result type
+            formatted_response = {
+                "success": False,
+                "error": "Invalid response format from AI service"
+            }
+        
+        # Store the schedule in the database
+        try:
+            user_schedules = get_user_schedules_collection()
+            
+            # Prepare the schedule document
+            schedule_content = formatted_response.get("schedule", "")
+            if isinstance(schedule_content, str) and "<schedule>" in schedule_content:
+                # Extract schedule content from tags
+                schedule_match = re.search(r'<schedule>([\s\S]*?)</schedule>', schedule_content)
+                if schedule_match:
+                    schedule_text = schedule_match.group(1).strip()
+                else:
+                    schedule_text = schedule_content
+            else:
+                schedule_text = str(schedule_content)
+            
+            # Create schedule document
+            schedule_document = {
+                "userId": user_id,
+                "date": datetime.now().isoformat(),
+                "inputs": user_data,
+                "schedule": schedule_text,
+                "metadata": {
+                    "created_at": datetime.now().isoformat(),
+                    "source": "ai_service"
+                }
+            }
+            
+            # Serialize any Task objects and insert into database
+            schedule_document = serialize_tasks(schedule_document)
+            user_schedules.insert_one(schedule_document)
+            
+            print("Schedule saved to database successfully")
+            
+        except Exception as db_error:
+            print(f"Error saving schedule to database: {str(db_error)}")
+            # Continue to return the response even if DB save fails
+        
+        return jsonify(formatted_response)
         
     except Exception as e:
         print(f"Error in submit_data: {str(e)}")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "success": False}), 500
 
 @api_bp.route("/categorize_task", methods=["POST"])
 def api_categorize_task():
