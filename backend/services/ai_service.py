@@ -533,6 +533,17 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         
         # Extract schedule from response
         schedule_text = response.content[0].text
+
+        # Extract only the content between <schedule> tags
+        schedule_match = re.search(r'<schedule>([\s\S]*?)<\/schedule>', schedule_text)
+        if schedule_match:
+            schedule_content = schedule_match.group(1).strip()
+            # Return the schedule with tags to ensure frontend can parse it correctly
+            return {"schedule": f"<schedule>{schedule_content}</schedule>"}
+        else:
+            print("No <schedule> tags found in AI response")
+            # Fallback to returning the full text if no schedule tags are found
+            return {"schedule": schedule_text}
         
         # Return the schedule
         return {"schedule": schedule_text}
