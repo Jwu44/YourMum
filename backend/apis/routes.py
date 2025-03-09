@@ -438,8 +438,11 @@ def api_categorize_task():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/update_parsed_schedule", methods=["POST"])
+@api_bp.route("/update_parsed_schedule", methods=["POST", "OPTIONS"])
 def update_parsed_schedule():
+    # Handle OPTIONS request for CORS preflight
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
     try:
         data = request.json
         if not data or 'scheduleId' not in data or 'parsedTasks' not in data:
@@ -661,9 +664,12 @@ def update_schedule(date):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/schedules/range", methods=["GET"])
+@api_bp.route("/schedules/range", methods=["GET", "OPTIONS"])
 def get_schedules_range():
     """Retrieve schedules within a date range."""
+    # Handle OPTIONS request for CORS preflight
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
     try:
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')

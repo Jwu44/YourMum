@@ -273,7 +273,7 @@ const createSectionTask = (text: string, section: string ): Task => ({
 const syncParsedScheduleWithBackend = async (scheduleId: string, parsedTasks: Task[]): Promise<void> => {
   try {
     // Send parsed tasks to backend for syncing
-    const response = await fetch(`${API_BASE_URL}/update_parsed_schedule`, {
+    const response = await fetch(`${API_BASE_URL}/api/update_parsed_schedule`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -365,7 +365,7 @@ export const generateNextDaySchedule = async (
 
     if (userData.user?.calendar?.connected) {
       try {
-        const calendarResponse = await fetch(`${API_BASE_URL}/calendar/sync/next-day`, {
+        const calendarResponse = await fetch(`${API_BASE_URL}/api/calendar/sync/next-day`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -421,7 +421,7 @@ export const generateNextDaySchedule = async (
     let existingRecurringTasks: Task[] = [];
     try {
       const existingRecurringTasksResponse = await fetchWithTimeout(
-        `${API_BASE_URL}/get_recurring_tasks`,
+        `${API_BASE_URL}/api/get_recurring_tasks`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -596,7 +596,7 @@ export const generateNextDaySchedule = async (
       };
 
       // Attempt to save the schedule
-      const saveResponse = await fetch(`${API_BASE_URL}/schedules`, {
+      const saveResponse = await fetch(`${API_BASE_URL}/api/schedules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scheduleDocument)
@@ -974,7 +974,7 @@ export const loadScheduleForDate = async (date: string): Promise<{
   error?: string 
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/schedules/${date}`, {
+    const response = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -1014,7 +1014,7 @@ export const updateScheduleForDate = async (
   tasks: Task[]
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/schedules/${date}`, {
+    const response = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tasks })
@@ -1045,7 +1045,7 @@ export const loadSchedulesRange = async (
 }> => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/schedules/range?start_date=${startDate}&end_date=${endDate}`,
+      `${API_BASE_URL}/api/schedules/range?start_date=${startDate}&end_date=${endDate}`,
       {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
@@ -1091,7 +1091,7 @@ export const handleMicrostepDecomposition = async (
       work_end_time: formData.work_end_time
     };
 
-    const response = await fetch(`${API_BASE_URL}/tasks/decompose`, {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/decompose`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1129,7 +1129,7 @@ export const submitMicrostepFeedback = async (
       timestamp: new Date().toISOString()
     };
 
-    const response = await fetch(`${API_BASE_URL}/tasks/microstep-feedback`, {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/microstep-feedback`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1234,7 +1234,7 @@ export const fetchAISuggestions = async (
   energyPatterns: string[]
 ): Promise<GetAISuggestionsResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/schedule/suggestions`, {
+    const response = await fetch(`${API_BASE_URL}/api/schedule/suggestions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1279,7 +1279,7 @@ export const checkScheduleExists = async (date: Date): Promise<boolean> => {
     
     // Use the range endpoint with a single day range for efficiency
     const response = await fetch(
-      `${API_BASE_URL}/schedules/range?start_date=${dateStr}&end_date=${dateStr}`
+      `${API_BASE_URL}/api/schedules/range?start_date=${dateStr}&end_date=${dateStr}`
     );
 
     if (!response.ok) {
