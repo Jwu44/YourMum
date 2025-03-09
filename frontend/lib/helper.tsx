@@ -49,6 +49,18 @@ export const submitFormData = async (formData: FormData) => {
 };
 
 export const extractSchedule = (response: ScheduleResponse | string): string => {
+  // Handle response being an object with schedule property
+  if (response && typeof response === 'object' && 'schedule' in response) {
+    const scheduleStr = response.schedule;
+    if (typeof scheduleStr === 'string') {
+      const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
+      const match = scheduleStr.match(scheduleRegex);
+      if (match) return match[1].trim();
+    }
+    return String(scheduleStr); // Fallback
+  }
+  
+  // Handle response with tasks array
   if (response && typeof response === 'object' && 'tasks' in response) {
     // Convert tasks array to schedule string format
     return response.tasks
@@ -59,13 +71,14 @@ export const extractSchedule = (response: ScheduleResponse | string): string => 
       .join('\n');
   }
   
+  // Handle direct string response
   if (typeof response === 'string') {
     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
     const match = response.match(scheduleRegex);
     if (match) return match[1].trim();
   }
   
-  console.warn("No valid schedule found in the response.");
+  console.warn("No valid schedule found in the response:", response);
   return '';
 };
 
