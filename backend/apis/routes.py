@@ -364,18 +364,18 @@ def submit_data():
         print(f"User data received for user {user_id}:", user_data)
         
         # Call AI service directly
-        result = generate_schedule(user_data)
-        print("Response from AI service:", result)
+        ai_result = generate_schedule(user_data)
+        print("Response from AI service:", ai_result)
         
-        if not result.get("success", False):
-            return jsonify(result), 400
+        if not ai_result.get("success", False):
+            return jsonify(ai_result), 400
         
         # Store the schedule in the database
         try:
             user_schedules = get_user_schedules_collection()
             
             # Extract schedule content from tags for storage
-            schedule_content = result.get("schedule", "")
+            schedule_content = ai_result.get("schedule", "")
             schedule_match = re.search(r'<schedule>([\s\S]*?)</schedule>', schedule_content)
             schedule_text = schedule_match.group(1).strip() if schedule_match else schedule_content
             
@@ -393,13 +393,13 @@ def submit_data():
             
             # Serialize any Task objects and insert into database
             schedule_document = serialize_tasks(schedule_document)
-            result = user_schedules.insert_one(schedule_document)
+            db_result = user_schedules.insert_one(schedule_document)
             
-            # Add the document ID to the response
+            # Create response with schedule and new document ID
             response_data = {
                 "success": True,
-                "schedule": result.get("schedule"),
-                "scheduleId": str(result.inserted_id)
+                "schedule": schedule_content,  # Keep original schedule with tags
+                "scheduleId": str(db_result.inserted_id)
             }
             
             print("Schedule saved to database successfully")
@@ -407,8 +407,8 @@ def submit_data():
             
         except Exception as db_error:
             print(f"Error saving schedule to database: {str(db_error)}")
-            # Still return the schedule even if DB save fails
-            return jsonify(result)
+            # Still return the AI result if DB save fails
+            return jsonify(ai_result)
         
     except Exception as e:
         print(f"Error in submit_data: {str(e)}")
