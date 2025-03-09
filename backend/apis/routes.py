@@ -361,10 +361,6 @@ def submit_data():
         user_id = user_data['name']
         
         print(f"User data received for user {user_id}:", user_data)
-
-        # Ensure tasks are properly serialized before processing
-        if 'tasks' in user_data:
-            user_data['tasks'] = serialize_tasks(user_data['tasks'])
         
         # Call AI service directly
         result = generate_schedule(user_data)
@@ -372,9 +368,6 @@ def submit_data():
         print("Response from AI service:", result)
 
         if result and 'schedule' in result:
-            # Serialize any Task objects in the schedule
-            serialized_schedule = serialize_tasks(result['schedule'])
-            
             user_schedules = get_user_schedules_collection()
 
             # Prepare the schedule document with more detailed information
@@ -391,12 +384,15 @@ def submit_data():
                     "priorities": user_data.get('priorities', {}),
                     "tasks": user_data.get('tasks', [])
                 },
-                "schedule": serialized_schedule,
+                "schedule": result['schedule'],
                 "metadata": {
                     "generated_at": datetime.now().isoformat(),
                     "source": "ai_service"
                 }
             }
+            
+            # Serialize the entire document to ensure all Task objects are converted
+            schedule_document = serialize_tasks(schedule_document)
             
             # Insert the schedule document
             user_schedules.insert_one(schedule_document)

@@ -45,6 +45,8 @@ To optimize query performance, we maintain the following indexes:
 - ObjectId fields are converted to strings for JSON serialization
 - Datetime objects are converted to ISO format strings
 - Nested objects are flattened where appropriate to reduce document size
+- Custom Python objects (like Task instances) are serialized to dictionaries before MongoDB storage using the `serialize_tasks()` utility function
+- Serialization is applied to entire document structures to ensure all nested objects are properly converted
 
 ### Large Object Handling
 
@@ -59,10 +61,10 @@ For large objects such as user profile images:
 - Flask application is configured with appropriate worker processes based on instance size
 - MongoDB connection pooling is implemented to efficiently reuse connections
 - Memory-intensive operations (like AI processing) are executed asynchronously
+- Custom Python objects are properly serialized before database storage to prevent InvalidDocument errors
 
 ### Frontend Memory Considerations
 
 - React component memoization is used to prevent unnecessary re-renders
 - Large lists implement virtualization to render only visible items
 - Images are lazy-loaded and properly sized to reduce memory usage
-
