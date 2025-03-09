@@ -131,16 +131,12 @@ def create_or_get_user():
     POST: Create/update user with Google Auth data
     GET: Return user info if Authorization header is provided, otherwise return API info
     OPTIONS: Handle preflight requests for CORS
-    """
+    """ 
     # Handle OPTIONS request (preflight) for CORS
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", request.headers.get("Origin", "*"))
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Max-Age", "3600")
+        # Don't add CORS headers here - they'll be added by the global handler
         return response
-        
     try:
         # Handle GET requests (for browser direct access or health checks)
         if request.method == "GET":
