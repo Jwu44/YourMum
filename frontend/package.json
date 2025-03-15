@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.mjs",
+    "dev": "next dev",
     "build": "next build",
     "deploy": "next build && firebase deploy --only hosting",
-    "start": "NODE_ENV=production node server.mjs",
+    "start": "next start",
     "lint": "next lint",
     "vercel-build": "next build"
   },
