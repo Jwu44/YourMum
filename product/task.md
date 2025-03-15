@@ -1,1 +1,2 @@
-[ ] I am looking to refactor the codebase so it contains less files and is optimised for performance. Trace the purpose of @server.mjs file. Currently I have deployed my frontend on vercel and backend on aws EB. Identify if there are any dependencies with @server.mjs file. 
+[ ] I am looking to refactor the codebase so it contains less files and is optimised for performance. What's the difference between @api.ts and @routes.ts files?
+Should I move the @api.ts file to @routes.ts file?
