@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight, Star } from "lucide-react";
+import { Check, Star } from "lucide-react";
 import { WithHandleGetStarted } from '@/lib/types';
 
 const CTA = ({ handleGetStarted }: WithHandleGetStarted) => {

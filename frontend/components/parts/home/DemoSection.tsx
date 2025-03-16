@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Check, Star } from "lucide-react";
+import { Check } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DemoSection = () => {
@@ -15,7 +15,7 @@ const DemoSection = () => {
           </h2>
           
           <p className="text-muted-foreground text-lg mb-12 animate-fade-in animate-delay-200 text-balance">
-            yourdai's AI adapts to your unique productivity patterns, continuously optimizing your 
+            yourdai&apos;s AI adapts to your unique productivity patterns, continuously optimizing your 
             schedule based on when and how you work best.
           </p>
         </div>
@@ -36,6 +36,8 @@ const DemoSection = () => {
                     src="/task-decomp.png"
                     alt="yourdai task decomposition" 
                     className="w-full rounded-xl"
+                    width={800}
+                    height={600}
                   />
                   
                   {/* Overlay info */}
@@ -66,7 +68,7 @@ const DemoSection = () => {
                 </h3>
                 
                 <p className="text-muted-foreground text-lg mb-8 animate-fade-in animate-delay-200">
-                  yourdai's task decomposition intelligence breaks down complex goals into manageable microsteps, 
+                  yourdai&apos;s task decomposition intelligence breaks down complex goals into manageable microsteps, 
                   helping you overcome procrastination and maintain momentum.
                 </p>
                 
@@ -118,6 +120,8 @@ const DemoSection = () => {
                     src="/dashboard-crossed.png" 
                     alt="yourdai energy-aware scheduling" 
                     className="w-full rounded-xl"
+                    width={800}
+                    height={600}
                   />
                   
                   {/* Overlay info */}
@@ -143,7 +147,7 @@ const DemoSection = () => {
               {/* Feature details */}
               <div className="w-full lg:w-2/5">
                 <h3 className="text-2xl md:text-3xl font-display font-bold mb-6 animate-fade-in animate-delay-100">
-                  Schedule tasks when you're at your 
+                  Schedule tasks when you&apos;re at your 
                   <span className="text-yourdai-purple"> peak performance</span>
                 </h3>
                 
@@ -200,6 +204,8 @@ const DemoSection = () => {
                     src="/suggestions.png" 
                     alt="yourdai energy-aware scheduling" 
                     className="w-full rounded-xl"
+                    width={800}
+                    height={600}
                   />
                   
                   {/* Overlay info */}
@@ -225,7 +231,7 @@ const DemoSection = () => {
               {/* Feature details */}
               <div className="w-full lg:w-2/5">
                 <h3 className="text-2xl md:text-3xl font-display font-bold mb-6 animate-fade-in animate-delay-100">
-                  Schedule tasks when you're at your 
+                  Schedule tasks when you&apos;re at your 
                   <span className="text-yourdai-purple"> peak performance</span>
                 </h3>
                 
