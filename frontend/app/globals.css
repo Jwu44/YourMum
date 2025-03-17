@@ -152,29 +152,26 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
   
-  /* Force white text on dark backgrounds for better visibility */
+ /* Replace with more targeted approach */
+ .dark body, 
   body.dark, 
-  .dark body,
   [data-theme="dark"] body,
   body[data-theme="dark"] {
-    @apply text-white;
+    @apply text-foreground;
   }
   
-  /* Ensure all pages with dark backgrounds have white text */
-  .bg-black, 
-  .bg-yourdai-dark, 
-  .bg-[#000000], 
-  .bg-[#1A1F2C],
-  [class*="bg-slate-9"],
-  [class*="bg-gray-9"],
-  [class*="bg-zinc-9"],
-  [class*="bg-neutral-9"] {
-    @apply text-white;
+  /* Ensure all text elements on dark backgrounds have proper contrast */
+  .bg-black *, 
+  .bg-yourdai-dark *,
+  .bg-[#000000] * {
+    color: white;
   }
   
-  /* Fix for dark backgrounds on non-home pages */
-  body:not(.home-page) {
-    color: white !important;
+  /* More targeted approach for specific dark backgrounds */
+  .dark .bg-card,
+  .dark .bg-popover,
+  .dark .bg-background {
+    @apply text-foreground;
   }
   
   /* Ensure form inputs and selects on dark backgrounds have proper contrast */
