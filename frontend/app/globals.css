@@ -160,13 +160,6 @@
     @apply text-foreground;
   }
   
-  /* Ensure all text elements on dark backgrounds have proper contrast */
-  .bg-black *, 
-  .bg-yourdai-dark *,
-  .bg-[#000000] * {
-    color: white;
-  }
-  
   /* More targeted approach for specific dark backgrounds */
   .dark .bg-card,
   .dark .bg-popover,
@@ -195,7 +188,11 @@
   body:not(.home-page) div,
   body:not(.home-page) label {
     color: white;
+    /* Remove any backdrop blur effects that might be affecting text */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
+
   
   /* Ensure links have proper visibility on dark backgrounds */
   .bg-black a, 
@@ -208,17 +205,17 @@
   
   /* Glass and special panel styles from home.css */
   .glass-panel {
-    @apply bg-white/50 dark:bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-glass;
+    @apply bg-white/50 dark:bg-black/30 backdrop-blur-md rounded-2xl border border-white/20 shadow-glass;
   }
-  
+
   .glass-panel-dark {
     @apply bg-black/30 backdrop-blur-md rounded-2xl border border-white/10 shadow-glass;
   }
-  
+
   .neo-blur {
     @apply bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 shadow-glass;
   }
-  
+
   .neo-button {
     @apply shadow-neolight hover:shadow-none transition-all duration-300 ease-in-out bg-white rounded-xl;
   }
@@ -238,6 +235,26 @@
                      radial-gradient(circle at 80% 80%, rgba(76, 0, 255, 0.1) 0%, rgba(76, 0, 255, 0) 25%);
   }
 }
+
+  /* Add a new style to ensure text remains visible over blurred backgrounds */
+  .preserve-text-visibility {
+    text-shadow: 0 0 1px rgba(0,0,0,0.8);
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Remove any white blur overlays on non-home pages */
+  body:not(.home-page) .drawer-background,
+  body:not(.home-page) .drawer-content {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Ensure dark mode has proper contrast and no white blur overlays */
+  .dark body:not(.home-page) {
+    background-color: hsl(var(--background));
+  }
 
 /* =================== */
 /* Utilities Layer */
