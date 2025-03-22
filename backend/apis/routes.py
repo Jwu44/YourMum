@@ -740,8 +740,8 @@ def api_decompose_task():
             'user_id': data.get('user_id', 'unknown'),
             'energy_patterns': data.get('energy_patterns', []),
             'priorities': data.get('priorities', {}),
-            'work_start_time': data.get('work_start_time'),
-            'work_end_time': data.get('work_end_time')
+            'work_start_time': data.get('work_start_time', '9:00 AM'),
+            'work_end_time': data.get('work_end_time', '10:00 PM')
         }
         
         # Call AI service directly
@@ -910,8 +910,8 @@ def api_generate_suggestions():
                 historical_schedules=data['historicalSchedules'],
                 priorities=data['priorities'],
                 energy_patterns=data['energyPatterns'],
-                work_start_time=data.get('workStartTime'),
-                work_end_time=data.get('workEndTime')
+                work_start_time=data.get('workStartTime', '9:00 AM'),
+                work_end_time=data.get('workEndTime', '10:00 PM')
             )
             
             # Store suggestions in database

@@ -220,9 +220,10 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
         Tuple of (system_prompt, user_prompt)
     """
     # Extract user data
-    name = user_data['name']
-    age = user_data['age']
-    work_schedule = f"{user_data['work_start_time']} - {user_data['work_end_time']}"
+    # Use default work times if not provided
+    work_start_time = user_data.get('work_start_time', '9:00 AM')
+    work_end_time = user_data.get('work_end_time', '10:00 PM')
+    work_schedule = f"{work_start_time} - {work_end_time}"
     energy_patterns = ', '.join(user_data['energy_patterns'])
     priorities = user_data['priorities']
     layout_preference = user_data['layout_preference']
@@ -260,9 +261,7 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     user_prompt = f"""
     Here is the client's information:
 
-    <client_info>
-    <client_name>{name}</client_name>
-    <client_age>{age}</client_age>
+    <client_info>>
     <work_schedule>{work_schedule}</work_schedule>
     <energy_patterns>{energy_patterns}</energy_patterns>
     <priority_description>{priority_description}</priority_description>

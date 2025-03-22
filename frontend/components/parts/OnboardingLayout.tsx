@@ -9,14 +9,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define as const to ensure type safety
 export const ONBOARDING_ROUTES = {
-  '/personal-details': 1,
-  '/work-times': 2,
-  '/priorities': 3,
-  '/tasks': 4,
-  '/energy-patterns': 5,
-  '/structure-preference': 6,
-  '/subcategory-preference': 7,
-  '/timebox-preference': 8,
+  '/priorities': 1,
+  '/tasks': 2,
+  '/energy-patterns': 3,
+  '/structure-preference': 4,
+  '/subcategory-preference': 5,
+  '/timebox-preference': 6,
 } as const;
 
 type OnboardingRoute = keyof typeof ONBOARDING_ROUTES;
