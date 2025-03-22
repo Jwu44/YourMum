@@ -96,7 +96,7 @@ const PriorityRanking: React.FC = () => {
   }, [router, state]);
 
   const handlePrevious = useCallback(() => {
-    router.push('/work-times');
+    router.push('/');
   }, [router]);
 
   return (

@@ -7,8 +7,8 @@ import { FormData, FormAction, FormContextType, Task } from './types';
 const initialState: FormData = {
   name: "",
   age: "",
-  work_start_time: "",
-  work_end_time: "",
+  work_start_time: "9:00 AM",
+  work_end_time: "10:00 PM",
   tasks: [],
   energy_patterns: [],
   priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
@@ -20,7 +20,7 @@ const initialState: FormData = {
   // Add onboarding progress tracking
   onboarding: {
     currentStep: 1,
-    totalSteps: 8, // Default to maximum steps (including conditional pages)
+    totalSteps: 6, // Default to maximum steps (including conditional pages)
     isComplete: false
   }
 };

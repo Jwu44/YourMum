@@ -121,13 +121,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Clear the stored route regardless of what happens next
           localStorage.removeItem('authRedirectDestination');
           
-          // Navigate to the intended route if one was saved, otherwise default to /work-times
+          // Navigate to the intended route if one was saved, otherwise default to /priorities
           if (intendedRoute) {
             console.log("Navigating to intended route:", intendedRoute);
             window.location.href = intendedRoute;
           } else {
-            console.log("Navigating to default route: /work-times");
-            window.location.href = '/work-times';
+            console.log("Navigating to default route: /priorities");
+            window.location.href = '/priorities';
           }
         } else {
           console.log("No redirect result found");
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Also add logging to the signIn function
-  const signIn = async (redirectTo = '/work-times') => {
+  const signIn = async (redirectTo = '/priorities') => {
     try {
       setError(null);
       console.log("Starting sign in process, redirect destination:", redirectTo);
