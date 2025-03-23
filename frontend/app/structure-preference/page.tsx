@@ -109,7 +109,7 @@ const StructurePreference: React.FC = () => {
             />
             <Label 
               htmlFor="structured"
-              className="cursor-pointer"
+              className="cursor-pointer text-white"
             >
               I prefer a structured day with clear sections
             </Label>
@@ -125,7 +125,7 @@ const StructurePreference: React.FC = () => {
             />
             <Label 
               htmlFor="unstructured"
-              className="cursor-pointer"
+              className="cursor-pointer text-white"
             >
               I like flexibility and do not want sections
             </Label>
@@ -138,6 +138,7 @@ const StructurePreference: React.FC = () => {
             onClick={handlePrevious} 
             variant="ghost"
             type="button"
+            className="text-primary hover:text-primary"
           >
             Previous
           </Button>
