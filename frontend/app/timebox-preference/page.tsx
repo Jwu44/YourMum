@@ -149,7 +149,7 @@ const TimeboxPreference: React.FC = () => {
             />
             <Label 
               htmlFor="timeboxed"
-              className="cursor-pointer"
+              className="cursor-pointer text-white"
             >
               Yes, I want timeboxed tasks
             </Label>
@@ -163,7 +163,7 @@ const TimeboxPreference: React.FC = () => {
             />
             <Label 
               htmlFor="untimeboxed"
-              className="cursor-pointer"
+              className="cursor-pointer text-white"
             >
               No, I prefer flexible timing
             </Label>
@@ -176,6 +176,7 @@ const TimeboxPreference: React.FC = () => {
             onClick={handlePrevious} 
             variant="ghost"
             type="button"
+            className="text-primary hover:text-primary"
             disabled={isLoading}
           >
             Previous
