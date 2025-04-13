@@ -52,7 +52,7 @@ export function TypographyH4({ children, className, ...props }: TypographyProps)
   return (
     <h4 
       className={cn(
-        "scroll-m-20 text-xl font-semibold tracking-tight",
+        "scroll-m-20 text-xl font-semibold tracking-tight text-white",
         className
       )}
       {...props}
