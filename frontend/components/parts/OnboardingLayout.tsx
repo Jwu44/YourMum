@@ -14,7 +14,7 @@ export const ONBOARDING_ROUTES = {
   '/energy-patterns': 3,
   '/structure-preference': 4,
   '/subcategory-preference': 5,
-  '/timebox-preference': 6,
+  '/task-pattern-preference': 6,
 } as const;
 
 type OnboardingRoute = keyof typeof ONBOARDING_ROUTES;
@@ -27,9 +27,9 @@ export const OnboardingLayout: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Memoize calculations to prevent unnecessary re-renders
   const totalSteps = useMemo(() => {
-    const skipSubcategory = state.layout_preference?.structure === 'unstructured';
+    const skipSubcategory = state.layout === 'todolist-unstructured';
     return Object.keys(ONBOARDING_ROUTES).length - (skipSubcategory ? 1 : 0);
-  }, [state.layout_preference?.structure]);
+  }, [state.layout]);
 
   const currentStep = useMemo(() => {
     return ONBOARDING_ROUTES[pathname as OnboardingRoute] || 0;

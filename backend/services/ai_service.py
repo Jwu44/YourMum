@@ -243,31 +243,69 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
     priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
 
+    # Check for enhanced layout preferences (new format)
+    layout_type = layout_preference.get('layout_type', 'todolist-structured')
+    structure = layout_preference.get('structure', 'structured')
+    
+    # Get appropriate subcategory based on layout type
+    subcategory = layout_preference.get('subcategory', '')
+    
+    # Set default subcategory if not provided, based on layout type
+    if not subcategory:
+        base_layout = layout_type.split('-')[0] if '-' in layout_type else 'todolist'
+        if structure == 'structured':
+            if base_layout == 'todolist':
+                subcategory = 'day-sections'
+            elif base_layout == 'kanban':
+                subcategory = 'status'
+            elif base_layout == 'calendar':
+                subcategory = 'day'
+            elif base_layout == 'timeline':
+                subcategory = 'chronological'
+        else:
+            # For unstructured layouts, subcategory isn't relevant
+            subcategory = ''
+    
+    # Get task ordering pattern 
+    ordering_pattern = layout_preference.get('orderingPattern', 'timebox')
+    
     # Determine the example schedule to use
-    structure = layout_preference['structure']
-    timeboxed = layout_preference['timeboxed']
-    # Construct the example_key based on user preferences
-    if structure == "structured":
-        subcategory = layout_preference['subcategory']
-        print(structure, subcategory, timeboxed)
-        example_key = f"structured-{subcategory}-{timeboxed}"
+    if ordering_pattern in ['alternating', 'batching', 'three-three-three']:
+        # Use new ordering pattern examples
+        example_key = ordering_pattern
+    elif structure == "structured":
+        # Use layout format with timeboxing based on ordering pattern
+        timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
+        example_key = f"structured-{subcategory}-{timeboxed_value}"
     else:  # unstructured
-        example_key = f"unstructured-{timeboxed}"
+        # For unstructured, also determine timeboxing based on ordering pattern
+        timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
+        example_key = f"unstructured-{timeboxed_value}"
 
     example_schedule = example_schedules.get(example_key, "No matching example found.")
-    print(example_schedule)
-    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth."""
+    
+    # Create a more comprehensive system prompt
+    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth.
 
+You understand different scheduling methodologies including:
+1. Timeboxing - Assigning specific time blocks to tasks
+2. Batching - Grouping similar tasks together to maximize focus and efficiency
+3. Alternating - Switching between different types of tasks to maintain energy and engagement
+4. 3-3-3 method - Structuring the day with 3 hours on the most important focus task, followed by 3 medium-priority tasks, then 3 maintenance tasks
+
+Based on client preferences, energy patterns, and priorities, you'll create an optimized schedule that follows their preferred structure and task ordering pattern."""
+
+    # Create detailed user prompt with ordering pattern instructions
     user_prompt = f"""
     Here is the client's information:
 
-    <client_info>>
+    <client_info>
     <work_schedule>{work_schedule}</work_schedule>
     <energy_patterns>{energy_patterns}</energy_patterns>
     <priority_description>{priority_description}</priority_description>
     <schedule_structure>{structure}</schedule_structure>
-    <schedule_timeboxed>{timeboxed}</schedule_timeboxed>
-    <layout_subcategory>{layout_preference['subcategory']}</layout_subcategory>
+    <layout_subcategory>{subcategory}</layout_subcategory>
+    <ordering_pattern>{ordering_pattern}</ordering_pattern>
     </client_info>
 
     Here are the client's tasks categorized:
@@ -284,21 +322,78 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
 
     1. Analyze the client's information carefully.
     2. Create a balanced schedule that adheres to the following guidelines:
-    a. Schedule work tasks strictly within the specified work schedule, considering the client's energy patterns.
-    b. Outside work hours, focus on personal tasks (exercise, relationship, fun, or ambition) based on the client's priority rankings and energy patterns.
-    c. For tasks with multiple categories, prioritize according to the client's priority description.
+       a. Schedule work tasks strictly within the specified work schedule, considering the client's energy patterns.
+       b. Outside work hours, focus on personal tasks (exercise, relationship, fun, or ambition) based on the client's priority rankings and energy patterns.
+       c. For tasks with multiple categories, prioritize according to the client's priority description.
+       d. Apply the specified task ordering pattern as outlined below.
     3. Format the schedule as follows:
-    a. If the schedule preference is timeboxed, include specific times for each task.
-    b. If the schedule preference is untimeboxed, list tasks in the order they should be performed without specific times.
-    c. Apply the correct schedule layout by referring to this example of the desired output format: {example_schedule}
+       a. If the ordering pattern is 'timebox', include specific times for each task.
+       b. If the ordering pattern is not 'timebox', list tasks in the order they should be performed without specific times.
+       c. Apply the correct schedule layout by referring to this example of the desired output format: {example_schedule}
     4. Ensure the language of the schedule is:
-    a. Clear, concise, and conversational.
-    b. Free of jargon and unnecessary complexity.
-    c. Without explanations or notes sections.
-    d. Without category labels for each task.
-
+       a. Clear, concise, and conversational.
+       b. Free of jargon and unnecessary complexity.
+       c. Without explanations or notes sections.
+       d. Without category labels for each task.
     5. Important: Ensure each task is listed separately. Do not combine multiple tasks into a single entry.
     6. Only include tasks that the client has provided. Do not add any new tasks.
+
+    Task Ordering Pattern Instructions:
+    """
+
+    # Add specific instructions based on ordering pattern
+    if ordering_pattern == "timebox":
+        user_prompt += """
+    For the 'timebox' pattern:
+    - Assign specific time slots to each task based on their estimated duration and priority
+    - Consider natural energy fluctuations throughout the day
+    - Schedule high-energy tasks during peak energy times
+    - Schedule low-energy tasks during energy dips
+    - Include short breaks between tasks
+    - Ensure calendar events and fixed-time commitments are respected
+    """
+    elif ordering_pattern == "batching":
+        user_prompt += """
+    For the 'batching' pattern:
+    - Group similar tasks together to minimize context switching
+    - Create themed blocks (e.g., communication tasks, creative work, administrative tasks)
+    - Arrange tasks by category or required mental mode
+    - Schedule similar activities consecutively to create flow states
+    - Consider related tasks that use similar resources or mental processes
+    - Aim for 60-90 minute batches of similar work before changing focus
+    """
+    elif ordering_pattern == "alternating":
+        user_prompt += """
+    For the 'alternating' pattern:
+    - Alternate between high, medium, and low energy tasks
+    - Switch between different types of mental activity (analytical, creative, administrative)
+    - Intersperse high-focus work with lighter tasks
+    - Create variety to maintain engagement and prevent mental fatigue
+    - Balance focused work with movement or social interaction
+    - Consider transitioning between different energy requirements throughout the day
+    """
+    elif ordering_pattern == "three-three-three":
+        user_prompt += """
+    For the '3-3-3' method:
+    - Allocate 3 hours to the single most important focus task of the day
+    - Identify 3 medium-priority tasks to complete
+    - Include 3 maintenance/health tasks (exercise, meal prep, etc.)
+    - Structure the day with the focus block during peak energy hours
+    - Schedule medium-priority tasks in the middle of the day
+    - Place maintenance tasks at natural transition points
+    - Be realistic about the 3-hour focus block (it should be a meaningful, high-impact task)
+    """
+    else:
+        user_prompt += """
+    Use a standard ordering approach based on the client's preferences, prioritizing tasks according to:
+    - Energy patterns throughout the day
+    - Priority rankings
+    - Natural task dependencies and flow
+    - Appropriate task grouping based on the layout structure
+    """
+
+    # Complete the prompt with the response structure
+    user_prompt += """
 
     Please structure your response as follows:
 
@@ -306,13 +401,16 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     1. List all tasks from each category
     2. Analyze energy patterns and work schedule to determine optimal task placement
     3. Consider priority rankings when scheduling personal tasks
-    4. Check if the schedule adheres to the timeboxed/untimeboxed and user's layout subcatgory preference
-    5. Create the final schedule based on the above analysis
+    4. Apply the specified task ordering pattern to optimize productivity and energy management
+    5. Ensure the schedule follows the requested layout structure and timeboxing preference
+    6. Create the final schedule based on the above analysis
     </schedule_planning>
 
     <schedule>
     [The final personalized schedule]
     </schedule>
+
+    If requested to provide JSON format, also include a structured representation of the schedule.
 
     Remember to adhere to all guidelines and requirements outlined above when creating the schedule.
     """
@@ -503,26 +601,48 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         user_data: Dictionary containing user preferences and tasks
         
     Returns:
-        Dictionary containing the generated schedule with consistent format
+        Dictionary containing the generated schedule with structured JSON representation for interactive tasks
     """
     try:
+        import uuid
+        
         # Convert Task objects to dictionaries if needed
+        original_tasks = []
         if 'tasks' in user_data:
             tasks = user_data['tasks']
             if tasks and isinstance(tasks[0], Task):
+                # Store original tasks for category matching later
+                original_tasks = tasks.copy()
                 # Already Task objects, no conversion needed
                 pass
             elif tasks and isinstance(tasks[0], dict):
+                # Store original tasks for category matching later
+                original_tasks = tasks.copy()
                 # Convert dictionaries to Task objects
                 user_data['tasks'] = [Task.from_dict(task) for task in tasks]
+        
+        # Create a task text to categories mapping for quick lookup
+        task_categories_map = {}
+        for task in original_tasks:
+            # Handle both Task objects and dictionaries
+            if isinstance(task, Task):
+                task_text = task.text.lower()
+                task_categories = task.categories
+            else:
+                task_text = task.get('text', '').lower()
+                task_categories = task.get('categories', [])
+            
+            # Normalize text for better matching
+            normalized_text = re.sub(r'[^\w\s]', '', task_text).strip()
+            task_categories_map[normalized_text] = task_categories
         
         # Create prompts for Claude
         system_prompt, user_prompt = create_prompt_schedule(user_data)
         
-        # Call Claude API
+        # Call Claude API with increased max_tokens for more detailed schedules
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
+            max_tokens=2048,  # Increased token limit for more detailed schedules
             temperature=0.7,
             system=system_prompt,
             messages=[
@@ -537,23 +657,120 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         schedule_match = re.search(r'<schedule>([\s\S]*?)<\/schedule>', schedule_text)
         if schedule_match:
             schedule_content = schedule_match.group(1).strip()
+            
+            # Parse the schedule into task objects
+            tasks = []
+            current_section = None
+            
+            # Extract layout preferences
+            layout_type = user_data.get('layout_preference', {}).get('layout', 'todolist-structured')
+            ordering_pattern = user_data.get('layout_preference', {}).get('orderingPattern', 'timebox')
+            
+            # Process the schedule line by line
+            lines = schedule_content.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Check if this is a section header (any line that doesn't start with a checkbox symbol)
+                if not line.startswith('□') and not line.startswith('-'):
+                    # This is a section header
+                    current_section = line
+                    
+                    # Create a section task with UUID
+                    task = {
+                        'id': str(uuid.uuid4()),
+                        'text': current_section,
+                        'categories': [],
+                        'is_section': True,
+                        'completed': False,
+                        'section': None,
+                        'parent_id': None,
+                        'level': 0,
+                        'type': 'section'
+                    }
+                    tasks.append(task)
+                else:
+                    # Process task line
+                    task_text = line.replace('□ ', '').replace('- ', '')
+                    
+                    # Extract time information if present (for timeboxed schedules)
+                    start_time = None
+                    end_time = None
+                    
+                    # Look for time patterns like "7:00am - 8:00am: Task description"
+                    time_match = re.search(r'^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)', task_text, re.IGNORECASE)
+                    if time_match:
+                        start_time = time_match.group(1)
+                        end_time = time_match.group(2)
+                        task_text = time_match.group(3).strip()
+                    
+                    # Try to find matching categories from original tasks
+                    categories = []
+                    normalized_task_text = re.sub(r'[^\w\s]', '', task_text.lower()).strip()
+                    
+                    # Try exact match first
+                    if normalized_task_text in task_categories_map:
+                        categories = task_categories_map[normalized_task_text]
+                    else:
+                        # Try partial matching (simple approach)
+                        for original_text, original_categories in task_categories_map.items():
+                            # Check for significant word overlap or one text containing the other
+                            if (normalized_task_text in original_text or 
+                                original_text in normalized_task_text or
+                                len(set(normalized_task_text.split()) & set(original_text.split())) >= 2):
+                                categories = original_categories
+                                break
+                    
+                    # Create task object with UUID
+                    task = {
+                        'id': str(uuid.uuid4()),
+                        'text': task_text,
+                        'categories': categories,
+                        'completed': False,
+                        'is_section': False,
+                        'section': current_section,
+                        'parent_id': None,
+                        'level': 0,
+                        'type': 'task',
+                        'start_time': start_time,
+                        'end_time': end_time
+                    }
+                    tasks.append(task)
+            
             return {
                 "success": True,
-                "schedule": f"<schedule>{schedule_content}</schedule>"
+                "tasks": tasks,
+                "layout_type": layout_type,
+                "ordering_pattern": ordering_pattern
             }
         else:
             print("No <schedule> tags found in AI response")
+            # Create minimal structured data with error information
             return {
                 "success": False,
                 "error": "No schedule found in AI response",
-                "raw_response": schedule_text
+                "structured_data": {
+                    "tasks": [],
+                    "layout_type": user_data.get('layout_preference', {}).get('layout_type', 'todolist-structured'),
+                    "ordering_pattern": user_data.get('layout_preference', {}).get('ordering_pattern', 'timebox'),
+                    "error": "Failed to parse schedule from AI response"
+                }
             }
         
     except Exception as e:
         print(f"Error generating schedule: {str(e)}")
+        # Always return structured_data even in error cases
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "structured_data": {
+                "tasks": [],
+                "layout_type": user_data.get('layout_preference', {}).get('layout_type', 'todolist-structured'),
+                "ordering_pattern": user_data.get('layout_preference', {}).get('ordering_pattern', 'timebox'),
+                "error": str(e)
+            }
         }
 
 def categorize_task(task_text: str) -> List[str]:
