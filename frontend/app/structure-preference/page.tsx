@@ -59,7 +59,7 @@ const StructurePreference: React.FC = () => {
     } catch (error) {
       console.error('Error navigating to next page:', error);
     }
-  }, [router, state.layout_preference, state]);
+  }, [router, state.layout_preference]);
 
   const handlePrevious = useCallback(() => {
     router.push('/energy-patterns');
