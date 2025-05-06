@@ -151,7 +151,7 @@ const TaskPatternPreference: React.FC = () => {
       heading={<TypographyH3>Task Pattern Preference</TypographyH3>}
       description={
         <TypographyP>
-          Choose how you'd like your tasks to be organized
+          Choose how you&apos;d like your tasks to be organized
         </TypographyP>
       }
     >

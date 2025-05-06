@@ -25,7 +25,7 @@ const SUBCATEGORY_OPTIONS = [
 
 const SubcategoryPreference: React.FC = () => {
   const router = useRouter();
-  const { state, dispatch } = useForm();
+  const { state } = useForm();
 
   // Get the form context at the component level
   const { updateLayoutPreference } = useForm();
