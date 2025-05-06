@@ -431,7 +431,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         variant: "destructive",
       });
     }
-  }, [task, onUpdateTask, suggestedMicrosteps.length, toast, formData]);
+  }, [task, onUpdateTask, suggestedMicrosteps.length, toast]);
 
   // Update the handleMicrostepReject to simply remove the suggestion
   const handleMicrostepReject = useCallback((microstep: Task) => {

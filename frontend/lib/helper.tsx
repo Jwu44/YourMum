@@ -1,7 +1,6 @@
 import { categorizeTask } from './api/users';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, GoogleCalendarEvent, FormAction , 
-  WeekDay, MonthWeek, RecurrenceType, DecompositionRequest, 
+import { Task, FormAction, DecompositionRequest, 
   DecompositionResponse, MicrostepFeedback, FeedbackResponse, 
   FormData, GetAISuggestionsResponse } from './types';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
