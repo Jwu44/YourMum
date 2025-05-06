@@ -270,7 +270,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [state, toast]);  
+  }, [state, toast, currentDayIndex, scheduleDays]);  
 
   // Helper function to get date string for a specific day offset
   const getDateString = (offset: number): string => {
@@ -854,7 +854,7 @@ useEffect(() => {
       });
     }
   }
-}, []); // Empty dependency array to only run once when component mounts
+}, [state.formUpdate.response, toast]); // Empty dependency array to only run once when component mounts
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">

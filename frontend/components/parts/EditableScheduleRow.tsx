@@ -312,10 +312,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       // Set loading state and clear any existing microsteps
       setIsDecomposing(true);
       setShowMicrosteps(false);
-
-      // Extract necessary layout information from form data
-      const layout = formData.layout_preference?.layout || 'todolist-structured';
-      const orderingPattern = formData.layout_preference?.orderingPattern || 'timebox';
       
       // Get microstep texts from backend
       const microstepTexts = await handleMicrostepDecomposition(task, formData);
@@ -387,10 +383,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
    * @param microstep - The microstep suggestion to convert to a task
    */
   const handleMicrostepAccept = useCallback(async (microstep: Task) => {
-    try {
-      // Extract layout preferences from form context
-      const { layout_preference } = formData;
-      
+    try {      
       // Create a new task object with all required properties for a subtask
       const newSubtask: Task = {
         ...microstep,
