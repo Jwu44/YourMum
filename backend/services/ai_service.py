@@ -12,7 +12,7 @@ import os
 import re
 import json
 import anthropic
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from cachetools import TTLCache, LRUCache
 from backend.models.task import Task
 from dotenv import load_dotenv
@@ -222,7 +222,7 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     # Extract user data
     # Use default work times if not provided
     work_start_time = user_data.get('work_start_time', '9:00 AM')
-    work_end_time = user_data.get('work_end_time', '10:00 PM')
+    work_end_time = user_data.get('work_end_time', '05:00 PM')
     work_schedule = f"{work_start_time} - {work_end_time}"
     energy_patterns = ', '.join(user_data['energy_patterns'])
     priorities = user_data['priorities']
@@ -597,181 +597,339 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate a personalized schedule based on user data.
     
+    Acts as a coordinator for the schedule generation process:
+    1. Prepares the user data
+    2. Creates LLM prompt
+    3. Calls external LLM API
+    4. Processes response into structured data
+    
     Args:
         user_data: Dictionary containing user preferences and tasks
         
     Returns:
-        Dictionary containing the generated schedule with structured JSON representation for interactive tasks
+        Dictionary containing the generated schedule with structured data
     """
     try:
-        import uuid
+        # Step 1: Prepare user data for prompt generation
+        prepared_data = prepare_user_data_for_schedule(user_data)
         
-        # Convert Task objects to dictionaries if needed
-        original_tasks = []
-        if 'tasks' in user_data:
-            tasks = user_data['tasks']
-            if tasks and isinstance(tasks[0], Task):
-                # Store original tasks for category matching later
-                original_tasks = tasks.copy()
-                # Already Task objects, no conversion needed
-                pass
-            elif tasks and isinstance(tasks[0], dict):
-                # Store original tasks for category matching later
-                original_tasks = tasks.copy()
-                # Convert dictionaries to Task objects
-                user_data['tasks'] = [Task.from_dict(task) for task in tasks]
+        # Step 2: Generate LLM prompt
+        system_prompt, user_prompt = create_prompt_schedule(prepared_data)
         
-        # Create a task text to categories mapping for quick lookup
-        task_categories_map = {}
-        for task in original_tasks:
-            # Handle both Task objects and dictionaries
-            if isinstance(task, Task):
-                task_text = task.text.lower()
-                task_categories = task.categories
-            else:
-                task_text = task.get('text', '').lower()
-                task_categories = task.get('categories', [])
-            
-            # Normalize text for better matching
-            normalized_text = re.sub(r'[^\w\s]', '', task_text).strip()
-            task_categories_map[normalized_text] = task_categories
+        # Step 3: Call LLM API
+        llm_response = call_schedule_llm(system_prompt, user_prompt)
         
-        # Create prompts for Claude
-        system_prompt, user_prompt = create_prompt_schedule(user_data)
+        # Step 4: Process LLM response into structured data
+        result = process_schedule_response(llm_response, user_data)
         
-        # Call Claude API with increased max_tokens for more detailed schedules
-        response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,  # Increased token limit for more detailed schedules
-            temperature=0.7,
-            system=system_prompt,
-            messages=[
-                {"role": "user", "content": user_prompt}
-            ]
-        )
-        
-        # Extract schedule from response
-        schedule_text = response.content[0].text
-        
-        # Extract content between <schedule> tags
-        schedule_match = re.search(r'<schedule>([\s\S]*?)<\/schedule>', schedule_text)
-        if schedule_match:
-            schedule_content = schedule_match.group(1).strip()
-            
-            # Parse the schedule into task objects
-            tasks = []
-            current_section = None
-            
-            # Extract layout preferences
-            layout_type = user_data.get('layout_preference', {}).get('layout', 'todolist-structured')
-            ordering_pattern = user_data.get('layout_preference', {}).get('orderingPattern', 'timebox')
-            
-            # Process the schedule line by line
-            lines = schedule_content.split('\n')
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                # Check if this is a section header (any line that doesn't start with a checkbox symbol)
-                if not line.startswith('□') and not line.startswith('-'):
-                    # This is a section header
-                    current_section = line
-                    
-                    # Create a section task with UUID
-                    task = {
-                        'id': str(uuid.uuid4()),
-                        'text': current_section,
-                        'categories': [],
-                        'is_section': True,
-                        'completed': False,
-                        'section': None,
-                        'parent_id': None,
-                        'level': 0,
-                        'type': 'section'
-                    }
-                    tasks.append(task)
-                else:
-                    # Process task line
-                    task_text = line.replace('□ ', '').replace('- ', '')
-                    
-                    # Extract time information if present (for timeboxed schedules)
-                    start_time = None
-                    end_time = None
-                    
-                    # Look for time patterns like "7:00am - 8:00am: Task description"
-                    time_match = re.search(r'^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)', task_text, re.IGNORECASE)
-                    if time_match:
-                        start_time = time_match.group(1)
-                        end_time = time_match.group(2)
-                        task_text = time_match.group(3).strip()
-                    
-                    # Try to find matching categories from original tasks
-                    categories = []
-                    normalized_task_text = re.sub(r'[^\w\s]', '', task_text.lower()).strip()
-                    
-                    # Try exact match first
-                    if normalized_task_text in task_categories_map:
-                        categories = task_categories_map[normalized_task_text]
-                    else:
-                        # Try partial matching (simple approach)
-                        for original_text, original_categories in task_categories_map.items():
-                            # Check for significant word overlap or one text containing the other
-                            if (normalized_task_text in original_text or 
-                                original_text in normalized_task_text or
-                                len(set(normalized_task_text.split()) & set(original_text.split())) >= 2):
-                                categories = original_categories
-                                break
-                    
-                    # Create task object with UUID
-                    task = {
-                        'id': str(uuid.uuid4()),
-                        'text': task_text,
-                        'categories': categories,
-                        'completed': False,
-                        'is_section': False,
-                        'section': current_section,
-                        'parent_id': None,
-                        'level': 0,
-                        'type': 'task',
-                        'start_time': start_time,
-                        'end_time': end_time
-                    }
-                    tasks.append(task)
-            
-            return {
-                "success": True,
-                "tasks": tasks,
-                "layout_type": layout_type,
-                "ordering_pattern": ordering_pattern
-            }
-        else:
-            print("No <schedule> tags found in AI response")
-            # Create minimal structured data with error information
-            return {
-                "success": False,
-                "error": "No schedule found in AI response",
-                "structured_data": {
-                    "tasks": [],
-                    "layout_type": user_data.get('layout_preference', {}).get('layout_type', 'todolist-structured'),
-                    "ordering_pattern": user_data.get('layout_preference', {}).get('ordering_pattern', 'timebox'),
-                    "error": "Failed to parse schedule from AI response"
-                }
-            }
-        
+        return result
+    
     except Exception as e:
         print(f"Error generating schedule: {str(e)}")
-        # Always return structured_data even in error cases
-        return {
-            "success": False,
-            "error": str(e),
-            "structured_data": {
-                "tasks": [],
-                "layout_type": user_data.get('layout_preference', {}).get('layout_type', 'todolist-structured'),
-                "ordering_pattern": user_data.get('layout_preference', {}).get('ordering_pattern', 'timebox'),
-                "error": str(e)
+        return create_error_response(e, user_data)
+
+
+def prepare_user_data_for_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Prepares user data for schedule generation by normalizing tasks and creating mappings.
+    
+    Args:
+        user_data: Raw user data from request
+    
+    Returns:
+        Processed user data ready for prompt creation
+    """
+    prepared_data = user_data.copy()
+    
+    # Convert tasks to consistent format
+    original_tasks = []
+    task_categories_map = {}
+    
+    if 'tasks' in user_data:
+        tasks = user_data['tasks']
+        if tasks:
+            # Store original tasks for category matching
+            original_tasks = tasks.copy()
+            
+            # Convert tasks to Task objects if needed
+            if isinstance(tasks[0], dict):
+                prepared_data['tasks'] = [Task.from_dict(task) for task in tasks]
+            
+            # Create normalized task text to categories mapping
+            task_categories_map = create_task_categories_map(original_tasks)
+    
+    # Add additional metadata to prepared data
+    prepared_data['task_categories_map'] = task_categories_map
+    
+    return prepared_data
+
+
+def create_task_categories_map(tasks: List[Any]) -> Dict[str, List[str]]:
+    """
+    Creates a mapping of normalized task text to categories for quick lookup.
+    
+    Args:
+        tasks: List of tasks (either Task objects or dictionaries)
+        
+    Returns:
+        Dictionary mapping normalized task text to category lists
+    """
+    task_categories_map = {}
+    
+    for task in tasks:
+        # Handle both Task objects and dictionaries
+        if isinstance(task, Task):
+            task_text = task.text.lower()
+            task_categories = task.categories
+        else:
+            task_text = task.get('text', '').lower()
+            task_categories = task.get('categories', [])
+        
+        # Normalize text for better matching
+        normalized_text = re.sub(r'[^\w\s]', '', task_text).strip()
+        task_categories_map[normalized_text] = task_categories
+    
+    return task_categories_map
+
+
+def call_schedule_llm(system_prompt: str, user_prompt: str) -> str:
+    """
+    Calls the LLM API with the generated prompts.
+    
+    Args:
+        system_prompt: System prompt for the LLM
+        user_prompt: User prompt for the LLM
+        
+    Returns:
+        LLM response text
+    """
+    response = client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=2048,
+        temperature=0.7,
+        system=system_prompt,
+        messages=[
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+    
+    return response.content[0].text
+
+
+def process_schedule_response(response_text: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Processes the LLM response text into structured schedule data.
+    
+    Args:
+        response_text: Raw LLM response text
+        user_data: Original user data with task mappings
+        
+    Returns:
+        Dictionary with structured schedule data
+    """
+    # Extract schedule content from tags
+    schedule_match = re.search(r'<schedule>([\s\S]*?)<\/schedule>', response_text)
+    
+    if not schedule_match:
+        print("No <schedule> tags found in AI response")
+        return create_error_response(
+            Exception("No schedule found in AI response"), 
+            user_data
+        )
+    
+    schedule_content = schedule_match.group(1).strip()
+    task_categories_map = user_data.get('task_categories_map', {})
+    
+    # Extract layout preferences
+    layout_type = user_data.get('layout_preference', {}).get('layout', 'todolist-structured')
+    ordering_pattern = user_data.get('layout_preference', {}).get('orderingPattern', 'timebox')
+    
+    # Parse schedule content into task objects
+    tasks = parse_schedule_content(
+        schedule_content, 
+        task_categories_map
+    )
+    
+    return {
+        "success": True,
+        "tasks": tasks,
+        "layout_type": layout_type,
+        "ordering_pattern": ordering_pattern
+    }
+
+
+def parse_schedule_content(
+    schedule_content: str, 
+    task_categories_map: Dict[str, List[str]]
+) -> List[Dict[str, Any]]:
+    """
+    Parses schedule content into structured task objects.
+    
+    Args:
+        schedule_content: Content extracted from LLM response
+        task_categories_map: Mapping of normalized task text to categories
+        
+    Returns:
+        List of task objects
+    """
+    import uuid
+    
+    tasks = []
+    current_section = None
+    
+    # Process the schedule line by line
+    lines = schedule_content.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this is a section header
+        if not line.startswith('□') and not line.startswith('-'):
+            # This is a section header
+            current_section = line
+            
+            # Create a section task with UUID
+            task = {
+                'id': str(uuid.uuid4()),
+                'text': current_section,
+                'categories': [],
+                'is_section': True,
+                'completed': False,
+                'section': None,
+                'parent_id': None,
+                'level': 0,
+                'type': 'section'
             }
+            tasks.append(task)
+        else:
+            # Regular task: process and create task object
+            task = create_task_from_line(line, current_section, task_categories_map)
+            tasks.append(task)
+    
+    return tasks
+
+
+def create_task_from_line(
+    line: str, 
+    current_section: str, 
+    task_categories_map: Dict[str, List[str]]
+) -> Dict[str, Any]:
+    """
+    Creates a task object from a single line of schedule text.
+    
+    Args:
+        line: Single line of schedule text
+        current_section: Current section header
+        task_categories_map: Mapping of normalized task text to categories
+        
+    Returns:
+        Task object as dictionary
+    """
+    import uuid
+    
+    # Process task line
+    task_text = line.replace('□ ', '').replace('- ', '')
+    
+    # Extract time information if present (for timeboxed schedules)
+    start_time, end_time, task_text = extract_time_info(task_text)
+    
+    # Find matching categories from original tasks
+    categories = find_matching_categories(task_text, task_categories_map)
+    
+    # Create task object with UUID
+    return {
+        'id': str(uuid.uuid4()),
+        'text': task_text,
+        'categories': categories,
+        'completed': False,
+        'is_section': False,
+        'section': current_section,
+        'parent_id': None,
+        'level': 0,
+        'type': 'task',
+        'start_time': start_time,
+        'end_time': end_time
+    }
+
+
+def extract_time_info(task_text: str) -> Tuple[Optional[str], Optional[str], str]:
+    """
+    Extracts time information from a task description.
+    
+    Args:
+        task_text: Task description text
+        
+    Returns:
+        Tuple of (start_time, end_time, cleaned_task_text)
+    """
+    start_time = None
+    end_time = None
+    
+    # Look for time patterns like "7:00am - 8:00am: Task description"
+    time_match = re.search(r'^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)', 
+                          task_text, re.IGNORECASE)
+    if time_match:
+        start_time = time_match.group(1)
+        end_time = time_match.group(2)
+        task_text = time_match.group(3).strip()
+    
+    return start_time, end_time, task_text
+
+
+def find_matching_categories(
+    task_text: str, 
+    task_categories_map: Dict[str, List[str]]
+) -> List[str]:
+    """
+    Finds matching categories for a task from the original task categories.
+    
+    Args:
+        task_text: Task description text
+        task_categories_map: Mapping of normalized task text to categories
+        
+    Returns:
+        List of category names
+    """
+    # Normalize task text for matching
+    normalized_task_text = re.sub(r'[^\w\s]', '', task_text.lower()).strip()
+    
+    # Try exact match first
+    if normalized_task_text in task_categories_map:
+        return task_categories_map[normalized_task_text]
+    
+    # Try partial matching
+    for original_text, original_categories in task_categories_map.items():
+        # Check for significant word overlap or one text containing the other
+        if (normalized_task_text in original_text or 
+            original_text in normalized_task_text or
+            len(set(normalized_task_text.split()) & set(original_text.split())) >= 2):
+            return original_categories
+    
+    return []
+
+
+def create_error_response(error: Exception, user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Creates a standardized error response.
+    
+    Args:
+        error: Exception that occurred
+        user_data: Original user data
+        
+    Returns:
+        Error response dictionary
+    """
+    return {
+        "success": False,
+        "error": str(error),
+        "structured_data": {
+            "tasks": [],
+            "layout_type": user_data.get('layout_preference', {}).get('layout_type', 'todolist-structured'),
+            "ordering_pattern": user_data.get('layout_preference', {}).get('ordering_pattern', 'timebox'),
+            "error": str(error)
         }
+    }
 
 def categorize_task(task_text: str) -> List[str]:
     """
