@@ -1,0 +1,294 @@
+# YourdAI Technical Specifications
+
+## Overview
+
+This document outlines the technical architecture for YourdAI, an AI-powered to-do list built using Next.js, Flask, MongoDB, and Anthropic's Claude models. The system follows a client-server architecture with AI-driven scheduling capabilities.
+
+## Technology Stack
+
+- **Frontend Framework**: Next.js 14.2.11
+- **Backend Framework**: Flask 2.3.2
+- **Database**: MongoDB
+- **AI Models**: Claude 3.5 Sonnet, Claude 3.5 Haiku
+- **Authentication**: Firebase
+- **Calendar Integration**: Google Calendar API
+
+## Data Models
+
+### Backend Models
+
+```typescript
+// models/AISuggestion.ts
+interface AISuggestion {
+  id: string;                // MongoDB ObjectId
+  text: string;              // Suggestion content
+  type: SuggestionType;      // Energy Optimization, Procrastination Prevention, etc.
+  rationale: string;         // Explanation for the suggestion
+  confidence: float;         // Confidence score (0-1)
+  categories: string[];      // Associated categories
+  user_id: string;           // User reference
+  date: string;              // Target date
+}
+
+// models/Task.ts
+interface Task {
+  id: string;                // UUID identifier
+  text: string;              // Task description
+  categories: Set<string>;   // Associated categories/tags
+  is_subtask: boolean;       // Task structure flags
+  is_microstep: boolean;
+  is_section: boolean;
+  completed: boolean;        // Completion status
+  parent_id?: string;        // Parent task for hierarchy
+  level: number;             // Indentation/hierarchy level
+  is_recurring: RecurrenceType; // Recurrence pattern
+  start_date: string;        // Scheduled date
+  estimated_time: number;    // Task characteristics
+  energy_level_required: number;
+}
+
+// models/User.ts
+interface User {
+  googleId: string;          // User identity
+  email: string;
+  displayName: string;
+  role: 'free' | 'premium' | 'admin';
+  calendar: {                // Integration configuration
+    connected: boolean;
+    tokens: OAuth2Credentials;
+    scopes: string[];
+    selectedCalendars: string[];
+  }
+}
+
+// models/UserSchedule.ts
+interface UserSchedule {
+  user_id: string;           // Reference to user
+  date: string;              // Schedule date
+  tasks: Task[];             // Associated tasks
+  preferences: Record<string, any>; // User preferences
+}
+
+// models/MicrostepFeedback.ts
+interface MicrostepFeedback {
+  task_id: string;           // Reference to original task
+  user_id: string;           // User providing feedback
+  microsteps: Task[];        // Generated microsteps
+  rating: number;            // User rating of usefulness
+  feedback?: string;         // Optional user comments
+}
+
+// models/DecompositionPattern.ts
+interface DecompositionPattern {
+  category: string;          // Task category
+  pattern: Record<string, any>; // Structure of decomposition
+  usage_count: number;       // Times this pattern was used
+  success_rate: float;       // Effectiveness rating
+}
+```
+
+## AI Capabilities
+
+### Models & Implementation
+
+```python
+# services/ai_service.py
+class AIService:
+    def __init__(self):
+        self.primary_model = "claude-3-5-sonnet-20241022"  # Complex tasks
+        self.secondary_model = "claude-3-5-haiku-20241022" # Simpler tasks
+        self.client = anthropic.Client(api_key=os.environ["ANTHROPIC_API_KEY"])
+    
+    def generate_schedule(self, user_data, preferences):
+        # Template-based generation with structure
+        prompt = self._build_schedule_prompt(user_data, preferences)
+        return self._call_model(prompt, model=self.primary_model)
+        
+    def categorize_task(self, task):
+        # Classify task into predefined categories
+        prompt = self._build_categorization_prompt(task)
+        return self._call_model(prompt, model=self.secondary_model)
+```
+
+### Core Capabilities
+
+1. **Schedule Generation**: Creates personalized daily schedules based on tasks, preferences and energy patterns
+2. **Task Categorization**: Automatically assigns categories to user-entered tasks
+3. **Task Decomposition**: Breaks down complex tasks into actionable microsteps
+4. **Schedule Suggestions**: Generates productivity optimization recommendations
+
+## Frontend Architecture
+
+### Components Structure
+
+```typescript
+// components/ui/button.tsx
+export const Button = React.forwardRef<
+  HTMLButtonElement,
+  ButtonProps
+>(({ className, variant, size, ...props }, ref) => {
+  return (
+    <button
+      className={cn(buttonVariants({ variant, size }), className)}
+      ref={ref}
+      {...props}
+    />
+  )
+})
+
+// components/parts/TaskItem.tsx
+export const TaskItem: React.FC<TaskItemProps> = ({ 
+  task, 
+  onUpdate, 
+  onDelete 
+}) => {
+  // Task item implementation
+}
+
+// components/parts/EditableSchedule.tsx
+export const EditableSchedule: React.FC<EditableScheduleProps> = ({
+  schedule,
+  onTaskUpdate,
+  onTaskMove,
+}) => {
+  // Schedule implementation with drag and drop
+}
+```
+
+### State Management
+
+```typescript
+// contexts/AuthContext.tsx
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  signIn: async () => {},
+  signOut: async () => {},
+});
+
+// contexts/FormContext.tsx
+export const FormContext = createContext<FormContextType>({
+  formData: initialFormData,
+  dispatch: () => {},
+});
+```
+
+## Backend Services
+
+### API Structure
+
+```python
+# apis/routes.py
+@app.route("/api/tasks", methods=["GET"])
+@jwt_required()
+def get_tasks():
+    user_id = get_jwt_identity()
+    tasks = task_repository.get_by_user(user_id)
+    return jsonify(tasks)
+
+# apis/calendar_routes.py
+@app.route("/api/calendar/sync", methods=["POST"])
+@jwt_required()
+def sync_calendar():
+    user_id = get_jwt_identity()
+    calendar_service = CalendarService(user_id)
+    result = calendar_service.sync_events()
+    return jsonify(result)
+```
+
+### AI Service Implementation
+
+```python
+# services/ai_service.py
+def generate_schedule(self, user_data, preferences):
+    # Build structured XML prompt
+    prompt = f"""<user_data>
+    <tasks>{self._format_tasks(user_data['tasks'])}</tasks>
+    <preferences>{self._format_preferences(preferences)}</preferences>
+    <calendar_events>{self._format_events(user_data['events'])}</calendar_events>
+    </user_data>"""
+    
+    # Call Claude model
+    response = self.client.messages.create(
+        model=self.primary_model,
+        max_tokens=4000,
+        temperature=0.7,
+        system="You are an expert productivity assistant...",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    # Parse structured JSON response
+    return json.loads(response.content[0].text)
+```
+
+## Dependencies
+
+### Frontend Dependencies
+
+```json
+// package.json (key dependencies)
+{
+  "dependencies": {
+    "react": "^18.0.0",
+    "next": "14.2.11",
+    "typescript": "^5.0.0",
+    "@radix-ui/react-dialog": "^1.0.4",
+    "tailwindcss": "3.4.1",
+    "framer-motion": "11.5.6",
+    "firebase": "11.1.0",
+    "dayjs": "1.11.10",
+    "uuid": "10.0.0",
+    "react-beautiful-dnd": "13.1.1"
+  }
+}
+```
+
+### Backend Dependencies
+
+```
+# requirements.txt
+flask==2.3.2
+flask-cors==5.0.0
+gunicorn==21.2.0
+pymongo==4.6.1
+anthropic>=0.5.0
+pydantic==2.5.2
+python-dotenv==1.0.0
+dnspython==2.4.2
+cachetools==5.3.1
+```
+
+## Development Workflow
+
+```bash
+# Frontend development
+cd frontend
+npm install
+npm run dev
+
+# Backend development
+cd backend
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+cd ..
+python3 application.py
+```
+
+## Future Considerations
+
+1. **AI Model Improvements**
+   - Custom fine-tuning for task-specific models
+   - User-specific adaptation based on feedback
+   - Multi-model comparison for optimal suggestions
+
+2. **Scalability**
+   - Microservices architecture for AI components
+   - Serverless functions for sporadic workloads
+   - Redis caching for frequently accessed data
+
+3. **Feature Expansion**
+   - Team collaboration capabilities
+   - Integration with additional productivity tools
+   - Mobile application with offline functionality
+
