@@ -15,12 +15,18 @@ calendar_bp = Blueprint("calendar", __name__)
 def get_user_id_from_token(request):
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
+        print("No Authorization header or invalid format")
         return None
         
     token = auth_header.split('Bearer ')[1]
     try:
+        # Print the active Firebase apps to debug
+        import firebase_admin
+        print(f"Active Firebase apps: {firebase_admin._apps}")
+        
         # Verify the token with Firebase
         decoded_token = firebase_auth.verify_id_token(token)
+        print(f"Token verified successfully for user: {decoded_token['uid']}")
         return decoded_token['uid']
     except Exception as e:
         print(f"Error verifying token: {e}")

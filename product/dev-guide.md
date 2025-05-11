@@ -51,10 +51,5 @@
 - Ensure comprehensive error handling
 - Run tests to validate implementation
 
-## Documentation & Tracking
-- Update `status.md` with current progress and any issues
-- Document code with clear comments explaining the logic
-- Track task completion in `task.md`, not in `memory.md`
-
 ## Continuous Improvement
 - Update these guidelines as needed to reflect new learnings
