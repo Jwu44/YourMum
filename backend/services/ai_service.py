@@ -16,6 +16,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from cachetools import TTLCache, LRUCache
 from backend.models.task import Task
 from dotenv import load_dotenv
+from backend.data import schedules_rag
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,182 +33,7 @@ frequent_tasks_cache = LRUCache(maxsize=100)
 decomposition_patterns_cache = {}
 
 # RAG examples for schedule generation
-example_schedules = {
-    "structured-day-sections-timeboxed": """
-    Morning 🌞
-    □ 7:00am - 7:30am: Wake up and morning routine
-    □ 7:30am - 8:00am: Breakfast and check emails
-    □ 8:00am - 9:30am: Work on high-priority project
-    □ 9:30am - 10:00am: Team standup meeting
-    □ 10:00am - 11:30am: Continue high-priority project work
-    □ 11:30am - 12:00pm: Review and respond to important messages
-
-    Afternoon 🌇
-    □ 12:00pm - 1:00pm: Lunch break and short walk
-    □ 1:00pm - 3:00pm: Deep work session on main tasks
-    □ 3:00pm - 3:30pm: Quick break and snack
-    □ 3:30pm - 5:00pm: Finish up daily tasks and plan for tomorrow
-
-    Evening 💤
-    □ 5:00pm - 6:00pm: Exercise or gym session
-    □ 6:00pm - 7:00pm: Dinner and relaxation
-    □ 7:00pm - 8:30pm: Personal project or hobby time
-    □ 8:30pm - 9:30pm: Wind down routine
-    □ 9:30pm: Bedtime
-    """,
-
-    "structured-day-sections-untimeboxed": """
-    Morning 🌞
-    □ Wake up and complete morning routine
-    □ Enjoy breakfast while checking and responding to urgent emails
-    □ Begin work on the day's highest priority task
-    □ Attend team standup meeting
-    □ Continue focused work on priority tasks
-    □ Review and respond to important messages
-
-    Afternoon 🌇
-    □ Take a lunch break and go for a short walk
-    □ Engage in a deep work session for main project tasks
-    □ Take a quick break and have a healthy snack
-    □ Wrap up daily tasks and plan for the next day
-
-    Evening 💤
-    □ Exercise or attend a gym session
-    □ Prepare and enjoy dinner
-    □ Spend time on a personal project or hobby
-    □ Complete evening wind-down routine
-    □ Go to bed at a consistent time
-    """,
-
-    "structured-priority-timeboxed": """
-    High Priority
-    □ 8:00am - 10:00am: Finish presentation for tomorrow's meeting
-    □ 10:00am - 10:30am: Schedule dentist appointment
-    □ 10:30am - 11:00am: Pay utility bills
-    □ 2:00pm - 4:00pm: Complete high-priority project deliverables
-
-    Medium Priority
-    □ 11:00am - 11:30am: Start learning Spanish (Duolingo, 15 minutes)
-    □ 12:30pm - 1:00pm: Plan weekend hiking trip
-    □ 4:00pm - 4:30pm: Research new recipes for meal prep
-    □ 6:00pm - 7:00pm: Work on personal development goals
-
-    Low Priority
-    □ 1:00pm - 1:30pm: Organize digital photos
-    □ 5:00pm - 5:30pm: Clean out email inbox
-    □ 7:00pm - 7:30pm: Look into new productivity apps
-    """,
-
-    "structured-priority-untimeboxed": """
-    High Priority
-    □ Finish presentation for tomorrow's meeting
-    □ Schedule dentist appointment
-    □ Pay utility bills
-    □ Complete high-priority project deliverables
-
-    Medium Priority
-    □ Start learning Spanish (Duolingo, 15 minutes)
-    □ Plan weekend hiking trip
-    □ Research new recipes for meal prep
-    □ Work on personal development goals
-
-    Low Priority
-    □ Organize digital photos
-    □ Clean out email inbox
-    □ Look into new productivity apps
-    """,
-
-    "structured-category-timeboxed": """
-    Work 💼
-    □ 9:00am - 9:30am: Prepare for team meeting
-    □ 9:30am - 10:30am: Attend team meeting
-    □ 10:30am - 11:30am: Review and respond to important emails
-    □ 2:00pm - 4:00pm: Work on quarterly report
-
-    Health & Fitness 🏋️‍♀️
-    □ 7:00am - 7:30am: 30-minute jog
-    □ 12:00pm - 12:30pm: Prepare healthy lunch
-    □ Throughout the day: Drink 8 glasses of water
-
-    Relationships ❤️
-    □ 5:00pm - 5:30pm: Plan date night with partner
-    □ 7:00pm - 7:30pm: Call best friend
-    □ 8:00pm - 9:00pm: Organize game night with friends
-
-    Fun 🎉
-    □ 12:30pm - 1:00pm: Play a quick game or solve a puzzle
-    □ 6:00pm - 6:30pm: Watch an episode of favorite TV show
-    □ 9:00pm - 9:30pm: Engage in a hobby (painting, gardening, etc.)
-
-    Ambition 🚀
-    □ 6:30am - 7:00am: Read 20 pages of a book on personal development
-    □ 5:30pm - 6:00pm: Work on side project or business idea
-    □ 9:30pm - 10:00pm: Reflect on goals and plan next steps
-    """,
-
-    "structured-category-untimeboxed": """
-    Work 💼
-    □ Prepare for team meeting
-    □ Attend team meeting
-    □ Review and respond to important emails
-    □ Work on quarterly report
-
-    Health 🏋️‍♀️
-    □ 30-minute jog
-    □ Prepare healthy lunch
-    □ Drink 8 glasses of water throughout the day
-
-    Relationships ❤️
-    □ Plan date night with partner
-    □ Call best friend
-    □ Organize game night with friends
-
-    Fun 🎉
-    □ Play a quick game or solve a puzzle
-    □ Watch an episode of favorite TV show
-    □ Engage in a hobby (painting, gardening, etc.)
-
-    Ambition 🚀
-    □ Read pages from a book on personal development
-    □ Work on side project or business idea
-    □ Reflect on goals and plan next steps
-    """,
-
-    "unstructured-timeboxed": """
-    □ 6:30am - 7:00am: Morning meditation and stretching
-    □ 7:00am - 7:30am: Breakfast and coffee
-    □ 7:30am - 9:00am: Deep work on main project
-    □ 9:00am - 9:15am: Quick break
-    □ 9:15am - 10:30am: Respond to emails and messages
-    □ 10:30am - 12:00pm: Team meeting and collaboration
-    □ 12:00pm - 1:00pm: Lunch and short walk
-    □ 1:00pm - 3:00pm: Continue work on main project
-    □ 3:00pm - 3:30pm: Afternoon snack and break
-    □ 3:30pm - 5:00pm: Wrap up daily tasks and plan for tomorrow
-    □ 5:00pm - 6:00pm: Exercise or gym session
-    □ 6:00pm - 7:00pm: Dinner preparation and eating
-    □ 7:00pm - 8:30pm: Personal hobby or project time
-    □ 8:30pm - 9:30pm: Reading or learning time
-    □ 9:30pm - 10:00pm: Evening routine and prepare for bed
-    """,
-
-    "unstructured-untimeboxed": """
-    □ Morning meditation and stretching
-    □ Enjoy breakfast and coffee
-    □ Deep work session on main project
-    □ Respond to important emails and messages
-    □ Attend team meeting and collaborate on projects
-    □ Lunch break and short walk
-    □ Continue work on main project
-    □ Take short breaks as needed
-    □ Wrap up daily tasks and plan for tomorrow
-    □ Exercise or gym session
-    □ Prepare and eat dinner
-    □ Spend time on personal hobby or project
-    □ Read or engage in learning activity
-    □ Complete evening routine and prepare for bed
-    """
-}
+example_schedules = schedules_rag
 
 def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     """
@@ -234,6 +60,8 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
         'Work': [], 'Exercise': [], 'Relationship': [],
         'Fun': [], 'Ambition': []
     }
+
+    # this could be more efficient instead of n^2
     for task in tasks:
         for category in task.categories:
             if category in categorized_tasks:
@@ -242,58 +70,13 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     # Convert priorities to a sorted list of tuples (category, rank)
     priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
     priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
-
-    # Check for enhanced layout preferences (new format)
-    layout_type = layout_preference.get('layout_type', 'todolist-structured')
-    structure = layout_preference.get('structure', 'structured')
     
-    # Get appropriate subcategory based on layout type
-    subcategory = layout_preference.get('subcategory', '')
-    
-    # Set default subcategory if not provided, based on layout type
-    if not subcategory:
-        base_layout = layout_type.split('-')[0] if '-' in layout_type else 'todolist'
-        if structure == 'structured':
-            if base_layout == 'todolist':
-                subcategory = 'day-sections'
-            elif base_layout == 'kanban':
-                subcategory = 'status'
-            elif base_layout == 'calendar':
-                subcategory = 'day'
-            elif base_layout == 'timeline':
-                subcategory = 'chronological'
-        else:
-            # For unstructured layouts, subcategory isn't relevant
-            subcategory = ''
-    
-    # Get task ordering pattern 
-    ordering_pattern = layout_preference.get('orderingPattern', 'timebox')
-    
-    # Determine the example schedule to use
-    if ordering_pattern in ['alternating', 'batching', 'three-three-three']:
-        # Use new ordering pattern examples
-        example_key = ordering_pattern
-    elif structure == "structured":
-        # Use layout format with timeboxing based on ordering pattern
-        timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
-        example_key = f"structured-{subcategory}-{timeboxed_value}"
-    else:  # unstructured
-        # For unstructured, also determine timeboxing based on ordering pattern
-        timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
-        example_key = f"unstructured-{timeboxed_value}"
-
+    # Get example schedule using the helper function
+    example_key = determine_schedule_example(layout_preference)
     example_schedule = example_schedules.get(example_key, "No matching example found.")
     
     # Create a more comprehensive system prompt
-    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth.
-
-You understand different scheduling methodologies including:
-1. Timeboxing - Assigning specific time blocks to tasks
-2. Batching - Grouping similar tasks together to maximize focus and efficiency
-3. Alternating - Switching between different types of tasks to maintain energy and engagement
-4. 3-3-3 method - Structuring the day with 3 hours on the most important focus task, followed by 3 medium-priority tasks, then 3 maintenance tasks
-
-Based on client preferences, energy patterns, and priorities, you'll create an optimized schedule that follows their preferred structure and task ordering pattern."""
+    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth. Based on client preferences, energy patterns, and priorities, you'll create an optimized schedule that follows their preferred structure and task ordering pattern."""
 
     # Create detailed user prompt with ordering pattern instructions
     user_prompt = f"""
@@ -303,9 +86,6 @@ Based on client preferences, energy patterns, and priorities, you'll create an o
     <work_schedule>{work_schedule}</work_schedule>
     <energy_patterns>{energy_patterns}</energy_patterns>
     <priority_description>{priority_description}</priority_description>
-    <schedule_structure>{structure}</schedule_structure>
-    <layout_subcategory>{subcategory}</layout_subcategory>
-    <ordering_pattern>{ordering_pattern}</ordering_pattern>
     </client_info>
 
     Here are the client's tasks categorized:
@@ -337,63 +117,6 @@ Based on client preferences, energy patterns, and priorities, you'll create an o
        d. Without category labels for each task.
     5. Important: Ensure each task is listed separately. Do not combine multiple tasks into a single entry.
     6. Only include tasks that the client has provided. Do not add any new tasks.
-
-    Task Ordering Pattern Instructions:
-    """
-
-    # Add specific instructions based on ordering pattern
-    if ordering_pattern == "timebox":
-        user_prompt += """
-    For the 'timebox' pattern:
-    - Assign specific time slots to each task based on their estimated duration and priority
-    - Consider natural energy fluctuations throughout the day
-    - Schedule high-energy tasks during peak energy times
-    - Schedule low-energy tasks during energy dips
-    - Include short breaks between tasks
-    - Ensure calendar events and fixed-time commitments are respected
-    """
-    elif ordering_pattern == "batching":
-        user_prompt += """
-    For the 'batching' pattern:
-    - Group similar tasks together to minimize context switching
-    - Create themed blocks (e.g., communication tasks, creative work, administrative tasks)
-    - Arrange tasks by category or required mental mode
-    - Schedule similar activities consecutively to create flow states
-    - Consider related tasks that use similar resources or mental processes
-    - Aim for 60-90 minute batches of similar work before changing focus
-    """
-    elif ordering_pattern == "alternating":
-        user_prompt += """
-    For the 'alternating' pattern:
-    - Alternate between high, medium, and low energy tasks
-    - Switch between different types of mental activity (analytical, creative, administrative)
-    - Intersperse high-focus work with lighter tasks
-    - Create variety to maintain engagement and prevent mental fatigue
-    - Balance focused work with movement or social interaction
-    - Consider transitioning between different energy requirements throughout the day
-    """
-    elif ordering_pattern == "three-three-three":
-        user_prompt += """
-    For the '3-3-3' method:
-    - Allocate 3 hours to the single most important focus task of the day
-    - Identify 3 medium-priority tasks to complete
-    - Include 3 maintenance/health tasks (exercise, meal prep, etc.)
-    - Structure the day with the focus block during peak energy hours
-    - Schedule medium-priority tasks in the middle of the day
-    - Place maintenance tasks at natural transition points
-    - Be realistic about the 3-hour focus block (it should be a meaningful, high-impact task)
-    """
-    else:
-        user_prompt += """
-    Use a standard ordering approach based on the client's preferences, prioritizing tasks according to:
-    - Energy patterns throughout the day
-    - Priority rankings
-    - Natural task dependencies and flow
-    - Appropriate task grouping based on the layout structure
-    """
-
-    # Complete the prompt with the response structure
-    user_prompt += """
 
     Please structure your response as follows:
 
@@ -1201,3 +924,51 @@ def generate_schedule_suggestions(
     except Exception as e:
         print(f"Error generating schedule suggestions: {str(e)}")
         return []
+
+def determine_schedule_example(layout_preference: Dict[str, Any]) -> str:
+    """
+    Determines the best matching example schedule based on user preferences.
+    
+    Uses a fallback strategy to find the most specific match first, then
+    progressively falls back to more general examples if needed.
+    
+    Args:
+        layout_preference: Dictionary containing layout, subcategory and ordering pattern
+        
+    Returns:
+        The key of the best matching example schedule
+    """
+    # Extract preferences with defaults
+    ordering_pattern = layout_preference.get('orderingPattern', 'timebox')
+    structure = layout_preference.get('structure', 'structured')
+    subcategory = layout_preference.get('subcategory', '')
+    
+    # Create prioritized list of possible keys from most to least specific
+    possible_keys = []
+    
+    # 1. Most specific: Combined structure-subcategory-ordering
+    if subcategory and structure == 'structured':
+        possible_keys.append(f"structured-{subcategory}-{ordering_pattern}")
+    
+    # 2. Next: Structure + ordering pattern
+    possible_keys.append(f"{structure}-{ordering_pattern}")
+    
+    # 3. Next: Just the ordering pattern (for specialized patterns)
+    possible_keys.append(ordering_pattern)
+    
+    # 4. Fallback: Standard structure with timeboxing
+    timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
+    if structure == 'structured' and subcategory:
+        possible_keys.append(f"structured-{subcategory}-{timeboxed_value}")
+    elif structure == 'structured':
+        possible_keys.append(f"structured-category-{timeboxed_value}")
+    else:
+        possible_keys.append(f"unstructured-{timeboxed_value}")
+    
+    # Find first matching key that exists in example_schedules
+    for key in possible_keys:
+        if key in example_schedules:
+            return key
+    
+    # Ultimate fallback
+    return 'unstructured-timeboxed'

@@ -1,10 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut as firebaseSignOut, GoogleAuthProvider } from 'firebase/auth';
 import { auth, provider } from './firebase';
 import { signInWithPopup, getRedirectResult } from 'firebase/auth';
 import { AuthContextType } from '@/lib/types';
+import { calendarApi } from '@/lib/api/calendar';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -22,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-      // Handle Firebase auth state changes
+  // Handle Firebase auth state changes
   useEffect(() => {
     console.log("Setting up auth state change listener");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -53,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             controller.abort();
           }, 20000);
           
-          // Try to store the user, but don't block the UI flow
+          // Try to store the user
           fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: user.email,
               displayName: user.displayName,
               photoURL: user.photoURL,
-              hasCalendarAccess: false
+              hasCalendarAccess: true
             }),
             signal: controller.signal
           })
@@ -102,7 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Cleanup subscription
     return () => unsubscribe();
   }, []);
-  // Add this to your useEffect to handle the redirect result
+  
+  // Handle redirect result and check for calendar access
   useEffect(() => {
     const handleRedirectResult = async () => {
       try {
@@ -113,21 +115,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result) {
           // User successfully signed in after redirect
           console.log("Redirect sign-in successful");
+        
+          // Get credentials from result.credential
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          if (!credential || !credential.accessToken) {
+            console.error("Missing credential or access token");
+            window.location.href = '/dashboard';
+            return;
+          }
           
-          // Get the intended destination from localStorage (if set)
-          const intendedRoute = localStorage.getItem('authRedirectDestination');
-          console.log("Intended route from localStorage:", intendedRoute);
+          // Get scopes and check for calendar access
+          const scopes = await getScopes(credential.accessToken);
+          const hasCalendarAccess = scopes.some(scope => 
+            scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+          );
           
-          // Clear the stored route regardless of what happens next
-          localStorage.removeItem('authRedirectDestination');
+          console.log("Has calendar access:", hasCalendarAccess);
           
-          // Navigate to the intended route if one was saved, otherwise default to /priorities
-          if (intendedRoute) {
-            console.log("Navigating to intended route:", intendedRoute);
-            window.location.href = intendedRoute;
+          if (hasCalendarAccess) {
+            try {
+              // Connect to Google Calendar with credentials
+              console.log("Connecting to Google Calendar...");
+              const credentials = {
+                accessToken: credential.accessToken,
+                expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+                scopes: scopes
+              };
+              
+              await calendarApi.connectCalendar(credentials);
+              console.log("Connected to Google Calendar");
+              
+              // Fetch events for current day
+              const today = new Date().toISOString().split('T')[0];
+              await calendarApi.fetchEvents(today);
+              
+              // Navigate to dashboard
+              console.log("Navigating to dashboard");
+              window.location.href = '/dashboard';
+            } catch (calendarError) {
+              console.error("Error connecting to calendar:", calendarError);
+              window.location.href = '/dashboard';
+            }
           } else {
-            console.log("Navigating to default route: /priorities");
-            window.location.href = '/priorities';
+            // No calendar access, go to dashboard with empty schedule
+            console.log("No calendar access, navigating to dashboard");
+            window.location.href = '/dashboard';
           }
         } else {
           console.log("No redirect result found");
@@ -141,8 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     handleRedirectResult();
   }, []);
 
-  // Also add logging to the signIn function
-  const signIn = async (redirectTo = '/priorities') => {
+  // Sign in function with Google Calendar scopes
+  const signIn = async (redirectTo = '/dashboard') => {
     try {
       setError(null);
       console.log("Starting sign in process, redirect destination:", redirectTo);
@@ -151,16 +183,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('authRedirectDestination', redirectTo);
       console.log("Stored redirect destination in localStorage");
       
+      // Configure provider to request calendar access
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+      
       console.log("Initiating signInWithPopup");
       const result = await signInWithPopup(auth, provider);
       console.log("Sign in successful:", result.user ? `${result.user.displayName} (${result.user.email})` : "No user");
       
-      // The user state will be updated by the onAuthStateChanged listener,
-      // but we can navigate right away since we have confirmation of success
-      const intendedRoute = localStorage.getItem('authRedirectDestination') || '/work-times';
-      console.log("Navigating to:", intendedRoute);
-      localStorage.removeItem('authRedirectDestination');
-      window.location.href = intendedRoute;
+      // Get credentials from result
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential && credential.accessToken) {
+        // Get scopes and check for calendar access
+        const scopes = await getScopes(credential.accessToken);
+        const hasCalendarAccess = scopes.some(scope => 
+          scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+        );
+        
+        if (hasCalendarAccess) {
+          try {
+            // Connect to Google Calendar with credentials
+            const credentials = {
+              accessToken: credential.accessToken,
+              expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+              scopes: scopes
+            };
+            
+            await calendarApi.connectCalendar(credentials);
+            
+            // Fetch events for current day
+            const today = new Date().toISOString().split('T')[0];
+            await calendarApi.fetchEvents(today);
+            
+            // Navigate to dashboard
+            window.location.href = '/dashboard';
+            return;
+          } catch (calendarError) {
+            console.error("Error connecting to calendar:", calendarError);
+          }
+        }
+      }
+      
+      // If calendar connection failed or no access, go to dashboard with empty schedule
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Sign in error:', error);
       setError('Failed to sign in with Google');
@@ -195,3 +260,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+// Helper function to get scopes
+const getScopes = async (accessToken: string): Promise<string[]> => {
+  try {
+    // This endpoint will return the scopes associated with the token
+    const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + accessToken);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    return data.scope ? data.scope.split(' ') : [];
+  } catch (error) {
+    console.error('Error getting token scopes:', error);
+    return [];
+  }
+};

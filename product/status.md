@@ -10,13 +10,18 @@
 
 ## 🏗️ In Progress
 - Modular schedule generation refactoring
-  - Enhancing RAG system with example-based prompting
+  - Schedule generation optimisation
+- Google Calendar integration via MCP server
+  - Backend API routes implemented
+  - Next: Frontend implementation to request permissions and display events
 
 ## Next
 - AI suggestion system improvements
   - Personalized recommendations based on historical data
   - More transparent AI decision-making
 - External calendar system integration refinements
+  - Complete Google Calendar integration
+  - Add support for other calendar services
 
 ## Known Issues
 - Some performance bottlenecks with large schedule generation

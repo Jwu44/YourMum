@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { auth } from '@/auth/firebase';
 
 // UI Components
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ import {
   generateSchedule,
 } from '@/lib/ScheduleHelper';
 
+import { calendarApi } from '@/lib/api/calendar';
 
 const initialPriorities: Priority[] = [
     { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
@@ -496,7 +498,8 @@ const Dashboard: React.FC = () => {
     handleEnergyChange(dispatch, currentPatterns)(value);
   }, [dispatch, state.energy_patterns]);
 
-  const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
+  // 2. Modify handleDateSelect to first try loading calendar events
+const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
   if (!newDate) {
     setIsDropdownOpen(false);
     return;
@@ -506,7 +509,7 @@ const Dashboard: React.FC = () => {
   try {
     const dateStr = formatDateToString(newDate);
     
-    // Calculate date differences first
+    // Calculate date differences for index
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const selectedDate = new Date(newDate);
@@ -514,19 +517,37 @@ const Dashboard: React.FC = () => {
     const diffTime = selectedDate.getTime() - today.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    // Always update the date states regardless of schedule existence
+    // Always update the date states
     setCurrentDayIndex(diffDays);
     setDate(newDate);
     setCurrentDate(newDate);
 
-    // Now try to load the schedule
+    // First, try to get calendar events
+    const calendarEvents = await calendarApi.fetchEvents(dateStr);
+
+    if (calendarEvents && calendarEvents.length > 0) {
+      // Update schedule with calendar events
+      setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarEvents));
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        newDays[diffDays] = calendarEvents;
+        return newDays;
+      });
+      
+      toast({
+        title: "Success",
+        description: "Calendar events loaded successfully",
+      });
+      return;
+    }
+    
+    // Fallback: try to load local schedule data
     const existingSchedule = await loadScheduleForDate(dateStr);
     
     if (existingSchedule.success && existingSchedule.schedule) {
-      // Update schedule states
+      // Update with local schedule data
       setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
       setScheduleDays(prevDays => {
-        // Preserve existing days and add/update the selected day
         const newDays = [...prevDays];
         newDays[diffDays] = existingSchedule.schedule!;
         return newDays;
@@ -537,7 +558,7 @@ const Dashboard: React.FC = () => {
         description: "Schedule loaded successfully",
       });
     } else {
-      // Clear schedule for this day but keep the date states
+      // No schedule found
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         newDays[diffDays] = [];
@@ -817,44 +838,80 @@ const handleRejectSuggestion = useCallback((suggestionId: string) => {
   });
 }, []);
 
-// Load pre-generated schedule from state when dashboard first loads
 useEffect(() => {
-  // Check if we have a response from the previous page (TaskPatternOrdering)
-  if (state.formUpdate?.response && 'tasks' in state.formUpdate.response) {
-    const scheduleData = state.formUpdate.response;
-    console.log("Found pre-generated schedule in state:", scheduleData);
+  const loadInitialSchedule = async () => {
+    setIsLoadingSchedule(true);
     
     try {
-      // Set the schedule days from the state
-      setScheduleDays([scheduleData.tasks]);
-      setCurrentDayIndex(0);
+      const today = getDateString(0);
       
-      // Save schedule to backend if needed
-      const currentDate = getDateString(0);
-      updateScheduleForDate(currentDate, scheduleData.tasks)
-        .then(() => {
-          // Update schedule cache
-          setScheduleCache(prev => new Map(prev).set(currentDate, scheduleData.tasks));
-          console.log("Pre-generated schedule set and saved");
-        })
-        .catch(error => {
-          console.error("Error saving pre-generated schedule:", error);
-          toast({
-            title: "Warning",
-            description: "Schedule loaded but could not be saved to database",
-            variant: "destructive",
-          });
-        });
+      // Try calendar events first
+      const calendarEvents = await calendarApi.fetchEvents(today);
+      
+      if (calendarEvents && calendarEvents.length > 0) {
+        setScheduleDays([calendarEvents]);
+        setScheduleCache(new Map([[today, calendarEvents]]));
+        return;
+      }
+      
+      // Fall back to regular schedule if no calendar events
+      const existingSchedule = await loadScheduleForDate(today);
+      
+      if (existingSchedule.success && existingSchedule.schedule) {
+        setScheduleDays([existingSchedule.schedule]);
+        setScheduleCache(new Map([[today, existingSchedule.schedule]]));
+      }
     } catch (error) {
-      console.error("Error initializing schedule from state:", error);
-      toast({
-        title: "Error",
-        description: "Failed to initialize schedule",
-        variant: "destructive",
-      });
+      console.error("Error loading initial schedule:", error);
+    } finally {
+      setIsLoadingSchedule(false);
     }
+  };
+  
+  // Only run if we don't already have a schedule from previous page
+  if (!state.formUpdate?.response) {
+    loadInitialSchedule();
   }
-}, [state.formUpdate.response, toast]); // Empty dependency array to only run once when component mounts
+}, []);
+
+// // Load pre-generated schedule from state when dashboard first loads
+// useEffect(() => {
+//   // Check if we have a response from the previous page (TaskPatternOrdering)
+//   if (state.formUpdate?.response && 'tasks' in state.formUpdate.response) {
+//     const scheduleData = state.formUpdate.response;
+//     console.log("Found pre-generated schedule in state:", scheduleData);
+    
+//     try {
+//       // Set the schedule days from the state
+//       setScheduleDays([scheduleData.tasks]);
+//       setCurrentDayIndex(0);
+      
+//       // Save schedule to backend if needed
+//       const currentDate = getDateString(0);
+//       updateScheduleForDate(currentDate, scheduleData.tasks)
+//         .then(() => {
+//           // Update schedule cache
+//           setScheduleCache(prev => new Map(prev).set(currentDate, scheduleData.tasks));
+//           console.log("Pre-generated schedule set and saved");
+//         })
+//         .catch(error => {
+//           console.error("Error saving pre-generated schedule:", error);
+//           toast({
+//             title: "Warning",
+//             description: "Schedule loaded but could not be saved to database",
+//             variant: "destructive",
+//           });
+//         });
+//     } catch (error) {
+//       console.error("Error initializing schedule from state:", error);
+//       toast({
+//         title: "Error",
+//         description: "Failed to initialize schedule",
+//         variant: "destructive",
+//       });
+//     }
+//   }
+// }, [state.formUpdate.response, toast]); // Empty dependency array to only run once when component mounts
 
   return (
     <div className="flex h-screen bg-[hsl(248,18%,4%)]">
