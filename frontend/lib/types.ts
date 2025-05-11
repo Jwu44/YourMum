@@ -461,3 +461,9 @@ export interface FirebaseUser {
 export interface WithHandleGetStarted {
   handleGetStarted: () => Promise<void>;
 }
+
+export interface CalendarCredentials {
+  accessToken: string;
+  expiresAt: number;
+  scopes: string[];
+}

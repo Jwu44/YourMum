@@ -10,6 +10,9 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
       const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
         method: 'POST',
         headers: {
@@ -35,6 +38,9 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
       const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
         method: 'POST',
         headers: {
@@ -59,6 +65,9 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
       
       const response = await fetch(`${API_BASE_URL}/api/calendar/status`, {
         headers: {
@@ -90,6 +99,9 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
       
       const response = await fetch(`${API_BASE_URL}/api/calendar/verify-permissions`, {
         method: 'POST',
@@ -116,6 +128,9 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
       const response = await fetch(`${API_BASE_URL}/api/calendar/events?date=${date}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
