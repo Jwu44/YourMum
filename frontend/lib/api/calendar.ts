@@ -1,5 +1,6 @@
 import { UserDocument, Task } from '../types';
 import { auth } from '@/auth/firebase';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Use the calendar part of UserDocument type
 type CalendarStatus = NonNullable<UserDocument['calendar']>;
@@ -9,8 +10,7 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
-      
-      const response = await fetch('/api/calendar/connect', {
+      const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,8 +35,7 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
-      
-      const response = await fetch('/api/calendar/disconnect', {
+      const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +60,7 @@ export const calendarApi = {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
       
-      const response = await fetch(`/api/calendar/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/calendar/status`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
@@ -92,7 +91,7 @@ export const calendarApi = {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
       
-      const response = await fetch('/api/calendar/verify-permissions', {
+      const response = await fetch(`${API_BASE_URL}/api/calendar/verify-permissions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,8 +116,7 @@ export const calendarApi = {
     try {
       // Get the current user's token
       const idToken = await auth.currentUser?.getIdToken();
-      
-      const response = await fetch(`/api/calendar/events?date=${date}`, {
+      const response = await fetch(`${API_BASE_URL}/api/calendar/events?date=${date}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
