@@ -9,10 +9,8 @@ export const calendarApi = {
   async connectCalendar(credentials: any) {
     try {
       // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
+      const idToken = await auth.currentUser?.getIdToken(true);
+      console.log("Token obtained:", !!idToken);
       const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
         method: 'POST',
         headers: {
@@ -37,7 +35,7 @@ export const calendarApi = {
   async disconnectCalendar() {
     try {
       // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await auth.currentUser?.getIdToken(true);
       if (!idToken) {
         throw new Error('User not authenticated');
       }
@@ -64,7 +62,7 @@ export const calendarApi = {
   async getCalendarStatus(): Promise<CalendarStatus> {
     try {
       // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await auth.currentUser?.getIdToken(true);
       if (!idToken) {
         throw new Error('User not authenticated');
       }
@@ -98,7 +96,7 @@ export const calendarApi = {
   }> {
     try {
       // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await auth.currentUser?.getIdToken(true);
       if (!idToken) {
         throw new Error('User not authenticated');
       }
@@ -127,7 +125,7 @@ export const calendarApi = {
   async fetchEvents(date: string): Promise<Task[]> {
     try {
       // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await auth.currentUser?.getIdToken(true);
       if (!idToken) {
         throw new Error('User not authenticated');
       }

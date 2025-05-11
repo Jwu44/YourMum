@@ -1,10 +1,9 @@
 # Development Guidelines
 ## Workflow
-<!-- - Before implementation, thoroughly understand the context from `task.md`  -->
+- Before implementation, thoroughly understand the context from `task.md` 
 - If requirements are unclear, ask clarifying questions until confident
 - Parse current task requirements, acceptance criteria, and dependencies
 - Validate changes against architectural constraints in `architecture.mermaid`
-- Update `status.md` with progress, blockers, and completed items
 
 ## Code Implementation Approach
 - Use task-based development with Test-Driven Development (TDD) principles
@@ -24,6 +23,7 @@
 ## Code Style & Patterns
 
 ### General Rules
+- Keep logic SIMPLE whenever possible
 - Do not unnecessarily remove any comments or code
 - Implement proper error handling with try/catch (JS) or try/except (Python) blocks
 - Consider edge cases, performance optimization, and language/framework best practices
@@ -54,7 +54,7 @@
 ## Documentation & Tracking
 - Update `status.md` with current progress and any issues
 - Document code with clear comments explaining the logic
-<!-- - Track task completion in `task.md`, not in `memory.md` -->
+- Track task completion in `task.md`, not in `memory.md`
 
 ## Continuous Improvement
 - Update these guidelines as needed to reflect new learnings
