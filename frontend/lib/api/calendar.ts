@@ -5,12 +5,64 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 // Use the calendar part of UserDocument type
 type CalendarStatus = NonNullable<UserDocument['calendar']>;
 
+// Maximum token refresh attempts
+const MAX_TOKEN_REFRESH_ATTEMPTS = 3;
+// Delay between attempts in milliseconds
+const TOKEN_REFRESH_DELAY = 1000;
+
 export const calendarApi = {
+  async getIdTokenWithRetry(forceRefresh = true, attempts = 0): Promise<string> {
+    if (attempts >= MAX_TOKEN_REFRESH_ATTEMPTS) {
+      throw new Error('Failed to obtain authentication token after multiple attempts');
+    }
+    
+    // Wait for auth to initialize if needed
+    if (!auth.currentUser) {
+      console.log(`Auth not ready yet, waiting attempt ${attempts + 1}/${MAX_TOKEN_REFRESH_ATTEMPTS}...`);
+      return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const token = await this.getIdTokenWithRetry(forceRefresh, attempts + 1);
+            resolve(token);
+          } catch (error) {
+            reject(error);
+          }
+        }, TOKEN_REFRESH_DELAY);
+      });
+    }
+    
+    try {
+      const token = await auth.currentUser.getIdToken(forceRefresh);
+      if (!token) {
+        throw new Error('Unable to get token from current user');
+      }
+      return token;
+    } catch (error) {
+      console.error(`Token retrieval error (attempt ${attempts + 1}/${MAX_TOKEN_REFRESH_ATTEMPTS}):`, error);
+      
+      if (attempts < MAX_TOKEN_REFRESH_ATTEMPTS - 1) {
+        return new Promise((resolve, reject) => {
+          setTimeout(async () => {
+            try {
+              const token = await this.getIdTokenWithRetry(forceRefresh, attempts + 1);
+              resolve(token);
+            } catch (error) {
+              reject(error);
+            }
+          }, TOKEN_REFRESH_DELAY);
+        });
+      } else {
+        throw error;
+      }
+    }
+  },
+
   async connectCalendar(credentials: any) {
     try {
-      // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken(true);
+      // Get the current user's token with retry mechanism
+      const idToken = await this.getIdTokenWithRetry(true);
       console.log("Token obtained:", !!idToken);
+      
       const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
         method: 'POST',
         headers: {
@@ -34,11 +86,9 @@ export const calendarApi = {
 
   async disconnectCalendar() {
     try {
-      // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken(true);
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
+      // Get the current user's token with retry mechanism
+      const idToken = await this.getIdTokenWithRetry(true);
+      
       const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
         method: 'POST',
         headers: {
@@ -61,11 +111,8 @@ export const calendarApi = {
 
   async getCalendarStatus(): Promise<CalendarStatus> {
     try {
-      // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken(true);
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
+      // Get the current user's token with retry mechanism
+      const idToken = await this.getIdTokenWithRetry(true);
       
       const response = await fetch(`${API_BASE_URL}/api/calendar/status`, {
         headers: {
@@ -95,11 +142,8 @@ export const calendarApi = {
     error?: string;
   }> {
     try {
-      // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken(true);
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
+      // Get the current user's token with retry mechanism
+      const idToken = await this.getIdTokenWithRetry(true);
       
       const response = await fetch(`${API_BASE_URL}/api/calendar/verify-permissions`, {
         method: 'POST',
@@ -124,11 +168,9 @@ export const calendarApi = {
 
   async fetchEvents(date: string): Promise<Task[]> {
     try {
-      // Get the current user's token
-      const idToken = await auth.currentUser?.getIdToken(true);
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
+      // Get the current user's token with retry mechanism
+      const idToken = await this.getIdTokenWithRetry(true);
+      
       const response = await fetch(`${API_BASE_URL}/api/calendar/events?date=${date}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
