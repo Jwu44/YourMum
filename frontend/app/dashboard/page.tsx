@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { auth } from '@/auth/firebase';
 
 // UI Components
 import { Button } from '@/components/ui/button';

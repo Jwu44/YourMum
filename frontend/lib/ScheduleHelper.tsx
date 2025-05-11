@@ -11,7 +11,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { format as dateFormat } from 'date-fns';
 import memoize from 'lodash/memoize';
-import { auth } from '../auth/firebase';
 
 // Types and Utils imports
 import { 
