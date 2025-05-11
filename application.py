@@ -62,7 +62,7 @@ def create_app(testing=False):
     
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(calendar_bp, url_prefix='/api/calendar')
+    app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
     
     try:
         # Initialize database connection only once

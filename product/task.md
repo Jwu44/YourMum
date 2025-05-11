@@ -1,15 +1,29 @@
-# USER-001: Schedule generation optimisation
-Status: To Do
+# USER-002: Google calendar integration via mcp server
+Status: In Progress
+
+## Current Progress
+- Backend API routes have been created in backend/apis/calendar_routes.py:
+  - `/api/calendar/connect` (POST): Connect user to Google Calendar after authorization
+  - `/api/calendar/events` (GET): Fetch user's calendar events for a specific date
+- MCP server configuration exists in mcp.json with the server URL
+- Frontend implementation:
+  - Fixed import for GoogleAuthProvider in AuthContext.tsx
+  - Updated calendar.ts to correctly import auth from '@/auth/firebase'
+  - Refactored dashboard.tsx to use calendarApi.fetchEvents() which automatically handles auth
+  - Modified fetchEvents to use a simplified API signature with just date parameter
 
 ## Requirements
-- Map out the current flow for generating a schedule by examining the code base
-- In the first response, review the first step in the first flow by assessing its complexity
-- Asess by asking:
-    - Is this class/module/file/function too complex?
-    - If so, what can be refactored to make it simpler?
-    - Please look for opportunities to extract a class or a method for any bit of shared or repeated functionality, or just to result in better code organization
-- When I am happy with the refactored response, continue the same process for the rest of the steps with each response focusing on 1 step
+- review current flow that uses an MCP server to connect user's google calendar 
+- problem: Backend requires userId parameter even though you could extract it from authentication headers
+- solution: Use Firebase auth tokens in headers rather than passing userId in query parameters
 
 ## Acceptance Criteria
-1. Any necessary refactoring should follow @dev-guide.md 
-2. Any necessary refactor should increase performance, scalability and be simple to understand 
+- after a user signs in via google sso, ask for access to google calendar
+- if they allow, then create a connection to google calendar mcp server
+  - gather all events and tasks the user has for the current day
+      - create them as task objects
+      - create a schedule using these task objects
+      - store the schedule in mongodb against the user for the current day
+- if user clicks 'don't allow', then user should also see their dashboard page with an empty schedule
+- instead of continuing to the current onboarding flow, take user directly to the dashboard page 
+

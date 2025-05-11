@@ -11,6 +11,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { format as dateFormat } from 'date-fns';
 import memoize from 'lodash/memoize';
+import { auth } from '../auth/firebase';
 
 // Types and Utils imports
 import { 
@@ -353,81 +354,3 @@ export const generateSchedule = async (
     };
   }
 };
-
-// /**
-//  * Parse schedule text to task objects
-//  * 
-//  * Converts a text-based schedule (from AI) into a list of Task objects.
-//  * 
-//  * @param scheduleText - The text schedule to parse
-//  * @returns Array of Task objects
-//  */
-// const parseScheduleText = (scheduleText: string): Task[] => {
-//   try {
-//     // Extract content from tags if they exist
-//     const scheduleRegex = /<schedule>([\s\S]*?)<\/schedule>/;
-//     const match = scheduleText.match(scheduleRegex);
-//     const content = match ? match[1].trim() : scheduleText.trim();
-    
-//     if (!content) {
-//       return [];
-//     }
-    
-//     const lines = content.split('\n');
-//     const tasks: Task[] = [];
-//     let currentSection: string | null = null;
-    
-//     for (const line of lines) {
-//       const trimmedLine = line.trim();
-//       if (!trimmedLine) continue;
-      
-//       // Check if this is a section header
-//       if (!trimmedLine.startsWith('□') && !trimmedLine.startsWith('-')) {
-//         currentSection = trimmedLine;
-//         tasks.push({
-//           id: uuidv4(),
-//           text: currentSection,
-//           categories: [],
-//           is_section: true,
-//           completed: false,
-//           section: null,
-//           parent_id: null,
-//           level: 0,
-//           type: 'section'
-//         });
-//         continue;
-//       }
-      
-//       // Process task
-//       let taskText = trimmedLine.replace('□ ', '').replace('- ', '');
-//       let startTime: string | undefined;
-//       let endTime: string | undefined;
-      
-//       // Extract time information if present
-//       const timeMatch = taskText.match(/^(\d{1,2}:\d{2}(?:am|pm)?) - (\d{1,2}:\d{2}(?:am|pm)?):?\s*(.*)/i);
-//       if (timeMatch) {
-//         [, startTime, endTime, taskText] = timeMatch;
-//       }
-      
-//       tasks.push({
-//         id: uuidv4(),
-//         text: taskText,
-//         categories: [],
-//         is_subtask: false,
-//         completed: false,
-//         is_section: false,
-//         section: currentSection,
-//         parent_id: null,
-//         level: 0,
-//         type: 'task',
-//         start_time: startTime,
-//         end_time: endTime
-//       });
-//     }
-    
-//     return tasks;
-//   } catch (error) {
-//     console.error('Error parsing schedule text:', error);
-//     return [];
-//   }
-// };

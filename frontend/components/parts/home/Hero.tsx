@@ -52,6 +52,8 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
               <Image 
                 src="/dashboard-crossed.png" 
                 alt="yourdai app interface" 
+                width={1024} 
+                height={576}
                 className="w-full rounded-xl transform hover:scale-[1.02] transition-all duration-700 ease-in-out"
               />
             </div>

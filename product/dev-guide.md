@@ -1,6 +1,6 @@
 # Development Guidelines
 ## Workflow
-- Before implementation, thoroughly understand the context from `task.md` 
+<!-- - Before implementation, thoroughly understand the context from `task.md`  -->
 - If requirements are unclear, ask clarifying questions until confident
 - Parse current task requirements, acceptance criteria, and dependencies
 - Validate changes against architectural constraints in `architecture.mermaid`
@@ -53,9 +53,8 @@
 
 ## Documentation & Tracking
 - Update `status.md` with current progress and any issues
-- Keep `memory.md` updated with project state and technical decisions
 - Document code with clear comments explaining the logic
-- Track task completion in `task.md`, not in `memory.md`
+<!-- - Track task completion in `task.md`, not in `memory.md` -->
 
 ## Continuous Improvement
 - Update these guidelines as needed to reflect new learnings

@@ -1,363 +1,271 @@
 from flask import Blueprint, jsonify, request
-from backend.db_config import (
-    get_database, 
-    get_users_collection,
-    get_user_schedules_collection,
-    sync_calendar_status
-)
-from datetime import datetime, timedelta
-from typing import Dict, Any
+from backend.db_config import get_database
+import traceback
+from datetime import datetime, timezone
+from backend.models.task import Task
+import uuid
 import requests
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+from firebase_admin import auth as firebase_auth
+import os
+from typing import List, Dict
 
 calendar_bp = Blueprint("calendar", __name__)
 
-# Helper function to convert Google Calendar events to yourdai tasks
-def convert_event_to_task(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert Google Calendar event to yourdai task format.
-    Adds special flags to identify calendar-sourced tasks.
-    """
-    return {
-        "id": f"gcal_{event['id']}",  # Prefix to identify calendar-sourced tasks
-        "text": event['summary'],
-        "completed": False,
-        "is_section": False,
-        "is_subtask": False,
-        "start_time": event.get('start', {}).get('dateTime'),
-        "end_time": event.get('end', {}).get('dateTime'),
-        "from_gcal": True,  # Flag to identify calendar-sourced tasks
-        "categories": ["calendar"]  # Tag calendar tasks
-    }
+# Helper function to extract user ID from Firebase token
+def get_user_id_from_token(request):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None
+        
+    token = auth_header.split('Bearer ')[1]
+    try:
+        # Verify the token with Firebase
+        decoded_token = firebase_auth.verify_id_token(token)
+        return decoded_token['uid']
+    except Exception as e:
+        print(f"Error verifying token: {e}")
+        return None
 
 @calendar_bp.route("/connect", methods=["POST"])
-def connect_calendar():
-    """Connect user's Google Calendar"""
-    try:
-        data = request.json
-        user_id = data.get('userId')
-        selected_calendars = data.get('selectedCalendars', [])
-
-        if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        users = get_users_collection()
-        
-        # Update user's calendar connection status
-        result = users.update_one(
-            {"googleId": user_id},
-            {
-                "$set": {
-                    "calendar.connected": True,
-                    "calendar.syncStatus": "in_progress",
-                    "calendar.selectedCalendars": selected_calendars,
-                    "calendar.lastSyncTime": datetime.utcnow().isoformat(),
-                    "calendar.error": None
-                }
-            }
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "User not found"}), 404
-
-        return jsonify({
-            "message": "Calendar connected successfully",
-            "status": "in_progress",
-            "selectedCalendars": selected_calendars
-        })
-
-    except Exception as e:
-        print(f"Error connecting calendar: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@calendar_bp.route("/disconnect", methods=["POST"])
-def disconnect_calendar():
-    """Disconnect user's Google Calendar"""
-    try:
-        data = request.json
-        user_id = data.get('userId')
-
-        if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        users = get_users_collection()
-        
-        # Update user's calendar connection status
-        result = users.update_one(
-            {"googleId": user_id},
-            {
-                "$set": {
-                    "calendar.connected": False,
-                    "calendar.syncStatus": "never",
-                    "calendar.selectedCalendars": [],
-                    "calendar.lastSyncTime": None,
-                    "calendar.error": None
-                }
-            }
-        )
-
-        if result.modified_count == 0:
-            return jsonify({"error": "User not found"}), 404
-
-        return jsonify({
-            "message": "Calendar disconnected successfully",
-            "status": "never"
-        })
-
-    except Exception as e:
-        print(f"Error disconnecting calendar: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@calendar_bp.route("/status/<user_id>", methods=["GET"])
-def check_calendar_status(user_id: str):
-    """Check user's calendar connection status"""
-    try:
-        users = get_users_collection()
-        user = users.find_one({"googleId": user_id})
-
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        calendar_status = {
-            "connected": user.get("calendar", {}).get("connected", False),
-            "syncStatus": user.get("calendar", {}).get("syncStatus", "never"),
-            "lastSyncTime": user.get("calendar", {}).get("lastSyncTime"),
-            "selectedCalendars": user.get("calendar", {}).get("selectedCalendars", []),
-            "error": user.get("calendar", {}).get("error")
-        }
-
-        return jsonify(calendar_status)
-
-    except Exception as e:
-        print(f"Error checking calendar status: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@calendar_bp.route("/verify-permissions", methods=["POST"])
-def verify_calendar_permissions():
-    """Verify user's calendar permissions"""
-    try:
-        data = request.json
-        token = data.get('accessToken')
-        
-        if not token:
-            return jsonify({"error": "Access token is required"}), 400
-
-        # Make a test request to Google Calendar API
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json"
-        }
-        
-        response = requests.get(
-            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
-            headers=headers
-        )
-
-        if response.status_code == 200:
-            calendars = response.json().get('items', [])
-            return jsonify({
-                "hasPermissions": True,
-                "availableCalendars": [
-                    {
-                        "id": cal['id'],
-                        "summary": cal['summary'],
-                        "primary": cal.get('primary', False)
-                    }
-                    for cal in calendars
-                ]
-            })
-        else:
-            return jsonify({
-                "hasPermissions": False,
-                "error": "Failed to access Google Calendar API"
-            }), 403
-
-    except Exception as e:
-        print(f"Error verifying calendar permissions: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# New sync routes
-@calendar_bp.route("/sync/initial", methods=["POST"])
-def initial_sync():
+def connect_google_calendar():
     """
-    Sync today's calendar events to tasks.
-    Converts calendar events to tasks and adds them to today's schedule.
+    Connect a user to Google Calendar after authorization
+    
+    Expected request body:
+    {
+        "credentials": {
+            "accessToken": str,
+            "refreshToken": str (optional),
+            "expiresAt": int,
+            "scopes": List[str]
+        }
+    }
+    
+    Authorization header required with Firebase ID token
     """
     try:
         data = request.json
-        user_id = data.get('userId')
+        if not data or 'credentials' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing required parameters"
+            }), 400
         
+        # Get user ID from token
+        user_id = get_user_id_from_token(request)
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        # Get user's calendar credentials
-        users = get_users_collection()
-        user = users.find_one({"googleId": user_id})
+            return jsonify({
+                "success": False,
+                "error": "Invalid or missing authentication token"
+            }), 401
         
-        if not user or not user.get('calendar', {}).get('credentials'):
-            return jsonify({"error": "Calendar credentials not found"}), 404
-
-        # Update sync status to in_progress
-        sync_calendar_status(user_id, "in_progress")
+        credentials = data['credentials']
         
-        # Setup Google Calendar API client
-        credentials = Credentials(**user['calendar']['credentials'])
-        service = build('calendar', 'v3', credentials=credentials)
-
-        # Calculate today's time range
-        today = datetime.now().date()
-        time_min = datetime.combine(today, datetime.min.time()).isoformat() + 'Z'
-        time_max = datetime.combine(today, datetime.max.time()).isoformat() + 'Z'
-
-        # Fetch today's events from Google Calendar
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-
-        events = events_result.get('items', [])
+        # Get database instance
+        db = get_database()
+        users = db['users']
         
-        # Convert events to yourdai tasks
-        calendar_tasks = [convert_event_to_task(event) for event in events]
-        
-        # Get current schedule
-        schedules = get_user_schedules_collection()
-        today_str = today.isoformat()
-        current_schedule = schedules.find_one({
-            "userId": user_id,
-            "date": f"{today_str}T00:00:00"
-        })
-
-        if current_schedule:
-            # Avoid duplicates by checking task text
-            existing_task_texts = {task['text'] for task in current_schedule['tasks']}
-            new_tasks = [
-                task for task in calendar_tasks 
-                if task['text'] not in existing_task_texts
-            ]
-            
-            # Update schedule with new tasks
-            if new_tasks:
-                updated_tasks = current_schedule['tasks'] + new_tasks
-                schedules.update_one(
-                    {"_id": current_schedule["_id"]},
-                    {"$set": {
-                        "tasks": updated_tasks,
-                        "metadata.lastModified": datetime.utcnow().isoformat()
-                    }}
-                )
-
-        # Update sync status with metadata
-        users.update_one(
+        # Update user with calendar credentials
+        result = users.update_one(
             {"googleId": user_id},
             {"$set": {
+                "calendar.connected": True,
+                "calendar.credentials": credentials,
                 "calendar.syncStatus": "completed",
-                "calendar.lastSyncTime": datetime.utcnow().isoformat(),
-                "calendar.eventsSynced": len(events),
-                "calendar.error": None
+                "calendar.lastSyncTime": datetime.now(timezone.utc).isoformat(),
+                "calendarSynced": True
             }}
         )
-
+        
+        if result.modified_count == 0:
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+        
         return jsonify({
             "success": True,
-            "eventsSynced": len(events),
-            "tasksAdded": len(calendar_tasks)
+            "data": {
+                "connected": True,
+                "syncStatus": "completed"
+            }
         })
-
-    except HttpError as error:
-        # Handle Google Calendar API specific errors
-        error_message = f"Calendar API error: {error.reason}"
-        sync_calendar_status(user_id, "failed")
-        return jsonify({"error": error_message}), 500
+        
     except Exception as e:
-        # Handle general errors
-        error_message = f"Sync error: {str(e)}"
-        sync_calendar_status(user_id, "failed")
-        return jsonify({"error": error_message}), 500
+        print(f"Error connecting to Google Calendar: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Failed to connect to Google Calendar: {str(e)}"
+        }), 500
 
-@calendar_bp.route("/sync/next-day", methods=["POST"])
-def next_day_sync():
+@calendar_bp.route("/events", methods=["GET"])
+def get_calendar_events():
     """
-    Sync tomorrow's calendar events during next day generation.
-    Similar to initial sync but for tomorrow's date.
+    Fetch Google Calendar events for a user
+    
+    Query parameters:
+    - date: string (required) - The date to fetch events for (YYYY-MM-DD)
+    
+    Authorization header required with Firebase ID token
     """
     try:
-        data = request.json
-        user_id = data.get('userId')
+        date = request.args.get('date')
         
+        if not date:
+            return jsonify({
+                "success": False,
+                "error": "Missing date parameter"
+            }), 400
+        
+        # Get user ID from token
+        user_id = get_user_id_from_token(request)
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        # Get user's calendar credentials
-        users = get_users_collection()
-        user = users.find_one({"googleId": user_id})
+            return jsonify({
+                "success": False,
+                "error": "Invalid or missing authentication token"
+            }), 401
         
-        if not user or not user.get('calendar', {}).get('credentials'):
-            return jsonify({"error": "Calendar credentials not found"}), 404
-
-        # Setup Google Calendar API client
-        credentials = Credentials(**user['calendar']['credentials'])
-        service = build('calendar', 'v3', credentials=credentials)
-
-        # Calculate tomorrow's time range
-        tomorrow = datetime.now().date() + timedelta(days=1)
-        time_min = datetime.combine(tomorrow, datetime.min.time()).isoformat() + 'Z'
-        time_max = datetime.combine(tomorrow, datetime.max.time()).isoformat() + 'Z'
-
-        # Fetch tomorrow's events
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-
-        events = events_result.get('items', [])
-        calendar_tasks = [convert_event_to_task(event) for event in events]
-
-        return jsonify({
-            "success": True,
-            "eventsSynced": len(events),
-            "tasks": calendar_tasks  # Return tasks for integration with generateNextDay
-        })
-
-    except HttpError as error:
-        return jsonify({
-            "success": False,
-            "error": f"Calendar API error: {error.reason}"
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Next day sync error: {str(e)}"
-        }), 500
-
-@calendar_bp.route("/sync/status/<user_id>", methods=["GET"])
-def sync_status(user_id: str):
-    """
-    Get detailed calendar sync status with metadata.
-    Includes number of events synced and any error information.
-    """
-    try:
-        users = get_users_collection()
+        # Get database instance
+        db = get_database()
+        users = db['users']
+        
+        # Get user with calendar credentials
         user = users.find_one({"googleId": user_id})
         
         if not user:
-            return jsonify({"error": "User not found"}), 404
-
-        calendar_status = user.get('calendar', {})
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+        
+        if not user.get('calendar', {}).get('connected') or not user.get('calendar', {}).get('credentials'):
+            return jsonify({
+                "success": False,
+                "error": "User not connected to Google Calendar"
+            }), 400
+        
+        # Format date for API request (start and end of day)
+        try:
+            start_date = f"{date}T00:00:00Z"
+            end_date = f"{date}T23:59:59Z"
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+        
+        # Get credentials
+        credentials = user['calendar']['credentials']
+        
+        # Call MCP server to fetch events
+        tasks = fetch_calendar_events(credentials, start_date, end_date)
+        
+        # Store the events in the database for this user and date
+        store_schedule_for_user(user_id, date, tasks)
+        
         return jsonify({
-            "syncStatus": calendar_status.get('syncStatus', 'never'),
-            "lastSyncTime": calendar_status.get('lastSyncTime'),
-            "eventsSynced": calendar_status.get('eventsSynced', 0),
-            "error": calendar_status.get('error')
+            "success": True,
+            "data": tasks
         })
-
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error fetching Google Calendar events: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Failed to fetch Google Calendar events: {str(e)}"
+        }), 500
+
+def fetch_calendar_events(credentials: Dict, start_date: str, end_date: str) -> List[Dict]:
+    """
+    Fetch calendar events from the Google Calendar MCP server
+    
+    Args:
+        credentials: User's Google Calendar credentials
+        start_date: Start date for events fetch (ISO string)
+        end_date: End date for events fetch (ISO string)
+        
+    Returns:
+        List of Task objects
+    """
+    # MCP server URL from config
+    MCP_SERVER_URL = os.getenv(
+        "GOOGLE_CALENDAR_MCP_URL", 
+        "https://mcp.pipedream.net/6ea7852a-7ca6-40c6-8c97-33ab3dfa6663/google_calendar"
+    )
+    
+    try:
+        # Call MCP server to fetch events
+        response = requests.post(MCP_SERVER_URL, json={
+            "action": "getEvents",
+            "accessToken": credentials['accessToken'],
+            "timeMin": start_date,
+            "timeMax": end_date
+        })
+        
+        # Check for successful response
+        response.raise_for_status()
+        
+        # Parse response
+        events_data = response.json()
+        
+        if not events_data or not events_data.get('items'):
+            return []
+        
+        # Convert events to tasks
+        tasks = []
+        for event in events_data['items']:
+            task = Task(
+                id=str(uuid.uuid4()),
+                text=event['summary'],
+                completed=False,
+                start_time=event.get('start', {}).get('dateTime'),
+                end_time=event.get('end', {}).get('dateTime'),
+                gcal_event_id=event['id'],
+                is_recurring=None,  # Can be set based on recurrence data if available
+                type="event"
+            )
+            tasks.append(task.to_dict())
+        
+        return tasks
+        
+    except requests.RequestException as e:
+        print(f"Error calling MCP server: {e}")
+        raise Exception(f"Failed to call MCP server: {str(e)}")
+
+def store_schedule_for_user(user_id: str, date: str, tasks: List[Dict]):
+    """
+    Store the schedule for a user on a specific date
+    
+    Args:
+        user_id: User's Google ID
+        date: Date string (YYYY-MM-DD)
+        tasks: List of task objects to store
+    """
+    try:
+        # Get database instance
+        db = get_database()
+        schedules = db['schedules']
+        
+        # Update or insert schedule for user and date
+        result = schedules.update_one(
+            {
+                "userId": user_id,
+                "date": date
+            },
+            {
+                "$set": {
+                    "tasks": tasks,
+                    "updatedAt": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+        
+        return result.modified_count > 0 or result.upserted_id is not None
+        
+    except Exception as e:
+        print(f"Error storing schedule: {e}")
+        traceback.print_exc()
+        return False
