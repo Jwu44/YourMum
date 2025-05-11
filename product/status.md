@@ -13,7 +13,10 @@
   - Schedule generation optimisation
 - Google Calendar integration via MCP server
   - Backend API routes implemented
-  - Next: Frontend implementation to request permissions and display events
+  - Frontend implementation partially complete but experiencing authentication issues
+  - 401 Unauthorized errors when attempting to connect to Google Calendar
+  - Suspected timing issue with Firebase auth token
+  - Next: Implement proper auth state handling with delayed API calls or forced token refresh
 
 ## Next
 - AI suggestion system improvements
@@ -27,3 +30,4 @@
 - Some performance bottlenecks with large schedule generation
 - Need better syncing between backend DB and frontend state
 - Nested tasks maintenance during schedule updates requires improvement
+- Google Calendar connection failing with 401 Unauthorized despite successful authentication

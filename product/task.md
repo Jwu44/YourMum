@@ -13,9 +13,11 @@ Status: In Progress
   - Modified fetchEvents to use a simplified API signature with just date parameter
 
 ## Requirements
-- review current flow that uses an MCP server to connect user's google calendar 
-- problem: Backend requires userId parameter even though you could extract it from authentication headers
-- solution: Use Firebase auth tokens in headers rather than passing userId in query parameters
+- understand and debug the following issue: Frontend correctly sends Firebase ID token in Authorization header, but backend returns 401 Unauthorized
+- details:
+  - Calendar connect API returning 401 Unauthorized despite Firebase authentication appearing successful
+  - Frontend logs show authentication completing but calendar API calls immediately failing with 401
+  - Token timing issue suspected - API calls might be made before auth state is fully ready
 
 ## Acceptance Criteria
 - after a user signs in via google sso, ask for access to google calendar
@@ -26,4 +28,3 @@ Status: In Progress
       - store the schedule in mongodb against the user for the current day
 - if user clicks 'don't allow', then user should also see their dashboard page with an empty schedule
 - instead of continuing to the current onboarding flow, take user directly to the dashboard page 
-
