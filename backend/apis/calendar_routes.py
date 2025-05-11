@@ -11,7 +11,7 @@ from typing import List, Dict
 
 calendar_bp = Blueprint("calendar", __name__)
 
-# Helper function to extract user ID from Firebase token
+# Update the helper function to extract user ID from Firebase token
 def get_user_id_from_token(request):
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
@@ -24,12 +24,31 @@ def get_user_id_from_token(request):
         import firebase_admin
         print(f"Active Firebase apps: {firebase_admin._apps}")
         
+        # Make sure the app is initialized (fallback in case not already initialized)
+        if not firebase_admin._apps:
+            from firebase_admin import credentials
+            import os
+            
+            # First try environment variable
+            cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
+            if cred_path and os.path.exists(cred_path):
+                print(f"Initializing Firebase with credentials file from env: {cred_path}")
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+            else:
+                print("Falling back to application default credentials")
+                # Try to use application default credentials
+                firebase_admin.initialize_app()
+        
         # Verify the token with Firebase
+        from firebase_admin import auth as firebase_auth
         decoded_token = firebase_auth.verify_id_token(token)
         print(f"Token verified successfully for user: {decoded_token['uid']}")
         return decoded_token['uid']
     except Exception as e:
-        print(f"Error verifying token: {e}")
+        print(f"Detailed error verifying token: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 @calendar_bp.route("/connect", methods=["POST"])

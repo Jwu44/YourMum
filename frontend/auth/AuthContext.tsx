@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Process calendar access and connect to Google Calendar
    * @param credential Google Auth credential
    */
+  // Inside the processCalendarAccess function of AuthContext.tsx, modify the calendar connection code:
+
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
       // Get scopes and check for calendar access
@@ -45,7 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (hasCalendarAccess) {
         try {
-          // Connect to Google Calendar with credentials
+          // Ensure user is fully authenticated before proceeding
+          // This forces a small delay to ensure Firebase auth state is fully established
+          console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Create credentials object
           console.log("Connecting to Google Calendar...");
           const credentials: CalendarCredentials = {
             accessToken: credential.accessToken,
@@ -53,14 +60,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             scopes: scopes
           };
           
+          // Connect to calendar with retry mechanism
           await calendarApi.connectCalendar(credentials);
           console.log("Connected to Google Calendar");
           
-          // Fetch events for current day
+          // Fetch events for current day - only attempt if connection succeeded
           const today = new Date().toISOString().split('T')[0];
           await calendarApi.fetchEvents(today);
         } catch (calendarError) {
           console.error("Error connecting to calendar:", calendarError);
+          // Continue to dashboard even if calendar connection fails
         }
       }
       
