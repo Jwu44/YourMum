@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from backend.models.task import Task
 import uuid
 import requests
-from firebase_admin import auth as firebase_auth
+from firebase_admin import auth
 import os
 from typing import List, Dict
 
@@ -13,6 +13,15 @@ calendar_bp = Blueprint("calendar", __name__)
 
 # Update the helper function to extract user ID from Firebase token
 def get_user_id_from_token(request):
+    """
+    Extract and verify user ID from Firebase token in request headers
+    
+    Args:
+        request: Flask request object containing Authorization header
+        
+    Returns:
+        str: User ID if token is valid, None otherwise
+    """
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         print("No Authorization header or invalid format")
@@ -22,23 +31,45 @@ def get_user_id_from_token(request):
     try:
         # Print the active Firebase apps to debug
         import firebase_admin
+        from firebase_admin import credentials
+        
         print(f"Active Firebase apps: {firebase_admin._apps}")
         
-        # Make sure the app is initialized (fallback in case not already initialized)
+        # If Firebase app is not initialized, initialize it with credentials
         if not firebase_admin._apps:
-            from firebase_admin import credentials
-            import os
-            
-            # First try environment variable
-            cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
-            if cred_path and os.path.exists(cred_path):
-                print(f"Initializing Firebase with credentials file from env: {cred_path}")
-                cred = credentials.Certificate(cred_path)
-                firebase_admin.initialize_app(cred)
-            else:
-                print("Falling back to application default credentials")
-                # Try to use application default credentials
-                firebase_admin.initialize_app()
+            try:
+                # Get credentials JSON directly from environment variable
+                # When using Parameter Store in EB, the value is automatically retrieved
+                cred_json = os.environ.get('FIREBASE_CREDENTIALS_PATH')
+                
+                if cred_json:
+                    # Parse the JSON string
+                    import json
+                    cred_data = json.loads(cred_json)
+                    
+                    # Initialize Firebase with the parsed credentials
+                    cred = credentials.Certificate(cred_data)
+                    firebase_admin.initialize_app(cred)
+                    print(f"Firebase initialized with credentials from Parameter Store")
+                else:
+                    # Fallback to project ID if available
+                    project_id = os.environ.get('FIREBASE_PROJECT_ID')
+                    if project_id:
+                        firebase_admin.initialize_app(options={
+                            'projectId': project_id
+                        })
+                        print(f"Firebase initialized with project ID: {project_id}")
+                    else:
+                        # Last resort - try application default credentials
+                        print("Falling back to application default credentials")
+                        firebase_admin.initialize_app()
+                        print("Firebase initialized with application default credentials")
+            except json.JSONDecodeError as json_error:
+                print(f"Error parsing credentials JSON: {json_error}")
+                return None
+            except Exception as init_error:
+                print(f"Error initializing Firebase: {init_error}")
+                return None
         
         # Verify the token with Firebase
         from firebase_admin import auth as firebase_auth
