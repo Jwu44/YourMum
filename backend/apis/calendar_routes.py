@@ -40,10 +40,16 @@ def get_user_id_from_token(request):
             try:
                 # Get credentials JSON directly from environment variable
                 # When using Parameter Store in EB, the value is automatically retrieved
-                cred_json = os.environ.get('FIREBASE_CREDENTIALS_PATH')
-                
-                if cred_json:
-                    # Parse the JSON string
+                cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
+
+                if cred_path:
+                    import boto3
+                    ssm = boto3.client('ssm', region_name='us-east-1')
+                    parameter = ssm.get_parameter(
+                        Name='/yourdai/firebase-credentials',
+                        WithDecryption=True
+                    )
+                    cred_json = parameter['Parameter']['Value']
                     import json
                     cred_data = json.loads(cred_json)
                     
