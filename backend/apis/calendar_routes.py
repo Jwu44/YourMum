@@ -5,87 +5,135 @@ from datetime import datetime, timezone
 from backend.models.task import Task
 import uuid
 import requests
-from firebase_admin import auth
 import os
-from typing import List, Dict
+import json
+from typing import List, Dict, Optional
+import logging
+import boto3
+from firebase_admin import credentials, get_app
+import firebase_admin
+
+logger = logging.getLogger(__name__)
 
 calendar_bp = Blueprint("calendar", __name__)
 
 # Update the helper function to extract user ID from Firebase token
-def get_user_id_from_token(request):
+def initialize_firebase() -> Optional[firebase_admin.App]:
     """
-    Extract and verify user ID from Firebase token in request headers
+    Initialize Firebase Admin SDK with credentials from various sources.
+    
+    Attempts to load credentials in this order:
+    1. AWS SSM Parameter Store (if FIREBASE_CREDENTIALS_PATH is an ARN)
+    2. Local file (if FIREBASE_CREDENTIALS_PATH is a valid file path)
+    3. GOOGLE_APPLICATION_CREDENTIALS environment variable
+    4. Project ID only (if FIREBASE_PROJECT_ID is available)
+    5. Default initialization (as a last resort)
+    
+    Returns:
+        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
+    """
+    # Skip initialization if already done
+    try:
+        return get_app()
+    except ValueError:
+        # App not yet initialized, continue with initialization
+        pass
+    
+    # Get credentials path from environment variable
+    ssm_parameter_path: str = os.environ.get('FIREBASE_CREDENTIALS_PATH', '')
+    
+    _initialize_from_ssm(ssm_parameter_path)
+
+
+def _initialize_from_ssm(ssm_parameter_path: str) -> Optional[firebase_admin.App]:
+    """
+    Initialize Firebase using credentials stored in AWS SSM Parameter Store.
     
     Args:
-        request: Flask request object containing Authorization header
+        ssm_parameter_path (str): ARN of the parameter in SSM Parameter Store
         
     Returns:
-        str: User ID if token is valid, None otherwise
+        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
     """
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        print("No Authorization header or invalid format")
-        return None
-        
-    token = auth_header.split('Bearer ')[1]
     try:
-        # Print the active Firebase apps to debug
-        import firebase_admin
-        from firebase_admin import credentials
+        # Extract region and parameter name from ARN
+        # ARN format: arn:aws:ssm:region:account-id:parameter/parameter-name
+        parts = ssm_parameter_path.split(':')
+        region = parts[3]  # Extract region from ARN
+        parameter_name = parts[5].split('/', 1)[1]  # Extract parameter name
         
-        print(f"Active Firebase apps: {firebase_admin._apps}")
+        # Initialize SSM client
+        ssm_client = boto3.client('ssm', region_name=region)
         
-        # If Firebase app is not initialized, initialize it with credentials
-        if not firebase_admin._apps:
-            try:
-                # Get credentials JSON directly from environment variable
-                # When using Parameter Store in EB, the value is automatically retrieved
-                cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
-
-                if cred_path:
-                    import boto3
-                    ssm = boto3.client('ssm', region_name='us-east-1')
-                    parameter = ssm.get_parameter(
-                        Name='/yourdai/firebase-credentials',
-                        WithDecryption=True
-                    )
-                    cred_json = parameter['Parameter']['Value']
-                    import json
-                    cred_data = json.loads(cred_json)
-                    
-                    # Initialize Firebase with the parsed credentials
-                    cred = credentials.Certificate(cred_data)
-                    firebase_admin.initialize_app(cred)
-                    print(f"Firebase initialized with credentials from Parameter Store")
-                else:
-                    # Fallback to project ID if available
-                    project_id = os.environ.get('FIREBASE_PROJECT_ID')
-                    if project_id:
-                        firebase_admin.initialize_app(options={
-                            'projectId': project_id
-                        })
-                        print(f"Firebase initialized with project ID: {project_id}")
-                    else:
-                        # Last resort - try application default credentials
-                        print("Falling back to application default credentials")
-                        firebase_admin.initialize_app()
-                        print("Firebase initialized with application default credentials")
-            except json.JSONDecodeError as json_error:
-                print(f"Error parsing credentials JSON: {json_error}")
-                return None
-            except Exception as init_error:
-                print(f"Error initializing Firebase: {init_error}")
-                return None
+        # Get parameter value
+        response = ssm_client.get_parameter(
+            Name=parameter_name,
+            WithDecryption=True  # Decrypt if encrypted
+        )
         
-        # Verify the token with Firebase
-        from firebase_admin import auth as firebase_auth
-        decoded_token = firebase_auth.verify_id_token(token)
-        print(f"Token verified successfully for user: {decoded_token['uid']}")
-        return decoded_token['uid']
+        creds_json = response['Parameter']['Value']
+        creds_dict = json.loads(creds_json)
+        
+        # Initialize Firebase Admin SDK with credentials
+        cred = credentials.Certificate(creds_dict)
+        app = firebase_admin.initialize_app(cred)
+        logger.info("Successfully initialized Firebase with credentials from SSM Parameter Store")
+        return app
+        
     except Exception as e:
-        print(f"Detailed error verifying token: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error retrieving Firebase credentials from SSM: {str(e)}")
+        return _fallback_initialization()
+
+def _fallback_initialization() -> Optional[firebase_admin.App]:
+    """
+    Attempt fallback initialization methods when primary methods fail.
+    
+    Returns:
+        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
+    """
+    # Fall back to project ID if available
+    project_id = os.environ.get('FIREBASE_PROJECT_ID')
+    if project_id:
+        try:
+            app = firebase_admin.initialize_app(options={'projectId': project_id})
+            logger.info(f"Initialized Firebase with project ID only: {project_id}")
+            return app
+        except Exception as e:
+            logger.error(f"Error initializing Firebase with project ID: {str(e)}")
+    
+    # Last resort: default initialization
+    try:
+        app = firebase_admin.initialize_app()
+        logger.warning("Initialized Firebase with default credentials - authentication may fail")
+        return app
+    except Exception as e:
+        logger.error(f"Failed to initialize Firebase with any method: {str(e)}")
+        return None
+
+
+def get_user_id_from_token(token: str) -> Optional[str]:
+    """
+    Verify a Firebase ID token and extract the user ID.
+    
+    Args:
+        token (str): Firebase ID token
+    
+    Returns:
+        Optional[str]: User ID if token is valid, None otherwise
+    """
+    try:
+        # Ensure Firebase is initialized
+        if not firebase_admin._apps:
+            initialize_firebase()
+            
+        # Verify the token
+        from firebase_admin import auth
+        decoded_token = auth.verify_id_token(token)
+        
+        # Extract and return user ID
+        return decoded_token.get('uid')
+    except Exception as e:
+        logger.error(f"Token verification error: {str(e)}")
         return None
 
 @calendar_bp.route("/connect", methods=["POST"])
