@@ -16,15 +16,6 @@ logger = logging.getLogger(__name__)
 
 calendar_bp = Blueprint("calendar", __name__)
 
-import os
-import json
-import logging
-from typing import Optional
-import firebase_admin
-from firebase_admin import credentials, get_app
-
-logger = logging.getLogger(__name__)
-
 def initialize_firebase() -> Optional[firebase_admin.App]:
     """
     Initialize Firebase Admin SDK with credentials from environment.
@@ -42,42 +33,50 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
         # App not yet initialized, continue with initialization
         pass
     
-    # Get credentials JSON from environment variable
-    # When using Parameter Store as the source, Elastic Beanstalk injects the actual JSON content
-    creds_json: str = os.environ.get('FIREBASE_CREDENTIALS_PATH', '')
+    # Get credentials from environment variable
+    # When using Parameter Store as the source, EB injects the actual content
+    creds_content: str = os.environ.get('FIREBASE_CREDENTIALS_PATH', '')
     
-    return _initialize_with_credentials(creds_json)
+    return _initialize_with_credentials(creds_content)
 
 
-def _initialize_with_credentials(creds_json: str) -> Optional[firebase_admin.App]:
+def _initialize_with_credentials(creds_content: str) -> Optional[firebase_admin.App]:
     """
-    Initialize Firebase using credentials JSON from environment.
+    Initialize Firebase using credentials content from environment.
     
     Args:
-        creds_json (str): JSON string containing Firebase credentials
+        creds_content (str): JSON string or path containing Firebase credentials
         
     Returns:
         Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
     """
     try:
-        # Check if credentials JSON is provided and parseable
-        if creds_json and creds_json.strip().startswith('{'):
-            # Parse the JSON credentials
-            creds_dict = json.loads(creds_json)
-            cred = credentials.Certificate(creds_dict)
-            app = firebase_admin.initialize_app(cred)
-            logger.info("Successfully initialized Firebase with injected credentials")
-            return app
-        else:
-            # Not a JSON string, try fallback methods
-            logger.warning("Firebase credentials not found in environment or not in JSON format")
-            return _fallback_initialization()
-            
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON format for Firebase credentials")
+        # First try: Parse as JSON (for Parameter Store injection)
+        if creds_content and creds_content.strip().startswith('{'):
+            try:
+                creds_dict = json.loads(creds_content)
+                cred = credentials.Certificate(creds_dict)
+                app = firebase_admin.initialize_app(cred)
+                logger.info("Successfully initialized Firebase with credentials from Parameter Store")
+                return app
+            except json.JSONDecodeError:
+                logger.warning("Credential content is not valid JSON, trying as file path")
+                
+        # Second try: Check if it's a valid file path
+        if os.path.exists(creds_content):
+            try:
+                cred = credentials.Certificate(creds_content)
+                app = firebase_admin.initialize_app(cred)
+                logger.info(f"Successfully initialized Firebase with credentials file: {creds_content}")
+                return app
+            except Exception as e:
+                logger.error(f"Error initializing with credential file: {str(e)}")
+        
+        # If we reach here, neither approach worked
         return _fallback_initialization()
+            
     except Exception as e:
-        logger.error(f"Error initializing Firebase with credentials: {str(e)}")
+        logger.error(f"Error in credential initialization: {str(e)}")
         return _fallback_initialization()
 
 
@@ -88,18 +87,17 @@ def _fallback_initialization() -> Optional[firebase_admin.App]:
     Returns:
         Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
     """
-    # Check for GOOGLE_APPLICATION_CREDENTIALS environment variable
+    # Fallback 1: Check for GOOGLE_APPLICATION_CREDENTIALS environment variable
     google_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
     if google_creds:
         try:
-            cred = credentials.Certificate(google_creds)
-            app = firebase_admin.initialize_app(cred)
+            app = firebase_admin.initialize_app()  # This will use GOOGLE_APPLICATION_CREDENTIALS automatically
             logger.info("Successfully initialized Firebase with GOOGLE_APPLICATION_CREDENTIALS")
             return app
         except Exception as e:
-            logger.error(f"Error initializing Firebase with GOOGLE_APPLICATION_CREDENTIALS: {str(e)}")
+            logger.warning(f"GOOGLE_APPLICATION_CREDENTIALS fallback failed: {str(e)}")
             
-    # Fall back to project ID if available
+    # Fallback 2: Use project ID if available
     project_id = os.environ.get('FIREBASE_PROJECT_ID')
     if project_id:
         try:
@@ -107,15 +105,15 @@ def _fallback_initialization() -> Optional[firebase_admin.App]:
             logger.info(f"Initialized Firebase with project ID only: {project_id}")
             return app
         except Exception as e:
-            logger.error(f"Error initializing Firebase with project ID: {str(e)}")
+            logger.warning(f"Project ID fallback failed: {str(e)}")
     
-    # Last resort: default initialization
+    # Fallback 3: Default initialization (last resort)
     try:
         app = firebase_admin.initialize_app()
         logger.warning("Initialized Firebase with default credentials - authentication may fail")
         return app
     except Exception as e:
-        logger.error(f"Failed to initialize Firebase with any method: {str(e)}")
+        logger.error(f"All Firebase initialization methods failed: {str(e)}")
         return None
 
 
@@ -132,36 +130,14 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     try:
         # Ensure Firebase is initialized
         if not firebase_admin._apps:
-            initialize_firebase()
+            if initialize_firebase() is None:
+                logger.error("Cannot verify token without Firebase initialization")
+                return None
             
-        # Verify the token
+        # Import auth only when needed
         from firebase_admin import auth
-        decoded_token = auth.verify_id_token(token)
         
-        # Extract and return user ID
-        return decoded_token.get('uid')
-    except Exception as e:
-        logger.error(f"Token verification error: {str(e)}")
-        return None
-
-
-def get_user_id_from_token(token: str) -> Optional[str]:
-    """
-    Verify a Firebase ID token and extract the user ID.
-    
-    Args:
-        token (str): Firebase ID token
-    
-    Returns:
-        Optional[str]: User ID if token is valid, None otherwise
-    """
-    try:
-        # Ensure Firebase is initialized
-        if not firebase_admin._apps:
-            initialize_firebase()
-            
         # Verify the token
-        from firebase_admin import auth
         decoded_token = auth.verify_id_token(token)
         
         # Extract and return user ID
