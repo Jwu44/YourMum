@@ -35,7 +35,7 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     
     # Get credentials from environment variable
     # When using Parameter Store as the source, EB injects the actual content
-    creds_content: str = os.environ.get('FIREBASE_CREDENTIALS_PATH', '')
+    creds_content: str = os.environ.get('FIREBASE_CREDENTIALS', '')
     
     return _initialize_with_credentials(creds_content)
 
