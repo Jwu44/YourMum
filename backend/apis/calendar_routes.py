@@ -11,17 +11,57 @@ from typing import List, Dict, Optional
 import logging
 from firebase_admin import credentials, get_app
 import firebase_admin
+import boto3
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
 calendar_bp = Blueprint("calendar", __name__)
 
+def get_parameter_store_credentials(parameter_name: str = '/yourdai/firebase-credentials') -> Optional[str]:
+    """
+    Fetch Firebase credentials from AWS Parameter Store.
+    
+    Args:
+        parameter_name (str): Parameter Store path to the credentials
+        
+    Returns:
+        Optional[str]: JSON string with credentials or None if retrieval fails
+    """
+    try:
+        # Initialize SSM client
+        ssm = boto3.client('ssm')
+        
+        # Get the parameter with decryption for SecureString
+        response = ssm.get_parameter(
+            Name=parameter_name,
+            WithDecryption=True
+        )
+        
+        # Return the parameter value
+        if 'Parameter' in response and 'Value' in response['Parameter']:
+            logger.info(f"Successfully retrieved credentials from Parameter Store: {parameter_name}")
+            return response['Parameter']['Value']
+        else:
+            logger.error(f"Parameter Store response missing expected structure: {response}")
+            return None
+            
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code')
+        if error_code == 'ParameterNotFound':
+            logger.error(f"Parameter not found in Parameter Store: {parameter_name}")
+        elif error_code == 'AccessDeniedException':
+            logger.error(f"Access denied to Parameter Store parameter: {parameter_name}. Check IAM permissions.")
+        else:
+            logger.error(f"Error retrieving from Parameter Store: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error accessing Parameter Store: {str(e)}")
+        return None
+
 def initialize_firebase() -> Optional[firebase_admin.App]:
     """
-    Initialize Firebase Admin SDK with credentials from environment.
-    
-    When using Parameter Store as the source in Elastic Beanstalk, the
-    credential content is automatically injected as the environment variable value.
+    Initialize Firebase Admin SDK with credentials from AWS Parameter Store.
     
     Returns:
         Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
@@ -33,12 +73,19 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
         # App not yet initialized, continue with initialization
         pass
     
-    # Get credentials from environment variable
+    # Primary approach: Get credentials directly from Parameter Store
+    creds_content = get_parameter_store_credentials()
+    if creds_content:
+        return _initialize_with_credentials(creds_content)
+        
+    # Fallback: Get credentials from environment variable
     # When using Parameter Store as the source, EB injects the actual content
-    creds_content: str = os.environ.get('FIREBASE_CREDENTIALS', '')
+    creds_content = os.environ.get('FIREBASE_CREDENTIALS', '')
+    if creds_content:
+        return _initialize_with_credentials(creds_content)
     
-    return _initialize_with_credentials(creds_content)
-
+    # If all else fails, try fallback methods
+    return _fallback_initialization()
 
 def _initialize_with_credentials(creds_content: str) -> Optional[firebase_admin.App]:
     """
