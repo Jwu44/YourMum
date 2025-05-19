@@ -9,14 +9,19 @@
   - Visual drag indicators for task reordering and indentation
 
 ## 🏗️ In Progress
-- Modular schedule generation refactoring
-  - Schedule generation optimisation
 - Google Calendar integration via MCP server
   - Backend API routes implemented
-  - Frontend implementation partially complete but experiencing authentication issues
-  - 401 Unauthorized errors when attempting to connect to Google Calendar
-  - Suspected timing issue with Firebase auth token
-  - Next: Implement proper auth state handling with delayed API calls or forced token refresh
+  - Firebase authentication issue identified and solution designed:
+    - Root cause: Firebase credentials not properly accessible from Parameter Store
+    - Issue still exists
+  - Next steps:
+    - Implement and test the proposed solution
+    - Verify calendar events properly sync to dashboard
+    - Complete end-to-end integration testing 
+  - If issues persist, fallback approach using AWS SDK to directly access credentials
+
+- Modular schedule generation refactoring
+  - Schedule generation optimization
 
 ## Next
 - AI suggestion system improvements
@@ -30,4 +35,4 @@
 - Some performance bottlenecks with large schedule generation
 - Need better syncing between backend DB and frontend state
 - Nested tasks maintenance during schedule updates requires improvement
-- Google Calendar connection failing with 401 Unauthorized despite successful authentication
+- Firebase authentication for Google Calendar requires Parameter Store configuration fix
