@@ -11,11 +11,20 @@ Status: In Progress
   - Updated calendar.ts to correctly import auth from '@/auth/firebase'
   - Refactored dashboard.tsx to use calendarApi.fetchEvents() which automatically handles auth
   - Modified fetchEvents to use a simplified API signature with just date parameter
+- Console print the following:
+"Request body: {'googleId': 'Si3NryNNjSMbW8q1t0niKX8sYng1', 'email': 'justin.wu4444@gmail.com', 'displayName': 'Justin Wu', 'photoURL': 'https://lh3.googleusercontent.com/a/ACg8ocL0LSvlk8wllunIei33pP_1Cce4t4DyHmlBrTaL1LNVYyKaU68FiA=s96-c', 'hasCalendarAccess': True}
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Extracted token from Authorization header. Token length: 1142
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Verifying user token. Token length: 1142
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Imported firebase_admin.auth successfully
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Attempting to verify token...
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Token verification error: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Received authentication request. Headers: Connection: upgrade
+May 21 11:44:17 ip-172-31-18-173 web[399906]: Host: yourdai.be"
 
 ## Requirements
 - Issue identified: Firebase authentication failing with "default credentials not found" error
 - Root cause: AWS Parameter Store credentials not properly loaded in backend
-- Solution path:
+- Attempted solution path:
   1. Store Firebase Credentials Securely - Save the Firebase service account JSON as a SecureString in AWS Systems Manager Parameter Store.
   2. Configure IAM Permissions - Ensure the Elastic Beanstalk EC2 instance role has ssm:GetParameter (and ssm:GetParameters) permission for the Parameter Store secret.
   3. Do Not Use Beanstalk Environment Variables for JSON - Avoid storing multi-line JSON in Elastic Beanstalk environment variables due to formatting issues.
