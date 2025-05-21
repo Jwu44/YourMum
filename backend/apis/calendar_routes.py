@@ -51,10 +51,12 @@ def get_parameter_store_credentials(parameter_name: str = '/yourdai/firebase-cre
             print(f"Parameter Store response missing expected structure: {response}")
             logger.error(f"Parameter Store response missing expected structure: {response}")
             return None
-            
+        
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
-        print(f"AWS ClientError: {error_code} - {str(e)}")
+        error_message = e.response.get('Error', {}).get('Message')
+        print(f"AWS ClientError: {error_code} - {error_message}")
+        print(f"Full error details: {e.response}")
         if error_code == 'ParameterNotFound':
             print(f"Parameter not found in Parameter Store: {parameter_name}")
             logger.error(f"Parameter not found in Parameter Store: {parameter_name}")
@@ -225,15 +227,22 @@ def get_user_id_from_token(token: str) -> Optional[str]:
         # Ensure Firebase is initialized
         if not firebase_admin._apps:
             print("Firebase not initialized yet, initializing now...")
-            if initialize_firebase() is None:
+            app = initialize_firebase()
+            if app is None:
                 print("Firebase initialization failed. Cannot verify token.")
                 logger.error("Cannot verify token without Firebase initialization")
                 return None
-            print("Firebase initialized successfully for token verification")
+            print(f"Firebase initialized successfully for token verification. App name: {app.name}")
+        else:
+            print(f"Firebase already initialized. Available apps: {list(firebase_admin._apps.keys())}")
             
         # Import auth only when needed
         from firebase_admin import auth
         print("Imported firebase_admin.auth successfully")
+        
+        # DEBUG: Check for credential file env var
+        google_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+        print(f"GOOGLE_APPLICATION_CREDENTIALS env var: {google_creds}" if google_creds else "GOOGLE_APPLICATION_CREDENTIALS env var not set")
         
         # Verify the token
         print("Attempting to verify token...")
@@ -247,6 +256,8 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     except Exception as e:
         print(f"Token verification error: {str(e)}")
         logger.error(f"Token verification error: {str(e)}")
+        # Add stack trace for better debugging
+        traceback.print_exc()
         return None
 
 @calendar_bp.route("/connect", methods=["POST"])
