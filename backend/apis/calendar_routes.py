@@ -25,7 +25,7 @@ def get_firebase_credentials() -> Optional[Dict]:
     Returns:
         Optional[Dict]: Firebase credentials as dict or None if retrieval fails
     """
-    parameter_name = '/yourdai/firebase-credentials'
+    parameter_name = 'yourdai/firebase-credentials'
     logger.info(f"Retrieving Firebase credentials from Parameter Store: {parameter_name}")
     
     try:
