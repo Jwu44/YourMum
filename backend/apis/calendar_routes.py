@@ -20,33 +20,33 @@ calendar_bp = Blueprint("calendar", __name__)
 
 def get_firebase_credentials() -> Optional[Dict]:
     """
-    Fetch Firebase credentials from AWS Parameter Store.
+    Fetch Firebase credentials from AWS Secrets Manager.
     
     Returns:
         Optional[Dict]: Firebase credentials as dict or None if retrieval fails
     """
-    parameter_name = 'yourdai/firebase-credentials'
-    logger.info(f"Retrieving Firebase credentials from Parameter Store: {parameter_name}")
+    secret_name = "yourdai/firebaseServiceAccount"
+    region_name = "us-east-1"
+    logger.info(f"Retrieving Firebase credentials from Secrets Manager: {secret_name}")
     
     try:
-        # Log AWS region and configuration
-        import boto3
+        # Create a Secrets Manager client
         session = boto3.session.Session()
-        region = session.region_name
-        logger.info(f"AWS Session region: {region}")
+        client = session.client(
+            service_name='secretsmanager',
+            region_name=region_name
+        )
+        logger.info("Secrets Manager client created, attempting to get secret")
         
-        ssm = boto3.client('ssm')
-        logger.info("SSM client created, attempting to get parameter")
-        response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
-        logger.info("Parameter retrieved successfully")
+        # Get the secret
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+        logger.info("Secret retrieved successfully")
         
-        if 'Parameter' in response and 'Value' in response['Parameter']:
-            creds_json = response['Parameter']['Value']
-            logger.info("Firebase credentials retrieved successfully from Parameter Store")
-            return json.loads(creds_json)
-        else:
-            logger.error(f"Parameter Store response missing expected structure: {response}")
-            return None
+        # Parse and return the secret
+        secret = get_secret_value_response['SecretString']
+        return json.loads(secret)
             
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
@@ -54,7 +54,7 @@ def get_firebase_credentials() -> Optional[Dict]:
         logger.error(f"AWS ClientError: {error_code} - {error_message}")
         
         if error_code == 'AccessDeniedException':
-            logger.error("Access denied to Parameter Store. Check IAM permissions.")
+            logger.error("Access denied to Secrets Manager. Check IAM permissions.")
         
         # Log instance metadata for debugging IAM role issues
         try:
