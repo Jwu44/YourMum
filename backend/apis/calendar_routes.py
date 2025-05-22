@@ -18,58 +18,36 @@ logger = logging.getLogger(__name__)
 
 calendar_bp = Blueprint("calendar", __name__)
 
-def get_parameter_store_credentials(parameter_name: str = '/yourdai/firebase-credentials') -> Optional[str]:
+def get_firebase_credentials() -> Optional[Dict]:
     """
     Fetch Firebase credentials from AWS Parameter Store.
     
-    Args:
-        parameter_name (str): Parameter Store path to the credentials
-        
     Returns:
-        Optional[str]: JSON string with credentials or None if retrieval fails
+        Optional[Dict]: Firebase credentials as dict or None if retrieval fails
     """
-    print(f"Attempting to retrieve credentials from Parameter Store: {parameter_name}")
+    parameter_name = '/yourdai/firebase-credentials'
+    logger.info(f"Retrieving Firebase credentials from Parameter Store: {parameter_name}")
+    
     try:
-        # Initialize SSM client
         ssm = boto3.client('ssm')
-        print("Created boto3 SSM client successfully")
+        response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
         
-        # Get the parameter with decryption for SecureString
-        response = ssm.get_parameter(
-            Name=parameter_name,
-            WithDecryption=True
-        )
-        print(f"Parameter Store API response received: {response.keys() if response else 'None'}")
-        
-        # Return the parameter value
         if 'Parameter' in response and 'Value' in response['Parameter']:
-            creds_value = response['Parameter']['Value']
-            print(f"Successfully retrieved credentials from Parameter Store. Length: {len(creds_value)} chars")
-            print(f"Credentials preview: {creds_value[:30]}...")
-            return creds_value
+            creds_json = response['Parameter']['Value']
+            return json.loads(creds_json)
         else:
-            print(f"Parameter Store response missing expected structure: {response}")
-            logger.error(f"Parameter Store response missing expected structure: {response}")
+            logger.error(f"Parameter Store response missing expected structure")
             return None
-        
+            
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
-        error_message = e.response.get('Error', {}).get('Message')
-        print(f"AWS ClientError: {error_code} - {error_message}")
-        print(f"Full error details: {e.response}")
-        if error_code == 'ParameterNotFound':
-            print(f"Parameter not found in Parameter Store: {parameter_name}")
-            logger.error(f"Parameter not found in Parameter Store: {parameter_name}")
-        elif error_code == 'AccessDeniedException':
-            print(f"Access denied to Parameter Store parameter: {parameter_name}. Check IAM permissions.")
-            logger.error(f"Access denied to Parameter Store parameter: {parameter_name}. Check IAM permissions.")
-        else:
-            print(f"Error retrieving from Parameter Store: {str(e)}")
-            logger.error(f"Error retrieving from Parameter Store: {str(e)}")
+        logger.error(f"AWS ClientError: {error_code} - {e.response.get('Error', {}).get('Message')}")
+        
+        if error_code == 'AccessDeniedException':
+            logger.error("Access denied to Parameter Store. Check IAM permissions.")
         return None
     except Exception as e:
-        print(f"Unexpected error accessing Parameter Store: {str(e)}")
-        logger.error(f"Unexpected error accessing Parameter Store: {str(e)}")
+        logger.error(f"Error retrieving Firebase credentials: {str(e)}")
         return None
 
 def initialize_firebase() -> Optional[firebase_admin.App]:
@@ -77,140 +55,34 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     Initialize Firebase Admin SDK with credentials from AWS Parameter Store.
     
     Returns:
-        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
+        Optional[firebase_admin.App]: Firebase app instance or None if initialization fails
     """
-    print("Starting Firebase initialization...")
-    # Skip initialization if already done
+    # Return existing app if already initialized
     try:
-        app = get_app()
-        print("Firebase already initialized, returning existing app")
-        return app
+        return get_app()
     except ValueError:
-        print("Firebase not yet initialized, continuing with initialization")
-        # App not yet initialized, continue with initialization
-        pass
+        logger.info("Firebase not yet initialized, continuing...")
     
-    # Primary approach: Get credentials directly from Parameter Store
-    print("Attempting to get credentials from Parameter Store...")
-    creds_content = get_parameter_store_credentials()
-    if creds_content:
-        print("Retrieved credentials from Parameter Store, initializing Firebase...")
-        return _initialize_with_credentials(creds_content)
-        
-    # Fallback: Get credentials from environment variable
-    print("Parameter Store approach failed, trying environment variable...")
-    creds_content = os.environ.get('FIREBASE_CREDENTIALS', '')
-    print(f"FIREBASE_CREDENTIALS env var: {creds_content[:30]}..." if creds_content else "FIREBASE_CREDENTIALS env var not set or empty")
-    if creds_content:
-        print("Using FIREBASE_CREDENTIALS environment variable...")
-        return _initialize_with_credentials(creds_content)
-    
-    # If all else fails, try fallback methods
-    print("All primary methods failed, trying fallback initialization...")
-    return _fallback_initialization()
-
-def _initialize_with_credentials(creds_content: str) -> Optional[firebase_admin.App]:
-    """
-    Initialize Firebase using credentials content from environment.
-    
-    Args:
-        creds_content (str): JSON string or path containing Firebase credentials
-        
-    Returns:
-        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
-    """
-    print(f"Initializing with credentials, content length: {len(creds_content)} chars")
-    try:
-        # First try: Parse as JSON (for Parameter Store injection)
-        if creds_content and creds_content.strip().startswith('{'):
-            print("Detected JSON format credential content")
-            try:
-                creds_dict = json.loads(creds_content)
-                print(f"Successfully parsed JSON. Keys: {creds_dict.keys()}")
-                cred = credentials.Certificate(creds_dict)
-                print("Certificate created successfully")
-                app = firebase_admin.initialize_app(cred)
-                print("Successfully initialized Firebase with credentials from JSON content")
-                logger.info("Successfully initialized Firebase with credentials from Parameter Store")
-                return app
-            except json.JSONDecodeError as e:
-                print(f"JSON parsing error: {str(e)}")
-                logger.warning(f"Credential content is not valid JSON, trying as file path. Error: {str(e)}")
-                
-        # Second try: Check if it's a valid file path
-        print(f"Checking if credential content is a file path: {creds_content}")
-        if os.path.exists(creds_content):
-            print(f"File exists at path: {creds_content}")
-            try:
-                cred = credentials.Certificate(creds_content)
-                print("Certificate created successfully from file")
-                app = firebase_admin.initialize_app(cred)
-                print(f"Successfully initialized Firebase with credentials file: {creds_content}")
-                logger.info(f"Successfully initialized Firebase with credentials file: {creds_content}")
-                return app
-            except Exception as e:
-                print(f"Error initializing with credential file: {str(e)}")
-                logger.error(f"Error initializing with credential file: {str(e)}")
-        else:
-            print(f"No file exists at path: {creds_content}")
-        
-        # If we reach here, neither approach worked
-        print("Neither JSON nor file path approach worked, trying fallback initialization")
-        return _fallback_initialization()
-            
-    except Exception as e:
-        print(f"Error in credential initialization: {str(e)}")
-        logger.error(f"Error in credential initialization: {str(e)}")
-        return _fallback_initialization()
-
-def _fallback_initialization() -> Optional[firebase_admin.App]:
-    """
-    Attempt fallback initialization methods when primary methods fail.
-    
-    Returns:
-        Optional[firebase_admin.App]: Initialized Firebase app instance or None if initialization fails
-    """
-    print("Starting fallback initialization...")
-    
-    # Fallback 1: Check for GOOGLE_APPLICATION_CREDENTIALS environment variable
-    google_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-    print(f"GOOGLE_APPLICATION_CREDENTIALS env var: {google_creds}" if google_creds else "GOOGLE_APPLICATION_CREDENTIALS env var not set")
-    if google_creds:
+    # Get credentials and initialize
+    creds_dict = get_firebase_credentials()
+    if creds_dict:
         try:
-            print(f"Trying to initialize with GOOGLE_APPLICATION_CREDENTIALS: {google_creds}")
-            app = firebase_admin.initialize_app()  # This will use GOOGLE_APPLICATION_CREDENTIALS automatically
-            print("Successfully initialized Firebase with GOOGLE_APPLICATION_CREDENTIALS")
-            logger.info("Successfully initialized Firebase with GOOGLE_APPLICATION_CREDENTIALS")
-            return app
+            cred = credentials.Certificate(creds_dict)
+            return firebase_admin.initialize_app(cred)
         except Exception as e:
-            print(f"GOOGLE_APPLICATION_CREDENTIALS fallback failed: {str(e)}")
-            logger.warning(f"GOOGLE_APPLICATION_CREDENTIALS fallback failed: {str(e)}")
-            
-    # Fallback 2: Use project ID if available
-    project_id = os.environ.get('FIREBASE_PROJECT_ID')
-    print(f"FIREBASE_PROJECT_ID env var: {project_id}" if project_id else "FIREBASE_PROJECT_ID env var not set")
-    if project_id:
-        try:
-            print(f"Trying to initialize with project ID: {project_id}")
-            app = firebase_admin.initialize_app(options={'projectId': project_id})
-            print(f"Initialized Firebase with project ID only: {project_id}")
-            logger.info(f"Initialized Firebase with project ID only: {project_id}")
-            return app
-        except Exception as e:
-            print(f"Project ID fallback failed: {str(e)}")
-            logger.warning(f"Project ID fallback failed: {str(e)}")
+            logger.error(f"Firebase initialization error: {str(e)}")
+            return None
     
-    # Fallback 3: Default initialization (last resort)
-    try:
-        print("Trying default initialization (last resort)")
-        app = firebase_admin.initialize_app()
-        print("Initialized Firebase with default credentials - authentication may fail")
-        logger.warning("Initialized Firebase with default credentials - authentication may fail")
-        return app
-    except Exception as e:
-        print(f"All Firebase initialization methods failed: {str(e)}")
-        logger.error(f"All Firebase initialization methods failed: {str(e)}")
-        return None
+    # Fallback to environment variable if Parameter Store fails
+    creds_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if creds_path and os.path.exists(creds_path):
+        try:
+            return firebase_admin.initialize_app()
+        except Exception as e:
+            logger.error(f"Firebase initialization with GOOGLE_APPLICATION_CREDENTIALS failed: {str(e)}")
+    
+    logger.error("Firebase initialization failed: No valid credentials found")
+    return None
 
 def get_user_id_from_token(token: str) -> Optional[str]:
     """
@@ -222,42 +94,23 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     Returns:
         Optional[str]: User ID if token is valid, None otherwise
     """
-    print(f"Verifying user token. Token length: {len(token) if token else 0}")
+    if not token:
+        logger.error("No token provided for verification")
+        return None
+        
+    # Ensure Firebase is initialized
+    if not firebase_admin._apps:
+        app = initialize_firebase()
+        if not app:
+            logger.error("Cannot verify token: Firebase initialization failed")
+            return None
+    
     try:
-        # Ensure Firebase is initialized
-        if not firebase_admin._apps:
-            print("Firebase not initialized yet, initializing now...")
-            app = initialize_firebase()
-            if app is None:
-                print("Firebase initialization failed. Cannot verify token.")
-                logger.error("Cannot verify token without Firebase initialization")
-                return None
-            print(f"Firebase initialized successfully for token verification. App name: {app.name}")
-        else:
-            print(f"Firebase already initialized. Available apps: {list(firebase_admin._apps.keys())}")
-            
-        # Import auth only when needed
         from firebase_admin import auth
-        print("Imported firebase_admin.auth successfully")
-        
-        # DEBUG: Check for credential file env var
-        google_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        print(f"GOOGLE_APPLICATION_CREDENTIALS env var: {google_creds}" if google_creds else "GOOGLE_APPLICATION_CREDENTIALS env var not set")
-        
-        # Verify the token
-        print("Attempting to verify token...")
         decoded_token = auth.verify_id_token(token)
-        print(f"Token verified successfully. Token contents: {decoded_token.keys()}")
-        
-        # Extract and return user ID
-        user_id = decoded_token.get('uid')
-        print(f"Extracted user ID: {user_id}")
-        return user_id
+        return decoded_token.get('uid')
     except Exception as e:
-        print(f"Token verification error: {str(e)}")
         logger.error(f"Token verification error: {str(e)}")
-        # Add stack trace for better debugging
-        traceback.print_exc()
         return None
 
 @calendar_bp.route("/connect", methods=["POST"])
@@ -292,7 +145,7 @@ def connect_google_calendar():
         else:
             token = auth_header
             
-        print(f"Extracted token from Authorization header. Token length: {len(token) if token else 0}")
+        print(f"Extracted token from Authorization header. Token: {token}")
         
         user_id = get_user_id_from_token(token)
         if not user_id:
