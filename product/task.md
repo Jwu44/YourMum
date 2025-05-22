@@ -11,44 +11,34 @@ Status: In Progress
   - Updated calendar.ts to correctly import auth from '@/auth/firebase'
   - Refactored dashboard.tsx to use calendarApi.fetchEvents() which automatically handles auth
   - Modified fetchEvents to use a simplified API signature with just date parameter
-- Console print the following:
-"Request body: {'googleId': 'Si3NryNNjSMbW8q1t0niKX8sYng1', 'email': 'justin.wu4444@gmail.com', 'displayName': 'Justin Wu', 'photoURL': 'https://lh3.googleusercontent.com/a/ACg8ocL0LSvlk8wllunIei33pP_1Cce4t4DyHmlBrTaL1LNVYyKaU68FiA=s96-c', 'hasCalendarAccess': True}
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Extracted token from Authorization header. Token length: 1142
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Verifying user token. Token length: 1142
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Imported firebase_admin.auth successfully
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Attempting to verify token...
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Token verification error: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Received authentication request. Headers: Connection: upgrade
-May 21 11:44:17 ip-172-31-18-173 web[399906]: Host: yourdai.be"
 
-## Requirements
-- Issue identified: Firebase authentication failing with "default credentials not found" error
-- Root cause: AWS Parameter Store credentials not properly loaded in backend
-- Attempted solution path:
-  1. Store Firebase Credentials Securely - Save the Firebase service account JSON as a SecureString in AWS Systems Manager Parameter Store.
-  2. Configure IAM Permissions - Ensure the Elastic Beanstalk EC2 instance role has ssm:GetParameter (and ssm:GetParameters) permission for the Parameter Store secret.
-  3. Do Not Use Beanstalk Environment Variables for JSON - Avoid storing multi-line JSON in Elastic Beanstalk environment variables due to formatting issues.
-  4. Retrieve Credentials at Runtime - Use the AWS SDK or AWS CLI in your application or deployment script to fetch the JSON from Parameter Store during runtime or deployment.
-- example implementation:
-  import boto3
-  import json
+## Issue Investigation
+- Firebase authentication failing with "default credentials not found" error
+- Root cause identified: AWS Parameter Store credentials not properly loaded in backend
+- IAM setup verified:
+  - Created custom policy "YourdAIParameterStoreAccess" with proper permissions:
+    - Actions: ssm:GetParameter, ssm:GetParameters
+    - Resource: arn:aws:ssm:us-east-1:055242619423:parameter/yourdai/firebase-credentials
+  - Policy attached to both EC2 instance roles:
+    - aws-elasticbeanstalk-ec2-role
+    - aws-elasticbeanstalk-service-role
 
-  # Initialize the SSM client (optionally specify region_name)
-  ssm = boto3.client('ssm')
+- Original implementation was overly complex with multiple fallback mechanisms
+- Simplified Firebase authentication implementation proposed with cleaner error handling
 
-  # Replace with your parameter name
-  PARAM_NAME = '/myapp/firebase/credentials'
+## Latest Logs (May 22)
+```
+May 22 11:46:35 ip-172-31-18-173 web[572642]: Extracted token from Authorization header. Token length: 1142
+May 22 11:46:59 ip-172-31-18-173 web[572642]: Request body: Token verification error: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+May 22 11:47:00 ip-172-31-18-173 web[572642]: Token verification error: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+```
 
-  # Fetch the parameter value with decryption (for SecureString)
-  response = ssm.get_parameter(
-      Name=PARAM_NAME,
-      WithDecryption=True
-  )
-
-  # The parameter value is a string; parse as JSON if needed
-  firebase_credentials = json.loads(response['Parameter']['Value'])
-
-
+## Next Steps
+1. Verify the parameter exists in Parameter Store with exact path: /yourdai/firebase-credentials
+2. Confirm EC2 instance has proper permissions by:
+   - Testing AWS CLI command from instance: `aws ssm get-parameter --name "/yourdai/firebase-credentials" --with-decryption`
+3. Implement simplified authentication approach
+4. Add additional logging to trace exactly where the credential retrieval is failing
 
 ## Acceptance Criteria
 - After a user signs in via Google SSO, ask for access to Google Calendar

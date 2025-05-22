@@ -29,25 +29,48 @@ def get_firebase_credentials() -> Optional[Dict]:
     logger.info(f"Retrieving Firebase credentials from Parameter Store: {parameter_name}")
     
     try:
+        # Log AWS region and configuration
+        import boto3
+        session = boto3.session.Session()
+        region = session.region_name
+        logger.info(f"AWS Session region: {region}")
+        
         ssm = boto3.client('ssm')
+        logger.info("SSM client created, attempting to get parameter")
         response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
+        logger.info("Parameter retrieved successfully")
         
         if 'Parameter' in response and 'Value' in response['Parameter']:
             creds_json = response['Parameter']['Value']
+            logger.info("Firebase credentials retrieved successfully from Parameter Store")
             return json.loads(creds_json)
         else:
-            logger.error(f"Parameter Store response missing expected structure")
+            logger.error(f"Parameter Store response missing expected structure: {response}")
             return None
             
     except ClientError as e:
         error_code = e.response.get('Error', {}).get('Code')
-        logger.error(f"AWS ClientError: {error_code} - {e.response.get('Error', {}).get('Message')}")
+        error_message = e.response.get('Error', {}).get('Message')
+        logger.error(f"AWS ClientError: {error_code} - {error_message}")
         
         if error_code == 'AccessDeniedException':
             logger.error("Access denied to Parameter Store. Check IAM permissions.")
+        
+        # Log instance metadata for debugging IAM role issues
+        try:
+            import requests
+            metadata_url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+            r = requests.get(metadata_url, timeout=2)
+            logger.info(f"Instance IAM role: {r.text}")
+        except Exception as meta_e:
+            logger.error(f"Failed to retrieve instance metadata: {str(meta_e)}")
+            
         return None
     except Exception as e:
         logger.error(f"Error retrieving Firebase credentials: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
 def initialize_firebase() -> Optional[firebase_admin.App]:
@@ -107,10 +130,15 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     
     try:
         from firebase_admin import auth
+        print(f"DEBUG - Attempting to verify token with Firebase")
+        print(f"DEBUG - Firebase apps initialized: {firebase_admin._apps}")
         decoded_token = auth.verify_id_token(token)
+        print(f"DEBUG - Token verification successful. User ID: {decoded_token.get('uid')}")
         return decoded_token.get('uid')
     except Exception as e:
-        logger.error(f"Token verification error: {str(e)}")
+        print(f"DEBUG - Token verification error: {str(e)}")
+        print(f"DEBUG - Exception type: {type(e).__name__}")
+        traceback.print_exc()
         return None
 
 @calendar_bp.route("/connect", methods=["POST"])
@@ -220,7 +248,9 @@ def get_calendar_events():
         else:
             token = auth_header
             
-        print(f"Extracted token from Authorization header. Token length: {len(token) if token else 0}")
+        print(f"DEBUG - FULL TOKEN: {token}")
+        print(f"DEBUG - Auth header: {auth_header}")
+        print(f"DEBUG - Request body: {request.json}")
         
         user_id = get_user_id_from_token(token)
         if not user_id:
