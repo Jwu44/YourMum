@@ -18,64 +18,10 @@ logger = logging.getLogger(__name__)
 
 calendar_bp = Blueprint("calendar", __name__)
 
-def get_firebase_credentials() -> Optional[Dict]:
-    """
-    Fetch Firebase credentials from AWS Secrets Manager.
-    
-    Returns:
-        Optional[Dict]: Firebase credentials as dict or None if retrieval fails
-    """
-    secret_name = "yourdai/firebaseServiceAccount"
-    region_name = "us-east-1"
-    logger.info(f"Retrieving Firebase credentials from Secrets Manager: {secret_name}")
-    
-    try:
-        # Create a Secrets Manager client
-        session = boto3.session.Session()
-        client = session.client(
-            service_name='secretsmanager',
-            region_name=region_name
-        )
-        logger.info("Secrets Manager client created, attempting to get secret")
-        
-        # Get the secret
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
-        )
-        logger.info("Secret retrieved successfully")
-        
-        # Parse and return the secret
-        secret = get_secret_value_response['SecretString']
-        return json.loads(secret)
-            
-    except ClientError as e:
-        error_code = e.response.get('Error', {}).get('Code')
-        error_message = e.response.get('Error', {}).get('Message')
-        logger.error(f"AWS ClientError: {error_code} - {error_message}")
-        
-        if error_code == 'AccessDeniedException':
-            logger.error("Access denied to Secrets Manager. Check IAM permissions.")
-        
-        # Log instance metadata for debugging IAM role issues
-        try:
-            import requests
-            metadata_url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
-            r = requests.get(metadata_url, timeout=2)
-            logger.info(f"Instance IAM role: {r.text}")
-        except Exception as meta_e:
-            logger.error(f"Failed to retrieve instance metadata: {str(meta_e)}")
-            
-        return None
-    except Exception as e:
-        logger.error(f"Error retrieving Firebase credentials: {str(e)}")
-        logger.error(f"Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return None
 
 def initialize_firebase() -> Optional[firebase_admin.App]:
     """
-    Initialize Firebase Admin SDK with credentials from AWS Parameter Store.
+    Initialize Firebase Admin SDK with credentials from Secrets Manager.
     
     Returns:
         Optional[firebase_admin.App]: Firebase app instance or None if initialization fails
@@ -86,17 +32,26 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     except ValueError:
         logger.info("Firebase not yet initialized, continuing...")
     
-    # Get credentials and initialize
-    creds_dict = get_firebase_credentials()
+    try:
+        # Get credentials from environment variable referencing Secrets Manager
+        firebase_secret = os.environ.get('FIREBASE_JSON')
+        if firebase_secret and firebase_secret.startswith('arn:aws:secretsmanager'):
+            # Secret is already being fetched by Elastic Beanstalk
+            # The actual value will be available in the environment variable
+            creds_dict = json.loads(firebase_secret)
+            cred = credentials.Certificate(creds_dict)
+            return firebase_admin.initialize_app(cred)
+    except Exception as e:
+        logger.error(f"Firebase initialization with FIREBASE_JSON failed: {str(e)}")
+    
     if creds_dict:
         try:
             cred = credentials.Certificate(creds_dict)
             return firebase_admin.initialize_app(cred)
         except Exception as e:
             logger.error(f"Firebase initialization error: {str(e)}")
-            return None
     
-    # Fallback to environment variable if Parameter Store fails
+    # Last resort fallback to environment variable path
     creds_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
     if creds_path and os.path.exists(creds_path):
         try:
