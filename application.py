@@ -7,6 +7,7 @@ from backend.apis.calendar_routes import calendar_bp
 from backend.db_config import initialize_db
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import jsonify
+from backend.apis.calendar_routes import initialize_firebase
 
 sys.path.append("./backend")
 
@@ -39,6 +40,13 @@ def create_app(testing=False):
     # Trust proxy headers from AWS ELB
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
+    # init firebase app
+    firebase_app = initialize_firebase()
+    if firebase_app:
+        app.logger.info('Firebase initialized successfully')
+    else:
+        app.logger.error('Firebase initialization failed, authentication features may not work')
+                         
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
