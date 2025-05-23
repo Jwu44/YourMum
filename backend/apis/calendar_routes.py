@@ -11,7 +11,6 @@ from typing import List, Dict, Optional
 from firebase_admin import credentials, get_app
 import firebase_admin
 import boto3
-from flask import current_app
 
 calendar_bp = Blueprint("calendar", __name__)
 
@@ -21,7 +20,7 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     try:
         return get_app()
     except ValueError:
-        current_app.logger.info("Firebase not yet initialized, continuing...")
+        print("Firebase not yet initialized, continuing...")
     
     creds_dict = None
     
@@ -29,7 +28,7 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     firebase_secret_arn = os.environ.get('FIREBASE_JSON')
     if firebase_secret_arn and firebase_secret_arn.startswith('arn:aws:secretsmanager'):
         try:
-            current_app.logger.info(f"Retrieving Firebase credentials from Secrets Manager: {firebase_secret_arn}")
+            print(f"Retrieving Firebase credentials from Secrets Manager: {firebase_secret_arn}")
             
             # Create Secrets Manager client
             session = boto3.session.Session()
@@ -40,11 +39,11 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
             
             # Parse the secret string
             creds_dict = json.loads(response['SecretString'])
-            current_app.logger.info("Successfully retrieved Firebase credentials from Secrets Manager")
+            print("Successfully retrieved Firebase credentials from Secrets Manager")
             
         except Exception as e:
-            current_app.logger.error(f"Error retrieving Firebase credentials from Secrets Manager: {str(e)}")
-            current_app.logger.error(f"Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
+            print.logger.error(f"Error retrieving Firebase credentials from Secrets Manager: {str(e)}")
+            print.logger.error(f"Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
             raise
     
     # Initialize Firebase with credentials
@@ -52,13 +51,13 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
         try:
             cred = credentials.Certificate(creds_dict)
             app = firebase_admin.initialize_app(cred)
-            current_app.logger.info("Successfully initialized Firebase with credentials")
+            print("Successfully initialized Firebase with credentials")
             return app
         except Exception as e:
-            current_app.logger.error(f"Firebase initialization error: {str(e)}")
+            print.logger.error(f"Firebase initialization error: {str(e)}")
             raise
     
-    current_app.logger.error("Firebase initialization failed: No valid credentials found")
+    print.logger.error("Firebase initialization failed: No valid credentials found")
     raise ValueError("Firebase credentials not found in environment variables")
 
 def get_user_id_from_token(token: str) -> Optional[str]:
@@ -72,14 +71,14 @@ def get_user_id_from_token(token: str) -> Optional[str]:
         Optional[str]: User ID if token is valid, None otherwise
     """
     if not token:
-        current_app.logger.error("No token provided for verification")
+        print.logger.error("No token provided for verification")
         return None
         
     # Ensure Firebase is initialized
     if not firebase_admin._apps:
         app = initialize_firebase()
         if not app:
-            current_app.logger.error("Cannot verify token: Firebase initialization failed")
+            print.logger.error("Cannot verify token: Firebase initialization failed")
             return None
     
     try:
