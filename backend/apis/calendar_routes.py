@@ -23,52 +23,45 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     try:
         return get_app()
     except ValueError:
-        print("Firebase not yet initialized, continuing...")
+        logger.info("Firebase not yet initialized, continuing...")
     
     creds_dict = None
     
-    # Try to get credentials from Secrets Manager if FIREBASE_JSON is an ARN
+    # Get Firebase credentials from Secrets Manager
     firebase_secret_arn = os.environ.get('FIREBASE_JSON')
     if firebase_secret_arn and firebase_secret_arn.startswith('arn:aws:secretsmanager'):
         try:
-            print(f"Retrieving Firebase credentials from Secrets Manager: {firebase_secret_arn}")
+            logger.info(f"Retrieving Firebase credentials from Secrets Manager: {firebase_secret_arn}")
+            
+            # Create Secrets Manager client
             session = boto3.session.Session()
-            client = session.client('secretsmanager')
+            client = session.client('secretsmanager', region_name='us-east-1')
+            
+            # Get the secret value
             response = client.get_secret_value(SecretId=firebase_secret_arn)
+            
+            # Parse the secret string
             creds_dict = json.loads(response['SecretString'])
-            print("Successfully retrieved Firebase credentials from Secrets Manager")
+            logger.info("Successfully retrieved Firebase credentials from Secrets Manager")
+            
         except Exception as e:
-            print(f"Error retrieving Firebase credentials from Secrets Manager: {str(e)}", flush=True)
+            logger.error(f"Error retrieving Firebase credentials from Secrets Manager: {str(e)}")
+            logger.error(f"Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
+            raise
     
-    # Try direct JSON if it's not an ARN
-    elif firebase_secret_arn:
-        try:
-            creds_dict = json.loads(firebase_secret_arn)
-            print("Successfully parsed FIREBASE_JSON as direct JSON")
-        except Exception as e:
-            print(f"Error parsing FIREBASE_JSON as JSON: {str(e)}", flush=True)
-    
-    # Initialize with credentials if we have them
+    # Initialize Firebase with credentials
     if creds_dict:
         try:
             cred = credentials.Certificate(creds_dict)
             app = firebase_admin.initialize_app(cred)
-            print("Successfully initialized Firebase with credentials")
+            logger.info("Successfully initialized Firebase with credentials")
             return app
         except Exception as e:
-            print(f"Firebase initialization error with credentials: {str(e)}", flush=True)
+            logger.error(f"Firebase initialization error: {str(e)}")
+            raise
     
-    # Last resort fallback to default credentials
-    try:
-        print("Attempting to initialize Firebase with default credentials")
-        app = firebase_admin.initialize_app()
-        print("Successfully initialized Firebase with default credentials")
-        return app
-    except Exception as e:
-        print(f"Firebase initialization with default credentials failed: {str(e)}", flush=True)
-    
-    print("Firebase initialization failed: No valid credentials found", flush=True)
-    return None
+    logger.error("Firebase initialization failed: No valid credentials found")
+    raise ValueError("Firebase credentials not found in environment variables")
 
 def get_user_id_from_token(token: str) -> Optional[str]:
     """
