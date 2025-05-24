@@ -22,43 +22,56 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     except ValueError:
         print("Firebase not yet initialized, continuing...")
     
-    creds_dict = None
-    
     # Get Firebase credentials from Secrets Manager
     firebase_secret_arn = os.environ.get('FIREBASE_JSON')
-    if firebase_secret_arn and firebase_secret_arn.startswith('arn:aws:secretsmanager'):
-        try:
-            print(f"Retrieving Firebase credentials from Secrets Manager: {firebase_secret_arn}")
-            
-            # Create Secrets Manager client
-            session = boto3.session.Session()
-            client = session.client('secretsmanager', region_name='us-east-1')
-            
-            # Get the secret value
-            response = client.get_secret_value(SecretId=firebase_secret_arn)
-            
-            # Parse the secret string
-            creds_dict = json.loads(response['SecretString'])
+    region_name = os.environ.get('AWS_REGION', 'us-east-1')  # Get region from env with fallback
+    
+    if not firebase_secret_arn:
+        print("FIREBASE_JSON environment variable not set")
+        raise ValueError("Firebase credentials not found in environment variables")
+        
+    # Only proceed with ARN-based lookup
+    if not firebase_secret_arn.startswith('arn:aws:secretsmanager'):
+        print(f"Invalid Secret ARN format: {firebase_secret_arn}")
+        raise ValueError("Firebase credentials ARN is invalid")
+    
+    try:
+        # Create Secrets Manager client
+        session = boto3.session.Session()
+        client = session.client(service_name='secretsmanager', region_name=region_name)
+        
+        # Get the secret value
+        response = client.get_secret_value(SecretId=firebase_secret_arn)
+        
+        # Extract and parse the secret string
+        if 'SecretString' in response:
+            secret_json = response['SecretString']
+            creds_dict = json.loads(secret_json)
             print("Successfully retrieved Firebase credentials from Secrets Manager")
+        else:
+            print("SecretBinary not supported for Firebase credentials")
+            raise ValueError("Firebase credentials in unexpected format")
             
-        except Exception as e:
-            print(f"Error retrieving Firebase credentials from Secrets Manager: {str(e)}")
-            print(f"Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
-            raise
+    except boto3.exceptions.botocore.exceptions.ClientError as e:
+        print(f"AWS Secrets Manager error: {str(e)}")
+        print("Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
+        raise ValueError(f"Failed to retrieve Firebase credentials: {str(e)}")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing Firebase credentials JSON: {str(e)}")
+        raise ValueError("Firebase credentials are not valid JSON")
+    except Exception as e:
+        print(f"Error retrieving Firebase credentials: {str(e)}")
+        raise ValueError(f"Failed to initialize Firebase: {str(e)}")
     
     # Initialize Firebase with credentials
-    if creds_dict:
-        try:
-            cred = credentials.Certificate(creds_dict)
-            app = firebase_admin.initialize_app(cred)
-            print("Successfully initialized Firebase with credentials")
-            return app
-        except Exception as e:
-            print(f"Firebase initialization error: {str(e)}")
-            raise
-    
-    print("Firebase initialization failed: No valid credentials found")
-    raise ValueError("Firebase credentials not found in environment variables")
+    try:
+        cred = credentials.Certificate(creds_dict)
+        app = firebase_admin.initialize_app(cred)
+        print("Successfully initialized Firebase with credentials")
+        return app
+    except Exception as e:
+        print(f"Firebase initialization error: {str(e)}")
+        raise ValueError(f"Failed to initialize Firebase: {str(e)}")
 
 def get_user_id_from_token(token: str) -> Optional[str]:
     """
