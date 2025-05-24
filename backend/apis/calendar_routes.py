@@ -15,55 +15,35 @@ import boto3
 calendar_bp = Blueprint("calendar", __name__)
 
 def initialize_firebase() -> Optional[firebase_admin.App]:
-    """Initialize Firebase Admin SDK with credentials from Secrets Manager."""
+    """Initialize Firebase Admin SDK with credentials from JSON."""
     # Check for existing app
     try:
         return get_app()
     except ValueError:
         print("Firebase not yet initialized, continuing...")
     
-    # Get Firebase credentials from Secrets Manager
-    firebase_secret_arn = os.environ.get('FIREBASE_JSON')
-    region_name = os.environ.get('AWS_REGION', 'us-east-1')  # Get region from env with fallback
+    # Get Firebase credentials JSON
+    firebase_json = os.environ.get('FIREBASE_JSON')
     
-    if not firebase_secret_arn:
+    if not firebase_json:
         print("FIREBASE_JSON environment variable not set")
         raise ValueError("Firebase credentials not found in environment variables")
-    # Debug the actual ARN value received
-    print(f"DEBUG - Received FIREBASE_JSON value: '{firebase_secret_arn}'")
-    
-    # Only proceed with ARN-based lookup
-    if not firebase_secret_arn.startswith('arn:aws:secretsmanager'):
-        print(f"Invalid Secret ARN format: {firebase_secret_arn}")
-        raise ValueError("Firebase credentials ARN is invalid")
     
     try:
-        # Create Secrets Manager client
-        session = boto3.session.Session()
-        client = session.client(service_name='secretsmanager', region_name=region_name)
+        # Parse the JSON string
+        json_data = json.loads(firebase_json)
         
-        # Get the secret value
-        response = client.get_secret_value(SecretId=firebase_secret_arn)
-        
-        # Extract and parse the secret string
-        if 'SecretString' in response:
-            secret_json = response['SecretString']
-            creds_dict = json.loads(secret_json)
-            print("Successfully retrieved Firebase credentials from Secrets Manager")
+        # Check if the JSON has a 'firebaseServiceAccount' field (nested JSON)
+        if 'firebaseServiceAccount' in json_data:
+            creds_dict = json.loads(json_data['firebaseServiceAccount'])
         else:
-            print("SecretBinary not supported for Firebase credentials")
-            raise ValueError("Firebase credentials in unexpected format")
+            creds_dict = json_data
             
-    except boto3.exceptions.botocore.exceptions.ClientError as e:
-        print(f"AWS Secrets Manager error: {str(e)}")
-        print("Make sure the IAM role has 'secretsmanager:GetSecretValue' permission")
-        raise ValueError(f"Failed to retrieve Firebase credentials: {str(e)}")
+        print("Successfully parsed Firebase credentials from JSON")
+        
     except json.JSONDecodeError as e:
         print(f"Error parsing Firebase credentials JSON: {str(e)}")
         raise ValueError("Firebase credentials are not valid JSON")
-    except Exception as e:
-        print(f"Error retrieving Firebase credentials: {str(e)}")
-        raise ValueError(f"Failed to initialize Firebase: {str(e)}")
     
     # Initialize Firebase with credentials
     try:
