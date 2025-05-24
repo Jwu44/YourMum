@@ -32,9 +32,6 @@ frequent_tasks_cache = LRUCache(maxsize=100)
 # Add cache for storing successful decomposition patterns
 decomposition_patterns_cache = {}
 
-# RAG examples for schedule generation
-example_schedules = schedules_rag
-
 def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     """
     Creates a prompt for schedule generation based on user data.
@@ -72,8 +69,8 @@ def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
     priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
     
     # Get example schedule using the helper function
-    example_key = determine_schedule_example(layout_preference)
-    example_schedule = example_schedules.get(example_key, "No matching example found.")
+    example_schedule = generate_composite_example(layout_preference)
+    print(example_schedule)
     
     # Create a more comprehensive system prompt
     system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth. Based on client preferences, energy patterns, and priorities, you'll create an optimized schedule that follows their preferred structure and task ordering pattern."""
@@ -925,50 +922,106 @@ def generate_schedule_suggestions(
         print(f"Error generating schedule suggestions: {str(e)}")
         return []
 
-def determine_schedule_example(layout_preference: Dict[str, Any]) -> str:
+def generate_composite_example(layout_preference: Dict[str, Any]) -> str:
     """
-    Determines the best matching example schedule based on user preferences.
-    
-    Uses a fallback strategy to find the most specific match first, then
-    progressively falls back to more general examples if needed.
+    Generate a composite example schedule based on user preferences.
     
     Args:
-        layout_preference: Dictionary containing layout, subcategory and ordering pattern
+        layout_preference: Dictionary containing structure, subcategory, and ordering patterns
         
     Returns:
-        The key of the best matching example schedule
+        A composite example that demonstrates the desired format
     """
-    # Extract preferences with defaults
-    ordering_pattern = layout_preference.get('orderingPattern', 'timebox')
+    # Extract preferences
     structure = layout_preference.get('structure', 'structured')
-    subcategory = layout_preference.get('subcategory', '')
+    subcategory = layout_preference.get('subcategory', '') if structure == 'structured' else ''
+    ordering_patterns = layout_preference.get('orderingPattern', ['timeboxed'])
     
-    # Create prioritized list of possible keys from most to least specific
-    possible_keys = []
+    # Ensure ordering_patterns is a list
+    if not isinstance(ordering_patterns, list):
+        ordering_patterns = [ordering_patterns]
     
-    # 1. Most specific: Combined structure-subcategory-ordering
-    if subcategory and structure == 'structured':
-        possible_keys.append(f"structured-{subcategory}-{ordering_pattern}")
+    # Load component examples from restructured YAML
+    components = schedules_rag
     
-    # 2. Next: Structure + ordering pattern
-    possible_keys.append(f"{structure}-{ordering_pattern}")
-    
-    # 3. Next: Just the ordering pattern (for specialized patterns)
-    possible_keys.append(ordering_pattern)
-    
-    # 4. Fallback: Standard structure with timeboxing
-    timeboxed_value = 'timeboxed' if ordering_pattern == 'timebox' else 'untimeboxed'
+    # Build the example based on structure and subcategory
     if structure == 'structured' and subcategory:
-        possible_keys.append(f"structured-{subcategory}-{timeboxed_value}")
+        # Get the basic structure from subcategory
+        example = components['subcategories'][subcategory]['sample']
     elif structure == 'structured':
-        possible_keys.append(f"structured-category-{timeboxed_value}")
+        # Default to category if no subcategory specified
+        example = components['subcategories']['category']['sample']
     else:
-        possible_keys.append(f"unstructured-{timeboxed_value}")
+        # Unstructured format
+        example = components['structures']['unstructured']['sample']
     
-    # Find first matching key that exists in example_schedules
-    for key in possible_keys:
-        if key in example_schedules:
-            return key
+    # Apply task formatting based on ordering patterns
+    example = apply_ordering_patterns(example, ordering_patterns, components)
     
-    # Ultimate fallback
-    return 'unstructured-timeboxed'
+    return example
+
+def apply_ordering_patterns(example: str, patterns: List[str], components: Dict) -> str:
+    """
+    Apply task ordering patterns to the example.
+    
+    Args:
+        example: Base example with structure
+        patterns: List of ordering patterns to apply
+        components: Component examples dictionary
+        
+    Returns:
+        Example with ordering patterns applied
+    """
+    # Extract section and task structure
+    sections = []
+    current_section = None
+    current_tasks = []
+    
+    for line in example.split('\n'):
+        if not line.strip():
+            continue
+            
+        if not line.startswith('□'):
+            # This is a section header
+            if current_section and current_tasks:
+                sections.append((current_section, current_tasks))
+            current_section = line
+            current_tasks = []
+        else:
+            # This is a task
+            current_tasks.append(line)
+    
+    # Add the last section
+    if current_section and current_tasks:
+        sections.append((current_section, current_tasks))
+    
+    # Generate task examples for each pattern
+    formatted_sections = []
+    for section, tasks in sections:
+        formatted_tasks = []
+        
+        # Apply each ordering pattern
+        for pattern in patterns:
+            # Get task examples for this pattern
+            task_examples = components['task_examples'].get(pattern, [])
+            
+            # For demonstration, use a subset of examples or repeat if needed
+            num_tasks = min(len(tasks), len(task_examples))
+            for i in range(num_tasks):
+                # Format the task according to the pattern
+                if pattern in components['ordering_patterns']:
+                    pattern_format = components['ordering_patterns'][pattern]['sample'].split('\n')[0]
+                    if '□' in pattern_format:
+                        formatted_task = pattern_format
+                    else:
+                        formatted_task = f"□ {task_examples[i % len(task_examples)]}"
+                    formatted_tasks.append(formatted_task)
+        
+        # Add the section with formatted tasks
+        formatted_section = section
+        for task in formatted_tasks:
+            formatted_section += f"\n{task}"
+        formatted_sections.append(formatted_section)
+    
+    # Combine all sections
+    return "\n\n".join(formatted_sections)
