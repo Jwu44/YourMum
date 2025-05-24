@@ -1,4 +1,4 @@
-# USER-002: Google calendar integration via mcp server
+# TASK-02: Google calendar integration via mcp server
 Status: In Progress
 
 ## Current Progress

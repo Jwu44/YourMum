@@ -1,233 +1,38 @@
-structured-day-sections-timeboxed: |
-    Morning 🌞
-    □ 7:00am - 7:30am: Wake up and morning routine
-    □ 7:30am - 8:00am: Breakfast and check emails
-    □ 8:00am - 9:30am: Work on high-priority project
-    □ 9:30am - 10:00am: Team standup meeting
-    □ 10:00am - 11:30am: Continue high-priority project work
-    □ 11:30am - 12:00pm: Review and respond to important messages
+# Structure examples
+structures:
+  structured:
+    description: "A schedule with clear sections."
+    sample: "Morning Section\n□ Task 1\n□ Task 2\n\nAfternoon Section\n□ Task 3\n□ Task 4"
+  unstructured:
+    description: "A flat list of tasks without sections."
+    sample: "□ Task 1\n□ Task 2\n□ Task 3\n□ Task 4"
 
-    Afternoon 🌇
-    □ 12:00pm - 1:00pm: Lunch break and short walk
-    □ 1:00pm - 3:00pm: Deep work session on main tasks
-    □ 3:00pm - 3:30pm: Quick break and snack
-    □ 3:30pm - 5:00pm: Finish up daily tasks and plan for tomorrow
+# Subcategory examples
+subcategories:
+  day-sections:
+    description: "Schedule organized by time of day."
+    sample: "Morning 🌞\n□ Task 1\n□ Task 2\n\nAfternoon 🌇\n□ Task 3\n□ Task 4\n\nEvening 💤\n□ Task 5\n□ Task 6"
+  priority:
+    description: "Schedule organized by priority levels."
+    sample: "High Priority\n□ Task 1\n□ Task 2\n\nMedium Priority\n□ Task 3\n□ Task 4\n\nLow Priority\n□ Task 5\n□ Task 6"
+  category:
+    description: "Schedule organized by task categories."
+    sample: "Work 💼\n□ Task 1\n□ Task 2\n\nHealth 🏋️‍♀️\n□ Task 3\n□ Task 4\n\nFun 🎉\n□ Task 5\n□ Task 6"
 
-    Evening 💤
-    □ 5:00pm - 6:00pm: Exercise or gym session
-    □ 6:00pm - 7:00pm: Dinner and relaxation
-    □ 7:00pm - 8:30pm: Personal project or hobby time
-    □ 8:30pm - 9:30pm: Wind down routine
-    □ 9:30pm: Bedtime
-
-structured-day-sections-untimeboxed: |
-    Morning 🌞
-    □ Wake up and complete morning routine
-    □ Enjoy breakfast while checking and responding to urgent emails
-    □ Begin work on the day's highest priority task
-    □ Attend team standup meeting
-    □ Continue focused work on priority tasks
-    □ Review and respond to important messages
-
-    Afternoon 🌇
-    □ Take a lunch break and go for a short walk
-    □ Engage in a deep work session for main project tasks
-    □ Take a quick break and have a healthy snack
-    □ Wrap up daily tasks and plan for the next day
-
-    Evening 💤
-    □ Exercise or attend a gym session
-    □ Prepare and enjoy dinner
-    □ Spend time on a personal project or hobby
-    □ Complete evening wind-down routine
-    □ Go to bed at a consistent time
-
-structured-priority-timeboxed: |
-    High Priority
-    □ 8:00am - 10:00am: Finish presentation for tomorrow's meeting
-    □ 10:00am - 10:30am: Schedule dentist appointment
-    □ 10:30am - 11:00am: Pay utility bills
-    □ 2:00pm - 4:00pm: Complete high-priority project deliverables
-
-    Medium Priority
-    □ 11:00am - 11:30am: Start learning Spanish (Duolingo, 15 minutes)
-    □ 12:30pm - 1:00pm: Plan weekend hiking trip
-    □ 4:00pm - 4:30pm: Research new recipes for meal prep
-    □ 6:00pm - 7:00pm: Work on personal development goals
-
-    Low Priority
-    □ 1:00pm - 1:30pm: Organize digital photos
-    □ 5:00pm - 5:30pm: Clean out email inbox
-    □ 7:00pm - 7:30pm: Look into new productivity apps
-
-structured-priority-untimeboxed: |
-    High Priority
-    □ Finish presentation for tomorrow's meeting
-    □ Schedule dentist appointment
-    □ Pay utility bills
-    □ Complete high-priority project deliverables
-
-    Medium Priority
-    □ Start learning Spanish (Duolingo, 15 minutes)
-    □ Plan weekend hiking trip
-    □ Research new recipes for meal prep
-    □ Work on personal development goals
-
-    Low Priority
-    □ Organize digital photos
-    □ Clean out email inbox
-    □ Look into new productivity apps
-
-structured-category-timeboxed: |
-    Work 💼
-    □ 9:00am - 9:30am: Prepare for team meeting
-    □ 9:30am - 10:30am: Attend team meeting
-    □ 10:30am - 11:30am: Review and respond to important emails
-    □ 2:00pm - 4:00pm: Work on quarterly report
-
-    Health & Fitness 🏋️‍♀️
-    □ 7:00am - 7:30am: 30-minute jog
-    □ 12:00pm - 12:30pm: Prepare healthy lunch
-    □ Throughout the day: Drink 8 glasses of water
-
-    Relationships ❤️
-    □ 5:00pm - 5:30pm: Plan date night with partner
-    □ 7:00pm - 7:30pm: Call best friend
-    □ 8:00pm - 9:00pm: Organize game night with friends
-
-    Fun 🎉
-    □ 12:30pm - 1:00pm: Play a quick game or solve a puzzle
-    □ 6:00pm - 6:30pm: Watch an episode of favorite TV show
-    □ 9:00pm - 9:30pm: Engage in a hobby (painting, gardening, etc.)
-
-    Ambition 🚀
-    □ 6:30am - 7:00am: Read 20 pages of a book on personal development
-    □ 5:30pm - 6:00pm: Work on side project or business idea
-    □ 9:30pm - 10:00pm: Reflect on goals and plan next steps
-
-structured-category-untimeboxed: |
-    Work 💼
-    □ Prepare for team meeting
-    □ Attend team meeting
-    □ Review and respond to important emails
-    □ Work on quarterly report
-
-    Health 🏋️‍♀️
-    □ 30-minute jog
-    □ Prepare healthy lunch
-    □ Drink 8 glasses of water throughout the day
-
-    Relationships ❤️
-    □ Plan date night with partner
-    □ Call best friend
-    □ Organize game night with friends
-
-    Fun 🎉
-    □ Play a quick game or solve a puzzle
-    □ Watch an episode of favorite TV show
-    □ Engage in a hobby (painting, gardening, etc.)
-
-    Ambition 🚀
-    □ Read pages from a book on personal development
-    □ Work on side project or business idea
-    □ Reflect on goals and plan next steps
-
-unstructured-timeboxed: |
-    □ 6:30am - 7:00am: Morning meditation and stretching
-    □ 7:00am - 7:30am: Breakfast and coffee
-    □ 7:30am - 9:00am: Deep work on main project
-    □ 9:00am - 9:15am: Quick break
-    □ 9:15am - 10:30am: Respond to emails and messages
-    □ 10:30am - 12:00pm: Team meeting and collaboration
-    □ 12:00pm - 1:00pm: Lunch and short walk
-    □ 1:00pm - 3:00pm: Continue work on main project
-    □ 3:00pm - 3:30pm: Afternoon snack and break
-    □ 3:30pm - 5:00pm: Wrap up daily tasks and plan for tomorrow
-    □ 5:00pm - 6:00pm: Exercise or gym session
-    □ 6:00pm - 7:00pm: Dinner preparation and eating
-    □ 7:00pm - 8:30pm: Personal hobby or project time
-    □ 8:30pm - 9:30pm: Reading or learning time
-    □ 9:30pm - 10:00pm: Evening routine and prepare for bed
-
-unstructured-untimeboxed: |
-    □ Morning meditation and stretching
-    □ Enjoy breakfast and coffee
-    □ Deep work session on main project
-    □ Respond to important emails and messages
-    □ Attend team meeting and collaborate on projects
-    □ Lunch break and short walk
-    □ Continue work on main project
-    □ Take short breaks as needed
-    □ Wrap up daily tasks and plan for tomorrow
-    □ Exercise or gym session
-    □ Prepare and eat dinner
-    □ Spend time on personal hobby or project
-    □ Read or engage in learning activity
-    □ Complete evening routine and prepare for bed
-
-timebox: |
-    □ 8:00am - 8:30am: Morning routine and breakfast
-    □ 8:30am - 9:00am: Review day's priorities and plan
-    □ 9:00am - 10:30am: Work on quarterly report (high priority)
-    □ 10:30am - 10:45am: Short break
-    □ 10:45am - 12:00pm: Attend team meeting and follow-ups
-    □ 12:00pm - 1:00pm: Lunch and quick walk
-    □ 1:00pm - 3:00pm: Continue quarterly report work
-    □ 3:00pm - 3:15pm: Afternoon break
-    □ 3:15pm - 4:30pm: Respond to emails and administrative tasks
-    □ 4:30pm - 5:00pm: Plan next day and wrap up
-    □ 5:30pm - 6:30pm: Exercise session
-    □ 6:30pm - 7:30pm: Dinner and family time
-    □ 7:30pm - 8:30pm: Personal project work
-    □ 8:30pm - 9:30pm: Reading and relaxation
-    □ 9:30pm: Bedtime routine
-
-batching: |
-    Communication Block 📱
-    □ 9:00am - 9:30am: Check and respond to emails
-    □ 9:30am - 10:00am: Team standup meeting
-    □ 10:00am - 10:30am: Call with client
-    
-    Creative Work Block 🎨
-    □ 10:45am - 12:30pm: Draft project proposal
-    □ 12:30pm - 1:00pm: Brainstorm ideas for upcoming campaign
-    
-    Admin Block ✏️
-    □ 2:00pm - 2:30pm: Process expense reports
-    □ 2:30pm - 3:00pm: Update project management system
-    
-    Personal Development Block 🌱
-    □ 5:00pm - 5:30pm: Learn Spanish on Duolingo
-    □ 5:30pm - 6:00pm: Read industry articles
-    
-    Physical Health Block 💪
-    □ 6:30pm - 7:30pm: Gym session
-    □ 7:30pm - 8:30pm: Cook and eat dinner
-
-alternating: |
-    □ 8:00am - 9:00am: High energy - Work on quarterly report (Focus)
-    □ 9:00am - 9:30am: Medium energy - Clear inbox (Admin)
-    □ 9:30am - 10:00am: Low energy - Review daily news (Learning)
-    □ 10:15am - 11:15am: High energy - Client presentation prep (Focus)
-    □ 11:15am - 11:45am: Medium energy - Team check-in call (Social)
-    □ 11:45am - 12:15pm: Low energy - Organize workspace (Admin)
-    □ 1:15pm - 2:15pm: High energy - Strategic planning (Focus)
-    □ 2:15pm - 2:45pm: Medium energy - Follow up on project tasks (Admin)
-    □ 2:45pm - 3:15pm: Low energy - Creative brainstorming (Creative)
-    □ 3:30pm - 4:30pm: High energy - Coding project (Focus)
-    □ 4:30pm - 5:00pm: Medium energy - Plan next day (Planning)
-    □ 5:00pm - 5:30pm: Low energy - Respond to non-urgent messages (Admin)
-
-three-three-three: |
-    Focus Task (3 hours) 🎯
-    □ 9:00am - 12:00pm: Complete quarterly financial analysis
-    
-    Medium Priority Tasks (3 tasks) 📋
-    □ 1:00pm - 1:45pm: Prepare for team meeting
-    □ 1:45pm - 2:30pm: Review upcoming project requirements
-    □ 2:30pm - 3:15pm: Update client documentation
-    
-    Maintenance Tasks (3 tasks) 🔄
-    □ 7:30am - 8:00am: Morning workout
-    □ 12:00pm - 12:45pm: Lunch and short walk
-    □ 5:00pm - 5:30pm: Review tomorrow's schedule and prep
+# Task ordering patterns
+ordering_patterns:
+  timeboxed:
+    description: "Tasks with specific time allocations."
+    sample: "□ 9:00am - 10:00am: Task 1\n□ 10:15am - 11:00am: Task 2"
+  untimeboxed:
+    description: "Tasks without specific times."
+    sample: "□ Task 1\n□ Task 2"
+  alternating:
+    description: "Tasks that alternate between energy levels."
+    sample: "□ High energy - Task 1 (Focus)\n□ Medium energy - Task 2 (Admin)\n□ Low energy - Task 3 (Creative)"
+  batching:
+    description: "Tasks grouped by similar activities."
+    sample: "Communication Block 📱\n□ Task 1\n□ Task 2\n\nCreative Work Block 🎨\n□ Task 3\n□ Task 4"
+  three-three-three:
+    description: "3 hours on focus, 3 medium tasks, 3 maintenance tasks."
+    sample: "Focus Task (3 hours) 🎯\n□ 9:00am - 12:00pm: Task 1\n\nMedium Priority Tasks (3 tasks) 📋\n□ Task 2\n□ Task 3\n□ Task 4"
