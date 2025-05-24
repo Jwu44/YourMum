@@ -29,7 +29,9 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
     if not firebase_secret_arn:
         print("FIREBASE_JSON environment variable not set")
         raise ValueError("Firebase credentials not found in environment variables")
-        
+    # Debug the actual ARN value received
+    print(f"DEBUG - Received FIREBASE_JSON value: '{firebase_secret_arn}'")
+    
     # Only proceed with ARN-based lookup
     if not firebase_secret_arn.startswith('arn:aws:secretsmanager'):
         print(f"Invalid Secret ARN format: {firebase_secret_arn}")
