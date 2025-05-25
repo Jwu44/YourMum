@@ -132,6 +132,10 @@ def connect_google_calendar():
         
         credentials = data['credentials']
         
+        # Convert expiresAt timestamp to datetime object
+        if 'expiresAt' in credentials and isinstance(credentials['expiresAt'], (int, float)):
+            credentials['expiresAt'] = datetime.fromtimestamp(credentials['expiresAt']/1000, tz=timezone.utc)
+        
         # Get database instance
         db = get_database()
         users = db['users']
@@ -143,7 +147,7 @@ def connect_google_calendar():
                 "calendar.connected": True,
                 "calendar.credentials": credentials,
                 "calendar.syncStatus": "completed",
-                "calendar.lastSyncTime": datetime.now(timezone.utc).isoformat(),
+                "calendar.lastSyncTime": datetime.now(timezone.utc),  # Store as datetime object, not string
                 "calendarSynced": True
             }}
         )
