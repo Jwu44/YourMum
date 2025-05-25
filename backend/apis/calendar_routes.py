@@ -78,8 +78,6 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     
     try:
         from firebase_admin import auth
-        print(f"DEBUG - Attempting to verify token with Firebase")
-        print(f"DEBUG - Firebase apps initialized: {firebase_admin._apps}")
         decoded_token = auth.verify_id_token(token)
         print(f"DEBUG - Token verification successful. User ID: {decoded_token.get('uid')}")
         return decoded_token.get('uid')
@@ -199,10 +197,6 @@ def get_calendar_events():
             token = auth_header[7:]  # Remove 'Bearer ' prefix
         else:
             token = auth_header
-            
-        print(f"DEBUG - FULL TOKEN: {token}")
-        print(f"DEBUG - Auth header: {auth_header}")
-        print(f"DEBUG - Request body: {request.json}")
         
         user_id = get_user_id_from_token(token)
         if not user_id:
@@ -302,12 +296,11 @@ def fetch_calendar_events(credentials: Dict, start_date: str, end_date: str) -> 
         tasks = []
         for event in events_data['items']:
             task = Task(
-                id=str(uuid.uuid4()),
+                id=event['id'],
                 text=event['summary'],
                 completed=False,
                 start_time=event.get('start', {}).get('dateTime'),
                 end_time=event.get('end', {}).get('dateTime'),
-                gcal_event_id=event['id'],
                 is_recurring=None,  # Can be set based on recurrence data if available
                 type="event"
             )
