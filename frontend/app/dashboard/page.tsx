@@ -522,14 +522,14 @@ const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
     setCurrentDate(newDate);
 
     // First, try to get calendar events
-    const calendarEvents = await calendarApi.fetchEvents(dateStr);
+    const calendarResponse = await calendarApi.fetchEvents(dateStr);
 
-    if (calendarEvents && calendarEvents.length > 0) {
+    if (calendarResponse.success && calendarResponse.tasks.length > 0) {
       // Update schedule with calendar events
-      setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarEvents));
+      setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarResponse.tasks));
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
-        newDays[diffDays] = calendarEvents;
+        newDays[diffDays] = calendarResponse.tasks;
         return newDays;
       });
       
@@ -539,7 +539,6 @@ const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
       });
       return;
     }
-    
     // Fallback: try to load local schedule data
     const existingSchedule = await loadScheduleForDate(dateStr);
     
@@ -845,11 +844,11 @@ useEffect(() => {
       const today = getDateString(0);
       
       // Try calendar events first
-      const calendarEvents = await calendarApi.fetchEvents(today);
-      
-      if (calendarEvents && calendarEvents.length > 0) {
-        setScheduleDays([calendarEvents]);
-        setScheduleCache(new Map([[today, calendarEvents]]));
+      const calendarResponse = await calendarApi.fetchEvents(today);
+
+      if (calendarResponse.success && calendarResponse.tasks.length > 0) {
+        setScheduleDays([calendarResponse.tasks]);
+        setScheduleCache(new Map([[today, calendarResponse.tasks]]));
         return;
       }
       
