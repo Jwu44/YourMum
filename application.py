@@ -24,22 +24,29 @@ def create_app(testing=False):
     def root():
         return jsonify({
             "status": "healthy",
-            "message": "API is running"
+            "message": "yourdai API is running",
+            "instance_type": "single_instance"  # Add this for debugging
         }), 200
+
+    # Update CORS for single instance (no load balancer)
+    allowed_origins = os.getenv(
+        "CORS_ALLOWED_ORIGINS", 
+        "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000"
+    ).split(",")
 
     # Single CORS configuration for all routes
     CORS(app, resources={
-        r"/*": {
-            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:8000").split(","),
+        r"/api/*": {
+            "origins": allowed_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-CSRFToken"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
             "supports_credentials": True,
             "expose_headers": ["Content-Type", "X-CSRFToken"]
         }
     })
     
     # Trust proxy headers from AWS ELB
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     # init firebase app
     try:
@@ -76,6 +83,7 @@ if __name__ == '__main__':
     
     # In production (AWS EB), always bind to all interfaces
     application.run(
-        host="0.0.0.0",  # Always bind to all interfaces for AWS
-        port=port
+        host="0.0.0.0",
+        port=port,
+        debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     )
