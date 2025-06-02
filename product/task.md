@@ -1,12 +1,12 @@
-# TASK-01: Google calendar integration via mcp server
+# TASK-01: Google calendar integration 
 Status: In Progress
 
 ## Current Progress
 - Backend API routes have been created in backend/apis/calendar_routes.py:
   - `/api/calendar/connect` (POST): Connect user to Google Calendar after authorization
   - `/api/calendar/events` (GET): Fetch user's calendar events for a specific date
-- MCP server configuration exists in mcp.json with the server URL
 - Frontend implementation:
+  - We already ask user to select their google calendar scope as seen in @firebase.ts
   - Fixed import for GoogleAuthProvider in AuthContext.tsx
   - Updated calendar.ts to correctly import auth from '@/auth/firebase'
   - Refactored dashboard.tsx to use calendarApi.fetchEvents() which automatically handles auth
@@ -14,13 +14,6 @@ Status: In Progress
 
 
 ## Requirements
-
-## Acceptance Criteria
-- After a user signs in via Google SSO, ask for access to Google Calendar
-- If they allow, then create a connection to Google Calendar MCP server
-  - Gather all events and tasks the user has for the current day
-      - Create them as task objects
-      - Create a schedule using these task objects
-      - Store the schedule in MongoDB against the user for the current day
-- If user clicks 'don't allow', then user should also see their dashboard page with an empty schedule
-- Instead of continuing to the current onboarding flow, take user directly to the dashboard page
+- If user allows google calendar access after google sso, then fetch their google calendar events and tasks for the current day
+- Take the title of the google calendar event or task and pass it into api_categorise_task to create a task object and categorise it
+- If a start and end time existed, add it to the created task object afterwards

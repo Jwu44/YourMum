@@ -1,192 +1,194 @@
 import { UserDocument, Task } from '../types';
 import { auth } from '@/auth/firebase';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Use the calendar part of UserDocument type
 type CalendarStatus = NonNullable<UserDocument['calendar']>;
 
-// Maximum token refresh attempts
-const MAX_TOKEN_REFRESH_ATTEMPTS = 3;
-// Delay between attempts in milliseconds
-const TOKEN_REFRESH_DELAY = 1000;
+// API base URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+/**
+ * Get the current user's Firebase ID token for API authentication
+ */
+async function getAuthToken(): Promise<string> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+  return await currentUser.getIdToken();
+}
 
 export const calendarApi = {
-  async getIdTokenWithRetry(forceRefresh = true, attempts = 0): Promise<string> {
-    if (attempts >= MAX_TOKEN_REFRESH_ATTEMPTS) {
-      throw new Error('Failed to obtain authentication token after multiple attempts');
+  /**
+   * Connect user's Google Calendar with stored credentials
+   */
+  async connectCalendar(credentials: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt: number;
+    scopes: string[];
+  }) {
+    const token = await getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ credentials }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to connect calendar');
     }
     
-    // Wait for auth to initialize if needed
-    if (!auth.currentUser) {
-      console.log(`Auth not ready yet, waiting attempt ${attempts + 1}/${MAX_TOKEN_REFRESH_ATTEMPTS}...`);
-      return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-          try {
-            const token = await this.getIdTokenWithRetry(forceRefresh, attempts + 1);
-            resolve(token);
-          } catch (error) {
-            reject(error);
-          }
-        }, TOKEN_REFRESH_DELAY);
-      });
-    }
-    
-    try {
-      const token = await auth.currentUser.getIdToken(forceRefresh);
-      if (!token) {
-        throw new Error('Unable to get token from current user');
-      }
-      return token;
-    } catch (error) {
-      console.error(`Token retrieval error (attempt ${attempts + 1}/${MAX_TOKEN_REFRESH_ATTEMPTS}):`, error);
-      
-      if (attempts < MAX_TOKEN_REFRESH_ATTEMPTS - 1) {
-        return new Promise((resolve, reject) => {
-          setTimeout(async () => {
-            try {
-              const token = await this.getIdTokenWithRetry(forceRefresh, attempts + 1);
-              resolve(token);
-            } catch (error) {
-              reject(error);
-            }
-          }, TOKEN_REFRESH_DELAY);
-        });
-      } else {
-        throw error;
-      }
-    }
+    return response.json();
   },
 
-  async connectCalendar(credentials: any) {
-    try {
-      // Get the current user's token with retry mechanism
-      const idToken = await this.getIdTokenWithRetry(true);
-      console.log("Token obtained:", !!idToken);
-      
-      const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({ credentials }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to connect calendar: ${errorText}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('Error connecting to calendar:', error);
-      throw error;
-    }
-  },
-
+  /**
+   * Disconnect user's Google Calendar
+   */
   async disconnectCalendar() {
-    try {
-      // Get the current user's token with retry mechanism
-      const idToken = await this.getIdTokenWithRetry(true);
+    const token = await getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to disconnect calendar');
+    }
+    
+    return response.json();
+  },
+
+  /**
+   * Get calendar connection status for a user
+   */
+  async getCalendarStatus(userId: string): Promise<CalendarStatus> {
+    const response = await fetch(`${API_BASE_URL}/api/calendar/status/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to get calendar status');
+    }
+    
+    const result = await response.json();
+    return result.data;
+  },
+
+  /**
+   * Fetch Google Calendar events for a specific date and convert them to tasks
+   * @param date - Date in YYYY-MM-DD format or Date object
+   * @returns Promise containing tasks created from calendar events
+   */
+    async fetchEvents(date: string | Date): Promise<{
+      success: boolean;
+      tasks: Task[];
+      count: number;
+      date: string;
+      error?: string;
+    }> {
+      // Convert Date object to string if needed
+      const dateString = date instanceof Date 
+        ? this.formatDateString(date) 
+        : date;
       
-      const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to disconnect calendar: ${errorText}`);
+      // Validate date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return {
+          success: false,
+          tasks: [],
+          count: 0,
+          date: dateString,
+          error: 'Invalid date format. Use YYYY-MM-DD'
+        };
       }
-      
-      return response.json();
+  
+      try {
+        const token = await getAuthToken();
+        const response = await fetch(
+          `${API_BASE_URL}/api/calendar/events?date=${encodeURIComponent(dateString)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+        
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+          return {
+            success: false,
+            tasks: [],
+            count: 0,
+            date: dateString,
+            error: result.error || `Failed to fetch calendar events (${response.status})`
+          };
+        }
+  
+        return {
+          success: true,
+          tasks: result.tasks || [],
+          count: result.count || 0,
+          date: result.date || dateString,
+        };
+        
+      } catch (error) {
+        console.error('Error fetching calendar events:', error);
+        return {
+          success: false,
+          tasks: [],
+          count: 0,
+          date: dateString,
+          error: error instanceof Error ? error.message : 'Unknown error occurred',
+        };
+      }
+    },
+
+  /**
+   * Check if user has calendar connected and credentials are valid
+   */
+  async hasValidCalendarConnection(): Promise<boolean> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return false;
+
+      const status = await this.getCalendarStatus(currentUser.uid);
+      return status.connected && Boolean(status.credentials);
     } catch (error) {
-      console.error('Error disconnecting calendar:', error);
-      throw error;
+      console.error('Error checking calendar connection:', error);
+      return false;
     }
   },
 
-  async getCalendarStatus(): Promise<CalendarStatus> {
-    try {
-      // Get the current user's token with retry mechanism
-      const idToken = await this.getIdTokenWithRetry(true);
-      
-      const response = await fetch(`${API_BASE_URL}/api/calendar/status`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to get calendar status: ${errorText}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('Error getting calendar status:', error);
-      throw error;
-    }
+  /**
+   * Format date for API calls
+   */
+  formatDateForAPI(date: Date): string {
+    return date.toISOString().split('T')[0];
   },
 
-  async verifyCalendarPermissions(accessToken: string): Promise<{
-    hasPermissions: boolean;
-    availableCalendars?: Array<{
-      id: string;
-      summary: string;
-      primary: boolean;
-    }>;
-    error?: string;
-  }> {
-    try {
-      // Get the current user's token with retry mechanism
-      const idToken = await this.getIdTokenWithRetry(true);
-      
-      const response = await fetch(`${API_BASE_URL}/api/calendar/verify-permissions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({ accessToken }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to verify calendar permissions: ${errorText}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('Error verifying calendar permissions:', error);
-      throw error;
-    }
+  /**
+   * Get today's date formatted for API
+   */
+  getTodayFormatted(): string {
+    return this.formatDateForAPI(new Date());
   },
 
-  async fetchEvents(date: string): Promise<Task[]> {
-    try {
-      // Get the current user's token with retry mechanism
-      const idToken = await this.getIdTokenWithRetry(true);
-      
-      const response = await fetch(`${API_BASE_URL}/api/calendar/events?date=${date}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch calendar events: ${errorText}`);
-      }
-      
-      const data = await response.json();
-      return data.success ? data.data : [];
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      return [];
-    }
-  }
+  /**
+   * Format a date to YYYY-MM-DD string for API calls
+   * @param date - Optional Date object (defaults to today if not provided)
+   * @returns Date string in YYYY-MM-DD format
+   */
+  formatDateString(date?: Date): string {
+    const targetDate = date || new Date();
+    return targetDate.toISOString().split('T')[0];
+  },
 };
