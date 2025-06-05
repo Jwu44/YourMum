@@ -38,9 +38,6 @@ def create_app(testing=False):
         }
     })
     
-    # Trust proxy headers from AWS ELB
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-    
     # init firebase app
     try:
         # Try to delete any existing Firebase apps
