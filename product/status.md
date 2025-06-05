@@ -7,14 +7,10 @@
   - Structured (sections) and unstructured layouts
   - Parent-child task relationships with subtasks
   - Visual drag indicators for task reordering and indentation
-- Fixed Firebase authentication issue by properly parsing credentials from environment variable JSON
+- Google Calendar API integration
 
 ## 🏗️ In Progress
-- Google Calendar integration via MCP server
-  - Backend API routes implemented
-
-## Next
-- Debug flow until google calendar events successfuly sync over
+- Refaactor schedule generation round 2
 
 ## Known Issues
 - Some performance bottlenecks with large schedule generation
