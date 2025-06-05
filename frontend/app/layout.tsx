@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from '@/auth/AuthContext';
 import { RouteGuard } from '@/auth/RouteGuard';
-import { OnboardingLayout } from '@/components/parts/OnboardingLayout';
 import { FormProvider } from "@/lib/FormContext";
 
 export const metadata: Metadata = {
@@ -24,9 +23,7 @@ export default function RootLayout({
         <AuthProvider>
           <FormProvider>
             <RouteGuard>
-              <OnboardingLayout>
                 {children}
-              </OnboardingLayout>
             </RouteGuard>
           </FormProvider>
         </AuthProvider>
