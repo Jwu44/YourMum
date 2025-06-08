@@ -6,7 +6,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDwtW6LWOo9eFGa_Y7jux0P3Zml-IEzxGc",
-  authDomain: "yourdai.app",
+  authDomain: "yourdai.firebaseapp.com",
   projectId: "yourdai",
   storageBucket: "yourdai.firebasestorage.app",
   messagingSenderId: "246264772427",
