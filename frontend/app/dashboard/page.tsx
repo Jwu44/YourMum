@@ -873,6 +873,11 @@ const Dashboard: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    // Remove dark mode when dashboard loads
+    document.documentElement.classList.remove('dark');
+  }, []);
+
   return (
     <SidebarLayout>
       {/* Main Dashboard Content */}
