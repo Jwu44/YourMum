@@ -9,7 +9,8 @@ import { Loader2, ActivitySquare, Heart, Smile, Trophy  } from 'lucide-react';
 import FloatingActionButton from '@/components/parts/FloatingActionButton';
 import TaskEditDrawer from '@/components/parts/TaskEditDrawer';
 
-// Custom Components
+// Layout Components
+import { SidebarLayout } from '@/components/parts/SidebarLayout';
 import DashboardHeader from '@/components/parts/DashboardHeader';
 import EditableSchedule from '@/components/parts/EditableSchedule';
 
@@ -498,431 +499,394 @@ const Dashboard: React.FC = () => {
   }, [dispatch, state.energy_patterns]);
 
   // 2. Modify handleDateSelect to first try loading calendar events
-const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
-  if (!newDate) {
-    setIsDropdownOpen(false);
-    return;
-  }
-
-  setIsLoadingSchedule(true);
-  try {
-    const dateStr = formatDateToString(newDate);
-    
-    // Calculate date differences for index
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(newDate);
-    selectedDate.setHours(0, 0, 0, 0);
-    const diffTime = selectedDate.getTime() - today.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    // Always update the date states
-    setCurrentDayIndex(diffDays);
-    setDate(newDate);
-    setCurrentDate(newDate);
-
-    // First, try to get calendar events
-    const calendarResponse = await calendarApi.fetchEvents(dateStr);
-
-    if (calendarResponse.success && calendarResponse.tasks.length > 0) {
-      // Update schedule with calendar events
-      setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarResponse.tasks));
-      setScheduleDays(prevDays => {
-        const newDays = [...prevDays];
-        newDays[diffDays] = calendarResponse.tasks;
-        return newDays;
-      });
-      
-      toast({
-        title: "Success",
-        description: "Calendar events loaded successfully",
-      });
+  const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
+    if (!newDate) {
+      setIsDropdownOpen(false);
       return;
     }
-    // Fallback: try to load local schedule data
-    const existingSchedule = await loadScheduleForDate(dateStr);
+
+    setIsLoadingSchedule(true);
+    try {
+      const dateStr = formatDateToString(newDate);
+      
+      // Calculate date differences for index
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      const diffTime = selectedDate.getTime() - today.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      // Always update the date states
+      setCurrentDayIndex(diffDays);
+      setDate(newDate);
+      setCurrentDate(newDate);
+
+      // First, try to get calendar events
+      const calendarResponse = await calendarApi.fetchEvents(dateStr);
+
+      if (calendarResponse.success && calendarResponse.tasks.length > 0) {
+        // Update schedule with calendar events
+        setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarResponse.tasks));
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          newDays[diffDays] = calendarResponse.tasks;
+          return newDays;
+        });
+        
+        toast({
+          title: "Success",
+          description: "Calendar events loaded successfully",
+        });
+        return;
+      }
+      // Fallback: try to load local schedule data
+      const existingSchedule = await loadScheduleForDate(dateStr);
+      
+      if (existingSchedule.success && existingSchedule.schedule) {
+        // Update with local schedule data
+        setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          newDays[diffDays] = existingSchedule.schedule!;
+          return newDays;
+        });
+
+        toast({
+          title: "Success",
+          description: "Schedule loaded successfully",
+        });
+      } else {
+        // No schedule found
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          newDays[diffDays] = [];
+          return newDays;
+        });
+
+        toast({
+          title: "Notice",
+          description: "No schedule found for selected date",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load schedule",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSchedule(false);
+      setIsCalendarDrawerOpen(false);
+      setIsDropdownOpen(false);
+    }
+  }, [setDate, toast]);
+
+  // Handle magic wand click
+  const handleRequestSuggestions = useCallback(async () => {
+    setIsLoadingSuggestions(true);
     
-    if (existingSchedule.success && existingSchedule.schedule) {
-      // Update with local schedule data
-      setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
-      setScheduleDays(prevDays => {
-        const newDays = [...prevDays];
-        newDays[diffDays] = existingSchedule.schedule!;
+    try {
+      const currentDate = getDateString(currentDayIndex);
+      
+      // Fetch new suggestions
+      const response: GetAISuggestionsResponse = await fetchAISuggestions(
+        state.name, // userId
+        currentDate,
+        scheduleDays[currentDayIndex] || [], // current schedule
+        scheduleDays.slice(Math.max(0, currentDayIndex - 14), currentDayIndex), // Last 14 days
+        state.priorities || {},
+        state.energy_patterns || []
+      );
+
+      // Filter out previously shown suggestions
+      const newSuggestions = response.suggestions.filter(
+        suggestion => !shownSuggestionIds.has(suggestion.id)
+      );
+
+      // Update shown suggestions tracking
+      newSuggestions.forEach(suggestion => {
+        shownSuggestionIds.add(suggestion.id);
+      });
+
+      setSuggestions(newSuggestions);
+
+    } catch (error) {
+      console.error('Error requesting suggestions:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to get AI suggestions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, [
+    currentDayIndex,
+    scheduleDays,
+    state.name,
+    state.priorities,
+    state.energy_patterns,
+    shownSuggestionIds,
+    toast
+  ]);
+
+  // Helper function to find relevant task for a suggestion
+  const findRelevantTaskForSuggestion = useCallback((
+    suggestion: AISuggestion, 
+    schedule: Task[]
+  ): string => {
+    // Start with category matching
+    const categoryMatch = schedule.find(task => 
+      task.categories?.some(category => 
+        suggestion.categories.includes(category)
+      )
+    );
+    if (categoryMatch) return categoryMatch.id;
+
+    // Fallback to type-based placement
+    switch (suggestion.type) {
+      case 'Energy Optimization':
+        // Place near morning tasks
+        return schedule[0]?.id || 'schedule-start';
+      case 'Priority Rebalancing':
+        // Place near high-priority tasks
+        const priorityTask = schedule.find(task => 
+          task.categories?.includes('high-priority')
+        );
+        return priorityTask?.id || 'schedule-start';
+      // Add other type-based logic...
+      default:
+        // Default to schedule start
+        return 'schedule-start';
+    }
+  }, []);
+
+  // Distribute suggestions between tasks when suggestions change
+  useEffect(() => {
+    if (!suggestions.length) return;
+
+    const currentSchedule = scheduleDays[currentDayIndex];
+    if (!currentSchedule) return;
+
+    // Create a new map for suggestions
+    const newSuggestionsMap = new Map<string, AISuggestion[]>();
+    
+    suggestions.forEach(suggestion => {
+      const relevantTaskId = findRelevantTaskForSuggestion(suggestion, currentSchedule);
+      
+      if (!newSuggestionsMap.has(relevantTaskId)) {
+        newSuggestionsMap.set(relevantTaskId, []);
+      }
+      newSuggestionsMap.get(relevantTaskId)!.push(suggestion);
+    });
+
+    setSuggestionsMap(newSuggestionsMap);
+  }, [suggestions, currentDayIndex, scheduleDays, findRelevantTaskForSuggestion]);
+
+  // Helper function to find the best index to insert a suggestion
+  const findTargetIndexForSuggestion = useCallback((
+    suggestion: AISuggestion, 
+    schedule: Task[]
+  ): number => {
+    // First try to find a task with matching categories
+    const categoryMatchIndex = schedule.findIndex(task => 
+      task.categories?.some(category => 
+        suggestion.categories.includes(category)
+      )
+    );
+    
+    if (categoryMatchIndex !== -1) {
+      // Insert after the matching task
+      return categoryMatchIndex + 1;
+    }
+
+    // If no category match, use suggestion type to determine placement
+    switch (suggestion.type) {
+      case 'Energy Optimization':
+        // Place near the start of the day
+        return 0;
+      
+      case 'Priority Rebalancing':
+        // Find first high-priority task
+        const priorityIndex = schedule.findIndex(task => 
+          task.categories?.includes('high-priority')
+        );
+        return priorityIndex !== -1 ? priorityIndex : 0;
+      
+      case 'Time Management':
+        // Place in the middle of the schedule
+        return Math.floor(schedule.length / 2);
+      
+      case 'Task Structure':
+        // Place near related tasks if possible
+        const structureIndex = schedule.findIndex(task => 
+          task.text.toLowerCase().includes(suggestion.text.toLowerCase())
+        );
+        return structureIndex !== -1 ? structureIndex + 1 : schedule.length;
+      
+      default:
+        // Default to end of schedule
+        return schedule.length;
+    }
+  }, []);
+
+  // Handle suggestion acceptance
+  const handleAcceptSuggestion = useCallback(async (suggestion: AISuggestion) => {
+    try {
+      // Convert suggestion to task with all required properties
+      const newTask: Task = {
+        id: uuidv4(),
+        text: suggestion.text,
+        categories: suggestion.categories,
+        is_subtask: false,
+        completed: false,
+        is_section: false,
+        section: null,
+        parent_id: null,
+        level: 0,
+        section_index: 0,
+        type: 'task',
+        start_time: null,
+        end_time: null,
+        is_recurring: null,
+        start_date: getDateString(currentDayIndex),
+      };
+
+      // Add task to schedule
+      const updatedSchedule = [...scheduleDays[currentDayIndex]];
+      const targetIndex = findTargetIndexForSuggestion(suggestion, updatedSchedule);
+      
+      // Update section and section_index for the new task and subsequent tasks
+      if (targetIndex > 0) {
+        const prevTask = updatedSchedule[targetIndex - 1];
+        newTask.section = prevTask.section;
+      }
+      
+      updatedSchedule.splice(targetIndex, 0, newTask);
+      
+      // Recalculate section_index for affected tasks
+      let sectionStartIndex = 0;
+      updatedSchedule.forEach((task, index) => {
+        if (task.is_section) {
+          sectionStartIndex = index;
+        }
+        if (!task.is_section) {
+          task.section_index = index - sectionStartIndex;
+        }
+      });
+
+      // Update schedule
+      setScheduleDays(prev => {
+        const newDays = [...prev];
+        newDays[currentDayIndex] = updatedSchedule;
         return newDays;
       });
+
+      // Update both suggestions and suggestionsMap
+      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+      setSuggestionsMap(prev => {
+        const newMap = new Map(prev);
+        Array.from(newMap.entries()).forEach(([taskId, suggestions]) => {
+          newMap.set(
+            taskId, 
+            suggestions.filter(s => s.id !== suggestion.id)
+          );
+        });
+        return newMap;
+      });
+
+      // Sync with backend
+      await updateScheduleForDate(
+        getDateString(currentDayIndex),
+        updatedSchedule
+      );
 
       toast({
         title: "Success",
-        description: "Schedule loaded successfully",
-      });
-    } else {
-      // No schedule found
-      setScheduleDays(prevDays => {
-        const newDays = [...prevDays];
-        newDays[diffDays] = [];
-        return newDays;
+        description: "Suggestion added to schedule",
       });
 
+    } catch (error) {
+      console.error('Error accepting suggestion:', error);
       toast({
-        title: "Notice",
-        description: "No schedule found for selected date",
-        variant: "default",
+        title: "Error",
+        description: "Failed to add suggestion to schedule",
+        variant: "destructive",
       });
     }
-  } catch (error) {
-    console.error("Error loading schedule:", error);
-    toast({
-      title: "Error",
-      description: "Failed to load schedule",
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoadingSchedule(false);
-    setIsCalendarDrawerOpen(false);
-    setIsDropdownOpen(false);
-  }
-}, [setDate, toast]);
+  }, [currentDayIndex, scheduleDays, toast, findTargetIndexForSuggestion]);
 
-// Handle magic wand click
-const handleRequestSuggestions = useCallback(async () => {
-  setIsLoadingSuggestions(true);
-  
-  try {
-    const currentDate = getDateString(currentDayIndex);
-    
-    // Fetch new suggestions
-    const response: GetAISuggestionsResponse = await fetchAISuggestions(
-      state.name, // userId
-      currentDate,
-      scheduleDays[currentDayIndex] || [], // current schedule
-      scheduleDays.slice(Math.max(0, currentDayIndex - 14), currentDayIndex), // Last 14 days
-      state.priorities || {},
-      state.energy_patterns || []
-    );
-
-    // Filter out previously shown suggestions
-    const newSuggestions = response.suggestions.filter(
-      suggestion => !shownSuggestionIds.has(suggestion.id)
-    );
-
-    // Update shown suggestions tracking
-    newSuggestions.forEach(suggestion => {
-      shownSuggestionIds.add(suggestion.id);
-    });
-
-    setSuggestions(newSuggestions);
-
-  } catch (error) {
-    console.error('Error requesting suggestions:', error);
-    toast({
-      title: "Error",
-      description: error instanceof Error 
-        ? error.message 
-        : "Failed to get AI suggestions. Please try again.",
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoadingSuggestions(false);
-  }
-}, [
-  currentDayIndex,
-  scheduleDays,
-  state.name,
-  state.priorities,
-  state.energy_patterns,
-  shownSuggestionIds,
-  toast
-]);
-
-// Helper function to find relevant task for a suggestion
-const findRelevantTaskForSuggestion = useCallback((
-  suggestion: AISuggestion, 
-  schedule: Task[]
-): string => {
-  // Start with category matching
-  const categoryMatch = schedule.find(task => 
-    task.categories?.some(category => 
-      suggestion.categories.includes(category)
-    )
-  );
-  if (categoryMatch) return categoryMatch.id;
-
-  // Fallback to type-based placement
-  switch (suggestion.type) {
-    case 'Energy Optimization':
-      // Place near morning tasks
-      return schedule[0]?.id || 'schedule-start';
-    case 'Priority Rebalancing':
-      // Place near high-priority tasks
-      const priorityTask = schedule.find(task => 
-        task.categories?.includes('high-priority')
-      );
-      return priorityTask?.id || 'schedule-start';
-    // Add other type-based logic...
-    default:
-      // Default to schedule start
-      return 'schedule-start';
-  }
-}, []);
-
-// Distribute suggestions between tasks when suggestions change
-useEffect(() => {
-  if (!suggestions.length) return;
-
-  const currentSchedule = scheduleDays[currentDayIndex];
-  if (!currentSchedule) return;
-
-  // Create a new map for suggestions
-  const newSuggestionsMap = new Map<string, AISuggestion[]>();
-  
-  suggestions.forEach(suggestion => {
-    const relevantTaskId = findRelevantTaskForSuggestion(suggestion, currentSchedule);
-    
-    if (!newSuggestionsMap.has(relevantTaskId)) {
-      newSuggestionsMap.set(relevantTaskId, []);
-    }
-    newSuggestionsMap.get(relevantTaskId)!.push(suggestion);
-  });
-
-  setSuggestionsMap(newSuggestionsMap);
-}, [suggestions, currentDayIndex, scheduleDays, findRelevantTaskForSuggestion]);
-
-// Helper function to find the best index to insert a suggestion
-const findTargetIndexForSuggestion = useCallback((
-  suggestion: AISuggestion, 
-  schedule: Task[]
-): number => {
-  // First try to find a task with matching categories
-  const categoryMatchIndex = schedule.findIndex(task => 
-    task.categories?.some(category => 
-      suggestion.categories.includes(category)
-    )
-  );
-  
-  if (categoryMatchIndex !== -1) {
-    // Insert after the matching task
-    return categoryMatchIndex + 1;
-  }
-
-  // If no category match, use suggestion type to determine placement
-  switch (suggestion.type) {
-    case 'Energy Optimization':
-      // Place near the start of the day
-      return 0;
-    
-    case 'Priority Rebalancing':
-      // Find first high-priority task
-      const priorityIndex = schedule.findIndex(task => 
-        task.categories?.includes('high-priority')
-      );
-      return priorityIndex !== -1 ? priorityIndex : 0;
-    
-    case 'Time Management':
-      // Place in the middle of the schedule
-      return Math.floor(schedule.length / 2);
-    
-    case 'Task Structure':
-      // Place near related tasks if possible
-      const structureIndex = schedule.findIndex(task => 
-        task.text.toLowerCase().includes(suggestion.text.toLowerCase())
-      );
-      return structureIndex !== -1 ? structureIndex + 1 : schedule.length;
-    
-    default:
-      // Default to end of schedule
-      return schedule.length;
-  }
-}, []);
-
-// Handle suggestion acceptance
-const handleAcceptSuggestion = useCallback(async (suggestion: AISuggestion) => {
-  try {
-    // Convert suggestion to task with all required properties
-    const newTask: Task = {
-      id: uuidv4(),
-      text: suggestion.text,
-      categories: suggestion.categories,
-      is_subtask: false,
-      completed: false,
-      is_section: false,
-      section: null,
-      parent_id: null,
-      level: 0,
-      section_index: 0,
-      type: 'task',
-      start_time: null,
-      end_time: null,
-      is_recurring: null,
-      start_date: getDateString(currentDayIndex),
-    };
-
-    // Add task to schedule
-    const updatedSchedule = [...scheduleDays[currentDayIndex]];
-    const targetIndex = findTargetIndexForSuggestion(suggestion, updatedSchedule);
-    
-    // Update section and section_index for the new task and subsequent tasks
-    if (targetIndex > 0) {
-      const prevTask = updatedSchedule[targetIndex - 1];
-      newTask.section = prevTask.section;
-    }
-    
-    updatedSchedule.splice(targetIndex, 0, newTask);
-    
-    // Recalculate section_index for affected tasks
-    let sectionStartIndex = 0;
-    updatedSchedule.forEach((task, index) => {
-      if (task.is_section) {
-        sectionStartIndex = index;
-      }
-      if (!task.is_section) {
-        task.section_index = index - sectionStartIndex;
-      }
-    });
-
-    // Update schedule
-    setScheduleDays(prev => {
-      const newDays = [...prev];
-      newDays[currentDayIndex] = updatedSchedule;
-      return newDays;
-    });
-
+  // Handle suggestion rejection
+  const handleRejectSuggestion = useCallback((suggestionId: string) => {
     // Update both suggestions and suggestionsMap
-    setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+    setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
     setSuggestionsMap(prev => {
       const newMap = new Map(prev);
       Array.from(newMap.entries()).forEach(([taskId, suggestions]) => {
         newMap.set(
           taskId, 
-          suggestions.filter(s => s.id !== suggestion.id)
+          suggestions.filter(s => s.id !== suggestionId)
         );
       });
       return newMap;
     });
+  }, []);
 
-    // Sync with backend
-    await updateScheduleForDate(
-      getDateString(currentDayIndex),
-      updatedSchedule
-    );
+  useEffect(() => {
+    const loadInitialSchedule = async () => {
+      setIsLoadingSchedule(true);
+      
+      try {
+        const today = getDateString(0);
+        
+        // Try calendar events first
+        const calendarResponse = await calendarApi.fetchEvents(today);
 
-    toast({
-      title: "Success",
-      description: "Suggestion added to schedule",
-    });
-
-  } catch (error) {
-    console.error('Error accepting suggestion:', error);
-    toast({
-      title: "Error",
-      description: "Failed to add suggestion to schedule",
-      variant: "destructive",
-    });
-  }
-}, [currentDayIndex, scheduleDays, toast, findTargetIndexForSuggestion]);
-
-// Handle suggestion rejection
-const handleRejectSuggestion = useCallback((suggestionId: string) => {
-  // Update both suggestions and suggestionsMap
-  setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
-  setSuggestionsMap(prev => {
-    const newMap = new Map(prev);
-    Array.from(newMap.entries()).forEach(([taskId, suggestions]) => {
-      newMap.set(
-        taskId, 
-        suggestions.filter(s => s.id !== suggestionId)
-      );
-    });
-    return newMap;
-  });
-}, []);
-
-useEffect(() => {
-  const loadInitialSchedule = async () => {
-    setIsLoadingSchedule(true);
+        if (calendarResponse.success && calendarResponse.tasks.length > 0) {
+          setScheduleDays([calendarResponse.tasks]);
+          setScheduleCache(new Map([[today, calendarResponse.tasks]]));
+          return;
+        }
+        
+        // Fall back to regular schedule if no calendar events
+        const existingSchedule = await loadScheduleForDate(today);
+        
+        if (existingSchedule.success && existingSchedule.schedule) {
+          setScheduleDays([existingSchedule.schedule]);
+          setScheduleCache(new Map([[today, existingSchedule.schedule]]));
+        }
+      } catch (error) {
+        console.error("Error loading initial schedule:", error);
+      } finally {
+        setIsLoadingSchedule(false);
+      }
+    };
     
-    try {
-      const today = getDateString(0);
-      
-      // Try calendar events first
-      const calendarResponse = await calendarApi.fetchEvents(today);
-
-      if (calendarResponse.success && calendarResponse.tasks.length > 0) {
-        setScheduleDays([calendarResponse.tasks]);
-        setScheduleCache(new Map([[today, calendarResponse.tasks]]));
-        return;
-      }
-      
-      // Fall back to regular schedule if no calendar events
-      const existingSchedule = await loadScheduleForDate(today);
-      
-      if (existingSchedule.success && existingSchedule.schedule) {
-        setScheduleDays([existingSchedule.schedule]);
-        setScheduleCache(new Map([[today, existingSchedule.schedule]]));
-      }
-    } catch (error) {
-      console.error("Error loading initial schedule:", error);
-    } finally {
-      setIsLoadingSchedule(false);
+    // Only run if we don't already have a schedule from previous page
+    if (!state.formUpdate?.response) {
+      loadInitialSchedule();
     }
-  };
-  
-  // Only run if we don't already have a schedule from previous page
-  if (!state.formUpdate?.response) {
-    loadInitialSchedule();
-  }
-}, []);
-
-// // Load pre-generated schedule from state when dashboard first loads
-// useEffect(() => {
-//   // Check if we have a response from the previous page (TaskPatternOrdering)
-//   if (state.formUpdate?.response && 'tasks' in state.formUpdate.response) {
-//     const scheduleData = state.formUpdate.response;
-//     console.log("Found pre-generated schedule in state:", scheduleData);
-    
-//     try {
-//       // Set the schedule days from the state
-//       setScheduleDays([scheduleData.tasks]);
-//       setCurrentDayIndex(0);
-      
-//       // Save schedule to backend if needed
-//       const currentDate = getDateString(0);
-//       updateScheduleForDate(currentDate, scheduleData.tasks)
-//         .then(() => {
-//           // Update schedule cache
-//           setScheduleCache(prev => new Map(prev).set(currentDate, scheduleData.tasks));
-//           console.log("Pre-generated schedule set and saved");
-//         })
-//         .catch(error => {
-//           console.error("Error saving pre-generated schedule:", error);
-//           toast({
-//             title: "Warning",
-//             description: "Schedule loaded but could not be saved to database",
-//             variant: "destructive",
-//           });
-//         });
-//     } catch (error) {
-//       console.error("Error initializing schedule from state:", error);
-//       toast({
-//         title: "Error",
-//         description: "Failed to initialize schedule",
-//         variant: "destructive",
-//       });
-//     }
-//   }
-// }, [state.formUpdate.response, toast]); // Empty dependency array to only run once when component mounts
+  }, []);
 
   return (
-    <div className="flex h-screen bg-[hsl(248,18%,4%)]">
-      <div className="w-full max-w-4xl mx-auto p-6 overflow-y-auto main-content"> 
-        {/* Header Component */}
+    <SidebarLayout>
+      {/* Main Dashboard Content */}
+      <div className="flex flex-col h-full bg-background">
+        
+        {/* Header Section */}
         <DashboardHeader
           selectedDate={date}
           isLoadingSuggestions={isLoadingSuggestions}
-          isCalendarDrawerOpen={isCalendarDrawerOpen}  // Updated prop name
+          isCalendarDrawerOpen={isCalendarDrawerOpen}
           isDropdownOpen={isDropdownOpen}
           state={state}
           onRequestSuggestions={handleRequestSuggestions}
-          onCalendarDrawerOpenChange={setIsCalendarDrawerOpen}  // Updated prop name
+          onCalendarDrawerOpenChange={setIsCalendarDrawerOpen}
           onDropdownOpenChange={setIsDropdownOpen}
           onDateSelect={handleDateSelect}
           onSubmitForm={handleSubmit}
@@ -941,65 +905,73 @@ useEffect(() => {
             handleEnergyChange: handleEnergyChangeCallback,
           }}
         />
-    
-        {/* Schedule Display Section */}
-        {isLoadingSchedule ? (
-          // Loading State
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
-          </div>
-        ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
-          // Schedule Content
-          <div className="space-y-4">
-            {/* Schedule Editor */}
-            <div className="rounded-lg shadow-lg px-8 py-6">
-              <EditableSchedule
-                tasks={scheduleDays[currentDayIndex] || []}
-                onUpdateTask={handleScheduleTaskUpdate}
-                onDeleteTask={handleScheduleTaskDelete}
-                onReorderTasks={handleReorderTasks}
-                layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
-                onRequestSuggestions={handleRequestSuggestions}
-                isLoadingSuggestions={isLoadingSuggestions}
-                suggestionsMap={suggestionsMap}
-                onAcceptSuggestion={handleAcceptSuggestion}
-                onRejectSuggestion={handleRejectSuggestion}
-              />
-            </div>
-  
-            {/* AI Suggestions Loading State */}
-            {isLoadingSuggestions && (
-              <div className="flex items-center justify-center h-20">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                <span className="ml-2 text-sm text-gray-400">
-                  Generating suggestions...
-                </span>
+
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="w-full max-w-4xl mx-auto p-6">
+            
+            {/* Schedule Display Section */}
+            {isLoadingSchedule ? (
+              <div className="loading-container-lg">
+                <div className="loading-spinner-lg" />
+              </div>
+            ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
+              // Schedule Content
+              <div className="space-y-4">
+                {/* Schedule Editor */}
+                <div className="rounded-lg shadow-lg px-8 py-6">
+                  <EditableSchedule
+                    tasks={scheduleDays[currentDayIndex] || []}
+                    onUpdateTask={handleScheduleTaskUpdate}
+                    onDeleteTask={handleScheduleTaskDelete}
+                    onReorderTasks={handleReorderTasks}
+                    layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
+                    onRequestSuggestions={handleRequestSuggestions}
+                    isLoadingSuggestions={isLoadingSuggestions}
+                    suggestionsMap={suggestionsMap}
+                    onAcceptSuggestion={handleAcceptSuggestion}
+                    onRejectSuggestion={handleRejectSuggestion}
+                  />
+                </div>
+
+                {/* AI Suggestions Loading State */}
+                {isLoadingSuggestions && (
+                  <div className="loading-container-sm">
+                    <Loader2 className="loading-spinner-sm" />
+                    <span className="loading-text">
+                      Generating suggestions...
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Empty State
+              <div className="empty-state-container">
+                <p className="text-lg text-foreground">
+                  {state.response 
+                    ? 'Processing your schedule...' 
+                    : 'No schedule found for selected date'
+                  }
+                </p>
+                {/* Show Generate Button only if no response exists */}
+                {!state.response && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleSubmit} 
+                    disabled={isLoading}
+                  >
+                    Generate Schedule
+                  </Button>
+                )}
               </div>
             )}
           </div>
-        ) : (
-          // Empty State
-          <div className="flex flex-col items-center justify-center h-64 space-y-4">
-            <p className="text-lg text-gray-300">
-              {state.response 
-                ? 'Processing your schedule...' 
-                : 'No schedule found for selected date'
-              }
-            </p>
-            {/* Show Generate Button only if no response exists */}
-            {!state.response && (
-              <Button 
-                variant="outline" 
-                onClick={handleSubmit} 
-                disabled={isLoading}
-              >
-                Generate Schedule
-              </Button>
-            )}
-          </div>
-        )}
-        {/* Add FloatingActionButton and TaskEditDrawer here */}
+        </div>
+
+        {/* Floating Action Button */}
         <FloatingActionButton onClick={() => setIsTaskDrawerOpen(true)} />
+        
+        {/* Task Edit Drawer */}
         <TaskEditDrawer
           isOpen={isTaskDrawerOpen}
           onClose={() => setIsTaskDrawerOpen(false)}
@@ -1007,7 +979,7 @@ useEffect(() => {
           currentDate={getDateString(currentDayIndex)}
         />
       </div>
-    </div>
+    </SidebarLayout>
   );
 };
 

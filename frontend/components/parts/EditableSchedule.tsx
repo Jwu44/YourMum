@@ -213,7 +213,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             allTasks={memoizedTasks}
           >
             {task.type === 'section' && (
-              <TypographyH4 className="mt-3 mb-1">
+              <TypographyH4 className="section-header">
                 {task.text}
               </TypographyH4>
             )}
@@ -221,12 +221,12 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
           {/* Render suggestions after each task if they exist */}
           {suggestionsMap.has(task.id) && (
-            <div className="ml-6 my-2">
+            <div className="suggestion-container">
               <AISuggestionsList
                 suggestions={suggestionsMap.get(task.id) || []}
                 onAccept={onAcceptSuggestion}
                 onReject={onRejectSuggestion}
-                className="border-l-2 border-blue-500 pl-4"
+                className="suggestion-list"
               />
             </div>
           )}
@@ -235,12 +235,12 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
       {/* Render suggestions for schedule start if they exist */}
       {suggestionsMap.has('schedule-start') && (
-        <div className="mb-4">
+        <div className="schedule-start-container">
           <AISuggestionsList
             suggestions={suggestionsMap.get('schedule-start') || []}
             onAccept={onAcceptSuggestion}
             onReject={onRejectSuggestion}
-            className="border-l-2 border-blue-500 pl-4"
+            className="suggestion-list"
           />
         </div>
       )}

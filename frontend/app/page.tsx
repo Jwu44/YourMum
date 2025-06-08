@@ -13,7 +13,7 @@ const HomePage = () => {
   // Handle sign in and redirect to priorities page
   const handleGetStarted = async () => {
     try {
-      await signIn('/priorities');
+      await signIn('/dashboard');
     } catch (error) {
       console.error('Sign in error:', error);
     }
