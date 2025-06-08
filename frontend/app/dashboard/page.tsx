@@ -923,21 +923,18 @@ const Dashboard: React.FC = () => {
             ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
               // Schedule Content
               <div className="space-y-4">
-                {/* Schedule Editor */}
-                <div className="rounded-lg shadow-lg px-8 py-6">
-                  <EditableSchedule
-                    tasks={scheduleDays[currentDayIndex] || []}
-                    onUpdateTask={handleScheduleTaskUpdate}
-                    onDeleteTask={handleScheduleTaskDelete}
-                    onReorderTasks={handleReorderTasks}
-                    layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
-                    onRequestSuggestions={handleRequestSuggestions}
-                    isLoadingSuggestions={isLoadingSuggestions}
-                    suggestionsMap={suggestionsMap}
-                    onAcceptSuggestion={handleAcceptSuggestion}
-                    onRejectSuggestion={handleRejectSuggestion}
-                  />
-                </div>
+                <EditableSchedule
+                  tasks={scheduleDays[currentDayIndex] || []}
+                  onUpdateTask={handleScheduleTaskUpdate}
+                  onDeleteTask={handleScheduleTaskDelete}
+                  onReorderTasks={handleReorderTasks}
+                  layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
+                  onRequestSuggestions={handleRequestSuggestions}
+                  isLoadingSuggestions={isLoadingSuggestions}
+                  suggestionsMap={suggestionsMap}
+                  onAcceptSuggestion={handleAcceptSuggestion}
+                  onRejectSuggestion={handleRejectSuggestion}
+                />
 
                 {/* AI Suggestions Loading State */}
                 {isLoadingSuggestions && (

@@ -34,7 +34,7 @@ const navigationItems = [
     id: "inputs",
     title: "Inputs",
     icon: Plus,
-    href: "/inputs",
+    href: "/dashboard/inputs",
     isActive: false,
   },
   {
