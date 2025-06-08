@@ -4,101 +4,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+
 @layer base {
   :root {
-    --background: 240 33% 98%;
-    --foreground: 240 10% 15%;
+    --dark-blue-gray: 215 25% 27%;
+    
+    --background: 0 0% 100%;
+    --foreground: var(--dark-blue-gray);
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 15%;
+    --card-foreground: var(--dark-blue-gray);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 15%;
+    --popover-foreground: var(--dark-blue-gray);
 
-    --primary: 250 80% 75%; /* Purple primary from new file */
-    --primary-foreground: 0 0% 100%;
+    --primary: 252 59% 81%;
+    --primary-foreground: var(--dark-blue-gray);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 13% 97%;
+    --secondary-foreground: var(--dark-blue-gray);
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 5% 40%;
+    --muted: 220 13% 97%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 252 59% 81%;
+    --accent-foreground: var(--dark-blue-gray);
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 240 6% 90%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 250 80% 75%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 252 59% 81%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Chart colors from original file */
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-
-    /* Sidebar styles from new file */
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-foreground: var(--dark-blue-gray);
+    --sidebar-primary: 252 59% 81%;
+    --sidebar-primary-foreground: var(--dark-blue-gray);
+    --sidebar-accent: 220 13% 95%;
+    --sidebar-accent-foreground: var(--dark-blue-gray);
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 252 59% 81%;
   }
 
   .dark {
-    --background: 240 10% 12%;
-    --foreground: 240 5% 98%;
+    --background: 215 28% 17%;
+    --foreground: 213 31% 91%;
 
-    --card: 240 10% 15%;
-    --card-foreground: 0 0% 98%;
+    --card: 215 28% 17%;
+    --card-foreground: 213 31% 91%;
 
-    --popover: 240 10% 15%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 215 28% 17%;
+    --popover-foreground: 213 31% 91%;
 
-    --primary: 250 80% 75%; /* Purple primary from new file */
-    --primary-foreground: 240 10% 4%;
+    --primary: 252 59% 81%;
+    --primary-foreground: 215 28% 17%;
 
-    --secondary: 240 7% 20%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 215 25% 27%;
+    --secondary-foreground: 213 31% 91%;
 
-    --muted: 240 7% 20%;
-    --muted-foreground: 240 5% 70%;
+    --muted: 215 25% 27%;
+    --muted-foreground: 217 10% 65%;
 
-    --accent: 240 7% 20%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 215 25% 27%;
+    --accent-foreground: 213 31% 91%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 213 31% 91%;
 
-    --border: 240 7% 25%;
-    --input: 240 7% 25%;
-    --ring: 250 80% 75%;
+    --border: 215 25% 27%;
+    --input: 215 25% 27%;
+    --ring: 252 59% 81%;
 
-    /* Chart colors from original file */
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-
-    /* Sidebar styles from new file */
-    --sidebar-background: 240 10% 15%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 250 80% 75%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 7% 20%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 7% 20%;
-    --sidebar-ring: 250 80% 75%;
+    --sidebar-background: 215 28% 17%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-primary: 252 59% 81%;
+    --sidebar-primary-foreground: 215 28% 17%;
+    --sidebar-accent: 215 25% 27%;
+    --sidebar-accent-foreground: 213 31% 91%;
+    --sidebar-border: 215 25% 27%;
+    --sidebar-ring: 252 59% 81%;
   }
 }
 
@@ -107,280 +95,167 @@
     @apply border-border;
   }
 
-  html {
-    @apply scroll-smooth;
-  }
-
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-  }
-
-  /* Glass panel styles from new file */
-  .glass-panel {
-    @apply bg-white/50 dark:bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-glass;
-  }
-
-  .glass-panel-dark {
-    @apply bg-black/30 backdrop-blur-md rounded-2xl border border-white/10 shadow-glass;
-  }
-
-  .neo-blur {
-    @apply bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 shadow-glass;
-  }
-
-  .neo-button {
-    @apply shadow-neolight hover:shadow-none transition-all duration-300 ease-in-out bg-white rounded-xl;
-  }
-
-  .shimmer {
-    @apply bg-gradient-to-r from-transparent via-white/20 to-transparent bg-[length:500px_100%] animate-shimmer;
+    @apply bg-background text-foreground font-medium;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   
-  .text-balance {
-    text-wrap: balance;
+  /* Override SVG colors globally */
+  svg {
+    @apply text-foreground;
+    stroke: hsl(var(--foreground));
   }
-
-  /* Add star background */
-  .stars-bg {
-    @apply relative;
-    background-image: radial-gradient(circle at 20% 50%, rgba(76, 0, 255, 0.15) 0%, rgba(76, 0, 255, 0) 25%), 
-                     radial-gradient(circle at 80% 80%, rgba(76, 0, 255, 0.1) 0%, rgba(76, 0, 255, 0) 25%);
+  
+  /* Override white text in components */
+  h1, h2, h3, h4, h5, h6, p, span, a, button, input, textarea, select, label {
+    @apply text-foreground;
+  }
+  
+  /* Override dropdown and drawer styling */
+  .dropdown-content, .drawer-content, .dialog-content, .sheet-content {
+    @apply bg-background text-foreground border-border;
+  }
+  
+  /* Fix for spinners and loaders */
+  .animate-spin {
+    @apply border-foreground;
   }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Z-index utilities from original file */
-  .z-drawer-overlay {
-    z-index: 50;
-  }
-  
-  .z-drawer-content {
-    z-index: 51;
-  }
-  
-  .z-main {
-    z-index: 1;
-  }
-}
-
+/* Apply styles to specific Tailwind-generated classes */
 @layer components {
-  .drawer-root {
-    @apply fixed inset-0 z-50;
+  /* Typography elements */
+  .typography-h3 {
+    @apply text-foreground;
   }
-
-  .drawer-background {
-    background-color: hsl(var(--background)); /* Added opacity for darker background */
-    opacity: 1 !important;
+  
+  /* Dropdown styling */
+  .dropdown-menu-content {
+    @apply bg-background text-foreground border-border;
   }
-
-  .drawer-overlay {
-    @apply fixed inset-0 bg-black/40 z-50;
-  }
-
+  
+  /* Drawer styling */
   .drawer-content {
-    @apply fixed inset-y-0 right-0 h-[75vh] w-full bg-background shadow-lg outline-none 
-    data-[state=closed]:animate-slideOutRight
-    data-[state=open]:animate-slideInRight;
-    opacity: 1 !important;
+    @apply bg-background text-foreground border-border;
+  }
+  
+  /* Task items */
+  .task-item {
+    @apply text-foreground;
+  }
+  
+  /* Button text */
+  .btn, .button {
+    @apply text-foreground;
   }
 
-  .main-content {
-    @apply relative z-[1] h-full;
+  /* Loading states */
+  .loading-container-lg {
+    @apply flex items-center justify-center h-64;
   }
-
-  .scroll-container {
-    @apply h-full overflow-y-auto overflow-x-hidden;
-    -webkit-overflow-scrolling: touch;
+  
+  .loading-container-sm {
+    @apply flex items-center justify-center h-20;
   }
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-muted/50 rounded-full dark:bg-white/5;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-primary/40 rounded-full transition-colors hover:bg-primary/60;
-}
-
-/* Animation keyframes */
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
+  
+  .loading-spinner-lg {
+    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-foreground;
   }
-  to {
-    transform: translateX(0);
+  
+  .loading-spinner-sm {
+    @apply h-6 w-6 animate-spin text-primary;
   }
-}
-
-@keyframes slideOutRight {
-  from {
-    transform: translateX(0);
+  
+  .loading-text {
+    @apply ml-2 text-sm text-muted-foreground;
   }
-  to {
-    transform: translateX(100%);
+  
+  /* Empty states */
+  .empty-state-container {
+    @apply flex flex-col items-center justify-center h-64 space-y-4;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+/* Custom gradients and effects */
+@layer utilities {
+  .gradient-purple {
+    background: linear-gradient(135deg, #b795ff 0%, #9966ff 100%);
   }
-  to {
-    opacity: 1;
+  
+  .gradient-purple-soft {
+    background: linear-gradient(135deg, #f3f0ff 0%, #e9d5ff 100%);
+  }
+  
+  .shadow-purple {
+    box-shadow: 0 4px 14px 0 rgba(155, 135, 245, 0.15);
+  }
+  
+  .border-purple {
+    border-color: #9b87f5;
+  }
+  
+  /* Force text colors */
+  .text-force-foreground {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Force SVG colors */
+  .svg-force-foreground {
+    stroke: hsl(var(--foreground)) !important;
+    fill: none !important;
+  }
+  
+  /* Force border colors */
+  .border-force-foreground {
+    border-color: hsl(var(--foreground)) !important;
+  }
+
+  .icon-xs {
+    @apply h-4 w-4;
+  }
+  
+  .icon-sm {
+    @apply h-5 w-5;
+  }
+  
+  .icon-md {
+    @apply h-6 w-6;
+  }
+  
+  /* Avatar sizing */
+  .avatar-sm {
+    @apply h-9 w-9;
+  }
+  
+  /* Dropdown width */
+  .dropdown-content-md {
+    @apply w-56;
+  }
+  
+  /* Margin utilities */
+  .mr-icon {
+    @apply mr-2;
+  }
+  
+  /* Sheet/drawer sizes */
+  .sheet-content-md {
+    @apply w-[400px] sm:w-[540px] p-0;
   }
 }
 
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+/* EditableSchedule component classes */
+.section-header {
+  @apply mt-3 mb-1;
 }
 
-/* Fade up animation from new file */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.suggestion-container {
+  @apply ml-6 my-2;
 }
 
-.animate-fade-up {
-  animation: fade-up 0.6s ease-out forwards;
+.suggestion-list {
+  @apply border-l-2 border-primary pl-4;
 }
 
-/* Custom animation classes from new file */
-.animate-delay-100 {
-  animation-delay: 100ms;
-}
-
-.animate-delay-200 {
-  animation-delay: 200ms;
-}
-
-.animate-delay-300 {
-  animation-delay: 300ms;
-}
-
-.animate-delay-400 {
-  animation-delay: 400ms;
-}
-
-.animate-delay-500 {
-  animation-delay: 500ms;
-}
-
-.animate-delay-600 {
-  animation-delay: 600ms;
-}
-
-.animate-delay-700 {
-  animation-delay: 700ms;
-}
-
-.animate-delay-1000 {
-  animation-delay: 1000ms;
-}
-
-/* Body scroll lock */
-body.drawer-open {
-  overflow: hidden;
-  padding-right: var(--scrollbar-width, 0px);
-}
-
-/* Calendar styles - preserved from original while using new color scheme */
-.react-calendar {
-  background-color: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.react-calendar__tile--now {
-  background-color: hsl(var(--secondary));
-}
-
-.react-calendar__tile--active {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-.react-calendar__navigation button {
-  color: hsl(var(--foreground));
-}
-
-.react-calendar__month-view__weekdays {
-  color: hsl(var(--muted-foreground));
-}
-
-/* Ensure proper stacking context for modals */
-.modal-root {
-  position: relative;
-  z-index: 40;
-}
-
-/* Prevent content shifting when modal opens */
-html.modal-open {
-  overflow: hidden;
-}
-
-/* Add smooth transitions for drawer */
-.drawer-transition {
-  transition: transform 0.3s ease-in-out;
-}
-
-/* Prevent text selection during drawer transitions */
-.drawer-content * {
-  user-select: none;
-}
-
-/* Reset text selection after transition */
-.drawer-content[data-state="open"] * {
-  user-select: text;
-}
-
-/* Ensure proper overlay behavior */
-.drawer-overlay[data-state="open"] {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.drawer-overlay[data-state="closed"] {
-  animation: fadeOut 0.2s ease-out;
-}
-
-/* Ensure body always has pointer events unless explicitly disabled */
-body {
-  pointer-events: auto !important;
-}
-
-/* Only disable pointer events on body when drawer is actually open */
-body[data-state="open"] {
-  pointer-events: none;
-}
-
-/* But keep pointer events enabled for the drawer content */
-.drawer-content {
-  pointer-events: auto !important;
-}
-
-/* Add styles for select dropdown to ensure proper z-index */
-.select-content {
-  z-index: 60 !important; /* Higher than drawer z-index */
+.schedule-start-container {
+  @apply mb-4;
 }

@@ -1,4 +1,4 @@
-# TASK-02: Google calendar integration 
+# TASK-02: Schedule generation optimisation
 Status: To do
 
 ## Current Progress

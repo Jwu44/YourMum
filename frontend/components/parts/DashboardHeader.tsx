@@ -164,7 +164,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             )}
           </Button>
   
-          <TypographyH3 className="text-white">
+          <TypographyH3 className="text-foreground">
             {formattedDate()}
           </TypographyH3>
             <div className="flex items-center gap-1 ml-2">
@@ -218,7 +218,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </DropdownMenuTrigger>
   
           <DropdownMenuContent
-            className="w-56 bg-[#1c1c1c] text-white border-gray-700"
+            className="w-56 bg-background text-foreground border-border"
             align="end"
             alignOffset={-5}
             sideOffset={5}
@@ -295,7 +295,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           open={isCalendarDrawerOpen} 
           onOpenChange={onCalendarDrawerOpenChange}
         >
-          <DrawerContent className="bg-[#1c1c1c] text-white border-t border-gray-700">
+          <DrawerContent className="bg-background text-foreground border-t border-border">
             <div className="flex justify-center items-center min-h-[20vh] py-2">
               <Calendar
                 mode="single"
