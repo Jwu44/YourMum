@@ -20,7 +20,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
            url.includes('code=') || 
            url.includes('state=') ||
            url.includes('oauth') ||
-           url.includes('firebase');
+           url.includes('firebase') ||
+           pathname.includes('/__/auth/iframe') ||
+           pathname.includes('/__/auth/handler');
   }, []);
   
   useEffect(() => {
