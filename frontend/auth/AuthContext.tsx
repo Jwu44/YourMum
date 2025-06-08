@@ -1,9 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut as firebaseSignOut, GoogleAuthProvider, UserCredential } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut as firebaseSignOut, GoogleAuthProvider } from 'firebase/auth';
 import { auth, provider } from './firebase';
-import { signInWithPopup, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { AuthContextType, CalendarCredentials } from '@/lib/types';
 import { calendarApi } from '@/lib/api/calendar';
 
@@ -33,8 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Process calendar access and connect to Google Calendar
    * @param credential Google Auth credential
    */
-  // Inside the processCalendarAccess function of AuthContext.tsx, modify the calendar connection code:
-
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
       // Get scopes and check for calendar access
@@ -47,10 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (hasCalendarAccess) {
         try {
-          // Ensure user is fully authenticated before proceeding
-          // This forces a small delay to ensure Firebase auth state is fully established
+          // Small delay to ensure Firebase auth state is fully established
           console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Create credentials object
           console.log("Connecting to Google Calendar...");
@@ -64,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await calendarApi.connectCalendar(credentials);
           console.log("Connected to Google Calendar");
           
-          // Fetch events for current day - only attempt if connection succeeded
+          // Fetch events for current day
           const today = new Date().toISOString().split('T')[0];
           await calendarApi.fetchEvents(today);
         } catch (calendarError) {
@@ -73,12 +70,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      // Navigate to dashboard
-      console.log("Navigating to dashboard");
-      window.location.href = '/dashboard';
+      // Get intended redirect destination
+      const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+      localStorage.removeItem('authRedirectDestination');
+      
+      // Navigate to intended destination
+      console.log("Navigating to:", redirectTo);
+      window.location.href = redirectTo;
     } catch (error) {
       console.error("Error processing calendar access:", error);
-      window.location.href = '/dashboard';
+      // Fallback to dashboard
+      const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+      localStorage.removeItem('authRedirectDestination');
+      window.location.href = redirectTo;
     }
   };
 
@@ -90,65 +94,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Get the token
       const idToken = await user.getIdToken();
-      console.log("Got ID token");
+      console.log("Got ID token for backend storage");
       
       // Check if NEXT_PUBLIC_API_URL is set correctly
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
-      console.log("API Base URL from env:", apiBaseUrl);
-      
-      // Now try the user endpoint
-      const apiUrl = `${apiBaseUrl}/api/auth/user`;
-      console.log("Attempting to store user at:", apiUrl);
-      
-      // Create a longer timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.error("Request to user endpoint timed out after 20 seconds");
-        controller.abort();
-      }, 20000);
-      
-      // Try to store the user
-      try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            googleId: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            hasCalendarAccess: true
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        console.log("User endpoint status:", response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Error storing user:', errorText);
-          return;
-        }
-        
-        const data = await response.json();
-        console.log("User stored successfully:", data);
-      } catch (error) {
-        clearTimeout(timeoutId);
-        console.error("Error storing user (non-blocking):", error);
-        console.log("Continuing without server-side user storage");
+      console.log("API Base URL:", apiBaseUrl);
+
+      const response = await fetch(`${apiBaseUrl}/api/auth/user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          googleId: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          hasCalendarAccess: false // Will be updated when calendar is connected
+        }),
+      });
+
+      if (response.ok) {
+        console.log("User stored in backend successfully");
+      } else {
+        console.error("Failed to store user in backend:", response.status);
       }
     } catch (error) {
-      console.error("Authentication process error:", error);
+      console.error("Error storing user in backend:", error);
     }
   };
 
-  // Handle Firebase auth state changes
+  // Listen for authentication state changes
   useEffect(() => {
-    console.log("Setting up auth state change listener");
+    console.log("Setting up auth state listener");
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
       
@@ -178,11 +158,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // User successfully signed in after redirect
           console.log("Redirect sign-in successful");
         
-          // Get credentials from result.credential
+          // Get credentials from result
           const credential = GoogleAuthProvider.credentialFromResult(result);
           if (!credential || !credential.accessToken) {
             console.error("Missing credential or access token");
-            window.location.href = '/dashboard';
+            // Get intended redirect destination
+            const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+            localStorage.removeItem('authRedirectDestination');
+            window.location.href = redirectTo;
             return;
           }
           
@@ -193,7 +176,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("Redirect sign-in error:", error);
         setError('Failed to sign in with Google');
-        window.location.href = '/dashboard';
+        // Get intended redirect destination
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        window.location.href = redirectTo;
       }
     };
     
@@ -209,7 +195,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       console.log("Starting sign in process, redirect destination:", redirectTo);
       
-      // Store the intended destination to access after authentication completes
+      // Check if user is already authenticated
+      if (user) {
+        console.log("User already authenticated, redirecting to:", redirectTo);
+        window.location.href = redirectTo;
+        return;
+      }
+      
+      // Store the intended destination
       localStorage.setItem('authRedirectDestination', redirectTo);
       console.log("Stored redirect destination in localStorage");
       
@@ -221,20 +214,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       console.log("Initiating signInWithPopup");
-      const result = await signInWithPopup(auth, provider);
-      console.log("Sign in successful:", result.user ? `${result.user.displayName} (${result.user.email})` : "No user");
       
-      // Get credentials from result
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential && credential.accessToken) {
-        await processCalendarAccess(credential);
-      } else {
-        window.location.href = '/dashboard';
+      try {
+        // Try popup first
+        const result = await signInWithPopup(auth, provider);
+        console.log("Sign in successful:", result.user ? 
+          `${result.user.displayName} (${result.user.email})` : "No user");
+        
+        // Get credentials from result
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential && credential.accessToken) {
+          await processCalendarAccess(credential);
+        } else {
+          // No calendar access, redirect anyway
+          const destination = localStorage.getItem('authRedirectDestination') || '/dashboard';
+          localStorage.removeItem('authRedirectDestination');
+          window.location.href = destination;
+        }
+      } catch (popupError: any) {
+        // If popup fails, try redirect as fallback
+        console.log("Popup failed, falling back to redirect:", popupError.message);
+        
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/cancelled-popup-request' ||
+            popupError.code === 'auth/popup-closed-by-user') {
+          
+          console.log("Using signInWithRedirect as fallback");
+          await signInWithRedirect(auth, provider);
+          // Note: signInWithRedirect doesn't return immediately
+          // The result will be handled by getRedirectResult in the useEffect
+        } else {
+          throw popupError;
+        }
       }
     } catch (error) {
       console.error('Sign in error:', error);
       setError('Failed to sign in with Google');
-      window.location.href = '/dashboard';
+      // Clean up localStorage on error
+      localStorage.removeItem('authRedirectDestination');
       throw error;
     }
   };
@@ -245,6 +262,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
+      // Clear any stored redirect destinations
+      localStorage.removeItem('authRedirectDestination');
       // Note: User state will be automatically set to null by onAuthStateChanged
     } catch (error) {
       console.error('Sign out error:', error);
