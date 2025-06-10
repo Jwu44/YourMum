@@ -1,6 +1,6 @@
 # Development Guidelines
 ## Workflow
-- Before implementation, thoroughly understand the context from `task.md` 
+- Before implementation, thoroughly understand the context from the attached task 
 - If requirements are unclear, ask clarifying questions until confident
 - Parse current task requirements, acceptance criteria, and dependencies
 - Validate changes against architectural constraints in `architecture.mermaid`
@@ -10,6 +10,8 @@
 - For each task:
   1. Create test files first
   2. Implement code to pass tests
+    a. Keep implementation SIMPLE whenever possible
+    b. Do not add any unnecessary or complex logic/functions 
   3. Update status on completion
 - Document complex logic with inline comments
 - Create reusable helper functions for common operations
@@ -23,7 +25,6 @@
 ## Code Style & Patterns
 
 ### General Rules
-- Keep logic SIMPLE whenever possible
 - Do not unnecessarily remove any comments or code
 - Implement proper error handling with try/catch (JS) or try/except (Python) blocks
 - Consider edge cases, performance optimization, and language/framework best practices

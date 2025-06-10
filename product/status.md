@@ -8,9 +8,10 @@
   - Parent-child task relationships with subtasks
   - Visual drag indicators for task reordering and indentation
 - Google Calendar API integration
+- Added left side navbar
 
 ## 🏗️ In Progress
-- Refaactor schedule generation round 2
+- Refactor schedule generation round 2
 
 ## Known Issues
 - Some performance bottlenecks with large schedule generation

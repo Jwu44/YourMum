@@ -8,46 +8,44 @@
 
 @layer base {
   :root {
-    --dark-blue-gray: 215 25% 27%;
-    
     --background: 0 0% 100%;
-    --foreground: var(--dark-blue-gray);
+    --foreground: 215 25% 27%;
 
     --card: 0 0% 100%;
-    --card-foreground: var(--dark-blue-gray);
+    --card-foreground: 215 25% 27%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: var(--dark-blue-gray);
+    --popover-foreground: 215 25% 27%;
 
-    --primary: 252 59% 81%;
-    --primary-foreground: var(--dark-blue-gray);
+    --primary: 251 91% 95%;
+    --primary-foreground: 215 25% 27%;
 
     --secondary: 220 13% 97%;
-    --secondary-foreground: var(--dark-blue-gray);
+    --secondary-foreground: 215 25% 27%;
 
     --muted: 220 13% 97%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 252 59% 81%;
-    --accent-foreground: var(--dark-blue-gray);
+    --accent: 251 91% 95%;
+    --accent-foreground: 215 25% 27%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 252 59% 81%;
+    --ring: 251 91% 95%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: var(--dark-blue-gray);
-    --sidebar-primary: 252 59% 81%;
-    --sidebar-primary-foreground: var(--dark-blue-gray);
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 251 91% 95%;
+    --sidebar-primary-foreground: 215 25% 27%;
     --sidebar-accent: 220 13% 95%;
-    --sidebar-accent-foreground: var(--dark-blue-gray);
+    --sidebar-accent-foreground: 215 25% 27%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 252 59% 81%;
+    --sidebar-ring: 251 91% 95%;
   }
 
   .dark {
@@ -60,7 +58,7 @@
     --popover: 215 28% 17%;
     --popover-foreground: 213 31% 91%;
 
-    --primary: 252 59% 81%;
+    --primary: 251 91% 95%;
     --primary-foreground: 215 28% 17%;
 
     --secondary: 215 25% 27%;
@@ -77,16 +75,16 @@
 
     --border: 215 25% 27%;
     --input: 215 25% 27%;
-    --ring: 252 59% 81%;
+    --ring: 251 91% 95%;
 
     --sidebar-background: 215 28% 17%;
     --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 252 59% 81%;
+    --sidebar-primary: 251 91% 95%;
     --sidebar-primary-foreground: 215 28% 17%;
     --sidebar-accent: 215 25% 27%;
     --sidebar-accent-foreground: 213 31% 91%;
     --sidebar-border: 215 25% 27%;
-    --sidebar-ring: 252 59% 81%;
+    --sidebar-ring: 251 91% 95%;
   }
 }
 
@@ -179,7 +177,7 @@
 /* Custom gradients and effects */
 @layer utilities {
   .gradient-purple {
-    background: linear-gradient(135deg, #b795ff 0%, #9966ff 100%);
+    background: linear-gradient(135deg, #9b87f5 0%, #7c3aed 100%);
   }
   
   .gradient-purple-soft {
@@ -193,69 +191,4 @@
   .border-purple {
     border-color: #9b87f5;
   }
-  
-  /* Force text colors */
-  .text-force-foreground {
-    color: hsl(var(--foreground)) !important;
-  }
-  
-  /* Force SVG colors */
-  .svg-force-foreground {
-    stroke: hsl(var(--foreground)) !important;
-    fill: none !important;
-  }
-  
-  /* Force border colors */
-  .border-force-foreground {
-    border-color: hsl(var(--foreground)) !important;
-  }
-
-  .icon-xs {
-    @apply h-4 w-4;
-  }
-  
-  .icon-sm {
-    @apply h-5 w-5;
-  }
-  
-  .icon-md {
-    @apply h-6 w-6;
-  }
-  
-  /* Avatar sizing */
-  .avatar-sm {
-    @apply h-9 w-9;
-  }
-  
-  /* Dropdown width */
-  .dropdown-content-md {
-    @apply w-56;
-  }
-  
-  /* Margin utilities */
-  .mr-icon {
-    @apply mr-2;
-  }
-  
-  /* Sheet/drawer sizes */
-  .sheet-content-md {
-    @apply w-[400px] sm:w-[540px] p-0;
-  }
-}
-
-/* EditableSchedule component classes */
-.section-header {
-  @apply mt-3 mb-1;
-}
-
-.suggestion-container {
-  @apply ml-6 my-2;
-}
-
-.suggestion-list {
-  @apply border-l-2 border-primary pl-4;
-}
-
-.schedule-start-container {
-  @apply mb-4;
 }

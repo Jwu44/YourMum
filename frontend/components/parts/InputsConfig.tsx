@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Reorder, motion } from 'framer-motion';
 
 // UI Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Icons
-import { Sun, Sunrise, Sunset, Moon, Flower, Clock, Target, CheckSquare, Calendar, LayoutGrid } from 'lucide-react';
+import { Sun, Sunrise, Sunset, Moon, Flower, Clock, Target, CheckSquare, LayoutGrid, Heart, Smile, Trophy, ActivitySquare } from 'lucide-react';
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout';
@@ -50,11 +51,25 @@ const taskOrderingOptions = [
 
 // Define priority options for draggable cards
 const defaultPriorities: Priority[] = [
-  { id: 'health', name: 'Health & Exercise', icon: Target, color: 'text-green-500' },
-  { id: 'relationships', name: 'Relationships', icon: Target, color: 'text-red-500' },
-  { id: 'fun_activities', name: 'Fun Activities', icon: Target, color: 'text-blue-500' },
-  { id: 'ambitions', name: 'Ambitions', icon: Target, color: 'text-yellow-500' },
+  { id: 'health', name: 'Health & Exercise', icon: ActivitySquare, color: 'text-green-500' },
+  { id: 'relationships', name: 'Relationships', icon: Heart, color: 'text-red-500' },
+  { id: 'fun_activities', name: 'Fun Activities', icon: Smile, color: 'text-blue-500' },
+  { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'text-yellow-500' },
 ];
+
+// Draggable card component for priorities
+const DraggableCard: React.FC<{ item: Priority }> = ({ item }) => {
+  return (
+    <motion.div layout className="mb-2.5">
+      <Card className="cursor-move">
+        <CardHeader className="flex flex-row items-center space-x-4 py-3">
+          <item.icon className={cn("w-4 h-4", item.color)} />
+          <p className="text-sm font-medium">{item.name}</p>
+        </CardHeader>
+      </Card>
+    </motion.div>
+  );
+};
 
 // Working days options
 const workingDays = [
@@ -69,20 +84,11 @@ const InputConfigurationPage: React.FC = () => {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [priorities, setPriorities] = useState(defaultPriorities);
 
   // Handle simple field changes
   const handleFieldChange = useCallback((field: string, value: any) => {
     dispatch({ type: 'UPDATE_FIELD', field, value });
-  }, [dispatch]);
-
-  // Handle nested field changes
-  const handleNestedChange = useCallback((field: string, subField: string, value: any) => {
-    dispatch({
-      type: 'UPDATE_NESTED_FIELD',
-      field,
-      subField,
-      value
-    });
   }, [dispatch]);
 
   // Handle working days checkbox changes
@@ -125,10 +131,29 @@ const InputConfigurationPage: React.FC = () => {
     handleLayoutChange('orderingPattern', value);
   }, [handleLayoutChange]);
 
+  // Handle priority reordering
+  const handleReorderPriorities = useCallback((newPriorities: Priority[]) => {
+    setPriorities(newPriorities);
+    
+    // Store the priority ranking in form context
+    // Convert to a ranked number list where index 0 = rank 1 (highest priority)
+    const rankedPriorities = newPriorities.reduce((acc, priority, index) => {
+      return {
+        ...acc,
+        [priority.id]: String(index + 1) // Convert to string to match existing structure
+      };
+    }, {});
+    
+    handleFieldChange('priorities', rankedPriorities);
+  }, [handleFieldChange]);
+
   // Handle save and generate schedule
   const handleSave = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Log the payload to ensure it matches backend expectations
+      console.log("Generating schedule with payload:", state);
+
       // Generate schedule with updated preferences
       await generateSchedule(state);
       
@@ -227,15 +252,14 @@ const InputConfigurationPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <Label className="text-base font-medium">Priority Order (Drag to reorder)</Label>
-              <div className="mt-4 space-y-2">
-                {defaultPriorities.map((priority) => (
-                  <Card key={priority.id} className="cursor-move">
-                    <CardHeader className="flex flex-row items-center space-x-4 py-3">
-                      <priority.icon className={cn("w-4 h-4", priority.color)} />
-                      <p className="text-sm font-medium">{priority.name}</p>
-                    </CardHeader>
-                  </Card>
-                ))}
+              <div className="mt-4">
+                <Reorder.Group axis="y" values={priorities} onReorder={handleReorderPriorities}>
+                  {priorities.map((item) => (
+                    <Reorder.Item key={item.id} value={item}>
+                      <DraggableCard item={item} />
+                    </Reorder.Item>
+                  ))}
+                </Reorder.Group>
               </div>
             </CardContent>
           </Card>
@@ -253,7 +277,7 @@ const InputConfigurationPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <Label className="text-base font-medium">Select your energy patterns</Label>
-              <div className="grid grid-cols-1 gap-3 mt-4">
+              <div className="grid grid-cols-1 gap-[10px] mt-4">
                 {energyOptions.map((option) => (
                   <Card
                     key={option.value}
@@ -263,9 +287,16 @@ const InputConfigurationPage: React.FC = () => {
                         ? "ring-2 ring-primary bg-accent"
                         : "hover:bg-accent/50"
                     )}
-                    onClick={() => handleEnergyChange(option.value)}
                   >
                     <CardHeader className="flex flex-row items-center space-x-4 py-3">
+                      <div className="flex items-center">
+                        <Checkbox
+                          id={`checkbox-${option.value}`}
+                          checked={(state.energy_patterns || []).includes(option.value)}
+                          onCheckedChange={() => handleEnergyChange(option.value)}
+                          className="mr-3"
+                        />
+                      </div>
                       <option.icon className="w-5 h-5" />
                       <p className="text-sm font-medium">{option.label}</p>
                     </CardHeader>
