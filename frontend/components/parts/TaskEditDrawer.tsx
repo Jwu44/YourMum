@@ -25,6 +25,7 @@ import {
   MonthWeek,
   RECURRENCE_OPTIONS 
 } from '../../lib/types';
+import { cn } from '@/lib/utils';
 
 interface TaskEditDrawerProps {
   isOpen: boolean;
@@ -65,7 +66,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     level: 0,
     section_index: 0,
     start_date: currentDate,
-    energy_level_required: 'medium'
   }), [currentDate]);
 
   // Initialize state with either empty task or existing task
@@ -194,15 +194,21 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }
   }, [getCurrentDayOfWeek, getWeekOfMonth]);
 
-  // Get category color
-  const getCategoryColor = (category: string): string => {
+  // Get category variant based on category name
+  const getCategoryVariant = (category: string) => {
     switch (category) {
-      case 'Work': return 'bg-blue-500';
-      case 'Fun': return 'bg-yellow-500';
-      case 'Relationships': return 'bg-purple-500';
-      case 'Ambition': return 'bg-orange-500';
-      case 'Exercise': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'Work':
+        return 'work';
+      case 'Fun':
+        return 'fun';
+      case 'Relationships':
+        return 'relationships';
+      case 'Ambition':
+        return 'ambition';
+      case 'Exercise':
+        return 'exercise';
+      default:
+        return undefined;
     }
   };
 
@@ -248,7 +254,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       modal={true}
     >
       <DrawerContent
-        className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-[#000000] shadow-lg outline-none"
+        className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-background shadow-lg outline-none"
         onPointerDownOutside={(e) => {
           e.preventDefault();
           handleClose();
@@ -256,12 +262,12 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       >
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
-            <DrawerTitle>Edit Task</DrawerTitle>
+            <DrawerTitle>Create New Task</DrawerTitle>
           </DrawerHeader>
           <div className="p-4 space-y-4">
             {/* Task Name */}
             <div>
-              <label htmlFor="text" className="block text-sm font-medium">
+              <label htmlFor="text" className="block text-sm font-medium text-foreground">
                 Task Name
               </label>
               <Input
@@ -275,32 +281,40 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 
             {/* Categories */}
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-foreground">
                 Categories
               </label>
               <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <Badge
-                    key={category}
-                    className={`cursor-pointer ${
-                      editedTask.categories?.includes(category)
-                        ? getCategoryColor(category)
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
-                    onClick={() => handleCategorySelect(category)}
-                  >
-                    {category}
-                    {editedTask.categories?.includes(category) && (
-                      <X className="ml-1 h-3 w-3" />
-                    )}
-                  </Badge>
-                ))}
+                {categories.map((category) => {
+                  const isSelected = editedTask.categories?.includes(category);
+                  return (
+                    <Badge
+                      key={category}
+                      variant={isSelected ? "default" : "outline"}
+                      className={cn(
+                        "cursor-pointer",
+                        isSelected && getCategoryVariant(category) === 'work' && "bg-blue-500 hover:bg-blue-400",
+                        isSelected && getCategoryVariant(category) === 'fun' && "bg-yellow-500 hover:bg-yellow-400",
+                        isSelected && getCategoryVariant(category) === 'relationships' && "bg-purple-500 hover:bg-purple-400",
+                        isSelected && getCategoryVariant(category) === 'ambition' && "bg-orange-500 hover:bg-orange-400",
+                        isSelected && getCategoryVariant(category) === 'exercise' && "bg-green-500 hover:bg-green-400",
+                        !isSelected && "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      )}
+                      onClick={() => handleCategorySelect(category)}
+                    >
+                      {category}
+                      {isSelected && (
+                        <X className="ml-1 h-3 w-3" />
+                      )}
+                    </Badge>
+                  );
+                })}
               </div>
             </div>
 
             {/* Time Fields */}
             <div>
-              <label htmlFor="start_time" className="block text-sm font-medium">
+              <label htmlFor="start_time" className="block text-sm font-medium text-foreground">
                 Start Time
               </label>
               <Input
@@ -312,7 +326,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
               />
             </div>
             <div>
-              <label htmlFor="end_time" className="block text-sm font-medium">
+              <label htmlFor="end_time" className="block text-sm font-medium text-foreground">
                 End Time
               </label>
               <Input
@@ -326,7 +340,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 
             {/* Recurrence Selection */}
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-foreground">
                 Repeat every...
               </label>
               <Select
@@ -338,7 +352,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select recurrence" />
                 </SelectTrigger>
-                <SelectContent className="select-content">
+                <SelectContent className="select-content bg-background">
                   {RECURRENCE_OPTIONS.map((option) => (
                     <SelectItem 
                       key={option.value} 
@@ -354,7 +368,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 
           {/* Footer */}
           <DrawerFooter>
-            <Button onClick={handleSave}>Save</Button>
+            <Button onClick={handleSave}>Create</Button>
           </DrawerFooter>
         </div>
       </DrawerContent>

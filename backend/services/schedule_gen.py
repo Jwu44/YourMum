@@ -1,0 +1,511 @@
+"""
+Optimized AI Service Module - Workflow-based schedule generation
+
+This module implements an optimized data preparation pipeline that:
+1. Preserves task identity throughout processing
+2. Minimizes LLM calls (max 2: categorization + ordering)
+3. Eliminates redundant task conversions
+4. Uses structured JSON responses instead of text parsing
+"""
+
+import os
+import json
+import uuid
+import anthropic
+from typing import List, Dict, Any, Tuple
+from backend.models.task import Task
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Anthropic client
+anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+client = anthropic.Anthropic(api_key=anthropic_api_key)
+
+
+def create_task_registry(input_tasks: List[Any]) -> Tuple[Dict[str, Task], List[Task]]:
+    """
+    Create a task registry and identify uncategorized tasks.
+    
+    Args:
+        input_tasks: List of task dictionaries or Task objects
+        
+    Returns:
+        Tuple of (task_registry, uncategorized_tasks)
+    """
+    task_registry = {}
+    uncategorized_tasks = []
+    
+    for task_data in input_tasks:
+        # Convert to Task object if needed
+        if isinstance(task_data, dict):
+            # Ensure task has an ID
+            if not task_data.get('id'):
+                task_data['id'] = str(uuid.uuid4())
+            task = Task.from_dict(task_data)
+        else:
+            task = task_data
+        
+        # Add to registry
+        task_registry[task.id] = task
+        
+        # Check if task needs categorization
+        if not task.categories or len(task.categories) == 0:
+            uncategorized_tasks.append(task)
+    
+    return task_registry, uncategorized_tasks
+
+
+def categorize_uncategorized_tasks(
+    uncategorized_tasks: List[Task], 
+    task_registry: Dict[str, Task]
+) -> bool:
+    """
+    Batch categorize uncategorized tasks using a single LLM call.
+    
+    Args:
+        uncategorized_tasks: List of tasks needing categorization
+        task_registry: Registry to update with categorizations
+        
+    Returns:
+        Boolean indicating success
+    """
+    if not uncategorized_tasks:
+        return True
+    
+    try:
+        # Create batch categorization prompt
+        prompt = create_batch_categorization_prompt(uncategorized_tasks)
+        
+        # Call Claude API
+        response = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=500,
+            temperature=0.2,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        # Parse response
+        response_data = json.loads(response.content[0].text.strip())
+        categorizations = response_data.get("categorizations", [])
+        
+        # Update task registry
+        for cat_data in categorizations:
+            task_id = cat_data.get("task_id")
+            categories = cat_data.get("categories", ["Work"])
+            
+            if task_id in task_registry:
+                task_registry[task_id].categories = categories
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in batch categorization: {str(e)}")
+        
+        # Fallback: assign 'Work' category to all uncategorized tasks
+        for task in uncategorized_tasks:
+            task_registry[task.id].categories = ["Work"]
+        
+        return False
+
+
+def create_batch_categorization_prompt(tasks: List[Task]) -> str:
+    """
+    Create a prompt for batch task categorization.
+    
+    Args:
+        tasks: List of tasks to categorize
+        
+    Returns:
+        Formatted prompt string
+    """
+    task_list = []
+    for task in tasks:
+        task_list.append(f'"{task.id}": "{task.text}"')
+    
+    tasks_json = "{\n" + ",\n".join(task_list) + "\n}"
+    
+    prompt = f"""Categorize the following tasks into these categories:
+        1. Exercise - physical activities like walking, running, swimming, gym, etc.
+        2. Relationships - activities with friends, family, colleagues, etc.
+        3. Fun - personal hobbies, entertainment, shopping, etc.
+        4. Ambition - short or long term goals someone wants to achieve
+        5. Work - professional tasks, meetings, emails, etc.
+
+        Tasks to categorize:
+        {tasks_json}
+
+        Rules:
+        - Each task can belong to multiple categories
+        - If a task is categorized as 'Work', it should not have other categories
+        - Respond only with valid JSON in this exact format:
+
+        {{
+            "categorizations": [
+                {{"task_id": "task_id_1", "categories": ["Category1", "Category2"]}},
+                {{"task_id": "task_id_2", "categories": ["Category1"]}}
+            ]
+    }}"""
+
+    return prompt
+
+
+def generate_local_sections(layout_preference: Dict[str, Any]) -> List[str]:
+    """
+    Generate schedule sections based on layout preferences.
+    
+    Args:
+        layout_preference: User's layout configuration
+        
+    Returns:
+        List of section names
+    """
+    subcategory = layout_preference.get("subcategory", "day-sections")
+    
+    if subcategory == "day-sections":
+        return ["Morning", "Afternoon", "Evening"]
+    elif subcategory == "priority":
+        return ["High Priority", "Medium Priority", "Low Priority"]
+    elif subcategory == "category":
+        return ["Work", "Exercise", "Relationships", "Fun", "Ambition"]
+    else:
+        # Default fallback
+        return ["Morning", "Afternoon", "Evening"]
+
+
+def create_ordering_prompt(
+    task_registry: Dict[str, Task], 
+    sections: List[str], 
+    user_data: Dict[str, Any]
+) -> str:
+    """
+    Create a prompt for task ordering and placement.
+    
+    Args:
+        task_registry: Registry of all tasks
+        sections: Available sections for placement
+        user_data: User preferences and constraints
+        
+    Returns:
+        Formatted prompt string
+    """
+    # Prepare task summaries
+    task_summaries = []
+    for task_id, task in task_registry.items():
+        task_summaries.append({
+            "id": task_id,
+            "text": task.text,
+            "categories": list(task.categories) if task.categories else []
+        })
+    
+    # Extract user preferences
+    energy_patterns = ', '.join(user_data.get('energy_patterns', []))
+    work_schedule = f"{user_data.get('work_start_time', '9:00 AM')} - {user_data.get('work_end_time', '5:00 PM')}"
+    priorities = user_data.get('priorities', {})
+    
+    # Format priorities
+    priority_text = ", ".join([f"{k}: {v}" for k, v in priorities.items()])
+    
+    prompt = f"""You are a productivity expert. Place the following tasks into the most optimal sections and order based on user preferences.
+
+    User Context:
+    - Work Schedule: {work_schedule}
+    - Energy Patterns: {energy_patterns}
+    - Priorities: {priority_text}
+
+    Available Sections: {', '.join(sections)}
+
+    Tasks to place:
+    {json.dumps(task_summaries, indent=2)}
+
+    Instructions:
+    1. Assign each task to the most appropriate section
+    2. Determine the optimal order within each section
+    3. Consider energy patterns, work schedule, and priorities
+    4. Work tasks should be placed during work hours when possible
+    5. High-energy tasks should align with high-energy periods
+
+    Respond with valid JSON in this exact format:
+    {{
+        "placements": [
+            {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
+            {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+        ]
+    }}"""
+
+    return prompt
+
+
+def process_ordering_response(response_text: str) -> List[Dict[str, Any]]:
+    """
+    Process the LLM ordering response into placement instructions.
+    
+    Args:
+        response_text: Raw LLM response
+        
+    Returns:
+        List of placement instructions
+    """
+    try:
+        # Extract JSON from response
+        response_data = json.loads(response_text.strip())
+        placements = response_data.get("placements", [])
+        
+        # Validate placement structure
+        validated_placements = []
+        for placement in placements:
+            if all(key in placement for key in ["task_id", "section", "order"]):
+                validated_placements.append(placement)
+        
+        return validated_placements
+        
+    except json.JSONDecodeError as e:
+        print(f"Error parsing ordering response: {str(e)}")
+        return []
+    except Exception as e:
+        print(f"Error processing ordering response: {str(e)}")
+        return []
+
+
+def assemble_final_schedule(
+    placements: List[Dict[str, Any]],
+    task_registry: Dict[str, Task],
+    sections: List[str],
+    layout_preference: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Assemble the final schedule from placement instructions and original tasks.
+    
+    Args:
+        placements: Task placement instructions
+        task_registry: Original task objects
+        sections: Section names
+        layout_preference: User layout preferences
+        
+    Returns:
+        Final schedule data
+    """
+    try:
+        # Organize placements by section
+        section_tasks = {section: [] for section in sections}
+        placed_task_ids = set()
+        
+        for placement in placements:
+            task_id = placement["task_id"]
+            section = placement["section"]
+            order = placement.get("order", 999)
+            
+            if task_id in task_registry and section in section_tasks:
+                section_tasks[section].append((order, task_registry[task_id]))
+                placed_task_ids.add(task_id)
+        
+        # Sort tasks within each section by order
+        for section in section_tasks:
+            section_tasks[section].sort(key=lambda x: x[0])
+        
+        # Build final task list
+        final_tasks = []
+        
+        for section in sections:
+            # Add section header
+            section_task = {
+                "id": str(uuid.uuid4()),
+                "text": section,
+                "categories": [],
+                "is_section": True,
+                "completed": False,
+                "section": None,
+                "parent_id": None,
+                "level": 0,
+                "type": "section"
+            }
+            final_tasks.append(section_task)
+            
+            # Add tasks in this section
+            for order, task in section_tasks[section]:
+                task_dict = {
+                    "id": task.id,
+                    "text": task.text,
+                    "categories": list(task.categories) if task.categories else [],
+                    "is_section": False,
+                    "completed": getattr(task, 'completed', False),
+                    "section": section,
+                    "parent_id": None,
+                    "level": 0,
+                    "type": "task"
+                }
+                final_tasks.append(task_dict)
+        
+        # Add any unplaced tasks to the end
+        unplaced_tasks = [
+            task for task_id, task in task_registry.items() 
+            if task_id not in placed_task_ids
+        ]
+        
+        if unplaced_tasks:
+            # Add "Other Tasks" section if needed
+            other_section = {
+                "id": str(uuid.uuid4()),
+                "text": "Other Tasks",
+                "categories": [],
+                "is_section": True,
+                "completed": False,
+                "section": None,
+                "parent_id": None,
+                "level": 0,
+                "type": "section"
+            }
+            final_tasks.append(other_section)
+            
+            for task in unplaced_tasks:
+                task_dict = {
+                    "id": task.id,
+                    "text": task.text,
+                    "categories": list(task.categories) if task.categories else [],
+                    "is_section": False,
+                    "completed": getattr(task, 'completed', False),
+                    "section": "Other Tasks",
+                    "parent_id": None,
+                    "level": 0,
+                    "type": "task"
+                }
+                final_tasks.append(task_dict)
+        
+        return {
+            "success": True,
+            "tasks": final_tasks,
+            "layout_type": layout_preference.get("layout", "todolist-structured"),
+            "ordering_pattern": layout_preference.get("orderingPattern", "timebox")
+        }
+        
+    except Exception as e:
+        print(f"Error assembling final schedule: {str(e)}")
+        return create_error_response(e, layout_preference, list(task_registry.values()))
+
+
+def create_error_response(
+    error: Exception, 
+    layout_preference: Dict[str, Any], 
+    original_tasks: List[Task]
+) -> Dict[str, Any]:
+    """
+    Create error response with original tasks in order.
+    
+    Args:
+        error: Exception that occurred
+        layout_preference: User layout preferences
+        original_tasks: Original task objects
+        
+    Returns:
+        Error response with fallback schedule
+    """
+    # Return tasks in original order as fallback
+    fallback_tasks = []
+    for task in original_tasks:
+        task_dict = {
+            "id": task.id,
+            "text": task.text,
+            "categories": list(task.categories) if task.categories else [],
+            "is_section": False,
+            "completed": getattr(task, 'completed', False),
+            "section": None,
+            "parent_id": None,
+            "level": 0,
+            "type": "task"
+        }
+        fallback_tasks.append(task_dict)
+    
+    return {
+        "success": False,
+        "tasks": fallback_tasks,
+        "layout_type": layout_preference.get("layout", "todolist-structured"),
+        "ordering_pattern": layout_preference.get("orderingPattern", "timebox"),
+        "error": str(error)
+    }
+
+
+def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate a personalized schedule using the optimized workflow-based approach.
+    
+    This is the main entry point that replaces the original generate_schedule function.
+    It implements the optimized pipeline that preserves task identity and minimizes
+    LLM calls while maintaining the same API interface.
+    
+    Args:
+        user_data: Dictionary containing user preferences and tasks
+        
+    Returns:
+        Dictionary containing the generated schedule with structured data
+    """
+    try:
+        # Step 1: Create task registry and identify uncategorized tasks
+        input_tasks = user_data.get('tasks', [])
+        task_registry, uncategorized_tasks = create_task_registry(input_tasks)
+        
+        if not task_registry:
+            # Handle empty task list
+            return {
+                "success": True,
+                "tasks": [],
+                "layout_type": user_data.get('layout_preference', {}).get('layout', 'todolist-structured'),
+                "ordering_pattern": user_data.get('layout_preference', {}).get('orderingPattern', 'timebox')
+            }
+        
+        # Step 2: Categorize uncategorized tasks (single LLM call)
+        categorization_success = categorize_uncategorized_tasks(uncategorized_tasks, task_registry)
+        if not categorization_success:
+            print("Warning: Categorization failed, using default categories")
+        
+        # Step 3: Generate sections locally based on layout preferences
+        layout_preference = user_data.get('layout_preference', {})
+        sections = generate_local_sections(layout_preference)
+        
+        # Step 4: Create ordering prompt and call LLM (single LLM call)
+        ordering_prompt = create_ordering_prompt(task_registry, sections, user_data)
+        
+        ordering_response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            temperature=0.7,
+            messages=[{"role": "user", "content": ordering_prompt}]
+        )
+        
+        # Step 5: Process ordering response
+        placements = process_ordering_response(ordering_response.content[0].text)
+        
+        if not placements:
+            print("Warning: Ordering failed, using original task order")
+            # Create default placements
+            placements = []
+            for i, (task_id, task) in enumerate(task_registry.items()):
+                section_idx = i % len(sections)
+                placements.append({
+                    "task_id": task_id,
+                    "section": sections[section_idx],
+                    "order": i + 1
+                })
+        
+        # Step 6: Assemble final schedule
+        result = assemble_final_schedule(placements, task_registry, sections, layout_preference)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in optimized schedule generation: {str(e)}")
+        # Handle case where task_registry might not be defined
+        original_tasks = []
+        if 'task_registry' in locals():
+            original_tasks = list(task_registry.values())
+        else:
+            # Fallback: convert input tasks to Task objects
+            for task_data in user_data.get('tasks', []):
+                if isinstance(task_data, dict):
+                    if not task_data.get('id'):
+                        task_data['id'] = str(uuid.uuid4())
+                    original_tasks.append(Task.from_dict(task_data))
+                else:
+                    original_tasks.append(task_data)
+        
+        return create_error_response(e, user_data.get('layout_preference', {}), original_tasks)

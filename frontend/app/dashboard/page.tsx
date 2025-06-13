@@ -23,7 +23,7 @@ import {
   Task, 
   Priority, 
   AISuggestion, 
-  GetAISuggestionsResponse 
+  GetAISuggestionsResponse
 } from '../../lib/types';
 
 // Helpers
@@ -36,14 +36,9 @@ import {
   formatDateToString
 } from '@/lib/helper';
 
-// New Schedule Helpers
-import {
-  loadScheduleForDate,
-  updateScheduleForDate,
-  generateSchedule,
-} from '@/lib/ScheduleHelper';
-
+// Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
+import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
 
 const initialPriorities: Priority[] = [
     { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
@@ -60,19 +55,17 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { state, dispatch } = useForm();
   const { toast } = useToast();
-  // Removed shouldUpdateSchedule and isInitialSchedule states as they're no longer needed
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
   const [isCalendarDrawerOpen, setIsCalendarDrawerOpen] = useState(false);
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  // Add these state variables after other state declarations
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [shownSuggestionIds] = useState<Set<string>>(new Set()); // Resets on page refresh
+  const [shownSuggestionIds] = useState<Set<string>>(new Set());
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());  // Initialize with today's date
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   
   useEffect(() => {
     const date = new Date();
@@ -83,8 +76,6 @@ const Dashboard: React.FC = () => {
 
   const addTask = useCallback(async (taskData?: Partial<Task>) => {
     try {
-      // If taskData is provided (from TaskEditDrawer), use its text
-      // Otherwise use newTask state (from DashboardLeftCol)
       const taskText = taskData?.text || newTask.trim();
       
       if (!taskText) return;
@@ -95,48 +86,39 @@ const Dashboard: React.FC = () => {
         taskData?.categories || []
       );
   
-      // Get the newly created task
       const newTaskObj = updatedTasks[updatedTasks.length - 1];
   
-      // If taskData exists (from TaskEditDrawer), merge additional fields
       const finalTask = taskData ? {
         ...newTaskObj,
         start_time: taskData.start_time,
         end_time: taskData.end_time,
         is_recurring: taskData.is_recurring,
-        start_date: getDateString(currentDayIndex), // Use currently viewed date
+        start_date: getDateString(currentDayIndex),
       } : newTaskObj;
   
-      // Update tasks state
       dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
   
-      // If task is created from TaskEditDrawer, add it to current schedule
       if (taskData) {
         setScheduleDays(prevDays => {
           const newDays = [...prevDays];
           if (newDays[currentDayIndex]) {
             newDays[currentDayIndex] = [finalTask, ...newDays[currentDayIndex]];
+          } else {
+            while (newDays.length <= currentDayIndex) {
+              newDays.push([]);
+            }
+            newDays[currentDayIndex] = [finalTask];
           }
           return newDays;
         });
   
-        // Update schedule cache
-        const currentDate = getDateString(currentDayIndex);
-        setScheduleCache(prevCache => {
-          const newCache = new Map(prevCache);
-          const currentTasks = prevCache.get(currentDate) || [];
-          newCache.set(currentDate, [finalTask, ...currentTasks]);
-          return newCache;
-        });
-  
-        // Sync with backend
-        await updateScheduleForDate(
+        const updatedTasks = [finalTask, ...(scheduleDays[currentDayIndex] || [])];
+        await updateSchedule(
           getDateString(currentDayIndex),
-          scheduleDays[currentDayIndex]
+          updatedTasks
         );
       }
   
-      // Clear input if it's from DashboardLeftCol
       if (!taskData) {
         setNewTask('');
       }
@@ -200,23 +182,18 @@ const Dashboard: React.FC = () => {
     });
   }, [dispatch]);
 
-  // Updated handleSubmit to use the refactored generateSchedule function
+  // Optimized handleSubmit - direct API call, no ScheduleHelper processing
   const handleSubmit = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Use the existing orderingPattern or default to timebox
-      const orderingPattern = state.layout_preference?.orderingPattern 
-        ? state.layout_preference.orderingPattern 
-        : 'timebox';
+      const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
         
-      // Ensure layout preference is properly structured
       const enhancedPreference = {
         layout: state.layout_preference?.layout || 'todolist-structured',
         subcategory: state.layout_preference?.subcategory || 'day-sections',
         orderingPattern
       };
       
-      // Create a complete form data object with all necessary fields
       const formData = {
         ...state,
         tasks: state.tasks || [],
@@ -232,7 +209,7 @@ const Dashboard: React.FC = () => {
         energy_patterns: state.energy_patterns || []
       };
             
-      // Generate schedule using the refactored function, passing existing response if available
+      // Direct API call - no ScheduleHelper processing
       const schedule = await generateSchedule(formData);
       
       if (!schedule || !schedule.tasks || schedule.tasks.length === 0) {
@@ -244,18 +221,13 @@ const Dashboard: React.FC = () => {
         return;
       }
       
-      // Update the schedule in the UI
+      // Direct usage - tasks are already perfectly structured by optimized backend
       setScheduleDays([schedule.tasks]);
       setCurrentDayIndex(0);
-      
-      // Add this debug line
-      console.log("Updated schedule state:", scheduleDays, currentDayIndex);
 
-      // Save schedule to backend
       const currentDate = getDateString(0);
-      await updateScheduleForDate(currentDate, schedule.tasks);
+      await updateSchedule(currentDate, schedule.tasks);
       
-      // Update schedule cache
       setScheduleCache(prevCache => new Map(prevCache).set(currentDate, schedule.tasks));
 
       toast({
@@ -272,9 +244,8 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [state, toast, currentDayIndex, scheduleDays]);  
+  }, [state, toast, currentDayIndex]);  
 
-  // Helper function to get date string for a specific day offset
   const getDateString = (offset: number): string => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
@@ -285,7 +256,6 @@ const Dashboard: React.FC = () => {
     try {
       const currentDate = getDateString(currentDayIndex);
       
-      // Update local state
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         if (newDays[currentDayIndex]) {
@@ -293,15 +263,12 @@ const Dashboard: React.FC = () => {
           const taskIndex = currentTasks.findIndex(t => t.id === updatedTask.id);
           
           if (taskIndex !== -1) {
-            // Update existing task
             newDays[currentDayIndex] = currentTasks.map(task => 
               task.id === updatedTask.id ? { ...task, ...updatedTask } : task
             );
           } else {
-            // Handle new subtask
             const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id);
             if (parentIndex !== -1) {
-              // Insert after parent and existing siblings
               const insertIndex = parentIndex + 1 + currentTasks
                 .slice(0, parentIndex + 1)
                 .filter(t => t.parent_id === updatedTask.parent_id).length;
@@ -315,20 +282,17 @@ const Dashboard: React.FC = () => {
         return newDays;
       });
   
-      // Update cache with the same logic
       setScheduleCache(prevCache => {
         const newCache = new Map(prevCache);
         const currentTasks = prevCache.get(currentDate) || [];
         const taskIndex = currentTasks.findIndex(t => t.id === updatedTask.id);
         
         if (taskIndex !== -1) {
-          // Update existing task
           const updatedTasks = currentTasks.map(task =>
             task.id === updatedTask.id ? { ...task, ...updatedTask } : task
           );
           newCache.set(currentDate, updatedTasks);
         } else {
-          // Handle new subtask
           const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id);
           if (parentIndex !== -1) {
             const insertIndex = parentIndex + 1 + currentTasks
@@ -343,8 +307,7 @@ const Dashboard: React.FC = () => {
         return newCache;
       });
   
-      // Persist changes to database
-      const updateResult = await updateScheduleForDate(
+      const updateResult = await updateSchedule(
         currentDate, 
         scheduleDays[currentDayIndex]
       );
@@ -353,7 +316,6 @@ const Dashboard: React.FC = () => {
         throw new Error(updateResult.error || 'Failed to update schedule');
       }
   
-      // Show success toast for new subtasks
       if (!scheduleDays[currentDayIndex].find(t => t.id === updatedTask.id)) {
         toast({
           title: "Success",
@@ -392,7 +354,6 @@ const Dashboard: React.FC = () => {
     const nextDayDate = getDateString(currentDayIndex + 1);
     console.log('Next day date:', nextDayDate);
     
-    // First check if we have this day's schedule in cache
     if (scheduleCache.has(nextDayDate)) {
       setScheduleDays(prevDays => [...prevDays, scheduleCache.get(nextDayDate)!]);
       setCurrentDayIndex(prevIndex => prevIndex + 1);
@@ -400,26 +361,17 @@ const Dashboard: React.FC = () => {
     }
   
     try {
-      // Try to load existing schedule
-      const existingSchedule = await loadScheduleForDate(nextDayDate);
+      const existingSchedule = await loadSchedule(nextDayDate);
       
       if (existingSchedule.success && existingSchedule.schedule) {
-        // Use existing schedule
         const nextDaySchedule = existingSchedule.schedule;
         setScheduleDays(prevDays => [...prevDays, nextDaySchedule]);
         setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, nextDaySchedule));
       } else {
-        // Generate new schedule if none exists
-        // Start with current tasks and recurring items from today's schedule
         const currentSchedule = scheduleDays[currentDayIndex];
-        
-        // Filter out recurring tasks from current schedule
         const recurringTasks = currentSchedule.filter(task => task.is_recurring);
         
-        // Use the existing orderingPattern or default to timebox
-        const orderingPattern = state.layout_preference?.orderingPattern 
-          ? state.layout_preference.orderingPattern 
-          : 'timebox';
+        const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
           
         const enhancedPreference = {
           layout: state.layout_preference?.layout || 'todolist-structured',
@@ -427,7 +379,6 @@ const Dashboard: React.FC = () => {
           orderingPattern
         };
         
-        // Create complete form data with recurring tasks included
         const formData = {
           ...state,
           tasks: [...state.tasks || [], ...recurringTasks],
@@ -443,12 +394,10 @@ const Dashboard: React.FC = () => {
           energy_patterns: state.energy_patterns || []
         };
         
-        // Generate new schedule with complete form data
-        // We don't pass existing response here since we want a fresh schedule for the next day
+        // Direct API call for next day
         const result = await generateSchedule(formData);
         
         if (result.tasks && result.tasks.length > 0) {
-          // Update with next day's date
           const tasksWithDate = result.tasks.map(task => ({
             ...task,
             start_date: nextDayDate
@@ -457,14 +406,12 @@ const Dashboard: React.FC = () => {
           setScheduleDays(prevDays => [...prevDays, tasksWithDate]);
           setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, tasksWithDate));
           
-          // Save the new schedule to the backend
-          await updateScheduleForDate(nextDayDate, tasksWithDate);
+          await updateSchedule(nextDayDate, tasksWithDate);
         } else {
           throw new Error('Failed to generate next day schedule');
         }
       }
       
-      // Update both currentDayIndex and date
       setCurrentDayIndex(prevIndex => prevIndex + 1);
       setDate(new Date(nextDayDate));
       
@@ -484,12 +431,11 @@ const Dashboard: React.FC = () => {
 
   const handlePreviousDay = useCallback(() => {
     if (currentDayIndex > 0) {
-      // Get previous day's date
       const prevDate = new Date(date!);
       prevDate.setDate(prevDate.getDate() - 1);
       
       setCurrentDayIndex(prevIndex => prevIndex - 1);
-      setDate(prevDate);  // Update the date state
+      setDate(prevDate);
     }
   }, [currentDayIndex, date]);
 
@@ -498,7 +444,6 @@ const Dashboard: React.FC = () => {
     handleEnergyChange(dispatch, currentPatterns)(value);
   }, [dispatch, state.energy_patterns]);
 
-  // 2. Modify handleDateSelect to first try loading calendar events
   const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
     if (!newDate) {
       setIsDropdownOpen(false);
@@ -509,7 +454,6 @@ const Dashboard: React.FC = () => {
     try {
       const dateStr = formatDateToString(newDate);
       
-      // Calculate date differences for index
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const selectedDate = new Date(newDate);
@@ -517,16 +461,13 @@ const Dashboard: React.FC = () => {
       const diffTime = selectedDate.getTime() - today.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-      // Always update the date states
       setCurrentDayIndex(diffDays);
       setDate(newDate);
       setCurrentDate(newDate);
 
-      // First, try to get calendar events
       const calendarResponse = await calendarApi.fetchEvents(dateStr);
 
       if (calendarResponse.success && calendarResponse.tasks.length > 0) {
-        // Update schedule with calendar events
         setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarResponse.tasks));
         setScheduleDays(prevDays => {
           const newDays = [...prevDays];
@@ -540,11 +481,10 @@ const Dashboard: React.FC = () => {
         });
         return;
       }
-      // Fallback: try to load local schedule data
-      const existingSchedule = await loadScheduleForDate(dateStr);
+
+      const existingSchedule = await loadSchedule(dateStr);
       
       if (existingSchedule.success && existingSchedule.schedule) {
-        // Update with local schedule data
         setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
         setScheduleDays(prevDays => {
           const newDays = [...prevDays];
@@ -557,7 +497,6 @@ const Dashboard: React.FC = () => {
           description: "Schedule loaded successfully",
         });
       } else {
-        // No schedule found
         setScheduleDays(prevDays => {
           const newDays = [...prevDays];
           newDays[diffDays] = [];
@@ -584,29 +523,25 @@ const Dashboard: React.FC = () => {
     }
   }, [setDate, toast]);
 
-  // Handle magic wand click
   const handleRequestSuggestions = useCallback(async () => {
     setIsLoadingSuggestions(true);
     
     try {
       const currentDate = getDateString(currentDayIndex);
       
-      // Fetch new suggestions
       const response: GetAISuggestionsResponse = await fetchAISuggestions(
-        state.name, // userId
+        state.name,
         currentDate,
-        scheduleDays[currentDayIndex] || [], // current schedule
-        scheduleDays.slice(Math.max(0, currentDayIndex - 14), currentDayIndex), // Last 14 days
+        scheduleDays[currentDayIndex] || [],
+        scheduleDays.slice(Math.max(0, currentDayIndex - 14), currentDayIndex),
         state.priorities || {},
         state.energy_patterns || []
       );
 
-      // Filter out previously shown suggestions
       const newSuggestions = response.suggestions.filter(
         suggestion => !shownSuggestionIds.has(suggestion.id)
       );
 
-      // Update shown suggestions tracking
       newSuggestions.forEach(suggestion => {
         shownSuggestionIds.add(suggestion.id);
       });
@@ -635,12 +570,10 @@ const Dashboard: React.FC = () => {
     toast
   ]);
 
-  // Helper function to find relevant task for a suggestion
   const findRelevantTaskForSuggestion = useCallback((
     suggestion: AISuggestion, 
     schedule: Task[]
   ): string => {
-    // Start with category matching
     const categoryMatch = schedule.find(task => 
       task.categories?.some(category => 
         suggestion.categories.includes(category)
@@ -648,32 +581,25 @@ const Dashboard: React.FC = () => {
     );
     if (categoryMatch) return categoryMatch.id;
 
-    // Fallback to type-based placement
     switch (suggestion.type) {
       case 'Energy Optimization':
-        // Place near morning tasks
         return schedule[0]?.id || 'schedule-start';
       case 'Priority Rebalancing':
-        // Place near high-priority tasks
         const priorityTask = schedule.find(task => 
           task.categories?.includes('high-priority')
         );
         return priorityTask?.id || 'schedule-start';
-      // Add other type-based logic...
       default:
-        // Default to schedule start
         return 'schedule-start';
     }
   }, []);
 
-  // Distribute suggestions between tasks when suggestions change
   useEffect(() => {
     if (!suggestions.length) return;
 
     const currentSchedule = scheduleDays[currentDayIndex];
     if (!currentSchedule) return;
 
-    // Create a new map for suggestions
     const newSuggestionsMap = new Map<string, AISuggestion[]>();
     
     suggestions.forEach(suggestion => {
@@ -688,12 +614,10 @@ const Dashboard: React.FC = () => {
     setSuggestionsMap(newSuggestionsMap);
   }, [suggestions, currentDayIndex, scheduleDays, findRelevantTaskForSuggestion]);
 
-  // Helper function to find the best index to insert a suggestion
   const findTargetIndexForSuggestion = useCallback((
     suggestion: AISuggestion, 
     schedule: Task[]
   ): number => {
-    // First try to find a task with matching categories
     const categoryMatchIndex = schedule.findIndex(task => 
       task.categories?.some(category => 
         suggestion.categories.includes(category)
@@ -701,44 +625,31 @@ const Dashboard: React.FC = () => {
     );
     
     if (categoryMatchIndex !== -1) {
-      // Insert after the matching task
       return categoryMatchIndex + 1;
     }
 
-    // If no category match, use suggestion type to determine placement
     switch (suggestion.type) {
       case 'Energy Optimization':
-        // Place near the start of the day
         return 0;
-      
       case 'Priority Rebalancing':
-        // Find first high-priority task
         const priorityIndex = schedule.findIndex(task => 
           task.categories?.includes('high-priority')
         );
         return priorityIndex !== -1 ? priorityIndex : 0;
-      
       case 'Time Management':
-        // Place in the middle of the schedule
         return Math.floor(schedule.length / 2);
-      
       case 'Task Structure':
-        // Place near related tasks if possible
         const structureIndex = schedule.findIndex(task => 
           task.text.toLowerCase().includes(suggestion.text.toLowerCase())
         );
         return structureIndex !== -1 ? structureIndex + 1 : schedule.length;
-      
       default:
-        // Default to end of schedule
         return schedule.length;
     }
   }, []);
 
-  // Handle suggestion acceptance
   const handleAcceptSuggestion = useCallback(async (suggestion: AISuggestion) => {
     try {
-      // Convert suggestion to task with all required properties
       const newTask: Task = {
         id: uuidv4(),
         text: suggestion.text,
@@ -757,11 +668,9 @@ const Dashboard: React.FC = () => {
         start_date: getDateString(currentDayIndex),
       };
 
-      // Add task to schedule
       const updatedSchedule = [...scheduleDays[currentDayIndex]];
       const targetIndex = findTargetIndexForSuggestion(suggestion, updatedSchedule);
       
-      // Update section and section_index for the new task and subsequent tasks
       if (targetIndex > 0) {
         const prevTask = updatedSchedule[targetIndex - 1];
         newTask.section = prevTask.section;
@@ -769,7 +678,6 @@ const Dashboard: React.FC = () => {
       
       updatedSchedule.splice(targetIndex, 0, newTask);
       
-      // Recalculate section_index for affected tasks
       let sectionStartIndex = 0;
       updatedSchedule.forEach((task, index) => {
         if (task.is_section) {
@@ -780,14 +688,12 @@ const Dashboard: React.FC = () => {
         }
       });
 
-      // Update schedule
       setScheduleDays(prev => {
         const newDays = [...prev];
         newDays[currentDayIndex] = updatedSchedule;
         return newDays;
       });
 
-      // Update both suggestions and suggestionsMap
       setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
       setSuggestionsMap(prev => {
         const newMap = new Map(prev);
@@ -800,8 +706,7 @@ const Dashboard: React.FC = () => {
         return newMap;
       });
 
-      // Sync with backend
-      await updateScheduleForDate(
+      await updateSchedule(
         getDateString(currentDayIndex),
         updatedSchedule
       );
@@ -821,9 +726,7 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, scheduleDays, toast, findTargetIndexForSuggestion]);
 
-  // Handle suggestion rejection
   const handleRejectSuggestion = useCallback((suggestionId: string) => {
-    // Update both suggestions and suggestionsMap
     setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
     setSuggestionsMap(prev => {
       const newMap = new Map(prev);
@@ -844,7 +747,6 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0);
         
-        // Try calendar events first
         const calendarResponse = await calendarApi.fetchEvents(today);
 
         if (calendarResponse.success && calendarResponse.tasks.length > 0) {
@@ -853,8 +755,7 @@ const Dashboard: React.FC = () => {
           return;
         }
         
-        // Fall back to regular schedule if no calendar events
-        const existingSchedule = await loadScheduleForDate(today);
+        const existingSchedule = await loadSchedule(today);
         
         if (existingSchedule.success && existingSchedule.schedule) {
           setScheduleDays([existingSchedule.schedule]);
@@ -867,61 +768,35 @@ const Dashboard: React.FC = () => {
       }
     };
     
-    // Only run if we don't already have a schedule from previous page
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
   }, []);
 
   useEffect(() => {
-    // Remove dark mode when dashboard loads
     document.documentElement.classList.remove('dark');
   }, []);
 
   return (
     <SidebarLayout>
-      {/* Main Dashboard Content */}
       <div className="flex flex-col h-full bg-background">
         
-        {/* Header Section */}
         <DashboardHeader
-          selectedDate={date}
           isLoadingSuggestions={isLoadingSuggestions}
-          isCalendarDrawerOpen={isCalendarDrawerOpen}
-          isDropdownOpen={isDropdownOpen}
-          state={state}
           onRequestSuggestions={handleRequestSuggestions}
-          onCalendarDrawerOpenChange={setIsCalendarDrawerOpen}
-          onDropdownOpenChange={setIsDropdownOpen}
-          onDateSelect={handleDateSelect}
-          onSubmitForm={handleSubmit}
-          isLoading={isLoading}
           onNextDay={handleNextDay}
           onPreviousDay={handlePreviousDay}
           currentDate={currentDate}
-          dashboardLeftColProps={{
-            newTask,
-            setNewTask,
-            priorities,
-            updateTask,
-            deleteTask,
-            addTask,
-            handleReorder,
-            handleEnergyChange: handleEnergyChangeCallback,
-          }}
         />
 
-        {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="w-full max-w-4xl mx-auto p-6">
             
-            {/* Schedule Display Section */}
             {isLoadingSchedule ? (
               <div className="loading-container-lg">
                 <div className="loading-spinner-lg" />
               </div>
             ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
-              // Schedule Content
               <div className="space-y-4">
                 <EditableSchedule
                   tasks={scheduleDays[currentDayIndex] || []}
@@ -936,7 +811,6 @@ const Dashboard: React.FC = () => {
                   onRejectSuggestion={handleRejectSuggestion}
                 />
 
-                {/* AI Suggestions Loading State */}
                 {isLoadingSuggestions && (
                   <div className="loading-container-sm">
                     <Loader2 className="loading-spinner-sm" />
@@ -947,7 +821,6 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             ) : (
-              // Empty State
               <div className="empty-state-container">
                 <p className="text-lg text-foreground">
                   {state.response 
@@ -955,7 +828,6 @@ const Dashboard: React.FC = () => {
                     : 'No schedule found for selected date'
                   }
                 </p>
-                {/* Show Generate Button only if no response exists */}
                 {!state.response && (
                   <Button 
                     variant="outline" 
@@ -970,10 +842,8 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Floating Action Button */}
         <FloatingActionButton onClick={() => setIsTaskDrawerOpen(true)} />
         
-        {/* Task Edit Drawer */}
         <TaskEditDrawer
           isOpen={isTaskDrawerOpen}
           onClose={() => setIsTaskDrawerOpen(false)}
