@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // UI Components
 import { Button } from '@/components/ui/button';
-import { Loader2, ActivitySquare, Heart, Smile, Trophy  } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import FloatingActionButton from '@/components/parts/FloatingActionButton';
 import TaskEditDrawer from '@/components/parts/TaskEditDrawer';
 
@@ -21,7 +21,6 @@ import { useForm } from '../../lib/FormContext';
 // Types
 import { 
   Task, 
-  Priority, 
   AISuggestion, 
   GetAISuggestionsResponse
 } from '../../lib/types';
@@ -31,9 +30,7 @@ import {
   handleAddTask,
   // handleUpdateTask,
   // handleDeleteTask,
-  handleEnergyChange,
   fetchAISuggestions,
-  formatDateToString
 } from '@/lib/helper';
 
 // Direct API helpers (no ScheduleHelper)
