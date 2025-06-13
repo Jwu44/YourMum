@@ -517,7 +517,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="mr-2 border-white"
+                className="mr-2 border-checkbox-border"
               />
             </div>
           </>

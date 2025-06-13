@@ -41,7 +41,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
                 <Checkbox
                   checked={false}
                   disabled
-                  className="mr-2 border-white opacity-50"
+                  className="mr-2 border-checkbox-border opacity-50"
                 />
               </div>
               {/* Text content */}

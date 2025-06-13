@@ -17,7 +17,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 27%;
 
-    --primary: 251 91% 95%;
+    /* Update primary to use the purple gradient color */
+    --primary-light: 260 84% 74%; /* #9b87f5 */
+    --primary-dark: 263 91% 58%;  /* #7c3aed */
+    --primary: var(--primary-light);
     --primary-foreground: 215 25% 27%;
 
     --secondary: 220 13% 97%;
@@ -26,7 +29,8 @@
     --muted: 220 13% 97%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 251 91% 95%;
+    /* Update accent to use the same purple as primary */
+    --accent: var(--primary-light);
     --accent-foreground: 215 25% 27%;
 
     --destructive: 0 84% 60%;
@@ -34,7 +38,10 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 251 91% 95%;
+    --ring: var(--primary-light);
+    
+    /* Checkbox border color */
+    --checkbox-border: 0 0% 0%; /* Black */
 
     --radius: 0.75rem;
 
@@ -76,6 +83,9 @@
     --border: 215 25% 27%;
     --input: 215 25% 27%;
     --ring: 251 91% 95%;
+    
+    /* Checkbox border color - use lighter color in dark mode for better visibility */
+    --checkbox-border: 0 0% 100%; /* White */
 
     --sidebar-background: 215 28% 17%;
     --sidebar-foreground: 213 31% 91%;
@@ -177,7 +187,7 @@
 /* Custom gradients and effects */
 @layer utilities {
   .gradient-purple {
-    background: linear-gradient(135deg, #9b87f5 0%, #7c3aed 100%);
+    background: linear-gradient(135deg, hsl(var(--primary-light)) 0%, hsl(var(--primary-dark)) 100%);
   }
   
   .gradient-purple-soft {
@@ -189,6 +199,6 @@
   }
   
   .border-purple {
-    border-color: #9b87f5;
+    border-color: hsl(var(--primary-light));
   }
 }
