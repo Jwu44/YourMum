@@ -29,8 +29,8 @@ import {
 // Helpers
 import {
   handleAddTask,
-  handleUpdateTask,
-  handleDeleteTask,
+  // handleUpdateTask,
+  // handleDeleteTask,
   handleEnergyChange,
   fetchAISuggestions,
   formatDateToString
@@ -40,27 +40,17 @@ import {
 import { calendarApi } from '@/lib/api/calendar';
 import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
 
-const initialPriorities: Priority[] = [
-    { id: 'health', name: 'Health', icon: ActivitySquare, color: 'green' },
-    { id: 'relationships', name: 'Relationships', icon: Heart, color: 'red' },
-    { id: 'fun_activities', name: 'Fun Activities', icon: Smile, color: 'blue' },
-    { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'yellow' }
-  ];
-
 const Dashboard: React.FC = () => {
   const [newTask, setNewTask] = useState('');
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
-  const [priorities, setPriorities] = useState<Priority[]>(initialPriorities);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const { state, dispatch } = useForm();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
-  const [isCalendarDrawerOpen, setIsCalendarDrawerOpen] = useState(false);
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [shownSuggestionIds] = useState<Set<string>>(new Set());
@@ -146,41 +136,23 @@ const Dashboard: React.FC = () => {
     setScheduleDays
   ]);
 
-  const updateTask = useCallback((updatedTask: Task) => {
-    const updatedTasks = handleUpdateTask(state.tasks || [], updatedTask);
-    dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-    toast({
-      title: "Success",
-      description: "Task updated successfully.",
-    });
-  }, [state.tasks, dispatch, toast]);
+  // const updateTask = useCallback((updatedTask: Task) => {
+  //   const updatedTasks = handleUpdateTask(state.tasks || [], updatedTask);
+  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
+  //   toast({
+  //     title: "Success",
+  //     description: "Task updated successfully.",
+  //   });
+  // }, [state.tasks, dispatch, toast]);
 
-  const deleteTask = useCallback((taskId: string) => {
-    const updatedTasks = handleDeleteTask(state.tasks || [], taskId);
-    dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-    toast({
-      title: "Success",
-      description: "Task deleted successfully.",
-    });
-  }, [state.tasks, dispatch, toast]);
-
-  const handleReorder = useCallback((newPriorities: Priority[]) => {
-    setPriorities(newPriorities);
-    const updatedPriorities = {
-      health: '',
-      relationships: '',
-      fun_activities: '',
-      ambitions: ''
-    };
-    newPriorities.forEach((priority, index) => {
-      updatedPriorities[priority.id as keyof typeof updatedPriorities] = (index + 1).toString();
-    });
-    dispatch({ 
-      type: 'UPDATE_FIELD', 
-      field: 'priorities', 
-      value: updatedPriorities 
-    });
-  }, [dispatch]);
+  // const deleteTask = useCallback((taskId: string) => {
+  //   const updatedTasks = handleDeleteTask(state.tasks || [], taskId);
+  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
+  //   toast({
+  //     title: "Success",
+  //     description: "Task deleted successfully.",
+  //   });
+  // }, [state.tasks, dispatch, toast]);
 
   // Optimized handleSubmit - direct API call, no ScheduleHelper processing
   const handleSubmit = useCallback(async () => {
@@ -438,90 +410,6 @@ const Dashboard: React.FC = () => {
       setDate(prevDate);
     }
   }, [currentDayIndex, date]);
-
-  const handleEnergyChangeCallback = useCallback((value: string) => {
-    const currentPatterns = state.energy_patterns || [];
-    handleEnergyChange(dispatch, currentPatterns)(value);
-  }, [dispatch, state.energy_patterns]);
-
-  const handleDateSelect = useCallback(async (newDate: Date | undefined) => {
-    if (!newDate) {
-      setIsDropdownOpen(false);
-      return;
-    }
-
-    setIsLoadingSchedule(true);
-    try {
-      const dateStr = formatDateToString(newDate);
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(newDate);
-      selectedDate.setHours(0, 0, 0, 0);
-      const diffTime = selectedDate.getTime() - today.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      setCurrentDayIndex(diffDays);
-      setDate(newDate);
-      setCurrentDate(newDate);
-
-      const calendarResponse = await calendarApi.fetchEvents(dateStr);
-
-      if (calendarResponse.success && calendarResponse.tasks.length > 0) {
-        setScheduleCache(prevCache => new Map(prevCache).set(dateStr, calendarResponse.tasks));
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          newDays[diffDays] = calendarResponse.tasks;
-          return newDays;
-        });
-        
-        toast({
-          title: "Success",
-          description: "Calendar events loaded successfully",
-        });
-        return;
-      }
-
-      const existingSchedule = await loadSchedule(dateStr);
-      
-      if (existingSchedule.success && existingSchedule.schedule) {
-        setScheduleCache(prevCache => new Map(prevCache).set(dateStr, existingSchedule.schedule!));
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          newDays[diffDays] = existingSchedule.schedule!;
-          return newDays;
-        });
-
-        toast({
-          title: "Success",
-          description: "Schedule loaded successfully",
-        });
-      } else {
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          newDays[diffDays] = [];
-          return newDays;
-        });
-
-        toast({
-          title: "Notice",
-          description: "No schedule found for selected date",
-          variant: "default",
-        });
-      }
-    } catch (error) {
-      console.error("Error loading schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load schedule",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingSchedule(false);
-      setIsCalendarDrawerOpen(false);
-      setIsDropdownOpen(false);
-    }
-  }, [setDate, toast]);
 
   const handleRequestSuggestions = useCallback(async () => {
     setIsLoadingSuggestions(true);

@@ -9,9 +9,6 @@ import { checkScheduleExists } from '@/lib/helper';
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
 
-// Types
-import { FormData, Priority, Task } from '@/lib/types';
-
 interface DashboardHeaderProps {
     isLoadingSuggestions: boolean;
     onRequestSuggestions: () => Promise<void>;
