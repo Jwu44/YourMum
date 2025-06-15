@@ -19,8 +19,8 @@ import {
   MonthWeek
 } from './types';
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_BASE_URL = 'http://localhost:8000';
 
 /**
  * Direct API call for schedule generation - bypasses ScheduleHelper
@@ -129,13 +129,27 @@ export const updateSchedule = async (
     
     // If schedule doesn't exist, create a new one with POST
     if (!existingSchedule.success || !existingSchedule.schedule) {
+      // Ensure proper date format with timestamp
+      const dateWithTime = `${date}T00:00:00`;
+      
       const scheduleData = {
-        date: date,
+        date: dateWithTime,
         tasks: tasks,
-        userId: 'default',
-        inputs: {},
-        schedule: tasks
+        userId: localStorage.getItem('userId') || 'default',
+        inputs: {
+          // Minimum required inputs
+          name: "User",
+          work_start_time: "09:00",
+          work_end_time: "17:00"
+        },
+        schedule: tasks,
+        metadata: {
+          createdAt: new Date().toISOString(),
+          lastModified: new Date().toISOString()
+        }
       };
+      
+      console.log("Creating new schedule:", JSON.stringify(scheduleData));
       
       const createResponse = await fetch(`${API_BASE_URL}/api/schedules`, {
         method: 'POST',
@@ -144,8 +158,9 @@ export const updateSchedule = async (
       });
 
       if (!createResponse.ok) {
-        const errorData = await createResponse.json();
-        throw new Error(errorData.error || 'Failed to create new schedule');
+        const errorText = await createResponse.text();
+        console.error("Failed to create schedule:", errorText);
+        throw new Error(`Failed to create new schedule: ${errorText}`);
       }
       
       return { success: true };
