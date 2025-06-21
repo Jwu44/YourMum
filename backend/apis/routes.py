@@ -23,35 +23,32 @@ from backend.services.schedule_gen import (
 
 import uuid
 
-# Add import for the new schedule schema
-from backend.models.schedule_schema import validate_schedule_document, get_default_local_user_id, format_schedule_date, format_timestamp
-
 # Add import for the new schedule service
 from backend.services.schedule_service import schedule_service
 
 api_bp = Blueprint("api", __name__)
 
-# Add a global CORS handler for the API blueprint
-@api_bp.after_request
-def add_cors_headers(response):
-    """Add CORS headers to all API responses"""
-    # Get origin from the request
-    origin = request.headers.get('Origin')
+# # Add a global CORS handler for the API blueprint
+# @api_bp.after_request
+# def add_cors_headers(response):
+#     """Add CORS headers to all API responses"""
+#     # Get origin from the request
+#     origin = request.headers.get('Origin')
     
-    # Check if origin is allowed
-    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
-                             "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(",")
+#     # Check if origin is allowed
+#     allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
+#                              "https://yourdai.app,https://yourdai-production.up.railway.app,http://localhost:3000,http://localhost:8000").split(",")
     
-    # If origin is in the allowed list, add CORS headers
-    if origin in allowed_origins:
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 
-                           'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-        response.headers.add('Access-Control-Allow-Methods', 
-                           'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+#     # If origin is in the allowed list, add CORS headers
+#     if origin in allowed_origins:
+#         response.headers.add('Access-Control-Allow-Origin', origin)
+#         response.headers.add('Access-Control-Allow-Headers', 
+#                            'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+#         response.headers.add('Access-Control-Allow-Methods', 
+#                            'GET, POST, PUT, DELETE, OPTIONS')
+#         response.headers.add('Access-Control-Allow-Credentials', 'true')
     
-    return response
+#     return response
 
 # Add a global OPTIONS request handler for all routes
 @api_bp.route('/<path:path>', methods=['OPTIONS'])
