@@ -13,7 +13,7 @@
       },
       {
         "source": "/api/**",
-        "destination": "https://yourdai-production.up.railway.app/"
+        "destination": "https://yourdai-production.up.railway.app"
       },
       {
         "source": "**",
