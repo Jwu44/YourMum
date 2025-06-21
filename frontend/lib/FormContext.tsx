@@ -17,7 +17,8 @@ const initialState: FormData = {
   name: "",
   age: "",
   work_start_time: "9:00 AM",
-  work_end_time: "10:00 PM",
+  work_end_time: "5:00 PM",
+  working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
   tasks: [],
   energy_patterns: [],
   priorities: { health: "", relationships: "", fun_activities: "", ambitions: "" },
@@ -25,11 +26,6 @@ const initialState: FormData = {
     layout: "todolist-structured",
     subcategory: 'day-sections',
     orderingPattern: "timebox"
-  },
-  onboarding: {
-    currentStep: 1,
-    totalSteps: 6,
-    isComplete: false
   }
 };
 
@@ -76,13 +72,6 @@ const setNestedProperty = (
     return obj; // Return unchanged object on error
   }
 };
-
-/**
- * Extended form actions including onboarding progress management
- */
-type ExtendedFormAction = FormAction | 
-  { type: 'UPDATE_ONBOARDING_PROGRESS'; currentStep: number; totalSteps: number } |
-  { type: 'COMPLETE_ONBOARDING' };
 
 /**
  * Validates layout preference to ensure proper relationship between layout type and subcategory
@@ -137,7 +126,7 @@ const validateLayoutPreference = (layoutPreference: Partial<LayoutPreference>): 
 /**
  * Form state reducer with enhanced type safety and proper error handling
  */
-const formReducer = (state: FormData, action: ExtendedFormAction): FormData => {
+const formReducer = (state: FormData, action: FormAction): FormData => {
   try {
     switch (action.type) {
       case 'UPDATE_FIELD': {
@@ -180,25 +169,6 @@ const formReducer = (state: FormData, action: ExtendedFormAction): FormData => {
           )
         };
   
-      case 'UPDATE_ONBOARDING_PROGRESS':
-        return {
-          ...state,
-          onboarding: {
-            ...state.onboarding,
-            currentStep: action.currentStep,
-            totalSteps: action.totalSteps
-          }
-        };
-  
-      case 'COMPLETE_ONBOARDING':
-        return {
-          ...state,
-          onboarding: {
-            ...state.onboarding,
-            isComplete: true
-          }
-        };
-  
       case 'RESET_FORM':
         return initialState;
   
@@ -211,23 +181,9 @@ const formReducer = (state: FormData, action: ExtendedFormAction): FormData => {
   }
 };
 
-/**
- * Extended form context type including onboarding state
- */
-interface ExtendedFormContextType extends FormContextType {
-  state: FormData & {
-    onboarding?: {
-      currentStep: number;
-      totalSteps: number;
-      isComplete: boolean;
-    }
-  };
-  dispatch: React.Dispatch<ExtendedFormAction>;
-  updateLayoutPreference: (layoutUpdates: Partial<LayoutPreference>) => void;
-}
 
 // Create context with proper typing
-const FormContext = createContext<ExtendedFormContextType | undefined>(undefined);
+const FormContext = createContext<FormContextType | undefined>(undefined);
 
 /**
  * Form provider component that manages state for the entire form
@@ -270,13 +226,10 @@ export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
  * @returns The form context value
  * @throws Error if used outside FormProvider
  */
-export const useForm = (): ExtendedFormContextType => {
+export const useForm = (): FormContextType => {
   const context = useContext(FormContext);
   if (context === undefined) {
     throw new Error('useForm must be used within a FormProvider');
   }
   return context;
 };
-
-// Export types for use in other components
-export type { ExtendedFormAction, ExtendedFormContextType };

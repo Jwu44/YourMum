@@ -8,8 +8,27 @@
     ],
     "rewrites": [
       {
+        "source": "/__/auth/**",
+        "function": "auth"
+      },
+      {
+        "source": "/api/**",
+        "destination": "https://yourdai-production.up.railway.app/"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/__/auth/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
       }
     ]
   },

@@ -6,17 +6,14 @@ import AISuggestionsList from './AISuggestionsList';
 import { 
   Task, 
   AISuggestion, 
-  ScheduleLayoutType, 
-  BaseLayoutType, 
-  LayoutStructure 
+  ScheduleLayoutType 
 } from '../../lib/types';
-import { applyScheduleLayout } from '../../lib/ScheduleHelper';
 
 /**
  * Props interface for the EditableSchedule component
  */
 interface EditableScheduleProps {
-  /** Tasks to display in the schedule */
+  /** Tasks to display in the schedule - pre-structured by optimized backend */
   tasks: Task[];
   
   /** Callback function for updating a task */
@@ -30,9 +27,7 @@ interface EditableScheduleProps {
   
   /** 
    * Layout preference for the schedule
-   * Can be:
-   * - ScheduleLayoutType string (e.g., 'todolist-structured')
-   * - Legacy string ('structured', 'unstructured', 'category')
+   * Note: This is now mainly for reference as backend handles structure
    */
   layoutPreference: string | ScheduleLayoutType;
   
@@ -52,6 +47,13 @@ interface EditableScheduleProps {
   onRejectSuggestion: (suggestionId: string) => void;
 }
 
+/**
+ * Simplified EditableSchedule component for direct rendering of optimized backend data
+ * 
+ * This component now focuses purely on rendering pre-structured tasks from the optimized
+ * backend, eliminating the need for complex layout processing that was previously handled
+ * by ScheduleHelper.
+ */
 const EditableSchedule: React.FC<EditableScheduleProps> = ({ 
   tasks, 
   onUpdateTask, 
@@ -63,54 +65,45 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onRejectSuggestion
 }) => {
   /**
-   * Convert and validate layout preference to ensure it's a proper ScheduleLayoutType
+   * Minimal task processing for layout-specific rendering
    * 
-   * Handles legacy string preferences and normalizes to the correct format
-   * while ensuring the result is a valid ScheduleLayoutType.
+   * Since the optimized backend returns properly structured tasks with sections
+   * and correct ordering, we only need minimal processing for layout-specific
+   * display requirements.
    */
-  const normalizedLayoutType: ScheduleLayoutType = useMemo(() => {
-    // Handle legacy string preferences
-    if (layoutPreference === 'category' || layoutPreference === 'structured') {
-      return 'todolist-structured';
-    } else if (layoutPreference === 'unstructured') {
-      return 'todolist-unstructured';
+  const processedTasks = useMemo(() => {
+    // For unstructured layout, filter out sections
+    if (layoutPreference === 'todolist-unstructured' || layoutPreference === 'unstructured') {
+      return tasks.filter(task => !task.is_section);
     }
     
-    // If it's already a ScheduleLayoutType string, validate it
-    const layoutString = String(layoutPreference);
-    if (layoutString.includes('-')) {
-      const [baseType, structure] = layoutString.split('-') as [BaseLayoutType, LayoutStructure];
-      
-      // Validate base type
-      const validBaseTypes: BaseLayoutType[] = ['todolist', 'kanban', 'calendar', 'timeline'];
-      const validStructures: LayoutStructure[] = ['structured', 'unstructured'];
-      
-      if (validBaseTypes.includes(baseType) && validStructures.includes(structure)) {
-        return layoutString as ScheduleLayoutType;
-      }
-    }
-    
-    // Default fallback for invalid formats
-    return 'todolist-structured';
-  }, [layoutPreference]);
+    // For structured layouts, use tasks as-is from optimized backend
+    // Backend already provides proper section structure and ordering
+    return tasks;
+  }, [tasks, layoutPreference]);
 
-  // Use the scheduleHelper function to apply the layout
-  const memoizedTasks = useMemo(() => {
-    return applyScheduleLayout(tasks, normalizedLayoutType);
-  }, [tasks, normalizedLayoutType]);
-
-  // Enhanced moveTask to handle indentation levels more precisely
-  const moveTask = useCallback((dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => {
-    const draggedTask = {...memoizedTasks[dragIndex]}; // Create new reference
-    const newTasks = memoizedTasks.filter((_, index) => index !== dragIndex);
+  /**
+   * Enhanced moveTask function to handle task reordering with proper indentation
+   * 
+   * This maintains the existing drag-and-drop functionality while working with
+   * the optimized backend structure.
+   */
+  const moveTask = useCallback((
+    dragIndex: number, 
+    hoverIndex: number, 
+    shouldIndent: boolean, 
+    targetSection: string | null
+  ) => {
+    const draggedTask = { ...processedTasks[dragIndex] };
+    const newTasks = processedTasks.filter((_, index) => index !== dragIndex);
 
     if (targetSection) {
+      // Moving to a section
       const sectionIndex = newTasks.findIndex(task => 
         task.is_section && task.text === targetSection
       );
       
       if (sectionIndex !== -1) {
-        // When moving to a section, reset indentation
         newTasks.splice(sectionIndex + 1, 0, { 
           ...draggedTask, 
           section: targetSection, 
@@ -130,28 +123,22 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
         });
       }
     } else {
-      // Get the actual target task based on the hover index
-      const targetTask = memoizedTasks[hoverIndex];
+      // Regular task reordering
+      const targetTask = processedTasks[hoverIndex];
       const updatedDraggedTask = { ...draggedTask };
       
       if (shouldIndent && !targetTask.is_section) {
-        // Calculate the new indentation level based on the target task
-        const newLevel = Math.min((targetTask.level || 0) + 1, 3); // Limit to 3 levels
+        const newLevel = Math.min((targetTask.level || 0) + 1, 3);
         
-        // Update the dragged task properties
         updatedDraggedTask.is_subtask = true;
         updatedDraggedTask.level = newLevel;
-        updatedDraggedTask.parent_id = targetTask.id; // Set parent to the target task
+        updatedDraggedTask.parent_id = targetTask.id;
         updatedDraggedTask.section = targetTask.section;
         
-        // Insert the task immediately after its new parent
-        // FIX: Adjust the insertion index to account for the removed dragged task
         const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex;
         newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask);
       } else {
-        // Handle non-indentation moves
         if (targetTask.is_section) {
-          // When dropping onto a section header, place after it
           newTasks.splice(hoverIndex + 1, 0, {
             ...updatedDraggedTask,
             is_subtask: false,
@@ -161,8 +148,6 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             categories: [targetTask.text]
           });
         } else {
-          // Maintain the task's current indentation level if it's being moved
-          // within the same parent or to the same level
           const keepIndentation = 
             targetTask.parent_id === draggedTask.parent_id ||
             targetTask.level === draggedTask.level;
@@ -177,43 +162,57 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       }
     }
 
-    // Update parent_id for all affected subtasks
-    const updateSubtaskParents = (tasks: Task[]): Task[] => {
-      const taskMap = new Map<string, Task>();
-      tasks.forEach(task => taskMap.set(task.id, task));
-
-      return tasks.map(task => {
-        if (task.is_subtask && task.parent_id) {
-          const parent = taskMap.get(task.parent_id);
-          if (!parent || parent.level! >= task.level!) {
-            return { ...task, is_subtask: false, level: 0, parent_id: null };
-          }
+    // Update section indices after reordering
+    const updateSectionIndices = (tasks: Task[]): Task[] => {
+      let currentSectionStartIndex = 0;
+      
+      return tasks.map((task, index) => {
+        if (task.is_section) {
+          currentSectionStartIndex = index;
+          return { ...task, section_index: 0 };
         }
-        return task;
+        return { 
+          ...task, 
+          section_index: index - currentSectionStartIndex 
+        };
       });
     };
 
-    const finalTasks = updateSubtaskParents(newTasks);
+    const finalTasks = updateSectionIndices(newTasks);
     onReorderTasks(finalTasks);
-  }, [memoizedTasks, onReorderTasks]); // Added dependency array
+  }, [processedTasks, onReorderTasks]);
 
+  /**
+   * Log optimization status for debugging
+   */
+  React.useEffect(() => {
+    const hasOptimizedStructure = tasks.some(task => 
+      task.is_section === true || (task.section && typeof task.section === 'string')
+    );
+    
+    if (hasOptimizedStructure) {
+      console.log("✅ Rendering optimized backend structure");
+    } else {
+      console.log("⚠️ Rendering legacy structure");
+    }
+  }, [tasks]);
 
   return (
     <Pane>
-      {/* Tasks and Suggestions */}
-      {memoizedTasks.map((task, index) => (
-        <React.Fragment key={`${task.id}-${task.type}`}>
+      {/* Direct rendering of pre-structured tasks */}
+      {processedTasks.map((task, index) => (
+        <React.Fragment key={`${task.id}-${task.type || 'task'}`}>
           <EditableScheduleRow
             task={task}
             index={index}
             onUpdateTask={onUpdateTask}
             onDeleteTask={onDeleteTask}
             moveTask={moveTask}
-            isSection={task.type === 'section'}
-            allTasks={memoizedTasks}
+            isSection={task.is_section || task.type === 'section'}
+            allTasks={processedTasks}
           >
-            {task.type === 'section' && (
-              <TypographyH4 className="mt-3 mb-1">
+            {(task.is_section || task.type === 'section') && (
+              <TypographyH4 className="section-header">
                 {task.text}
               </TypographyH4>
             )}
@@ -221,12 +220,12 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
           {/* Render suggestions after each task if they exist */}
           {suggestionsMap.has(task.id) && (
-            <div className="ml-6 my-2">
+            <div className="suggestion-container">
               <AISuggestionsList
                 suggestions={suggestionsMap.get(task.id) || []}
                 onAccept={onAcceptSuggestion}
                 onReject={onRejectSuggestion}
-                className="border-l-2 border-blue-500 pl-4"
+                className="suggestion-list"
               />
             </div>
           )}
@@ -235,12 +234,12 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
       {/* Render suggestions for schedule start if they exist */}
       {suggestionsMap.has('schedule-start') && (
-        <div className="mb-4">
+        <div className="schedule-start-container">
           <AISuggestionsList
             suggestions={suggestionsMap.get('schedule-start') || []}
             onAccept={onAcceptSuggestion}
             onReject={onRejectSuggestion}
-            className="border-l-2 border-blue-500 pl-4"
+            className="suggestion-list"
           />
         </div>
       )}

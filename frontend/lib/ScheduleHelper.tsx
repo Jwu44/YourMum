@@ -8,106 +8,183 @@
  */
 
 // React and 3rd-party imports
-import { v4 as uuidv4 } from 'uuid';
 import { format as dateFormat } from 'date-fns';
 import memoize from 'lodash/memoize';
 
 // Types and Utils imports
 import { 
   Task, 
-  ScheduleLayoutType, 
   FormData, 
   ScheduleData,
   MonthWeek
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_BASE_URL = 'http://localhost:8000';
 
 /**
- * Schedule Layout Handler
+ * Direct API call for schedule generation - bypasses ScheduleHelper
  * 
- * Transforms tasks based on desired layout type for rendering purposes.
- * Note: This doesn't reorder tasks, just organizes them for display.
- * 
- * @param tasks - Tasks to transform
- * @param layoutType - The desired layout type
- * @returns Transformed tasks ready for rendering
+ * @param formData - Form data containing user preferences and tasks
+ * @returns Backend response with structured schedule data
  */
-export const applyScheduleLayout = (
-  tasks: Task[],
-  layoutType: ScheduleLayoutType
-): Task[] => {
+export const generateSchedule = async (formData: FormData): Promise<ScheduleData> => {
+  console.log("Direct API call to optimized backend");
+
   try {
-    switch (layoutType) {
-      case "todolist-structured":
-        return formatStructuredTodoList(tasks);
-        
-      case "todolist-unstructured":
-        return formatUnstructuredTodoList(tasks);
-        
-      // case "kanban":
-      // case "calendar":
-      //   // Future implementations
-      //   console.log(`Layout type ${layoutType} not fully implemented yet, using structured view`);
-      //   return formatStructuredTodoList(tasks);
-        
-      default:
-        // Fallback to structured todolist
-        return formatStructuredTodoList(tasks);
+    const response = await fetch(`${API_BASE_URL}/api/submit_data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+
+    if (!response.ok) throw new Error('Network response was not ok');
+
+    const responseData = await response.json();
+    console.log("Response from optimized backend:", responseData);
+
+    // Validate optimized backend response
+    if (!responseData || !Array.isArray(responseData.tasks)) {
+      throw new Error("Invalid response: Missing structured data");
     }
+
+    // Return structured data directly - no processing needed!
+    return {
+      tasks: responseData.tasks, // Direct usage of backend-structured tasks
+      layout: formData.layout_preference?.layout || 'todolist-structured',
+      orderingPattern: formData.layout_preference?.orderingPattern || 'timebox',
+      scheduleId: responseData.scheduleId,
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        totalTasks: responseData.tasks.filter((task: any) => !task.is_section).length,
+        calendarEvents: responseData.tasks.filter((task: any) => Boolean(task.gcal_event_id)).length,
+        recurringTasks: responseData.tasks.filter((task: any) => Boolean(task.is_recurring)).length,
+      }
+    };
   } catch (error) {
-    console.error('Error applying schedule layout:', error);
-    // Return original tasks as fallback
-    return tasks;
+    console.error("Error in direct API call:", error);
+    throw error;
   }
 };
 
 /**
- * Format tasks for structured to-do list layout
+ * Load schedule for a specific date - direct API call
  * 
- * @param tasks - Tasks to format
- * @returns Formatted tasks
+ * @param date - Date string in format "YYYY-MM-DD"
+ * @returns Schedule data or error
  */
-const formatStructuredTodoList = (tasks: Task[]): Task[] => {
-  let currentSection: string | null = null;
-  let sectionStartIndex = 0;
-  
-  // Map tasks to include section information
-  return tasks.map((task, index) => {
-    if (task.is_section) {
-      currentSection = task.text;
-      sectionStartIndex = index;
+export const loadSchedule = async (date: string): Promise<{ 
+  success: boolean; 
+  schedule?: Task[]; 
+  error?: string 
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: false, error: 'Schedule not found' };
+      }
+      throw new Error('Failed to fetch schedule');
+    }
+
+    const scheduleData = await response.json();
+    if (!scheduleData.tasks) {
       return {
-        ...task,
-        type: 'section',
-        section: currentSection,
-        section_index: 0
+        success: false,
+        error: 'Invalid schedule data format'
       };
     }
+
     return {
-      ...task,
-      type: 'task',
-      section: currentSection,
-      section_index: index - sectionStartIndex
+      success: true,
+      schedule: scheduleData.tasks
     };
-  });
+  } catch (error) {
+    console.error("Error loading schedule:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to load schedule"
+    };
+  }
 };
 
 /**
- * Format tasks for unstructured to-do list layout
+ * Update schedule for a specific date or create new if none exists
  * 
- * @param tasks - Tasks to format
- * @returns Formatted tasks
+ * @param date - Date string in format "YYYY-MM-DD"
+ * @param tasks - Tasks to save
+ * @returns Success status
  */
-const formatUnstructuredTodoList = (tasks: Task[]): Task[] => {
-  // Flat list of tasks without sections
-  return tasks.map(task => ({
-    ...task,
-    section: null,
-    section_index: 0,
-    // Preserve the task's is_section property if it has one
-    ...(task.is_section ? {} : { is_section: false })
-  }));
+export const updateSchedule = async (
+  date: string, 
+  tasks: Task[]
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // First check if schedule exists for this date
+    const existingSchedule = await loadSchedule(date);
+    
+    // If schedule doesn't exist, create a new one with POST
+    if (!existingSchedule.success || !existingSchedule.schedule) {
+      // Ensure proper date format with timestamp
+      const dateWithTime = `${date}T00:00:00`;
+      
+      const scheduleData = {
+        date: dateWithTime,
+        tasks: tasks,
+        userId: localStorage.getItem('userId') || 'default',
+        inputs: {
+          // Minimum required inputs
+          name: "User",
+          work_start_time: "09:00",
+          work_end_time: "17:00"
+        },
+        schedule: tasks,
+        metadata: {
+          createdAt: new Date().toISOString(),
+          lastModified: new Date().toISOString()
+        }
+      };
+      
+      console.log("Creating new schedule:", JSON.stringify(scheduleData));
+      
+      const createResponse = await fetch(`${API_BASE_URL}/api/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduleData)
+      });
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        console.error("Failed to create schedule:", errorText);
+        throw new Error(`Failed to create new schedule: ${errorText}`);
+      }
+      
+      return { success: true };
+    }
+    
+    // Otherwise update the existing schedule with PUT
+    const updateResponse = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks })
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error('Failed to update schedule');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating schedule:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update schedule"
+    };
+  }
 };
 
 
@@ -171,185 +248,3 @@ export const getWeekOfMonth = (date: Date): MonthWeek => {
   return 'last';
 };
 
-/**
- * Load a schedule for a specific date
- * 
- * Fetches a schedule from the API for the specified date.
- * 
- * @param date - The date to load the schedule for (format: "YYYY-MM-DD")
- * @returns Promise resolving to an object with the schedule or error information
- */
-export const loadScheduleForDate = async (date: string): Promise<{ 
-  success: boolean; 
-  schedule?: Task[]; 
-  error?: string 
-}> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { success: false, error: 'Schedule not found' };
-      }
-      throw new Error('Failed to fetch schedule');
-    }
-
-    const scheduleData = await response.json();
-    // Check if tasks exist in the response
-    if (!scheduleData.tasks) {
-      return {
-        success: false,
-        error: 'Invalid schedule data format'
-      };
-    }
-
-    return {
-      success: true,
-      schedule: scheduleData.tasks
-    };
-  } catch (error) {
-    console.error("Error loading schedule:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to load schedule"
-    };
-  }
-};
-
-/**
- * Update an existing schedule
- * 
- * Updates a schedule in the database for the specified date.
- * 
- * @param date - The date of the schedule to update (format: "YYYY-MM-DD")
- * @param tasks - The updated tasks for the schedule
- * @returns Promise resolving to an object indicating success or failure
- */
-export const updateScheduleForDate = async (
-  date: string, 
-  tasks: Task[]
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${date}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tasks })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to update schedule');
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error updating schedule:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to update schedule"
-    };
-  }
-};
-
-/**
- * Submit form data to generate a schedule
- * 
- * Sends user data to the backend API to generate a schedule.
- * This is a direct API call that should be used when we need to generate a new schedule.
- * 
- * @param formData - Form data containing user preferences and tasks
- * @returns API response with schedule data
- */
-const submitFormDataToAPI = async (formData: FormData): Promise<any> => {
-  console.log("Submitting form data to API for schedule generation");
-
-  try {
-    // Make API request to generate schedule
-    const response = await fetch(`${API_BASE_URL}/api/submit_data`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-
-    if (!response.ok) throw new Error('Network response was not ok');
-
-    const data = await response.json();
-    console.log("Response from schedule generation API:", data);
-    return data;
-  } catch (error) {
-    console.error("Error submitting form data:", error);
-    throw error;
-  }
-};
-
-/**
- * Generate Schedule
- * 
- * Processes an existing schedule response or generates a new one by calling the API.
- * This function ensures schedules are only generated once from the backend during the user flow,
- * and can also format existing schedule data for the frontend.
- * 
- * @param formData - Form data containing user preferences and tasks
- * @param existingResponse - Optional existing response from a previous generation
- * @returns ScheduleData object with tasks arranged according to preferences
- */
-export const generateSchedule = async (
-  formData: FormData
-): Promise<ScheduleData> => {
-  try {
-    const { layout_preference } = formData;
-    
-    console.log("Generating new schedule via API");
-    const responseData = await submitFormDataToAPI(formData);
-    
-    if (!responseData || !Array.isArray(responseData.tasks)) {
-      throw new Error("Invalid response: Missing structured data");
-    }
-
-    // Process structured data
-    const processedTasks = responseData.tasks.map((task: Partial<Task>) => ({
-      ...task,
-      id: task.id || uuidv4(), // Ensure each task has an ID
-      is_subtask: typeof task.is_subtask === 'boolean' ? task.is_subtask : false,
-      parent_id: task.parent_id || null,
-      level: typeof task.level === 'number' ? task.level : 0,
-    }));
-    
-    // Apply frontend-specific layout formatting
-    const formattedTasks = applyScheduleLayout(processedTasks, layout_preference.layout);
-    
-    // Return formatted schedule data
-    return {
-      tasks: formattedTasks,
-      layout: layout_preference.layout,
-      orderingPattern: layout_preference.orderingPattern,
-      scheduleId: responseData.scheduleId,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        totalTasks: formattedTasks.filter(task => !task.is_section).length,
-        calendarEvents: formattedTasks.filter(task => Boolean(task.gcal_event_id)).length,
-        recurringTasks: formattedTasks.filter(task => Boolean(task.is_recurring)).length
-      }
-    };
-  } catch (error) {
-    // Comprehensive error handling
-    console.error('Error generating schedule:', error);
-    
-    // Return a minimal valid schedule on error to prevent UI crashes
-    return {
-      tasks: [],
-      layout: formData.layout_preference.layout,
-      orderingPattern: formData.layout_preference.orderingPattern,
-      scheduleId: undefined,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        totalTasks: 0,
-        calendarEvents: 0,
-        recurringTasks: 0,
-        error: error instanceof Error ? error.message : "Unknown error generating schedule"
-      }
-    };
-  }
-};

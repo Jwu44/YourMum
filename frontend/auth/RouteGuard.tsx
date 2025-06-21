@@ -12,11 +12,17 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const isAuthRedirect = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    
     const url = window.location.href;
-    return url.includes('auth/handler') || 
+    return url.includes('__/auth/handler') || 
            url.includes('accounts.google.com') || 
            url.includes('code=') || 
-           url.includes('state=');
+           url.includes('state=') ||
+           url.includes('oauth') ||
+           url.includes('firebase') ||
+           pathname.includes('/__/auth/iframe') ||
+           pathname.includes('/__/auth/handler');
   }, []);
   
   useEffect(() => {
@@ -25,25 +31,30 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const inAuthFlow = isAuthRedirect();
       
       console.log("RouteGuard State:", {
-        user,
+        user: user ? `${user.displayName} (${user.email})` : null,
         loading,
         pathname,
         isPublicPath,
         inAuthFlow,
-        currentUrl: window.location.href
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'server'
       });
       
-      // Don't redirect if in auth flow
+      // Don't redirect if in auth flow or if user is authenticated
       if (!user && !isPublicPath && !inAuthFlow) {
-        router.push('/home');
+        console.log("Redirecting unauthenticated user to home");
+        router.push('/');
       }
     }
   }, [user, loading, pathname, router, isAuthRedirect]);
+
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-yourdai-dark">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }

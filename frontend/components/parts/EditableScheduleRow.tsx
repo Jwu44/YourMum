@@ -517,7 +517,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="mr-2 border-white"
+                className="mr-2 border-checkbox-border"
               />
             </div>
           </>
@@ -531,7 +531,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             <div className="w-full h-px bg-white opacity-50" />
           </>
         ) : (
-          <span className={`flex-1 text-white ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+          <span className={`flex-1 text-foreground ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
             {task.start_time && task.end_time ? 
               `${task.start_time} - ${task.end_time}: ` : ''}
             {task.text}

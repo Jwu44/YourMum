@@ -13,12 +13,15 @@ import os
 import re
 # Import AI service functions directly
 from backend.services.ai_service import (
-    generate_schedule,
     categorize_task,
     decompose_task,
     update_decomposition_patterns,
     generate_schedule_suggestions
 )
+from backend.services.schedule_gen import (
+    generate_schedule
+)
+
 import uuid
 
 api_bp = Blueprint("api", __name__)
@@ -376,7 +379,7 @@ def submit_data():
             user_schedules = get_user_schedules_collection()
             
             # Use structured data directly for storage
-            structured_data = ai_result.get("structured_data", {})
+            structured_data = ai_result.get("tasks", {})
             
             # Create schedule document
             schedule_document = {
@@ -398,9 +401,7 @@ def submit_data():
             response_data = {
                 "success": True,
                 "scheduleId": str(db_result.inserted_id),
-                "tasks": ai_result.get("tasks", []),
-                "layout_type": ai_result.get("layout_type", "todolist-structured"),
-                "ordering_pattern": ai_result.get("ordering_pattern", "timebox")
+                "tasks": structured_data
             }
             
             print("Schedule saved to database successfully")

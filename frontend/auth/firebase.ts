@@ -6,7 +6,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDwtW6LWOo9eFGa_Y7jux0P3Zml-IEzxGc",
-  authDomain: "yourdai.app",
+  authDomain: "yourdai.firebaseapp.com",
   projectId: "yourdai",
   storageBucket: "yourdai.firebasestorage.app",
   messagingSenderId: "246264772427",
@@ -20,18 +20,23 @@ const auth = getAuth(app);
 
 // Only disable app verification in development
 if (process.env.NODE_ENV === 'development') {
-  auth.settings.appVerificationDisabledForTesting = true;
+  // Note: This is for testing purposes only
+  (auth as any).settings = { appVerificationDisabledForTesting: true };
   console.log("Firebase app verification disabled for testing (development mode)");
 }
 
+// Create Google Auth Provider
 const provider = new GoogleAuthProvider();
 
 // Add Calendar scopes to the provider
 provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
 provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
 
+// Set custom parameters for better user experience
 provider.setCustomParameters({
-    prompt: 'select_account'
+  prompt: 'consent', // Always show consent screen to ensure fresh tokens
+  access_type: 'offline', // Request refresh tokens
+  include_granted_scopes: 'true' // Include previously granted scopes
 });
 
 export { auth, provider };
