@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user
+from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user
 import traceback
 from bson import ObjectId
 from datetime import datetime, timezone 
@@ -233,7 +233,7 @@ def create_or_update_user():
         users = db['users']
 
         # Create or update user using the utility function
-        user = create_or_update_user(users, processed_user_data)
+        user = db_create_or_update_user(users, processed_user_data)
         
         if not user:
             return jsonify({
