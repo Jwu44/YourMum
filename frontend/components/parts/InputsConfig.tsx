@@ -28,8 +28,9 @@ import { useToast } from '@/hooks/use-toast';
 
 // Types and Utils
 import { LayoutPreference, Priority } from '@/lib/types';
-import { generateSchedule } from '@/lib/ScheduleHelper';
+
 import { cn } from '@/lib/utils';
+import { generateSchedule } from '@/lib/ScheduleHelper';
 
 // Define energy options with icons
 const energyOptions = [

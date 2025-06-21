@@ -35,7 +35,7 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
-import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
+import { generateSchedule, loadSchedule, updateSchedule, createEmptySchedule } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
   const [newTask, setNewTask] = useState('');
@@ -632,6 +632,7 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0);
         
+        // Step 1: Try to fetch calendar events first
         const calendarResponse = await calendarApi.fetchEvents(today);
 
         if (calendarResponse.success && calendarResponse.tasks.length > 0) {
@@ -640,14 +641,65 @@ const Dashboard: React.FC = () => {
           return;
         }
         
+        // Step 2: Try to load existing schedule
         const existingSchedule = await loadSchedule(today);
         
         if (existingSchedule.success && existingSchedule.schedule) {
           setScheduleDays([existingSchedule.schedule]);
           setScheduleCache(new Map([[today, existingSchedule.schedule]]));
+          return;
         }
+        
+        // Step 3: Create empty schedule as fallback
+        console.log("No calendar events or existing schedule found, creating empty schedule");
+        
+        const emptyScheduleResult = await createEmptySchedule(today);
+        
+        if (emptyScheduleResult.success && emptyScheduleResult.schedule) {
+          setScheduleDays([emptyScheduleResult.schedule]);
+          setScheduleCache(new Map([[today, emptyScheduleResult.schedule]]));
+          
+          console.log("Empty schedule created successfully");
+          
+          // Show success message for new users
+          toast({
+            title: "Welcome!",
+            description: "Your schedule is ready. You can add tasks or generate an AI-powered schedule.",
+          });
+        } else {
+          // Final fallback: create basic empty array structure
+          console.warn("Failed to create empty schedule, using basic empty structure");
+          setScheduleDays([[]]);
+          
+          toast({
+            title: "Notice",
+            description: "Schedule initialized. You can start adding tasks manually.",
+          });
+        }
+        
       } catch (error) {
         console.error("Error loading initial schedule:", error);
+        
+        // Error fallback: create basic empty schedule structure
+        try {
+          console.log("Attempting to create basic empty schedule due to error");
+          setScheduleDays([[]]);
+          
+          toast({
+            title: "Warning",
+            description: "Could not initialize schedule properly. You can still create tasks manually.",
+            variant: "destructive",
+          });
+        } catch (fallbackError) {
+          console.error("Failed to create fallback empty schedule:", fallbackError);
+          
+          // Show error but don't block the UI
+          toast({
+            title: "Error",
+            description: "Failed to initialize schedule. Please refresh the page.",
+            variant: "destructive",
+          });
+        }
       } finally {
         setIsLoadingSchedule(false);
       }
@@ -656,7 +708,7 @@ const Dashboard: React.FC = () => {
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
