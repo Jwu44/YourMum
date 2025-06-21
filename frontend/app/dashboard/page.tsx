@@ -31,6 +31,7 @@ import {
   // handleUpdateTask,
   // handleDeleteTask,
   fetchAISuggestions,
+  formatDateToString,
 } from '@/lib/helper';
 
 // Direct API helpers (no ScheduleHelper)
@@ -218,7 +219,7 @@ const Dashboard: React.FC = () => {
   const getDateString = (offset: number): string => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
-    return date.toISOString().split('T')[0];
+    return formatDateToString(date);
   };
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {

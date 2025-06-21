@@ -491,11 +491,11 @@ def store_schedule_for_user(user_id: str, date: str, calendar_tasks: List[Dict])
             [
                 {
                     "$set": {
-                        "tasks": {
+                        "schedule": {
                             "$concatArrays": [
-                                # Keep non-calendar tasks
+                                # Keep non-calendar tasks from schedule field
                                 {"$filter": {
-                                    "input": {"$ifNull": ["$tasks", []]},
+                                    "input": {"$ifNull": ["$schedule", []]},
                                     "cond": {"$ne": ["$$this.from_gcal", True]}
                                 }},
                                 # Add new calendar tasks
