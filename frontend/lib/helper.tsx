@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Task, FormAction, DecompositionRequest, 
   DecompositionResponse, MicrostepFeedback, FeedbackResponse, 
   FormData, GetAISuggestionsResponse } from './types';
+import { auth } from '@/auth/firebase';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const today = new Date().toISOString().split('T')[0];
@@ -640,6 +642,19 @@ export const formatDateToString = (date: Date): string => {
 };
 
 /**
+ * Get the current user's Firebase ID token for API authentication
+ * @returns Promise<string> - The authentication token
+ * @throws Error if user is not authenticated
+ */
+const getAuthToken = async (): Promise<string> => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+  return await currentUser.getIdToken();
+};
+
+/**
  * Check if a schedule exists for a specific date
  * @param date The date to check for schedule existence
  * @returns Promise<boolean> indicating if a schedule exists
@@ -649,17 +664,22 @@ export const checkScheduleExists = async (date: Date): Promise<boolean> => {
     // Format date for API
     const dateStr = formatDateToString(date);
     
-    // Use the range endpoint with a single day range for efficiency
+    // Use the existing GET schedule endpoint to check if a schedule exists
     const response = await fetch(
-      `${API_BASE_URL}/api/schedules/range?start_date=${dateStr}&end_date=${dateStr}`
+      `${API_BASE_URL}/api/schedules/${dateStr}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getAuthToken()}`,
+        },
+      }
     );
 
-    if (!response.ok) {
-      throw new Error('Failed to check schedule existence');
-    }
-
-    const data = await response.json();
-    return data.schedules.length > 0;
+    // If we get a 200, schedule exists
+    // If we get a 404, schedule doesn't exist
+    // Any other error should be treated as "doesn't exist" for safety
+    return response.ok;
   } catch (error) {
     console.error('Error checking schedule:', error);
     return false;
