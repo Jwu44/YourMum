@@ -474,45 +474,40 @@ def get_calendar_events():
 
 def store_schedule_for_user(user_id: str, date: str, calendar_tasks: List[Dict]) -> bool:
     """
-    Store or update calendar tasks for a user on a specific date
-    
-    Args:
-        user_id: User's Google ID
-        date: Date string (YYYY-MM-DD)
-        calendar_tasks: List of task objects from calendar
-    
-    Returns:
-        bool: True if successful, False otherwise
+    Store or update calendar tasks for a user on a specific date.
+    Uses aggregation pipeline to replace calendar tasks in single operation.
     """
     try:
-        # Get schedules collection
         schedules = get_user_schedules_collection()
-        
-        # Format date for storage
         date_str = f"{date}T00:00:00"
         date_end = f"{date}T23:59:59"
         
-        # Use upsert approach with atomic operations
+        # Single operation: filter out calendar tasks and add new ones
         update_result = schedules.update_one(
             {
                 "userId": user_id,
                 "date": {"$gte": date_str, "$lt": date_end}
             },
-            {
-                # Remove existing calendar tasks and add new ones in one operation
-                "$pull": {"tasks": {"from_gcal": True}},
-                "$push": {"tasks": {"$each": calendar_tasks}},
-                "$set": {
-                    "metadata.lastModified": datetime.now(timezone.utc).isoformat(),
-                    "metadata.calendarSynced": True,
-                    "metadata.calendarEvents": len(calendar_tasks)
-                },
-                "$setOnInsert": {
-                    "userId": user_id,
-                    "date": date_str,
-                    "metadata.createdAt": datetime.now(timezone.utc).isoformat(),
+            [
+                {
+                    "$set": {
+                        "tasks": {
+                            "$concatArrays": [
+                                # Keep non-calendar tasks
+                                {"$filter": {
+                                    "input": {"$ifNull": ["$tasks", []]},
+                                    "cond": {"$ne": ["$$this.from_gcal", True]}
+                                }},
+                                # Add new calendar tasks
+                                calendar_tasks
+                            ]
+                        },
+                        "metadata.lastModified": datetime.now(timezone.utc).isoformat(),
+                        "metadata.calendarSynced": True,
+                        "metadata.calendarEvents": len(calendar_tasks)
+                    }
                 }
-            },
+            ],
             upsert=True
         )
         
