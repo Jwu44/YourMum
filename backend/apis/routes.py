@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user
+from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 from bson import ObjectId
 from datetime import datetime, timezone 
@@ -89,6 +89,14 @@ def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
         The decoded token payload or None if verification fails
     """
     try:
+        # Development bypass
+        if os.getenv('NODE_ENV') == 'development' and token == 'mock-token-for-development':
+            return {
+                'uid': 'dev-user-123',
+                'email': 'dev@example.com',
+                'name': 'Dev User'
+            }
+        
         # Verify the token
         decoded_token = firebase_auth.verify_id_token(token)
         return decoded_token
@@ -117,6 +125,18 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         user_id = decoded_token.get('uid')
         if not user_id:
             return None
+            
+        # Development bypass - return mock user for dev-user-123
+        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
+            return {
+                'googleId': 'dev-user-123',
+                'email': 'dev@example.com',
+                'displayName': 'Dev User',
+                'photoURL': '',
+                'role': 'free',
+                'calendarSynced': False,
+                # Add other required fields as needed
+            }
             
         # Get database instance
         db = get_database()
@@ -767,6 +787,7 @@ def submit_data():
     
     Expected request body (from InputsConfig.tsx state):
     {
+        "date": str (YYYY-MM-DD format, required),
         "name": str (optional),
         "googleId": str (optional),
         "tasks": List[Dict] (optional, may include calendar events as task objects),
@@ -786,7 +807,7 @@ def submit_data():
         200: Schedule generated successfully with schedule data
         400: Invalid request data or validation errors  
         401: Authentication required
-        500: Internal server error
+        500: Internal server error (with existing schedule if available)
     """
     try:
         # Validate request data
@@ -803,7 +824,7 @@ def submit_data():
             return jsonify(error_response), 401
 
         # Validate required fields from InputsConfig.tsx
-        required_fields = ['work_start_time', 'work_end_time']
+        required_fields = ['date', 'work_start_time', 'work_end_time']
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             return jsonify({
@@ -811,19 +832,79 @@ def submit_data():
                 "error": f"Missing required fields: {', '.join(missing_fields)}"
             }), 400
 
-        # Use schedule service to create or update schedule
-        success, result = schedule_service.create_or_update_schedule(user_id, data)
-        
-        if not success:
+        # Validate date format
+        date = data['date']
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
             return jsonify({
                 "success": False,
-                "error": result.get("error", "Failed to generate schedule")
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Get existing schedule for fallback error handling
+        existing_schedule = None
+        try:
+            success, result = schedule_service.get_schedule_by_date(user_id, date)
+            if success:
+                existing_schedule = result.get('schedule', [])
+        except Exception:
+            # Continue if we can't get existing schedule
+            pass
+
+        # Call schedule_gen.py directly - bypass schedule service
+        try:
+            schedule_result = generate_schedule(data)
+            
+            if not schedule_result or not schedule_result.get('success', True):
+                raise Exception(schedule_result.get('error', 'Schedule generation failed'))
+            
+            generated_tasks = schedule_result.get('tasks', [])
+            if not generated_tasks:
+                raise Exception('No tasks generated')
+
+        except Exception as gen_error:
+            print(f"Schedule generation failed: {str(gen_error)}")
+            # Return existing schedule with error message
+            return jsonify({
+                "success": False,
+                "error": f"Failed to generate schedule: {str(gen_error)}",
+                "schedule": existing_schedule or [],
+                "fallback": True
             }), 500
 
-        return jsonify({
-            "success": True,
-            **result
-        })
+        # Store the generated schedule using centralized service
+        try:
+            success, result = schedule_service.create_schedule_from_ai_generation(
+                user_id=user_id,
+                date=date,
+                generated_tasks=generated_tasks,
+                inputs=data
+            )
+            
+            if not success:
+                print(f"Error storing AI-generated schedule: {result.get('error', 'Unknown error')}")
+                # Return generated schedule even if storage fails
+                return jsonify({
+                    "success": True,
+                    **result
+                })
+
+            return jsonify({
+                "success": True,
+                **result
+            })
+
+        except Exception as store_error:
+            print(f"Error storing schedule: {str(store_error)}")
+            # Return generated schedule even if storage fails
+            return jsonify({
+                "success": True,
+                "schedule": generated_tasks,
+                "date": date,
+                "warning": f"Schedule generated but storage failed: {str(store_error)}"
+            })
 
     except Exception as e:
         print(f"Error in submit_data: {str(e)}")
@@ -884,7 +965,13 @@ def get_schedule_by_date(date):
         success, result = schedule_service.get_schedule_by_date(user_id, date)
         
         if not success:
-            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            # More explicit error handling
+            error_msg = result.get("error", "")
+            if "no schedule found" in error_msg.lower() or "not found" in error_msg.lower():
+                status_code = 404
+            else:
+                status_code = 500
+            
             return jsonify({
                 "success": False,
                 "error": result.get("error", "Failed to get schedule")
@@ -912,24 +999,7 @@ def handle_schedule_options(date):
 def update_schedule_by_date(date):
     """
     Update an existing schedule for a specific date with new tasks.
-    
-    URL Parameters:
-        date: Date in YYYY-MM-DD format
-        
-    Headers:
-        Authorization: Bearer <firebase_id_token> (required)
-        
-    Request Body:
-        {
-            "tasks": List[Dict] - Array of task objects to update the schedule with
-        }
-    
-    Returns:
-        200: Schedule updated successfully
-        400: Invalid date format, missing tasks, or validation errors
-        401: Authentication required
-        404: No existing schedule found for the date
-        500: Internal server error
+    Returns 404 if schedule doesn't exist (proper REST semantics).
     """
     try:
         # Validate date format
@@ -976,7 +1046,7 @@ def update_schedule_by_date(date):
 
         user_id = user.get('googleId')
 
-        # Use schedule service to update schedule
+        # Use strict update - fail if schedule doesn't exist
         success, result = schedule_service.update_schedule_tasks(user_id, date, tasks)
         
         if not success:
@@ -1000,21 +1070,22 @@ def update_schedule_by_date(date):
         }), 500
 
 @api_bp.route("/schedules", methods=["POST"])
-def create_empty_schedule():
+def create_schedule():
     """
-    Create an empty schedule for a user on a specific date.
+    Create a new schedule for a user on a specific date with provided tasks.
     
     Expected request body:
     {
-        "date": str (YYYY-MM-DD format, optional - defaults to today)
+        "date": str (YYYY-MM-DD format, required),
+        "tasks": List[Dict] (optional, defaults to empty array)
     }
     
     Headers:
         Authorization: Bearer <firebase_id_token> (required)
     
     Returns:
-        200: Empty schedule created successfully
-        400: Invalid date format or request data
+        200: Schedule created successfully
+        400: Invalid date format, invalid tasks, or validation errors
         401: Authentication required
         500: Internal server error
     """
@@ -1037,14 +1108,21 @@ def create_empty_schedule():
 
         user_id = user.get('googleId')
 
-        # Get request data (date is optional)
-        data = request.json or {}
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate required date field
         date = data.get('date')
-        
-        # Default to today if no date provided
         if not date:
-            from datetime import datetime
-            date = datetime.now().strftime('%Y-%m-%d')
+            return jsonify({
+                "success": False,
+                "error": "Missing required field: date"
+            }), 400
         
         # Validate date format
         try:
@@ -1056,13 +1134,25 @@ def create_empty_schedule():
                 "error": "Invalid date format. Use YYYY-MM-DD"
             }), 400
 
-        # Use schedule service to create empty schedule
-        success, result = schedule_service.create_empty_schedule(user_id, date)
+        # Validate tasks array (optional, defaults to empty)
+        tasks = data.get('tasks', [])
+        if not isinstance(tasks, list):
+            return jsonify({
+                "success": False,
+                "error": "Tasks must be an array"
+            }), 400
+
+        # Create schedule using centralized service
+        success, result = schedule_service.create_empty_schedule(
+            user_id=user_id,
+            date=date,
+            tasks=tasks
+        )
         
         if not success:
             return jsonify({
                 "success": False,
-                "error": result.get("error", "Failed to create empty schedule")
+                "error": result.get("error", "Failed to create schedule")
             }), 500
 
         return jsonify({
@@ -1071,7 +1161,7 @@ def create_empty_schedule():
         })
 
     except Exception as e:
-        print(f"Error in create_empty_schedule: {str(e)}")
+        print(f"Error in create_schedule: {str(e)}")
         traceback.print_exc()
         return jsonify({
             "success": False,

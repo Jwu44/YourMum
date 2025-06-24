@@ -1,6 +1,10 @@
 import { UserDocument, Task } from '../types';
 import { auth } from '@/auth/firebase';
 
+// Add development bypass constants
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
 // Use the calendar part of UserDocument type
 type CalendarStatus = NonNullable<UserDocument['calendar']>;
 
@@ -11,6 +15,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
  * Get the current user's Firebase ID token for API authentication
  */
 async function getAuthToken(): Promise<string> {
+  // In development mode with bypass enabled, return a mock token
+  if (IS_DEVELOPMENT && BYPASS_AUTH) {
+    return 'mock-token-for-development';
+  }
+  
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('User not authenticated');
