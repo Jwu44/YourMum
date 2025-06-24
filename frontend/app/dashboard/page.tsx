@@ -27,9 +27,6 @@ import {
 
 // Helpers
 import {
-  // handleAddTask,
-  handleUpdateTask,
-  handleDeleteTask,
   fetchAISuggestions,
   formatDateToString,
 } from '@/lib/helper';
