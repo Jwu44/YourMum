@@ -27,9 +27,9 @@ import {
 
 // Helpers
 import {
-  handleAddTask,
-  // handleUpdateTask,
-  // handleDeleteTask,
+  // handleAddTask,
+  handleUpdateTask,
+  handleDeleteTask,
   fetchAISuggestions,
   formatDateToString,
 } from '@/lib/helper';
@@ -42,7 +42,7 @@ const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const { state, dispatch } = useForm();
+  const { state } = useForm();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -108,24 +108,6 @@ const Dashboard: React.FC = () => {
       });
     }
   }, [currentDayIndex, scheduleDays, toast]);
-
-  // const updateTask = useCallback((updatedTask: Task) => {
-  //   const updatedTasks = handleUpdateTask(state.tasks || [], updatedTask);
-  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  //   toast({
-  //     title: "Success",
-  //     description: "Task updated successfully.",
-  //   });
-  // }, [state.tasks, dispatch, toast]);
-
-  // const deleteTask = useCallback((taskId: string) => {
-  //   const updatedTasks = handleDeleteTask(state.tasks || [], taskId);
-  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  //   toast({
-  //     title: "Success",
-  //     description: "Task deleted successfully.",
-  //   });
-  // }, [state.tasks, dispatch, toast]);
 
   // Optimized handleSubmit - direct API call, no ScheduleHelper processing
   const handleSubmit = useCallback(async () => {
