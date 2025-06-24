@@ -24,6 +24,10 @@ export const useAuth = () => {
   return context;
 };
 
+// Add this constant at the top after imports
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +132,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Listen for authentication state changes
   useEffect(() => {
     console.log("Setting up auth state listener");
+    
+    // If in development mode with bypass enabled, create a mock user
+    if (IS_DEVELOPMENT && BYPASS_AUTH) {
+      console.log("Development mode: bypassing authentication");
+      const mockUser = {
+        uid: 'dev-user-123',
+        email: 'dev@example.com',
+        displayName: 'Dev User',
+        photoURL: null,
+        getIdToken: async () => 'mock-token-for-development'
+      } as User;
+      
+      setUser(mockUser);
+      setLoading(false);
+      return;
+    }
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");

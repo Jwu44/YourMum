@@ -25,12 +25,21 @@ import {
 // API base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// Add this constant at the top after imports
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
 /**
  * Get the current user's Firebase ID token for API authentication
  * @returns Promise<string> - The authentication token
  * @throws Error if user is not authenticated
  */
 const getAuthToken = async (): Promise<string> => {
+  // In development mode with bypass enabled, return a mock token
+  if (IS_DEVELOPMENT && BYPASS_AUTH) {
+    return 'mock-token-for-development';
+  }
+  
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('User not authenticated');
@@ -179,13 +188,103 @@ export const loadSchedule = async (date: string): Promise<{
 };
 
 /**
- * Update an existing schedule with new tasks
+ * Create a new schedule with provided tasks
  * 
- * Updates a schedule for a specific date with modified tasks.
+ * Creates a new schedule for a specific date with the given tasks.
+ * Uses the POST /api/schedules endpoint to ensure proper REST semantics.
+ * 
+ * @param date - Date in YYYY-MM-DD format
+ * @param tasks - Array of tasks for the new schedule
+ * @returns Promise with success status and new schedule data
+ * @throws Error if date format is invalid or tasks is not an array
+ */
+export const createSchedule = async (date: string, tasks: Task[]): Promise<{
+  success: boolean;
+  schedule?: Task[];
+  error?: string;
+  metadata?: {
+    totalTasks: number;
+    calendarEvents: number;
+    recurringTasks: number;
+    generatedAt: string;
+  };
+}> => {
+  try {
+    // Input validation - ensure date format is correct
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Input validation - ensure tasks is an array
+    if (!Array.isArray(tasks)) {
+      throw new Error('Tasks must be an array');
+    }
+
+    // Get authentication token with proper error handling
+    const token = await getAuthToken();
+
+    // Prepare request payload
+    const requestPayload = { date, tasks };
+
+    // Call backend API to create schedule
+    const response = await fetch(`${API_BASE_URL}/api/schedules`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    // Handle HTTP errors
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || `HTTP ${response.status}: Failed to create schedule`;
+      throw new Error(errorMessage);
+    }
+
+    // Parse and validate response
+    const result = await response.json();
+    
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || 'Failed to create schedule'
+      };
+    }
+
+    // Return structured response with validated data
+    return {
+      success: true,
+      schedule: result.schedule || [],
+      metadata: result.metadata || {
+        totalTasks: 0,
+        calendarEvents: 0,
+        recurringTasks: 0,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Error creating schedule:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create schedule'
+    };
+  }
+};
+
+/**
+ * Update an existing schedule with new tasks, or create if it doesn't exist
+ * 
+ * Implements upsert behavior: attempts to update existing schedule first,
+ * then creates new schedule if none exists. This provides a seamless
+ * experience for manual task addition via FAB.
  * 
  * @param date - Date in YYYY-MM-DD format
  * @param tasks - Updated array of tasks
  * @returns Promise with success status and updated schedule data
+ * @throws Error if date format is invalid or tasks is not an array
  */
 export const updateSchedule = async (date: string, tasks: Task[]): Promise<{
   success: boolean;
@@ -199,47 +298,65 @@ export const updateSchedule = async (date: string, tasks: Task[]): Promise<{
   };
 }> => {
   try {
-    // Validate inputs
+    // Input validation - ensure date format is correct
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new Error('Invalid date format. Use YYYY-MM-DD');
     }
 
+    // Input validation - ensure tasks is an array
     if (!Array.isArray(tasks)) {
       throw new Error('Tasks must be an array');
     }
 
-    // Get authentication token
+    // Get authentication token with proper error handling
     const token = await getAuthToken();
 
-    // Call backend API
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${encodeURIComponent(date)}`, {
+    // Prepare request payload
+    const requestPayload = { tasks };
+
+    // Step 1: Attempt to update existing schedule (PUT)
+    const updateResponse = await fetch(`${API_BASE_URL}/api/schedules/${encodeURIComponent(date)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ tasks }),
+      body: JSON.stringify(requestPayload),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to update schedule (${response.status})`);
-    }
+    // Handle successful update
+    if (updateResponse.ok) {
+      const result = await updateResponse.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Failed to update schedule'
+        };
+      }
 
-    const result = await response.json();
-    
-    if (!result.success) {
       return {
-        success: false,
-        error: result.error || 'Failed to update schedule'
+        success: true,
+        schedule: result.schedule || [],
+        metadata: result.metadata || {
+          totalTasks: 0,
+          calendarEvents: 0,
+          recurringTasks: 0,
+          generatedAt: new Date().toISOString()
+        }
       };
     }
 
-    return {
-      success: true,
-      schedule: result.schedule || [],
-      metadata: result.metadata
-    };
+    // Step 2: Handle 404 (no existing schedule) by creating new one
+    if (updateResponse.status === 404) {
+      console.log('No existing schedule found, creating new schedule for date:', date);
+      return await createSchedule(date, tasks);
+    }
+
+    // Step 3: Handle other HTTP errors
+    const errorData = await updateResponse.json().catch(() => ({}));
+    const errorMessage = errorData.error || `HTTP ${updateResponse.status}: Failed to update schedule`;
+    throw new Error(errorMessage);
 
   } catch (error) {
     console.error('Error updating schedule:', error);
@@ -309,87 +426,3 @@ export const getWeekOfMonth = (date: Date): MonthWeek => {
   if (dayOfMonth >= 22 && dayOfMonth <= 28) return 'fourth';
   return 'last';
 };
-
-/**
- * Create an empty schedule for a specific date
- * 
- * Creates a new empty schedule document in the backend for users who don't have
- * calendar events or existing schedules. This is used for initial dashboard setup.
- * 
- * @param date - Date in YYYY-MM-DD format (optional, defaults to today)
- * @returns Promise with success status and empty schedule data
- */
-export const createEmptySchedule = async (date?: string): Promise<{
-  success: boolean;
-  schedule?: Task[];
-  error?: string;
-  scheduleId?: string;
-  metadata?: {
-    totalTasks: number;
-    calendarEvents: number;
-    recurringTasks: number;
-    generatedAt: string;
-  };
-}> => {
-  try {
-    // Default to today if no date provided
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    
-    // Validate date format
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-      throw new Error('Invalid date format. Use YYYY-MM-DD');
-    }
-
-    // Get authentication token
-    const token = await getAuthToken();
-
-    // Prepare request payload
-    const payload = {
-      date: targetDate
-    };
-
-    // Call backend API
-    const response = await fetch(`${API_BASE_URL}/api/schedules`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to create empty schedule (${response.status})`);
-    }
-
-    const result = await response.json();
-    
-    if (!result.success) {
-      return {
-        success: false,
-        error: result.error || 'Failed to create empty schedule'
-      };
-    }
-
-    return {
-      success: true,
-      schedule: result.schedule || [],
-      scheduleId: result.scheduleId,
-      metadata: result.metadata || {
-        totalTasks: 0,
-        calendarEvents: 0,
-        recurringTasks: 0,
-        generatedAt: new Date().toISOString()
-      }
-    };
-
-  } catch (error) {
-    console.error('Error creating empty schedule:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to create empty schedule'
-    };
-  }
-};
-

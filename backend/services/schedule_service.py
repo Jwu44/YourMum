@@ -1,12 +1,15 @@
 """
 Schedule Service Module
 
-Centralized service for handling schedule operations including creation, retrieval,
-updates, and validation. Provides a clean abstraction layer between API routes
-and database operations.
+Centralized service for handling all schedule operations including creation,
+retrieval, updates, and validation. Provides a clean abstraction layer between 
+API routes and database operations.
+
+All schedule creation operations are centralized here for consistency and 
+to eliminate code duplication across API routes.
 """
 
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 import traceback
 
 from backend.db_config import get_user_schedules_collection
@@ -15,96 +18,19 @@ from backend.models.schedule_schema import (
     format_schedule_date, 
     format_timestamp
 )
-from backend.services.schedule_gen import generate_schedule
 
 
 class ScheduleService:
     """
     Service class for managing schedule operations with proper error handling
     and business logic separation.
+    
+    Centralizes all schedule CRUD operations to eliminate duplication across API routes.
     """
 
     def __init__(self):
         """Initialize the schedule service."""
         self.schedules_collection = get_user_schedules_collection()
-
-    def create_or_update_schedule(
-        self, 
-        user_id: str, 
-        form_data: Dict[str, Any], 
-        date: Optional[str] = None
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Create a new schedule or update existing one using AI service.
-        
-        Args:
-            user_id: User's Google ID or Firebase UID
-            form_data: Form data from frontend containing user preferences and tasks
-            date: Optional date string (YYYY-MM-DD), defaults to today
-            
-        Returns:
-            Tuple of (success: bool, result: Dict) where result contains either
-            schedule data on success or error message on failure
-        """
-        try:
-            # Use provided date or default to today
-            schedule_date = format_schedule_date(date)
-            
-            # Check if schedule already exists
-            existing_schedule = self.schedules_collection.find_one({
-                "userId": user_id,
-                "date": schedule_date
-            })
-
-            # Generate schedule using AI service
-            schedule_result = generate_schedule({
-                **form_data,
-                'user_id': user_id,
-                'tasks': form_data.get('tasks', [])
-            })
-            
-            if not schedule_result or not schedule_result.get('tasks'):
-                return False, {"error": "Failed to generate schedule"}
-
-            # Prepare schedule document
-            schedule_document = self._build_schedule_document(
-                user_id=user_id,
-                date=schedule_date,
-                tasks=schedule_result['tasks'],
-                form_data=form_data,
-                source="ai_service"
-            )
-
-            # Validate document against schema
-            is_valid, validation_error = validate_schedule_document(schedule_document)
-            if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
-
-            # Store or update schedule
-            if existing_schedule:
-                success, schedule_id = self._update_existing_schedule(
-                    existing_schedule["_id"], 
-                    schedule_document
-                )
-            else:
-                success, schedule_id = self._create_new_schedule(schedule_document)
-
-            if not success:
-                return False, {"error": "Failed to store schedule"}
-
-            # Calculate and return metadata
-            metadata = self._calculate_schedule_metadata(schedule_result['tasks'])
-            
-            return True, {
-                "schedule": schedule_result['tasks'],
-                "scheduleId": str(schedule_id),
-                "metadata": metadata
-            }
-
-        except Exception as e:
-            print(f"Error in create_or_update_schedule: {str(e)}")
-            traceback.print_exc()
-            return False, {"error": f"Internal error: {str(e)}"}
 
     def get_schedule_by_date(
         self, 
@@ -122,10 +48,9 @@ class ScheduleService:
             Tuple of (success: bool, result: Dict) where result contains either
             schedule data on success or error message on failure
         """
-        try:
+        try:            
             # Format date for database query
             formatted_date = format_schedule_date(date)
-            
             # Find schedule in database
             schedule_doc = self.schedules_collection.find_one({
                 "userId": user_id,
@@ -158,6 +83,247 @@ class ScheduleService:
             traceback.print_exc()
             return False, {"error": f"Internal error: {str(e)}"}
 
+    def create_schedule_from_ai_generation(
+        self,
+        user_id: str,
+        date: str,
+        generated_tasks: List[Dict[str, Any]],
+        inputs: Dict[str, Any]
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Create or replace a schedule from AI generation with full input context.
+        
+        Args:
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            generated_tasks: List of AI-generated task objects
+            inputs: Full user input data used for generation
+            
+        Returns:
+            Tuple of (success: bool, result: Dict) where result contains either
+            schedule data on success or error message on failure
+        """
+        try:
+            # Prepare inputs with safe defaults
+            processed_inputs = {
+                "name": inputs.get('name', ''),
+                "work_start_time": inputs.get('work_start_time', ''),
+                "work_end_time": inputs.get('work_end_time', ''),
+                "working_days": inputs.get('working_days', []),
+                "energy_patterns": inputs.get('energy_patterns', []),
+                "priorities": inputs.get('priorities', {}),
+                "layout_preference": inputs.get('layout_preference', {}),
+                "tasks": inputs.get('tasks', [])
+            }
+            
+            # Create schedule document using centralized helper
+            schedule_document = self._create_schedule_document(
+                user_id=user_id,
+                date=date,
+                tasks=generated_tasks,
+                source="ai_service",
+                inputs=processed_inputs
+            )
+            
+            # Validate document before storage
+            is_valid, validation_error = validate_schedule_document(schedule_document)
+            if not is_valid:
+                return False, {"error": f"Schedule validation failed: {validation_error}"}
+            
+            # Replace existing schedule or create new one (upsert)
+            formatted_date = format_schedule_date(date)
+            result = self.schedules_collection.replace_one(
+                {"userId": user_id, "date": formatted_date},
+                schedule_document,
+                upsert=True
+            )
+            
+            # Calculate and return response metadata
+            metadata = self._calculate_schedule_metadata(generated_tasks)
+            metadata.update({
+                "generatedAt": schedule_document["metadata"]["created_at"],
+                "lastModified": schedule_document["metadata"]["last_modified"],
+                "source": "ai_service"
+            })
+            
+            return True, {
+                "schedule": generated_tasks,
+                "date": date,
+                "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
+                "metadata": metadata
+            }
+            
+        except Exception as e:
+            print(f"Error in create_schedule_from_ai_generation: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to create AI-generated schedule: {str(e)}"}
+
+    def create_schedule_from_calendar_sync(
+        self,
+        user_id: str,
+        date: str,
+        calendar_tasks: List[Dict[str, Any]]
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Create or merge calendar tasks with existing schedule.
+        Preserves non-calendar tasks and adds/updates calendar tasks.
+        
+        Args:
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            calendar_tasks: List of calendar task objects to sync
+            
+        Returns:
+            Tuple of (success: bool, result: Dict) where result contains either
+            schedule data on success or error message on failure
+        """
+        try:
+            formatted_date = format_schedule_date(date)
+            
+            # Check if schedule exists
+            existing_schedule = self.schedules_collection.find_one({
+                "userId": user_id,
+                "date": formatted_date
+            })
+            
+            if existing_schedule:
+                # Merge calendar tasks with existing non-calendar tasks
+                existing_tasks = existing_schedule.get('schedule', [])
+                
+                # Filter out old calendar tasks, keep non-calendar tasks
+                non_calendar_tasks = [
+                    task for task in existing_tasks 
+                    if not task.get('from_gcal', False)
+                ]
+                
+                # Combine with new calendar tasks
+                merged_tasks = non_calendar_tasks + calendar_tasks
+                
+                # Update existing schedule
+                result = self.schedules_collection.update_one(
+                    {"userId": user_id, "date": formatted_date},
+                    {
+                        "$set": {
+                            "schedule": merged_tasks,
+                            "metadata.last_modified": format_timestamp(),
+                            "metadata.calendarSynced": True,
+                            "metadata.calendarEvents": len(calendar_tasks)
+                        }
+                    }
+                )
+                
+                if result.modified_count == 0:
+                    return False, {"error": "Failed to update schedule with calendar tasks"}
+                
+                final_tasks = merged_tasks
+                
+            else:
+                # Create new schedule with calendar tasks only
+                schedule_document = self._create_schedule_document(
+                    user_id=user_id,
+                    date=date,
+                    tasks=calendar_tasks,
+                    source="calendar"
+                )
+                
+                # Add calendar-specific metadata
+                schedule_document["metadata"].update({
+                    "calendarSynced": True,
+                    "calendarEvents": len(calendar_tasks)
+                })
+                
+                # Validate and insert
+                is_valid, validation_error = validate_schedule_document(schedule_document)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
+                
+                result = self.schedules_collection.insert_one(schedule_document)
+                final_tasks = calendar_tasks
+            
+            # Calculate metadata for response
+            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata.update({
+                "generatedAt": format_timestamp(),
+                "lastModified": format_timestamp(),
+                "source": "calendar",
+                "calendarSynced": True,
+                "calendarEvents": len(calendar_tasks)
+            })
+            
+            return True, {
+                "schedule": final_tasks,
+                "date": date,
+                "metadata": metadata
+            }
+            
+        except Exception as e:
+            print(f"Error in create_schedule_from_calendar_sync: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to sync calendar schedule: {str(e)}"}
+
+    def create_empty_schedule(
+        self,
+        user_id: str,
+        date: str,
+        tasks: Optional[List[Dict[str, Any]]] = None
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Create a basic schedule manually with optional initial tasks.
+        
+        Args:
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            tasks: Optional list of initial task objects (defaults to empty list)
+            
+        Returns:
+            Tuple of (success: bool, result: Dict) where result contains either
+            schedule data on success or error message on failure
+        """
+        try:
+            # Default to empty task list if none provided
+            initial_tasks = tasks if tasks is not None else []
+            
+            # Create schedule document using centralized helper
+            schedule_document = self._create_schedule_document(
+                user_id=user_id,
+                date=date,
+                tasks=initial_tasks,
+                source="manual"
+            )
+            
+            # Validate document before storage
+            is_valid, validation_error = validate_schedule_document(schedule_document)
+            if not is_valid:
+                return False, {"error": f"Schedule validation failed: {validation_error}"}
+            
+            # Replace existing schedule or create new one (upsert)
+            formatted_date = format_schedule_date(date)
+            result = self.schedules_collection.replace_one(
+                {"userId": user_id, "date": formatted_date},
+                schedule_document,
+                upsert=True
+            )
+            
+            # Calculate response metadata
+            metadata = self._calculate_schedule_metadata(initial_tasks)
+            metadata.update({
+                "generatedAt": schedule_document["metadata"]["created_at"],
+                "lastModified": schedule_document["metadata"]["last_modified"],
+                "source": "manual"
+            })
+            
+            return True, {
+                "schedule": initial_tasks,
+                "date": date,
+                "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
+                "metadata": metadata
+            }
+            
+        except Exception as e:
+            print(f"Error in create_empty_schedule: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to create manual schedule: {str(e)}"}
+
     def update_schedule_tasks(
         self, 
         user_id: str, 
@@ -165,7 +331,8 @@ class ScheduleService:
         tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Update an existing schedule with new tasks.
+        Update an existing schedule with new tasks, or create if it doesn't exist.
+        Now implements upsert behavior for seamless manual task addition.
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -186,151 +353,112 @@ class ScheduleService:
                 "date": formatted_date
             })
 
-            if not existing_schedule:
-                return False, {"error": "No existing schedule found for this date"}
-
-            # Validate updated document structure
-            temp_doc = {
-                **existing_schedule,
-                "schedule": tasks,
-                "metadata": {
-                    **existing_schedule.get('metadata', {}),
-                    "last_modified": format_timestamp(),
-                    "source": "manual"
-                }
-            }
-            
-            is_valid, validation_error = validate_schedule_document(temp_doc)
-            if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
-
-            # Update the schedule
-            result = self.schedules_collection.update_one(
-                {"_id": existing_schedule["_id"]},
-                {
-                    "$set": {
-                        "schedule": tasks,
-                        "metadata.last_modified": format_timestamp(),
-                        "metadata.source": "manual"
+            if existing_schedule:
+                # Update existing schedule
+                # Validate updated document structure
+                temp_doc = {
+                    **existing_schedule,
+                    "schedule": tasks,
+                    "metadata": {
+                        **existing_schedule.get('metadata', {}),
+                        "last_modified": format_timestamp(),
+                        "source": "manual"
                     }
                 }
-            )
+                
+                is_valid, validation_error = validate_schedule_document(temp_doc)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
 
-            if result.modified_count == 0:
-                return False, {"error": "Failed to update schedule"}
+                # Update the schedule
+                result = self.schedules_collection.update_one(
+                    {"_id": existing_schedule["_id"]},
+                    {
+                        "$set": {
+                            "schedule": tasks,
+                            "metadata.last_modified": format_timestamp(),
+                            "metadata.source": "manual"
+                        }
+                    }
+                )
 
-            # Calculate metadata
-            metadata = self._calculate_schedule_metadata(tasks)
-            metadata.update({
-                "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
-                "lastModified": format_timestamp(),
-                "source": "manual"
-            })
+                if result.modified_count == 0:
+                    return False, {"error": "Failed to update schedule"}
 
-            return True, {
-                "schedule": tasks,
-                "date": date,
-                "metadata": metadata
-            }
+                # Calculate metadata
+                metadata = self._calculate_schedule_metadata(tasks)
+                metadata.update({
+                    "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
+                    "lastModified": format_timestamp(),
+                    "source": "manual"
+                })
+
+                return True, {
+                    "schedule": tasks,
+                    "date": date,
+                    "metadata": metadata
+                }
+            else:
+                # No existing schedule - create new one using create_empty_schedule logic
+                return self.create_empty_schedule(user_id, date, tasks)
 
         except Exception as e:
             print(f"Error in update_schedule_tasks: {str(e)}")
             traceback.print_exc()
             return False, {"error": f"Internal error: {str(e)}"}
 
-    def _build_schedule_document(
-        self, 
-        user_id: str, 
-        date: str, 
-        tasks: List[Dict[str, Any]], 
-        form_data: Dict[str, Any],
-        source: str = "ai_service"
+    def _create_schedule_document(
+        self,
+        user_id: str,
+        date: str,
+        tasks: List[Dict[str, Any]],
+        source: str,
+        inputs: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Build a complete schedule document following the schema.
+        Internal helper method to create consistent schedule documents.
+        Centralizes document structure creation to eliminate duplication.
         
         Args:
-            user_id: User identifier
-            date: Formatted date string
-            tasks: List of task objects
-            form_data: Original form data
-            source: Source of the schedule creation
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            tasks: List of task objects for the schedule
+            source: Source of schedule creation ("ai_service", "calendar", "manual")
+            inputs: Optional user input data (defaults to empty structure)
             
         Returns:
             Complete schedule document ready for database storage
         """
+        # Format date consistently
+        formatted_date = format_schedule_date(date)
+        
+        # Prepare default inputs structure if not provided
+        default_inputs = {
+            "name": "",
+            "work_start_time": "",
+            "work_end_time": "",
+            "working_days": [],
+            "energy_patterns": [],
+            "priorities": {},
+            "layout_preference": {},
+            "tasks": []
+        }
+        
+        # Use provided inputs or defaults
+        document_inputs = inputs if inputs is not None else default_inputs
+        
+        # Create consistent document structure
         return {
             "userId": user_id,
-            "date": date,
-            "schedule": tasks,  # Source of truth
-            "inputs": {
-                "name": form_data.get('name', ''),
-                "work_start_time": form_data.get('work_start_time', ''),
-                "work_end_time": form_data.get('work_end_time', ''),
-                "working_days": form_data.get('working_days', []),
-                "energy_patterns": form_data.get('energy_patterns', []),
-                "priorities": form_data.get('priorities', {}),
-                "layout_preference": form_data.get('layout_preference', {}),
-                "tasks": form_data.get('tasks', [])
-            },
+            "date": formatted_date,
+            "schedule": tasks,
+            "inputs": document_inputs,
             "metadata": {
                 "created_at": format_timestamp(),
                 "last_modified": format_timestamp(),
                 "source": source
             }
         }
-
-    def _update_existing_schedule(
-        self, 
-        schedule_id: Any, 
-        schedule_document: Dict[str, Any]
-    ) -> Tuple[bool, Any]:
-        """
-        Update an existing schedule document.
-        
-        Args:
-            schedule_id: MongoDB ObjectId of existing schedule
-            schedule_document: New schedule document data
-            
-        Returns:
-            Tuple of (success: bool, schedule_id: Any)
-        """
-        try:
-            result = self.schedules_collection.update_one(
-                {"_id": schedule_id},
-                {
-                    "$set": {
-                        "schedule": schedule_document["schedule"],
-                        "inputs": schedule_document["inputs"],
-                        "metadata.last_modified": format_timestamp(),
-                        "metadata.source": schedule_document["metadata"]["source"]
-                    }
-                }
-            )
-            return result.modified_count > 0, schedule_id
-        except Exception as e:
-            print(f"Error updating schedule: {e}")
-            return False, None
-
-    def _create_new_schedule(
-        self, 
-        schedule_document: Dict[str, Any]
-    ) -> Tuple[bool, Any]:
-        """
-        Create a new schedule document.
-        
-        Args:
-            schedule_document: Complete schedule document
-            
-        Returns:
-            Tuple of (success: bool, schedule_id: Any)
-        """
-        try:
-            result = self.schedules_collection.insert_one(schedule_document)
-            return bool(result.inserted_id), result.inserted_id
-        except Exception as e:
-            print(f"Error creating schedule: {e}")
-            return False, None
 
     def _calculate_schedule_metadata(
         self, 
@@ -356,69 +484,6 @@ class ScheduleService:
             "generatedAt": format_timestamp()
         }
 
-    def create_empty_schedule(self, user_id: str, date: str) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Create an empty schedule document for a user on a specific date.
-        """
-        try:
-            # 1. Format date properly
-            formatted_date = format_schedule_date(date)
-            
-            # 2. Check for existing schedule (prevents duplicates)
-            existing_schedule = self.schedules_collection.find_one({
-                "userId": user_id,
-                "date": formatted_date
-            })
 
-            if existing_schedule:
-                return False, {"error": "Schedule already exists for this date"}
-
-            # 3. Create schema-compliant empty document
-            schedule_document = {
-                "userId": user_id,
-                "date": formatted_date,
-                "schedule": [],  # Empty task array
-                "inputs": {
-                    "name": "",
-                    "work_start_time": "",
-                    "work_end_time": "",
-                    "working_days": [],
-                    "energy_patterns": [],
-                    "priorities": {},
-                    "layout_preference": {},
-                    "tasks": []
-                },
-                "metadata": {
-                    "created_at": format_timestamp(),
-                    "last_modified": format_timestamp(),
-                    "source": "manual"
-                }
-            }
-            
-            # 4. Validate against schema
-            is_valid, error_message = validate_schedule_document(schedule_document)
-
-            if not is_valid:
-                return False, {"error": f"Schedule validation failed: {error_message}"}
-
-            # 5. Insert into database
-            result = self.schedules_collection.insert_one(schedule_document)
-            
-            return True, {
-                "schedule": [],
-                "scheduleId": str(result.inserted_id),
-                "metadata": {
-                    "totalTasks": 0,
-                    "calendarEvents": 0,
-                    "recurringTasks": 0,
-                    "generatedAt": format_timestamp()
-                }
-            }
-
-        except Exception as e:
-            # Comprehensive error handling
-            return False, {"error": f"Failed to create empty schedule: {str(e)}"}
-
-
-# Create a singleton instance for use across the application
+# Create singleton instance for import
 schedule_service = ScheduleService()

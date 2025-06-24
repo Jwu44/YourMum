@@ -9,6 +9,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const today = new Date().toISOString().split('T')[0];
 
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
 export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
   (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -295,6 +298,11 @@ export const formatDateToString = (date: Date): string => {
  * @throws Error if user is not authenticated
  */
 const getAuthToken = async (): Promise<string> => {
+  // In development mode with bypass enabled, return a mock token
+  if (IS_DEVELOPMENT && BYPASS_AUTH) {
+    return 'mock-token-for-development';
+  }
+  
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('User not authenticated');

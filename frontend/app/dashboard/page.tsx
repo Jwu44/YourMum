@@ -36,10 +36,9 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
-import { generateSchedule, loadSchedule, updateSchedule, createEmptySchedule } from '@/lib/ScheduleHelper';
+import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
-  const [newTask, setNewTask] = useState('');
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,77 +61,53 @@ const Dashboard: React.FC = () => {
     setCurrentDate(date);
   }, [currentDayIndex]);
 
-  const addTask = useCallback(async (taskData?: Partial<Task>) => {
+  const addTask = useCallback(async (newTask: Task) => {
     try {
-      const taskText = taskData?.text || newTask.trim();
+      const currentDate = getDateString(currentDayIndex);
+      const currentSchedule = scheduleDays[currentDayIndex] || [];
       
-      if (!taskText) return;
-  
-      const updatedTasks = await handleAddTask(
-        state.tasks || [], 
-        taskText,
-        taskData?.categories || []
+      const taskWithId = {
+        ...newTask,
+        id: uuidv4(),
+        start_date: currentDate,
+      };
+
+      const updatedSchedule = [...currentSchedule, taskWithId];
+      
+      // Use updateSchedule which implements upsert behavior:
+      // - First tries PUT (update existing schedule)
+      // - If 404 (no schedule exists), automatically calls POST (create new)
+      const updateResult = await updateSchedule(currentDate, updatedSchedule);
+      
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to add task');
+      }
+
+      // Update UI state with confirmed backend data
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        newDays[currentDayIndex] = updateResult.schedule || updatedSchedule;
+        return newDays;
+      });
+
+      setScheduleCache(prevCache => 
+        new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
       );
-  
-      const newTaskObj = updatedTasks[updatedTasks.length - 1];
-  
-      const finalTask = taskData ? {
-        ...newTaskObj,
-        start_time: taskData.start_time,
-        end_time: taskData.end_time,
-        is_recurring: taskData.is_recurring,
-        start_date: getDateString(currentDayIndex),
-      } : newTaskObj;
-  
-      dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  
-      if (taskData) {
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          if (newDays[currentDayIndex]) {
-            newDays[currentDayIndex] = [finalTask, ...newDays[currentDayIndex]];
-          } else {
-            while (newDays.length <= currentDayIndex) {
-              newDays.push([]);
-            }
-            newDays[currentDayIndex] = [finalTask];
-          }
-          return newDays;
-        });
-  
-        const updatedTasks = [finalTask, ...(scheduleDays[currentDayIndex] || [])];
-        await updateSchedule(
-          getDateString(currentDayIndex),
-          updatedTasks
-        );
-      }
-  
-      if (!taskData) {
-        setNewTask('');
-      }
-  
+
       toast({
         title: "Success",
         description: "Task added successfully.",
       });
-  
+
     } catch (error) {
-      console.error("Error adding task:", error);
+      console.error('Error adding task:', error);
       toast({
         title: "Error",
-        description: "Failed to add task. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add task. Please try again.",
         variant: "destructive",
       });
     }
-  }, [
-    newTask, 
-    state.tasks, 
-    dispatch, 
-    toast, 
-    currentDayIndex, 
-    scheduleDays, 
-    setScheduleDays
-  ]);
+  }, [currentDayIndex, scheduleDays, toast]);
 
   // const updateTask = useCallback((updatedTask: Task) => {
   //   const updatedTasks = handleUpdateTask(state.tasks || [], updatedTask);
@@ -635,7 +610,7 @@ const Dashboard: React.FC = () => {
         
         // Step 1: Try to fetch calendar events first
         const calendarResponse = await calendarApi.fetchEvents(today);
-
+  
         if (calendarResponse.success && calendarResponse.tasks.length > 0) {
           setScheduleDays([calendarResponse.tasks]);
           setScheduleCache(new Map([[today, calendarResponse.tasks]]));
@@ -651,56 +626,19 @@ const Dashboard: React.FC = () => {
           return;
         }
         
-        // Step 3: Create empty schedule as fallback
-        console.log("No calendar events or existing schedule found, creating empty schedule");
-        
-        const emptyScheduleResult = await createEmptySchedule(today);
-        
-        if (emptyScheduleResult.success && emptyScheduleResult.schedule) {
-          setScheduleDays([emptyScheduleResult.schedule]);
-          setScheduleCache(new Map([[today, emptyScheduleResult.schedule]]));
-          
-          console.log("Empty schedule created successfully");
-          
-          // Show success message for new users
-          toast({
-            title: "Welcome!",
-            description: "Your schedule is ready. You can add tasks or generate an AI-powered schedule.",
-          });
-        } else {
-          // Final fallback: create basic empty array structure
-          console.warn("Failed to create empty schedule, using basic empty structure");
-          setScheduleDays([[]]);
-          
-          toast({
-            title: "Notice",
-            description: "Schedule initialized. You can start adding tasks manually.",
-          });
-        }
+        // Step 3: Show empty state UI (no database writes)
+        console.log("No calendar events or existing schedule found, showing empty state");
+        setScheduleDays([[]]);
         
       } catch (error) {
         console.error("Error loading initial schedule:", error);
+        // Fallback to empty state
+        setScheduleDays([[]]);
         
-        // Error fallback: create basic empty schedule structure
-        try {
-          console.log("Attempting to create basic empty schedule due to error");
-          setScheduleDays([[]]);
-          
-          toast({
-            title: "Warning",
-            description: "Could not initialize schedule properly. You can still create tasks manually.",
-            variant: "destructive",
-          });
-        } catch (fallbackError) {
-          console.error("Failed to create fallback empty schedule:", fallbackError);
-          
-          // Show error but don't block the UI
-          toast({
-            title: "Error",
-            description: "Failed to initialize schedule. Please refresh the page.",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Notice",
+          description: "Could not load schedule. You can start adding tasks manually.",
+        });
       } finally {
         setIsLoadingSchedule(false);
       }
