@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 // UI Components
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import FloatingActionButton from '@/components/parts/FloatingActionButton';
 import TaskEditDrawer from '@/components/parts/TaskEditDrawer';
@@ -38,7 +37,6 @@ import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHe
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const { state } = useForm();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
