@@ -9,7 +9,7 @@
 import * as React from "react"
 import { Calendar, User, Plus, Archive, Settings } from "lucide-react"
 import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 import {
   Sidebar,
@@ -84,7 +84,6 @@ const navigationItems: NavigationItem[] = [
  */
 export function AppSidebar(): JSX.Element {
   const router = useRouter()
-  const pathname = usePathname()
 
   /**
    * Get the current dashboard date from the context
