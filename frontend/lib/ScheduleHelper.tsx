@@ -64,6 +64,7 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
     
     // Prepare request payload
     const payload = {
+      date: formData.date,
       name: formData.name,
       tasks: formData.tasks || [],
       work_start_time: formData.work_start_time,
