@@ -113,70 +113,6 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, scheduleDays, toast]);
 
-  // Optimized handleSubmit - direct API call, no ScheduleHelper processing
-  const handleSubmit = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
-        
-      const enhancedPreference = {
-        layout: state.layout_preference?.layout || 'todolist-structured',
-        subcategory: state.layout_preference?.subcategory || 'day-sections',
-        orderingPattern
-      };
-      
-      const formData = {
-        ...state,
-        tasks: state.tasks || [],
-        layout_preference: enhancedPreference,
-        work_start_time: state.work_start_time || '09:00',
-        work_end_time: state.work_end_time || '17:00',
-        priorities: state.priorities || {
-          health: "",
-          relationships: "",
-          fun_activities: "",
-          ambitions: ""
-        },
-        energy_patterns: state.energy_patterns || []
-      };
-            
-      // Direct API call - no ScheduleHelper processing
-      const schedule = await generateSchedule(formData);
-      
-      if (!schedule || !schedule.tasks || schedule.tasks.length === 0) {
-        toast({
-          title: "Error",
-          description: "No valid schedule was generated",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Direct usage - tasks are already perfectly structured by optimized backend
-      setScheduleDays([schedule.tasks]);
-      setCurrentDayIndex(0);
-
-      const currentDate = getDateString(0);
-      await updateSchedule(currentDate, schedule.tasks);
-      
-      setScheduleCache(prevCache => new Map(prevCache).set(currentDate, schedule.tasks));
-
-      toast({
-        title: "Success",
-        description: "Schedule generated successfully",
-      });
-    } catch (error) {
-      console.error("Error generating schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate schedule. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [state, toast, currentDayIndex]);  
-
   const getDateString = (offset: number): string => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
@@ -690,15 +626,6 @@ const Dashboard: React.FC = () => {
                     : 'No schedule found for selected date'
                   }
                 </p>
-                {!state.response && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSubmit} 
-                    disabled={isLoading}
-                  >
-                    Generate Schedule
-                  </Button>
-                )}
               </div>
             )}
           </div>
