@@ -56,6 +56,13 @@ const Dashboard: React.FC = () => {
     date.setDate(date.getDate() + currentDayIndex);
     console.log('Setting currentDate:', date);
     setCurrentDate(date);
+    
+    // Persist current date for sidebar navigation
+    try {
+      localStorage.setItem('dashboardCurrentDate', formatDateToString(date));
+    } catch (error) {
+      console.error('Failed to persist dashboard date:', error);
+    }
   }, [currentDayIndex]);
 
   const addTask = useCallback(async (newTask: Task) => {

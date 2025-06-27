@@ -5,8 +5,8 @@
 
 "use client"
 
-import React, { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Reorder, motion } from 'framer-motion';
 
 // UI Components
@@ -28,9 +28,9 @@ import { useToast } from '@/hooks/use-toast';
 
 // Types and Utils
 import { LayoutPreference, Priority } from '@/lib/types';
-
 import { cn } from '@/lib/utils';
-import { generateSchedule } from '@/lib/ScheduleHelper';
+import { generateSchedule, loadSchedule } from '@/lib/ScheduleHelper';
+import { formatDateToString } from '@/lib/helper';
 
 // Define energy options with icons
 const energyOptions = [
@@ -84,8 +84,73 @@ const InputConfigurationPage: React.FC = () => {
   const { state, dispatch } = useForm();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [priorities, setPriorities] = useState(defaultPriorities);
+
+  /**
+   * Get the target date from URL parameter or fallback to today
+   * @returns date string in YYYY-MM-DD format
+   */
+  const getTargetDate = useCallback((): string => {
+    const dateParam = searchParams.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      return dateParam;
+    }
+    // Fallback to today's date
+    return formatDateToString(new Date());
+  }, [searchParams]);
+
+  /**
+   * Load current schedule tasks for the target date
+   * This ensures tasks are included in the payload when saving
+   */
+  const loadCurrentScheduleTasks = useCallback(async () => {
+    setIsLoadingTasks(true);
+    try {
+      const targetDate = getTargetDate();
+      console.log('Loading schedule tasks for date:', targetDate);
+      
+      const scheduleResult = await loadSchedule(targetDate);
+      
+      if (scheduleResult.success && scheduleResult.schedule) {
+        // Update FormContext with loaded tasks
+        dispatch({
+          type: 'UPDATE_FIELD',
+          field: 'tasks',
+          value: scheduleResult.schedule
+        });
+        
+        console.log('Loaded tasks from current schedule:', scheduleResult.schedule.length);
+      } else {
+        // No existing schedule found, keep tasks empty
+        console.log('No existing schedule found for date:', targetDate);
+        dispatch({
+          type: 'UPDATE_FIELD',
+          field: 'tasks',
+          value: []
+        });
+      }
+    } catch (error) {
+      console.error('Error loading current schedule tasks:', error);
+      // Keep tasks empty on error
+      dispatch({
+        type: 'UPDATE_FIELD',
+        field: 'tasks',
+        value: []
+      });
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  }, [getTargetDate, dispatch]);
+
+  /**
+   * Load current schedule tasks when component mounts
+   */
+  useEffect(() => {
+    loadCurrentScheduleTasks();
+  }, [loadCurrentScheduleTasks]);
 
   // Handle simple field changes
   const handleFieldChange = useCallback((field: string, value: any) => {
@@ -152,11 +217,19 @@ const InputConfigurationPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Log the payload to ensure it matches backend expectations
-      console.log("Generating schedule with payload:", state);
+      const targetDate = getTargetDate();
+      
+      // Prepare payload with current date and loaded tasks
+      const payload = {
+        ...state,
+        date: targetDate, // Include target date in payload
+        tasks: state.tasks || [] // Include loaded tasks from current schedule
+      };
+      
+      console.log("Generating schedule with payload:", payload);
 
-      // Generate schedule with updated preferences
-      await generateSchedule(state);
+      // Generate schedule with updated preferences and existing tasks
+      await generateSchedule(payload);
       
       toast({
         title: "Success",
@@ -175,7 +248,7 @@ const InputConfigurationPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [state, toast, router]);
+  }, [state, toast, router, getTargetDate]);
 
   return (
     <SidebarLayout>
@@ -186,6 +259,18 @@ const InputConfigurationPage: React.FC = () => {
           <p className="text-muted-foreground mt-2">
             Customize your workflow settings and preferences to optimize your task management experience
           </p>
+          {/* Show loading indicator while loading tasks */}
+          {isLoadingTasks && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Loading current schedule tasks...
+            </p>
+          )}
+          {/* Show confirmation when tasks are loaded */}
+          {!isLoadingTasks && state.tasks && state.tasks.length > 0 && (
+            <p className="text-sm text-green-600 mt-1">
+              ✓ Loaded {state.tasks.length} tasks from current schedule
+            </p>
+          )}
         </div>
 
         <div className="grid gap-6">
@@ -398,7 +483,7 @@ const InputConfigurationPage: React.FC = () => {
           <div className="flex justify-end">
             <Button 
               onClick={handleSave} 
-              disabled={isLoading}
+              disabled={isLoading || isLoadingTasks}
               size="lg"
             >
               {isLoading ? 'Saving...' : 'Save Configuration'}
