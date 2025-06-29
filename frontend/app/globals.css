@@ -33,6 +33,10 @@
     --accent: var(--primary-light);
     --accent-foreground: 215 25% 27%;
 
+    /* Add hover selection colors */
+    --hover-selection: 0 0% 94%; /* Light grey for hover selection */
+    --hover-selection-foreground: 215 25% 27%;
+
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
@@ -76,6 +80,10 @@
 
     --accent: 215 25% 27%;
     --accent-foreground: 213 31% 91%;
+
+    /* Add hover selection colors for dark mode */
+    --hover-selection: 215 25% 22%; /* Slightly lighter than background for dark mode */
+    --hover-selection-foreground: 213 31% 91%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 213 31% 91%;
@@ -157,6 +165,11 @@
     @apply text-foreground;
   }
 
+  /* Hover selection utilities */
+  .hover-selection {
+    @apply hover:bg-[hsl(var(--hover-selection))] hover:text-[hsl(var(--hover-selection-foreground))];
+  }
+
   /* Loading states */
   .loading-container-lg {
     @apply flex items-center justify-center h-64;
@@ -200,5 +213,14 @@
   
   .border-purple {
     border-color: hsl(var(--primary-light));
+  }
+
+  /* Hover selection utilities */
+  .bg-hover-selection {
+    background-color: hsl(var(--hover-selection));
+  }
+  
+  .text-hover-selection-foreground {
+    color: hsl(var(--hover-selection-foreground));
   }
 }

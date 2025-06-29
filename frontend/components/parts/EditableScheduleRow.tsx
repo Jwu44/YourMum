@@ -22,6 +22,7 @@ import {
   handleMicrostepDecomposition
 } from '../../lib/helper';
 import { isBrowser } from '../../lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface EditableScheduleRowProps {
   task: Task;
@@ -48,6 +49,152 @@ interface DragIndicatorProps {
   width: string | number;
   opacity: number;
 }
+
+/**
+ * Get custom emoji from localStorage
+ */
+const getCustomEmojis = (): { [sectionName: string]: string } => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const saved = localStorage.getItem('sectionCustomEmojis');
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * Save custom emoji to localStorage
+ */
+const saveCustomEmoji = (sectionName: string, emoji: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const customEmojis = getCustomEmojis();
+    customEmojis[sectionName] = emoji;
+    localStorage.setItem('sectionCustomEmojis', JSON.stringify(customEmojis));
+  } catch (error) {
+    console.error('Failed to save custom emoji:', error);
+  }
+};
+
+/**
+ * Common emojis for quick selection
+ */
+const COMMON_EMOJIS = [
+  '⚡️', '✏️', '☕️', '🌅', '🌆', '🎑', '🦕',
+  '🎯', '💼', '🏠', '💪', '🧠', '❤️', '🎉',
+  '📚', '🍎', '🚀', '⭐', '🔥', '💎', '🌟',
+  '📝', '💻', '🎨', '🎵', '🏃', '🛏️', '🍽️'
+];
+
+/**
+ * Simple emoji picker component using Popover
+ */
+interface EmojiPickerProps {
+  currentEmoji: string;
+  onEmojiChange: (emoji: string) => void;
+}
+
+const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    onEmojiChange(emoji);
+    setIsOpen(false);
+  }, [onEmojiChange]);
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "text-lg cursor-pointer transition-all duration-200 select-none border-none bg-transparent p-1 rounded hover:bg-hover-selection",
+            isHovered && "scale-110"
+          )}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          title="Click to change emoji"
+        >
+          {currentEmoji}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2">
+        <div className="grid grid-cols-7 gap-1">
+          {COMMON_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => handleEmojiSelect(emoji)}
+              className={cn(
+                "w-8 h-8 flex items-center justify-center text-lg hover:bg-hover-selection rounded transition-colors",
+                emoji === currentEmoji && "bg-hover-selection"
+              )}
+              title={`Select ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t">
+          <p className="text-xs text-muted-foreground text-center">
+            Click any emoji to select it
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/**
+ * Get the appropriate emoji for a section based on its name
+ * First checks for custom emojis, then falls back to hardcoded mapping
+ */
+const getSectionIcon = (sectionName: string, onEmojiChange?: (emoji: string) => void): React.ReactNode => {
+  const customEmojis = getCustomEmojis();
+  
+  // Check for custom emoji first
+  if (customEmojis[sectionName]) {
+    return (
+      <EmojiPicker 
+        currentEmoji={customEmojis[sectionName]}
+        onEmojiChange={(emoji) => {
+          saveCustomEmoji(sectionName, emoji);
+          onEmojiChange?.(emoji);
+        }}
+      />
+    );
+  }
+
+  const lowerName = sectionName.toLowerCase();
+  let defaultEmoji = '🦕'; // Default emoji
+  
+  // Priority-based sections
+  if (lowerName.includes('high priority')) {
+    defaultEmoji = '⚡️';
+  } else if (lowerName.includes('medium priority')) {
+    defaultEmoji = '✏️';
+  } else if (lowerName.includes('low priority')) {
+    defaultEmoji = '☕️';
+  }
+  // Time-based sections
+  else if (lowerName.includes('morning')) {
+    defaultEmoji = '🌅';
+  } else if (lowerName.includes('afternoon') || lowerName.includes('arvo')) {
+    defaultEmoji = '🌆';
+  } else if (lowerName.includes('evening') || lowerName.includes('night')) {
+    defaultEmoji = '🎑';
+  }
+  
+  return (
+    <EmojiPicker 
+      currentEmoji={defaultEmoji}
+      onEmojiChange={(emoji) => {
+        saveCustomEmoji(sectionName, emoji);
+        onEmojiChange?.(emoji);
+      }}
+    />
+  );
+};
 
 const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({ 
   task, 
@@ -81,6 +228,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Can only decompose non-section, non-microstep, non-subtask tasks
   const canDecompose = !isSection && !task.is_microstep && !task.is_subtask;
+
+  // Add state for re-rendering when emoji changes
+  const [, forceUpdate] = useState(0);
+
+  // Callback to force re-render when emoji changes
+  const handleEmojiChange = useCallback(() => {
+    forceUpdate(prev => prev + 1);
+  }, []);
 
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {
@@ -497,14 +652,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         onDragEnd={handleDragEnd}
         className={cn(
           "relative flex items-center p-2 my-1 rounded",
-          isSection ? "cursor-default flex-col items-start" : "cursor-move",
+          isSection ? "cursor-default" : "cursor-move",
           isDecomposing && "animate-pulse",
           task.level && task.level > 0 ? "pl-8" : "",
-          isSection ? "mt-4" : ""
+          isSection ? "mt-4 mb-2" : ""
         )}
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
-          minHeight: isSection ? '40px' : 'auto',
+          minHeight: isSection ? '48px' : 'auto',
         }}
       >
         {/* Task/Section Content */}
@@ -524,12 +679,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         )}
 
         {isSection ? (
-          <>
-            <TypographyH4 className="w-full mb-2">
+          <div className="w-full border-b border-border px-4 py-3 flex items-center gap-3">
+            {getSectionIcon(task.text, handleEmojiChange)}
+            <TypographyH4 className="text-foreground font-semibold mb-0">
               {task.text}
             </TypographyH4>
-            <div className="w-full h-px bg-white opacity-50" />
-          </>
+          </div>
         ) : (
           <span className={`flex-1 text-foreground ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
             {task.start_time && task.end_time ? 
@@ -562,7 +717,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           onClose={handleDrawerClose}
           task={task}
           onUpdateTask={handleTaskUpdate}
-          currentDate={task.start_date || new Date().toISOString().split('T')[0]} // Add current date prop
+          currentDate={task.start_date || new Date().toISOString().split('T')[0]}
         />
       ) : null}
     </motion.div>

@@ -115,14 +115,17 @@ const InputConfigurationPage: React.FC = () => {
       const scheduleResult = await loadSchedule(targetDate);
       
       if (scheduleResult.success && scheduleResult.schedule) {
-        // Update FormContext with loaded tasks
+        // Filter out section tasks (is_section=true) before updating FormContext
+        const nonSectionTasks = scheduleResult.schedule.filter(task => !task.is_section);
+        
+        // Update FormContext with filtered tasks (excluding sections)
         dispatch({
           type: 'UPDATE_FIELD',
           field: 'tasks',
-          value: scheduleResult.schedule
+          value: nonSectionTasks
         });
         
-        console.log('Loaded tasks from current schedule:', scheduleResult.schedule.length);
+        console.log('Loaded tasks from current schedule:', nonSectionTasks.length, 'out of', scheduleResult.schedule.length, 'total items');
       } else {
         // No existing schedule found, keep tasks empty
         console.log('No existing schedule found for date:', targetDate);
