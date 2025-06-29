@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
 import { Pane } from 'evergreen-ui';
-import { TypographyH4 } from '@/app/fonts/text';
 import EditableScheduleRow from './EditableScheduleRow';
 import AISuggestionsList from './AISuggestionsList';
 import { 
