@@ -210,13 +210,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             moveTask={moveTask}
             isSection={task.is_section || task.type === 'section'}
             allTasks={processedTasks}
-          >
-            {(task.is_section || task.type === 'section') && (
-              <TypographyH4 className="section-header">
-                {task.text}
-              </TypographyH4>
-            )}
-          </EditableScheduleRow>
+          />
 
           {/* Render suggestions after each task if they exist */}
           {suggestionsMap.has(task.id) && (
