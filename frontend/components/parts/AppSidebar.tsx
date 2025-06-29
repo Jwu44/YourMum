@@ -9,6 +9,7 @@
 import * as React from "react"
 import { Calendar, User, Plus, Archive, Settings } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import {
   Sidebar,
@@ -20,10 +21,24 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
+// Import helper to get current date string
+import { formatDateToString } from "@/lib/helper"
+
+/**
+ * Type definition for navigation menu items
+ */
+interface NavigationItem {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  isActive: boolean;
+}
+
 /**
  * Navigation menu items configuration
  */
-const navigationItems = [
+const navigationItems: NavigationItem[] = [
   {
     id: "profile",
     title: "Profile",
@@ -52,7 +67,7 @@ const navigationItems = [
     href: "#",
     isActive: false,
   },
-] as const
+]
 
 /**
  * AppSidebar component implementing the left navigation sidebar
@@ -63,10 +78,63 @@ const navigationItems = [
  * - Full height layout spanning entire viewport
  * - Responsive design for desktop and mobile
  * - Hover effects and smooth transitions
+ * - Dynamic navigation for Inputs page with current date context
  * 
  * @returns {JSX.Element} The rendered sidebar component
  */
 export function AppSidebar(): JSX.Element {
+  const router = useRouter()
+
+  /**
+   * Get the current dashboard date from the context
+   * This function checks multiple sources to determine the current date:
+   * 1. Dashboard persisted date from localStorage
+   * 2. Fallback to today's date
+   * 
+   * @returns {string} Date string in YYYY-MM-DD format
+   */
+  const getCurrentDashboardDate = React.useCallback((): string => {
+    try {
+      // Try to get persisted dashboard date from localStorage
+      const persistedDate = localStorage.getItem('dashboardCurrentDate');
+      if (persistedDate && /^\d{4}-\d{2}-\d{2}$/.test(persistedDate)) {
+        console.log('Using persisted dashboard date:', persistedDate);
+        return persistedDate;
+      }
+      
+      // Fallback to today's date
+      const todayDate = formatDateToString(new Date());
+      console.log('Using fallback date (today):', todayDate);
+      return todayDate;
+    } catch (error) {
+      console.error('Error getting current dashboard date:', error);
+      // Fallback to today's date on any error
+      return formatDateToString(new Date());
+    }
+  }, []);
+
+  /**
+   * Handle navigation to inputs page with current dashboard date context
+   * Uses the current dashboard date instead of just today's date
+   */
+  const handleInputsNavigation = React.useCallback(() => {
+    const currentDate = getCurrentDashboardDate();
+    console.log('Navigating to inputs with date:', currentDate);
+    router.push(`/dashboard/inputs?date=${currentDate}`);
+  }, [router, getCurrentDashboardDate]);
+
+  /**
+   * Handle navigation for menu items
+   * Special handling for inputs page to include date context
+   */
+  const handleNavigation = React.useCallback((item: NavigationItem) => {
+    if (item.id === "inputs") {
+      handleInputsNavigation();
+    } else if (item.href !== "#") {
+      router.push(item.href);
+    }
+  }, [router, handleInputsNavigation]);
+
   return (
     <Sidebar 
       variant="sidebar" 
@@ -96,18 +164,18 @@ export function AppSidebar(): JSX.Element {
             {navigationItems.map((item) => (
               <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
-                  asChild
                   size="lg"
-                  className="h-12 transition-colors duration-200 hover:bg-sidebar-accent/50"
+                  className="h-12 transition-colors duration-200 hover:bg-sidebar-accent/50 cursor-pointer"
                   data-testid={`nav-item-${item.id}`}
+                  onClick={() => handleNavigation(item)}
                 >
-                  <a href={item.href} className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
                     <item.icon 
                       className="w-5 h-5" 
                       data-testid={`nav-icon-${item.id}`}
                     />
                     <span className="font-medium">{item.title}</span>
-                  </a>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}

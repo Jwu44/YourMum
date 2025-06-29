@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 // UI Components
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import FloatingActionButton from '@/components/parts/FloatingActionButton';
 import TaskEditDrawer from '@/components/parts/TaskEditDrawer';
@@ -27,10 +26,8 @@ import {
 
 // Helpers
 import {
-  handleAddTask,
-  // handleUpdateTask,
-  // handleDeleteTask,
   fetchAISuggestions,
+  formatDateToString,
 } from '@/lib/helper';
 
 // Direct API helpers (no ScheduleHelper)
@@ -38,11 +35,9 @@ import { calendarApi } from '@/lib/api/calendar';
 import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
-  const [newTask, setNewTask] = useState('');
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const { state, dispatch } = useForm();
+  const { state } = useForm();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -53,172 +48,74 @@ const Dashboard: React.FC = () => {
   const [shownSuggestionIds] = useState<Set<string>>(new Set());
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const hasInitiallyLoaded = useRef(false);
   
   useEffect(() => {
     const date = new Date();
     date.setDate(date.getDate() + currentDayIndex);
     console.log('Setting currentDate:', date);
     setCurrentDate(date);
+    
+    // Persist current date for sidebar navigation
+    try {
+      localStorage.setItem('dashboardCurrentDate', formatDateToString(date));
+    } catch (error) {
+      console.error('Failed to persist dashboard date:', error);
+    }
   }, [currentDayIndex]);
 
-  const addTask = useCallback(async (taskData?: Partial<Task>) => {
+  const addTask = useCallback(async (newTask: Task) => {
     try {
-      const taskText = taskData?.text || newTask.trim();
+      const currentDate = getDateString(currentDayIndex);
+      const currentSchedule = scheduleDays[currentDayIndex] || [];
       
-      if (!taskText) return;
-  
-      const updatedTasks = await handleAddTask(
-        state.tasks || [], 
-        taskText,
-        taskData?.categories || []
+      const taskWithId = {
+        ...newTask,
+        id: uuidv4(),
+        start_date: currentDate,
+      };
+
+      const updatedSchedule = [...currentSchedule, taskWithId];
+      
+      // Use updateSchedule which implements upsert behavior:
+      // - First tries PUT (update existing schedule)
+      // - If 404 (no schedule exists), automatically calls POST (create new)
+      const updateResult = await updateSchedule(currentDate, updatedSchedule);
+      
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to add task');
+      }
+
+      // Update UI state with confirmed backend data
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        newDays[currentDayIndex] = updateResult.schedule || updatedSchedule;
+        return newDays;
+      });
+
+      setScheduleCache(prevCache => 
+        new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
       );
-  
-      const newTaskObj = updatedTasks[updatedTasks.length - 1];
-  
-      const finalTask = taskData ? {
-        ...newTaskObj,
-        start_time: taskData.start_time,
-        end_time: taskData.end_time,
-        is_recurring: taskData.is_recurring,
-        start_date: getDateString(currentDayIndex),
-      } : newTaskObj;
-  
-      dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  
-      if (taskData) {
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays];
-          if (newDays[currentDayIndex]) {
-            newDays[currentDayIndex] = [finalTask, ...newDays[currentDayIndex]];
-          } else {
-            while (newDays.length <= currentDayIndex) {
-              newDays.push([]);
-            }
-            newDays[currentDayIndex] = [finalTask];
-          }
-          return newDays;
-        });
-  
-        const updatedTasks = [finalTask, ...(scheduleDays[currentDayIndex] || [])];
-        await updateSchedule(
-          getDateString(currentDayIndex),
-          updatedTasks
-        );
-      }
-  
-      if (!taskData) {
-        setNewTask('');
-      }
-  
+
       toast({
         title: "Success",
         description: "Task added successfully.",
       });
-  
+
     } catch (error) {
-      console.error("Error adding task:", error);
+      console.error('Error adding task:', error);
       toast({
         title: "Error",
-        description: "Failed to add task. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add task. Please try again.",
         variant: "destructive",
       });
     }
-  }, [
-    newTask, 
-    state.tasks, 
-    dispatch, 
-    toast, 
-    currentDayIndex, 
-    scheduleDays, 
-    setScheduleDays
-  ]);
-
-  // const updateTask = useCallback((updatedTask: Task) => {
-  //   const updatedTasks = handleUpdateTask(state.tasks || [], updatedTask);
-  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  //   toast({
-  //     title: "Success",
-  //     description: "Task updated successfully.",
-  //   });
-  // }, [state.tasks, dispatch, toast]);
-
-  // const deleteTask = useCallback((taskId: string) => {
-  //   const updatedTasks = handleDeleteTask(state.tasks || [], taskId);
-  //   dispatch({ type: 'UPDATE_FIELD', field: 'tasks', value: updatedTasks });
-  //   toast({
-  //     title: "Success",
-  //     description: "Task deleted successfully.",
-  //   });
-  // }, [state.tasks, dispatch, toast]);
-
-  // Optimized handleSubmit - direct API call, no ScheduleHelper processing
-  const handleSubmit = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
-        
-      const enhancedPreference = {
-        layout: state.layout_preference?.layout || 'todolist-structured',
-        subcategory: state.layout_preference?.subcategory || 'day-sections',
-        orderingPattern
-      };
-      
-      const formData = {
-        ...state,
-        tasks: state.tasks || [],
-        layout_preference: enhancedPreference,
-        work_start_time: state.work_start_time || '09:00',
-        work_end_time: state.work_end_time || '17:00',
-        priorities: state.priorities || {
-          health: "",
-          relationships: "",
-          fun_activities: "",
-          ambitions: ""
-        },
-        energy_patterns: state.energy_patterns || []
-      };
-            
-      // Direct API call - no ScheduleHelper processing
-      const schedule = await generateSchedule(formData);
-      
-      if (!schedule || !schedule.tasks || schedule.tasks.length === 0) {
-        toast({
-          title: "Error",
-          description: "No valid schedule was generated",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Direct usage - tasks are already perfectly structured by optimized backend
-      setScheduleDays([schedule.tasks]);
-      setCurrentDayIndex(0);
-
-      const currentDate = getDateString(0);
-      await updateSchedule(currentDate, schedule.tasks);
-      
-      setScheduleCache(prevCache => new Map(prevCache).set(currentDate, schedule.tasks));
-
-      toast({
-        title: "Success",
-        description: "Schedule generated successfully",
-      });
-    } catch (error) {
-      console.error("Error generating schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate schedule. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [state, toast, currentDayIndex]);  
+  }, [currentDayIndex, scheduleDays, toast]);
 
   const getDateString = (offset: number): string => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
-    return date.toISOString().split('T')[0];
+    return formatDateToString(date);
   };
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
@@ -626,37 +523,57 @@ const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Prevent duplicate loads in React Strict Mode
+    if (hasInitiallyLoaded.current) return;
+
     const loadInitialSchedule = async () => {
       setIsLoadingSchedule(true);
       
       try {
         const today = getDateString(0);
         
+        // Single API call approach: Try calendar sync first
+        // The backend handles merging with existing schedules automatically
         const calendarResponse = await calendarApi.fetchEvents(today);
-
-        if (calendarResponse.success && calendarResponse.tasks.length > 0) {
+        
+        if (calendarResponse.success) {
+          // Calendar API returns the complete merged schedule
           setScheduleDays([calendarResponse.tasks]);
           setScheduleCache(new Map([[today, calendarResponse.tasks]]));
           return;
         }
         
+        // Fallback: Load existing schedule if calendar sync fails
         const existingSchedule = await loadSchedule(today);
         
         if (existingSchedule.success && existingSchedule.schedule) {
           setScheduleDays([existingSchedule.schedule]);
           setScheduleCache(new Map([[today, existingSchedule.schedule]]));
+          return;
         }
+        
+        // Show empty state if no schedule and no calendar events
+        console.log("No existing schedule or calendar events found, showing empty state");
+        setScheduleDays([[]]);
+        
       } catch (error) {
         console.error("Error loading initial schedule:", error);
+        setScheduleDays([[]]);
+        
+        toast({
+          title: "Notice",
+          description: "Could not load schedule. You can start adding tasks manually.",
+        });
       } finally {
         setIsLoadingSchedule(false);
+        hasInitiallyLoaded.current = true;
       }
     };
     
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, []);
+  }, [state.formUpdate?.response]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -713,15 +630,6 @@ const Dashboard: React.FC = () => {
                     : 'No schedule found for selected date'
                   }
                 </p>
-                {!state.response && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSubmit} 
-                    disabled={isLoading}
-                  >
-                    Generate Schedule
-                  </Button>
-                )}
               </div>
             )}
           </div>

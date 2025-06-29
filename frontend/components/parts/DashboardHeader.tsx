@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { format as dateFormat } from 'date-fns';
 import { Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // UI Components
 import { Button } from '@/components/ui/button';
-import { checkScheduleExists } from '@/lib/helper';
 
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
@@ -17,6 +16,10 @@ interface DashboardHeaderProps {
     currentDate: Date | undefined;
 }
 
+/**
+ * DashboardHeader component provides navigation controls and AI suggestions for the dashboard
+ * Navigation buttons are always enabled to avoid unnecessary API calls for schedule checking
+ */
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     isLoadingSuggestions,
     onRequestSuggestions,
@@ -24,11 +27,11 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onPreviousDay,
     currentDate
   }) => {
-    // State to track button disabled states
-  const [isPrevDisabled, setIsPrevDisabled] = useState(true);
-  const [isNextDisabled, setIsNextDisabled] = useState(false);
 
-  // Memoize the date formatting to prevent unnecessary recalculations
+  /**
+   * Memoized date formatting to prevent unnecessary recalculations
+   * @returns Formatted date string or error fallback
+   */
   const formattedDate = useCallback(() => {
     try {
       if (!currentDate) return 'Invalid Date';
@@ -38,51 +41,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       return 'Invalid Date';
     }
   }, [currentDate]);
-
-  // Memoized function to check if previous day is available
-  const isPreviousDayAvailable = useCallback(async (): Promise<boolean> => {
-    if (!currentDate) return false;
-    
-    const yesterday = new Date(currentDate);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    // Check if yesterday's schedule exists using helper function
-    return await checkScheduleExists(yesterday);
-  }, [currentDate]);
-
-  // Memoized function to check if next day is available
-  const isNextDayAvailable = useCallback(async (): Promise<boolean> => {
-    if (!currentDate) return false;
-    
-    const tomorrow = new Date(currentDate);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    // Allow navigation to next day if it's tomorrow (can generate new schedule)
-    const actualTomorrow = new Date();
-    actualTomorrow.setDate(actualTomorrow.getDate() + 1);
-    
-    if (tomorrow.toDateString() === actualTomorrow.toDateString()) {
-      return true;
-    }
-    
-    // Check if next day's schedule exists using helper function
-    return await checkScheduleExists(tomorrow);
-  }, [currentDate]);
-
-  // Effect to update button states
-  useEffect(() => {
-    const updateNavigationStates = async () => {
-      const [prevAvailable, nextAvailable] = await Promise.all([
-        isPreviousDayAvailable(),
-        isNextDayAvailable()
-      ]);
-      
-      setIsPrevDisabled(!prevAvailable);
-      setIsNextDisabled(!nextAvailable);
-    };
-
-    updateNavigationStates();
-  }, [currentDate, isPreviousDayAvailable, isNextDayAvailable]);
 
   return (
     <div className="flex justify-between items-center mb-6">
@@ -114,10 +72,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => onPreviousDay()}
-                disabled={isPrevDisabled}
-                className={`h-9 w-9 transition-opacity ${
-                  isPrevDisabled ? 'opacity-50' : 'opacity-100 hover:opacity-80'
-                }`}
+                className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
                 aria-label="Previous day"
               >
                 <ChevronLeft className="h-5 w-5 text-primary" />
@@ -126,10 +81,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => onNextDay()}
-                disabled={isNextDisabled}
-                className={`h-9 w-9 transition-opacity ${
-                  isNextDisabled ? 'opacity-50' : 'opacity-100 hover:opacity-80'
-                }`}
+                className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
                 aria-label="Next day"
               >
                 <ChevronRight className="h-5 w-5 text-primary" />

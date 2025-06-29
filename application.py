@@ -77,11 +77,18 @@ if __name__ == '__main__':
     
     print(f"Starting application on port {port}")
     print(f"Environment: {os.getenv('FLASK_ENV', 'not_set')}")
+    print(f"NODE_ENV: {os.getenv('NODE_ENV', 'not_set')}")
     print(f"PORT env var: {os.getenv('PORT', 'not_set')}")
+    
+    # Add debug logging for authentication
+    print(f"Development bypass active: {os.getenv('NODE_ENV') == 'development'}")
+    
+    # Set development flag based on environment variables
+    is_development = os.getenv('NODE_ENV') == 'development' or os.getenv('FLASK_ENV') == 'development'
     
     # Railway provides PORT environment variable
     application.run(
         host="0.0.0.0",
         port=port,
-        debug=False  # Always False in production
+        debug=is_development  # Enable debug mode in development
     )

@@ -1,16 +1,15 @@
 from flask import Blueprint, jsonify, request
-from backend.db_config import get_database, get_user_schedules_collection, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user
+from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 from bson import ObjectId
 from datetime import datetime, timezone 
 from backend.models.task import Task
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Tuple
 import json
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
 import os
-import re
 # Import AI service functions directly
 from backend.services.ai_service import (
     categorize_task,
@@ -24,29 +23,32 @@ from backend.services.schedule_gen import (
 
 import uuid
 
+# Add import for the new schedule service
+from backend.services.schedule_service import schedule_service
+
 api_bp = Blueprint("api", __name__)
 
-# Add a global CORS handler for the API blueprint
-@api_bp.after_request
-def add_cors_headers(response):
-    """Add CORS headers to all API responses"""
-    # Get origin from the request
-    origin = request.headers.get('Origin')
+# # Add a global CORS handler for the API blueprint
+# @api_bp.after_request
+# def add_cors_headers(response):
+#     """Add CORS headers to all API responses"""
+#     # Get origin from the request
+#     origin = request.headers.get('Origin')
     
-    # Check if origin is allowed
-    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
-                             "https://yourdai.app,https://yourdai.be,https://www.yourdai.app,http://localhost:3000").split(",")
+#     # Check if origin is allowed
+#     allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
+#                              "https://yourdai.app,https://yourdai-production.up.railway.app,http://localhost:3000,http://localhost:8000").split(",")
     
-    # If origin is in the allowed list, add CORS headers
-    if origin in allowed_origins:
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 
-                           'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-        response.headers.add('Access-Control-Allow-Methods', 
-                           'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+#     # If origin is in the allowed list, add CORS headers
+#     if origin in allowed_origins:
+#         response.headers.add('Access-Control-Allow-Origin', origin)
+#         response.headers.add('Access-Control-Allow-Headers', 
+#                            'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+#         response.headers.add('Access-Control-Allow-Methods', 
+#                            'GET, POST, PUT, DELETE, OPTIONS')
+#         response.headers.add('Access-Control-Allow-Credentials', 'true')
     
-    return response
+#     return response
 
 # Add a global OPTIONS request handler for all routes
 @api_bp.route('/<path:path>', methods=['OPTIONS'])
@@ -87,6 +89,14 @@ def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
         The decoded token payload or None if verification fails
     """
     try:
+        # Development bypass
+        if os.getenv('NODE_ENV') == 'development' and token == 'mock-token-for-development':
+            return {
+                'uid': 'dev-user-123',
+                'email': 'dev@example.com',
+                'name': 'Dev User'
+            }
+        
         # Verify the token
         decoded_token = firebase_auth.verify_id_token(token)
         return decoded_token
@@ -116,6 +126,18 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         if not user_id:
             return None
             
+        # Development bypass - return mock user for dev-user-123
+        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
+            return {
+                'googleId': 'dev-user-123',
+                'email': 'dev@example.com',
+                'displayName': 'Dev User',
+                'photoURL': '',
+                'role': 'free',
+                'calendarSynced': False,
+                # Add other required fields as needed
+            }
+            
         # Get database instance
         db = get_database()
         users = db['users']
@@ -128,64 +150,88 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         traceback.print_exc()
         return None
     
-@api_bp.route("/auth/user", methods=["POST", "GET", "OPTIONS"])
-def create_or_get_user():
+@api_bp.route("/auth/user", methods=["OPTIONS"])
+def handle_auth_user_options():
+    """Handle CORS preflight requests for the auth user endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/auth/user", methods=["GET"])
+def get_auth_user_info():
+    """
+    Get authenticated user information or return API documentation.
+    
+    Returns:
+        - User info if valid Authorization header provided
+        - API documentation if no Authorization header
+        - 401 error if invalid token
+    """
+    try:
+        # Check if Authorization header is provided
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            # Extract token and get user
+            token = auth_header.split(' ')[1]
+            user = get_user_from_token(token)
+            
+            if user:
+                # Process user for JSON serialization
+                serialized_user = process_user_for_response(user)
+                return jsonify({
+                    "user": serialized_user,
+                    "authenticated": True
+                }), 200
+            else:
+                return jsonify({
+                    "error": "Authentication failed",
+                    "message": "Invalid token or user not found"
+                }), 401
+        else:
+            # No auth header, return API documentation
+            return jsonify({
+                "endpoint": "/api/auth/user",
+                "methods": ["GET", "POST", "OPTIONS"],
+                "description": "User authentication endpoint",
+                "GET_parameters": {
+                    "Authorization": "Bearer <firebase_id_token> (required in header)"
+                },
+                "POST_parameters": {
+                    "googleId": "string (required)",
+                    "email": "string (required)",
+                    "displayName": "string",
+                    "photoURL": "string",
+                    "hasCalendarAccess": "boolean"
+                }
+            }), 200
+            
+    except Exception as e:
+        print(f"Error in get_auth_user_info: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e)
+        }), 500
+
+@api_bp.route("/auth/user", methods=["POST"])
+def create_or_update_user():
     """
     Create or update user after Google authentication.
-    POST: Create/update user with Google Auth data
-    GET: Return user info if Authorization header is provided, otherwise return API info
-    OPTIONS: Handle preflight requests for CORS
-    """ 
-    # Handle OPTIONS request (preflight) for CORS
-    if request.method == "OPTIONS":
-        response = jsonify({"status": "ok"})
-        # Don't add CORS headers here - they'll be added by the global handler
-        return response
+    
+    Expected JSON body:
+        - googleId: string (required)
+        - email: string (required) 
+        - displayName: string (optional)
+        - photoURL: string (optional)
+        - hasCalendarAccess: boolean (optional)
+    
+    Returns:
+        - 200: User successfully created/updated
+        - 400: Missing required fields or invalid data
+        - 500: Internal server error
+    """
     try:
-        # Handle GET requests (for browser direct access or health checks)
-        if request.method == "GET":
-            # Check if Authorization header is provided
-            auth_header = request.headers.get('Authorization')
-            if auth_header and auth_header.startswith('Bearer '):
-                # Extract token
-                token = auth_header.split(' ')[1]
-                
-                # Get user based on verified token
-                user = get_user_from_token(token)
-                
-                if user:
-                    # Process user for JSON serialization
-                    serialized_user = process_user_for_response(user)
-                    return jsonify({
-                        "user": serialized_user,
-                        "authenticated": True
-                    }), 200
-                else:
-                    return jsonify({
-                        "error": "Authentication failed",
-                        "message": "Invalid token or user not found"
-                    }), 401
-            else:
-                # No auth header, return API info
-                return jsonify({
-                    "endpoint": "/api/auth/user",
-                    "methods": ["GET", "POST", "OPTIONS"],
-                    "description": "User authentication endpoint",
-                    "GET_parameters": {
-                        "Authorization": "Bearer <firebase_id_token> (required in header)"
-                    },
-                    "POST_parameters": {
-                        "googleId": "string (required)",
-                        "email": "string (required)",
-                        "displayName": "string",
-                        "photoURL": "string",
-                        "hasCalendarAccess": "boolean"
-                    }
-                }), 200
-        
-        # Handle POST requests (existing functionality)
         print("Received authentication request. Headers:", request.headers)
         print("Request body:", request.get_json(silent=True))
+        
         # Validate request payload
         user_data = request.json
         if not user_data:
@@ -199,48 +245,15 @@ def create_or_get_user():
                 "error": f"Missing required fields: {', '.join(missing_fields)}"
             }), 400
 
+        # Process user data for creation/update
+        processed_user_data = _prepare_user_data_for_storage(user_data)
+
         # Get database instance and users collection
         db = get_database()
         users = db['users']
 
-        # Prepare calendar settings based on hasCalendarAccess
-        has_calendar_access = user_data.get('hasCalendarAccess', False)
-        calendar_settings = {
-            "connected": has_calendar_access,
-            "lastSyncTime": None,
-            "syncStatus": "never",
-            "selectedCalendars": [],
-            "error": None,
-            "settings": {
-                "autoSync": True,
-                "syncFrequency": 15,  # minutes
-                "defaultReminders": True
-            }
-        }
-
-        # Ensure displayName is never None/null
-        display_name = user_data.get("displayName")
-        if not display_name:
-            # Fall back to email username if displayName is not provided
-            display_name = user_data["email"].split('@')[0]
-
-        # Prepare user data with all required fields and ensure no null values
-        processed_user_data = {
-            "googleId": user_data["googleId"],
-            "email": user_data["email"],
-            "displayName": display_name,  # Use processed display_name
-            "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
-            "role": "free",  # Default role for new users
-            "calendarSynced": has_calendar_access,
-            "lastLogin": datetime.now(timezone.utc), 
-            "calendar": calendar_settings,
-            "metadata": {
-                "lastModified": datetime.now(timezone.utc)  # Use timezone.utc here as well
-            }
-        }
-
         # Create or update user using the utility function
-        user = create_or_update_user(users, processed_user_data)
+        user = db_create_or_update_user(users, processed_user_data)
         
         if not user:
             return jsonify({
@@ -257,11 +270,59 @@ def create_or_get_user():
 
     except Exception as e:
         # Log the full error traceback for debugging
+        print(f"Error in create_or_update_user: {str(e)}")
         traceback.print_exc()
         return jsonify({
             "error": "Internal server error",
             "message": str(e)
         }), 500
+
+def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Helper function to prepare user data for database storage.
+    Handles default values, calendar settings, and data validation.
+    
+    Args:
+        user_data: Raw user data from request
+        
+    Returns:
+        Processed user data ready for database storage
+    """
+    # Prepare calendar settings based on hasCalendarAccess
+    has_calendar_access = user_data.get('hasCalendarAccess', False)
+    calendar_settings = {
+        "connected": has_calendar_access,
+        "lastSyncTime": None,
+        "syncStatus": "never",
+        "selectedCalendars": [],
+        "error": None,
+        "settings": {
+            "autoSync": True,
+            "syncFrequency": 15,  # minutes
+            "defaultReminders": True
+        }
+    }
+
+    # Ensure displayName is never None/null
+    display_name = user_data.get("displayName")
+    if not display_name:
+        # Fall back to email username if displayName is not provided
+        display_name = user_data["email"].split('@')[0]
+
+    # Prepare user data with all required fields and ensure no null values
+    return {
+        "googleId": user_data["googleId"],
+        "email": user_data["email"],
+        "displayName": display_name,  # Use processed display_name
+        "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
+        "role": "free",  # Default role for new users
+        "calendarSynced": has_calendar_access,
+        "lastLogin": datetime.now(timezone.utc), 
+        "calendar": calendar_settings,
+        "metadata": {
+            "lastModified": datetime.now(timezone.utc)
+        }
+    }
 
 def process_user_for_response(user: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -355,68 +416,6 @@ def update_user(user_id):
         print(f"Error updating user: {e}")
         return jsonify({"error": str(e)}), 500
 
-@api_bp.route("/submit_data", methods=["POST"])
-def submit_data():
-    try:
-        user_data = request.json
-        if not user_data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        # Use 'name' field if available, otherwise generate a unique identifier
-        user_id = user_data.get('name', str(uuid.uuid4()))
-        
-        print(f"User data received for user {user_id}:", user_data)
-        
-        # Call AI service directly
-        ai_result = generate_schedule(user_data)
-        print("Response from AI service:", ai_result)
-        
-        if not ai_result.get("success", False):
-            return jsonify(ai_result), 400
-        
-        # Store the schedule in the database
-        try:
-            user_schedules = get_user_schedules_collection()
-            
-            # Use structured data directly for storage
-            structured_data = ai_result.get("tasks", {})
-            
-            # Create schedule document
-            schedule_document = {
-                "userId": user_id,
-                "date": datetime.now().isoformat(),
-                "inputs": user_data,
-                "schedule": structured_data,
-                "metadata": {
-                    "created_at": datetime.now().isoformat(),
-                    "source": "ai_service"
-                }
-            }
-            
-            # Serialize any Task objects and insert into database
-            schedule_document = serialize_tasks(schedule_document)
-            db_result = user_schedules.insert_one(schedule_document)
-            
-            # Create response with schedule and new document ID
-            response_data = {
-                "success": True,
-                "scheduleId": str(db_result.inserted_id),
-                "tasks": structured_data
-            }
-            
-            print("Schedule saved to database successfully")
-            return jsonify(response_data)
-            
-        except Exception as db_error:
-            print(f"Error saving schedule to database: {str(db_error)}")
-            # Still return the AI result if DB save fails
-            return jsonify(ai_result)
-        
-    except Exception as e:
-        print(f"Error in submit_data: {str(e)}")
-        traceback.print_exc()
-        return jsonify({"error": str(e), "success": False}), 500
-
 @api_bp.route("/categorize_task", methods=["POST"])
 def api_categorize_task():
     try:
@@ -437,37 +436,6 @@ def api_categorize_task():
         
     except Exception as e:
         print(f"Error in api_categorize_task: {str(e)}")
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/update_parsed_schedule", methods=["POST", "OPTIONS"])
-def update_parsed_schedule():
-    # Handle OPTIONS request for CORS preflight
-    if request.method == "OPTIONS":
-        return jsonify({"status": "ok"}), 200
-    try:
-        data = request.json
-        if not data or 'scheduleId' not in data or 'parsedTasks' not in data:
-            return jsonify({"error": "Invalid data provided"}), 400
-
-        schedule_id = data['scheduleId']
-        parsed_tasks = data['parsedTasks']
-
-        user_schedules = get_user_schedules_collection()
-
-        # Update the document with the parsed tasks
-        result = user_schedules.update_one(
-            {"_id": ObjectId(schedule_id)},
-            {"$set": {"schedule": parsed_tasks}}
-        )
-
-        if result.modified_count > 0:
-            return jsonify({"message": "Schedule synced to backend"}), 200
-        else:
-            return jsonify({"error": "Failed to update parsed schedule"}), 500
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -543,168 +511,6 @@ def get_recurring_tasks():
 
     except Exception as e:
         print("Exception occurred:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/schedules/<date>", methods=["GET"])
-def get_schedule_by_date(date):
-    """Retrieve schedule for a specific date."""
-    try:
-        # Validate date format
-        try:
-            datetime.strptime(date, '%Y-%m-%d')
-        except ValueError:
-            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
-
-        user_schedules = get_user_schedules_collection()
-        
-        # Find schedule for the specific date using date range
-        schedule = user_schedules.find_one({
-            "date": {
-                "$gte": f"{date}T00:00:00",
-                "$lt": f"{date}T23:59:59"
-            }
-        })
-
-        if schedule:
-            # Convert ObjectId to string for JSON serialization
-            schedule['_id'] = str(schedule['_id'])
-            return jsonify(schedule), 200
-        else:
-            return jsonify({"error": "Schedule not found"}), 404
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/schedules", methods=["POST"])
-def save_schedule():
-    """Save a new schedule."""
-    try:
-        data = request.json
-        if not data or 'date' not in data or 'tasks' not in data:
-            return jsonify({"error": "Missing required fields: date or tasks"}), 400
-
-        user_schedules = get_user_schedules_collection()
-
-        # Check if schedule already exists for this date
-        existing_schedule = user_schedules.find_one({
-            "date": {
-                "$gte": data['date'].split('T')[0] + "T00:00:00",
-                "$lt": data['date'].split('T')[0] + "T23:59:59"
-            }
-        })
-
-        if existing_schedule:
-            return jsonify({"error": "Schedule already exists for this date"}), 409
-
-        # Prepare schedule document with all fields
-        schedule_document = {
-            "date": data['date'],
-            "tasks": data['tasks'],
-            "userId": data.get('userId'),
-            "inputs": data.get('inputs'),
-            "schedule": data.get('schedule'),
-            "metadata": {
-                "createdAt": datetime.now().isoformat(),
-                "lastModified": datetime.now().isoformat()
-            }
-        }
-
-        result = user_schedules.insert_one(schedule_document)
-
-        if result.inserted_id:
-            schedule_document['_id'] = str(result.inserted_id)
-            return jsonify(schedule_document), 201
-        else:
-            return jsonify({"error": "Failed to save schedule"}), 500
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/schedules/<date>", methods=["PUT"])
-def update_schedule(date):
-    """Update an existing schedule."""
-    try:
-        data = request.json
-        if not data or 'tasks' not in data:
-            return jsonify({"error": "No tasks provided"}), 400
-
-        # Validate date format
-        try:
-            datetime.strptime(date, '%Y-%m-%d')
-        except ValueError:
-            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
-
-        user_schedules = get_user_schedules_collection()
-
-        # Update the schedule
-        result = user_schedules.update_one(
-            {
-                "date": {
-                    "$gte": f"{date}T00:00:00",
-                    "$lt": f"{date}T23:59:59"
-                }
-            },
-            {
-                "$set": {
-                    "tasks": data['tasks'],
-                    "metadata.lastModified": datetime.now().isoformat()
-                }
-            }
-        )
-
-        if result.modified_count > 0:
-            return jsonify({"message": "Schedule updated successfully"}), 200
-        else:
-            return jsonify({"error": "Schedule not found"}), 404
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@api_bp.route("/schedules/range", methods=["GET", "OPTIONS"])
-def get_schedules_range():
-    """Retrieve schedules within a date range."""
-    # Handle OPTIONS request for CORS preflight
-    if request.method == "OPTIONS":
-        return jsonify({"status": "ok"}), 200
-    try:
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
-
-        if not start_date or not end_date:
-            return jsonify({"error": "Missing start_date or end_date"}), 400
-
-        # Validate date formats
-        try:
-            datetime.strptime(start_date, '%Y-%m-%d')
-            datetime.strptime(end_date, '%Y-%m-%d')
-        except ValueError:
-            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
-
-        user_schedules = get_user_schedules_collection()
-
-        # Find schedules within the date range
-        schedules = list(user_schedules.find({
-            "date": {
-                "$gte": f"{start_date}T00:00:00",
-                "$lt": f"{end_date}T23:59:59"
-            }
-        }).sort("date", 1))  # Sort by date ascending
-
-        # Convert ObjectIds to strings
-        for schedule in schedules:
-            schedule['_id'] = str(schedule['_id'])
-
-        return jsonify({"schedules": schedules}), 200
-
-    except Exception as e:
-        print("Exception occurred:", str(e))
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     
 @api_bp.route("/user/<user_id>/has-schedules", methods=["GET"])
@@ -838,41 +644,6 @@ def api_store_microstep_feedback():
             "colab_status": "error"
         }), 500
 
-# Add new routes for microstep operations
-@api_bp.route("/microstep/feedback", methods=["POST"])
-def submit_microstep_feedback():
-    """Handle feedback submission for microstep suggestions"""
-    try:
-        feedback_data = request.json
-        if not feedback_data or not all(
-            k in feedback_data for k in ['task_id', 'microstep_id', 'accepted']
-        ):
-            return jsonify({
-                "error": "Missing required fields"
-            }), 400
-        
-        # Add timestamp if not provided
-        if 'timestamp' not in feedback_data:
-            feedback_data['timestamp'] = datetime.timezone.utcnow().isoformat()
-            
-        # Store feedback
-        success = store_microstep_feedback(feedback_data)
-        
-        if success:
-            return jsonify({
-                "message": "Feedback stored successfully",
-                "status": "success"
-            }), 201
-        else:
-            return jsonify({
-                "error": "Failed to store feedback"
-            }), 500
-            
-    except Exception as e:
-        print(f"Error in submit_microstep_feedback: {str(e)}")
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
 @api_bp.route("/schedule/suggestions", methods=["POST"])
 def api_generate_suggestions():
     """
@@ -980,26 +751,424 @@ def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) ->
         # Return original suggestions if storage fails
         return suggestions
 
-def serialize_tasks(data):
+# Helper function for extracting user ID from request (reusable across routes)
+def extract_user_id_from_request() -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
-    Recursively convert Task objects to dictionaries throughout a data structure.
-    Works with lists, dictionaries, and individual items.
+    Extract user ID from request, prioritizing token-based auth with fallback.
     
-    Args:
-        data: Any data structure that might contain Task objects
-        
     Returns:
-        The data structure with all Task objects converted to dictionaries
+        Tuple of (user_id: Optional[str], error_response: Optional[Dict])
+        If user_id is None, error_response contains the error details
     """
-    if isinstance(data, Task):
-        # If it's a Task object, convert to dictionary
-        return data.to_dict()
-    elif isinstance(data, list):
-        # If it's a list, process each item
-        return [serialize_tasks(item) for item in data]
-    elif isinstance(data, dict):
-        # If it's a dictionary, process each value
-        return {key: serialize_tasks(value) for key, value in data.items()}
-    else:
-        # Return other types unchanged (int, str, bool, etc.)
-        return data
+    # Try to get user ID from authentication token
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if user and user.get('googleId'):
+            return user.get('googleId'), None
+    
+    # Fallback to request data for submit_data endpoint
+    data = request.json or {}
+    user_id = data.get('googleId') or data.get('name')
+    
+    if not user_id:
+        return None, {
+            "success": False,
+            "error": "User identification required"
+        }
+    
+    return user_id, None
+
+@api_bp.route("/submit_data", methods=["POST"])
+def submit_data():
+    """
+    Generate and store a new schedule based on user input data and existing tasks.
+    
+    Expected request body (from InputsConfig.tsx state):
+    {
+        "date": str (YYYY-MM-DD format, required),
+        "name": str (optional),
+        "googleId": str (optional),
+        "tasks": List[Dict] (optional, may include calendar events as task objects),
+        "work_start_time": str,
+        "work_end_time": str,
+        "working_days": List[str] (optional),
+        "priorities": Dict[str, str],
+        "energy_patterns": List[str],
+        "layout_preference": {
+            "layout": str,
+            "subcategory": str (optional),
+            "orderingPattern": str
+        }
+    }
+    
+    Returns:
+        200: Schedule generated successfully with schedule data
+        400: Invalid request data or validation errors  
+        401: Authentication required
+        500: Internal server error (with existing schedule if available)
+    """
+    try:
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Extract user ID with proper error handling
+        user_id, error_response = extract_user_id_from_request()
+        if not user_id:
+            return jsonify(error_response), 401
+
+        # Validate required fields from InputsConfig.tsx
+        required_fields = ['date', 'work_start_time', 'work_end_time']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+
+        # Validate date format
+        date = data['date']
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Get existing schedule for fallback error handling
+        existing_schedule = None
+        try:
+            success, result = schedule_service.get_schedule_by_date(user_id, date)
+            if success:
+                existing_schedule = result.get('schedule', [])
+        except Exception:
+            # Continue if we can't get existing schedule
+            pass
+
+        # Call schedule_gen.py directly - bypass schedule service
+        try:
+            schedule_result = generate_schedule(data)
+            
+            if not schedule_result or not schedule_result.get('success', True):
+                raise Exception(schedule_result.get('error', 'Schedule generation failed'))
+            
+            generated_tasks = schedule_result.get('tasks', [])
+            if not generated_tasks:
+                raise Exception('No tasks generated')
+
+        except Exception as gen_error:
+            print(f"Schedule generation failed: {str(gen_error)}")
+            # Return existing schedule with error message
+            return jsonify({
+                "success": False,
+                "error": f"Failed to generate schedule: {str(gen_error)}",
+                "schedule": existing_schedule or [],
+                "fallback": True
+            }), 500
+
+        # Store the generated schedule using centralized service
+        try:
+            success, result = schedule_service.create_schedule_from_ai_generation(
+                user_id=user_id,
+                date=date,
+                generated_tasks=generated_tasks,
+                inputs=data
+            )
+            
+            if not success:
+                print(f"Error storing AI-generated schedule: {result.get('error', 'Unknown error')}")
+                # Return generated schedule even if storage fails
+                return jsonify({
+                    "success": True,
+                    **result
+                })
+
+            return jsonify({
+                "success": True,
+                **result
+            })
+
+        except Exception as store_error:
+            print(f"Error storing schedule: {str(store_error)}")
+            # Return generated schedule even if storage fails
+            return jsonify({
+                "success": True,
+                "schedule": generated_tasks,
+                "date": date,
+                "warning": f"Schedule generated but storage failed: {str(store_error)}"
+            })
+
+    except Exception as e:
+        print(f"Error in submit_data: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/schedules/<date>", methods=["GET"])
+def get_schedule_by_date(date):
+    """
+    Get an existing schedule for a specific date.
+    
+    URL Parameters:
+        date: Date in YYYY-MM-DD format
+        
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Schedule found and returned successfully
+        404: No schedule found for the specified date
+        400: Invalid date format or request
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Extract user ID (requires authentication for GET)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Use schedule service to get schedule
+        success, result = schedule_service.get_schedule_by_date(user_id, date)
+        
+        if not success:
+            # More explicit error handling
+            error_msg = result.get("error", "")
+            if "no schedule found" in error_msg.lower() or "not found" in error_msg.lower():
+                status_code = 404
+            else:
+                status_code = 500
+            
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Failed to get schedule")
+            }), status_code
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        print(f"Error in get_schedule_by_date: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/schedules/<date>", methods=["OPTIONS"])
+def handle_schedule_options(date):
+    """Handle CORS preflight requests for schedule endpoints."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/schedules/<date>", methods=["PUT"])
+def update_schedule_by_date(date):
+    """
+    Update an existing schedule for a specific date with new tasks.
+    Returns 404 if schedule doesn't exist (proper REST semantics).
+    """
+    try:
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate tasks array
+        tasks = data.get('tasks')
+        if not isinstance(tasks, list):
+            return jsonify({
+                "success": False,
+                "error": "Tasks must be an array"
+            }), 400
+
+        # Extract user ID (requires authentication for PUT)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Use strict update - fail if schedule doesn't exist
+        success, result = schedule_service.update_schedule_tasks(user_id, date, tasks)
+        
+        if not success:
+            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Failed to update schedule")
+            }), status_code
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        print(f"Error in update_schedule_by_date: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/schedules", methods=["POST"])
+def create_schedule():
+    """
+    Create a new schedule for a user on a specific date with provided tasks.
+    
+    Expected request body:
+    {
+        "date": str (YYYY-MM-DD format, required),
+        "tasks": List[Dict] (optional, defaults to empty array)
+    }
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Schedule created successfully
+        400: Invalid date format, invalid tasks, or validation errors
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate required date field
+        date = data.get('date')
+        if not date:
+            return jsonify({
+                "success": False,
+                "error": "Missing required field: date"
+            }), 400
+        
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Validate tasks array (optional, defaults to empty)
+        tasks = data.get('tasks', [])
+        if not isinstance(tasks, list):
+            return jsonify({
+                "success": False,
+                "error": "Tasks must be an array"
+            }), 400
+
+        # Create schedule using centralized service
+        success, result = schedule_service.create_empty_schedule(
+            user_id=user_id,
+            date=date,
+            tasks=tasks
+        )
+        
+        if not success:
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Failed to create schedule")
+            }), 500
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        print(f"Error in create_schedule: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/schedules", methods=["OPTIONS"])
+def handle_create_schedule_options():
+    """Handle CORS preflight requests for schedule creation endpoint."""
+    return jsonify({"status": "ok"})
