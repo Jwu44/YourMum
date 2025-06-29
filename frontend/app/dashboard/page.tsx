@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 // UI Components
@@ -48,6 +48,12 @@ const Dashboard: React.FC = () => {
   const [shownSuggestionIds] = useState<Set<string>>(new Set());
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  /**
+   * Ref to track if initial schedule loading has completed
+   * Prevents duplicate API calls in React Strict Mode (development)
+   */
+  const hasInitiallyLoadedRef = useRef<boolean>(false);
   
   useEffect(() => {
     const date = new Date();
@@ -521,38 +527,97 @@ const Dashboard: React.FC = () => {
     });
   }, []);
 
+  /**
+   * Sync calendar events with existing schedule
+   * Triggers backend merge and reloads the complete schedule
+   */
+  const syncCalendarWithSchedule = useCallback(async (date: string): Promise<void> => {
+    try {
+      // Trigger calendar sync (backend will merge with existing schedule)
+      const calendarResponse = await calendarApi.fetchEvents(date);
+      
+      if (calendarResponse.success) {
+        // Reload the complete merged schedule from backend
+        const updatedSchedule = await loadSchedule(date);
+        
+        if (updatedSchedule.success && updatedSchedule.schedule) {
+          setScheduleDays(prevDays => {
+            const newDays = [...prevDays];
+            newDays[currentDayIndex] = updatedSchedule.schedule || [];
+            return newDays;
+          });
+          
+          setScheduleCache(prevCache => 
+            new Map(prevCache).set(date, updatedSchedule.schedule || [])
+          );
+        }
+      }
+    } catch (error) {
+      // Silent fail for calendar sync - don't disrupt main schedule loading
+      console.warn('Calendar sync failed:', error);
+    }
+  }, [currentDayIndex]);
+
   useEffect(() => {
-    const loadInitialSchedule = async () => {
+    /**
+     * Load initial schedule for today with optimized single API call approach
+     * 
+     * Implementation notes:
+     * - Uses ref guard to prevent duplicate calls in React Strict Mode
+     * - Prioritizes calendar API which handles backend merging automatically  
+     * - Maintains existing error handling and fallback logic
+     * - Preserves all existing state management patterns
+     */
+    const loadInitialSchedule = async (): Promise<void> => {
+      // Prevent duplicate loads in React Strict Mode (development only)
+      if (hasInitiallyLoadedRef.current) {
+        console.log('Initial schedule already loaded, skipping duplicate call');
+        return;
+      }
+
       setIsLoadingSchedule(true);
       
       try {
-        const today = getDateString(0);
+        const today: string = getDateString(0);
         
-        // Step 1: Try to fetch calendar events first
-        const calendarResponse = await calendarApi.fetchEvents(today);
-  
-        if (calendarResponse.success && calendarResponse.tasks.length > 0) {
-          setScheduleDays([calendarResponse.tasks]);
-          setScheduleCache(new Map([[today, calendarResponse.tasks]]));
-          return;
+        // Primary approach: Use calendar API first (handles backend merging)
+        // This eliminates the need for separate loadSchedule + calendar sync calls
+        try {
+          const calendarResponse = await calendarApi.fetchEvents(today);
+          
+          if (calendarResponse.success) {
+            // Calendar API returns complete merged schedule from backend
+            setScheduleDays([calendarResponse.tasks]);
+            setScheduleCache(new Map([[today, calendarResponse.tasks]]));
+            
+            console.log(`Loaded ${calendarResponse.tasks.length} tasks via calendar sync`);
+            return;
+          }
+        } catch (calendarError) {
+          // Silent fail for calendar sync - continue to fallback
+          console.warn('Calendar sync failed, trying schedule load fallback:', calendarError);
         }
         
-        // Step 2: Try to load existing schedule
+        // Fallback approach: Load existing schedule if calendar sync fails
         const existingSchedule = await loadSchedule(today);
         
         if (existingSchedule.success && existingSchedule.schedule) {
+          // Set the existing schedule without additional calendar sync
           setScheduleDays([existingSchedule.schedule]);
           setScheduleCache(new Map([[today, existingSchedule.schedule]]));
+          
+          console.log(`Loaded ${existingSchedule.schedule.length} tasks from existing schedule`);
           return;
         }
         
-        // Step 3: Show empty state UI (no database writes)
-        console.log("No calendar events or existing schedule found, showing empty state");
+        // Final fallback: Show empty state if no schedule exists
+        console.log("No existing schedule or calendar events found, showing empty state");
         setScheduleDays([[]]);
         
       } catch (error) {
         console.error("Error loading initial schedule:", error);
-        // Fallback to empty state
+        
+        // Maintain existing error handling pattern
         setScheduleDays([[]]);
         
         toast({
@@ -561,13 +626,16 @@ const Dashboard: React.FC = () => {
         });
       } finally {
         setIsLoadingSchedule(false);
+        // Mark as loaded to prevent duplicate calls
+        hasInitiallyLoadedRef.current = true;
       }
     };
     
+    // Only load if no form response is pending (existing logic preserved)
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, [toast, state.formUpdate?.response]);
+  }, [state.formUpdate?.response]); // Removed toast from dependencies to prevent unnecessary re-runs
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');

@@ -7,7 +7,7 @@ import uuid
 import requests
 import os
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from firebase_admin import credentials, get_app
 import firebase_admin
 from backend.services.ai_service import categorize_task
@@ -346,6 +346,39 @@ def disconnect_google_calendar():
             "error": f"Failed to disconnect from Google Calendar: {str(e)}"
         }), 500
 
+def store_schedule_for_user(user_id: str, date: str, calendar_tasks: List[Dict]) -> Tuple[bool, Optional[Dict]]:
+    """
+    Store or update calendar tasks for a user on a specific date.
+    Uses centralized schedule service for consistent calendar sync operations.
+    
+    Args:
+        user_id: User's Google ID or Firebase UID
+        date: Date in YYYY-MM-DD format
+        calendar_tasks: List of calendar task objects to store
+        
+    Returns:
+        Tuple of (success: bool, merged_schedule_result: Optional[Dict])
+        where merged_schedule_result contains the complete merged schedule on success
+    """
+    try:
+        # Use centralized calendar sync service
+        success, result = schedule_service.create_schedule_from_calendar_sync(
+            user_id=user_id,
+            date=date,
+            calendar_tasks=calendar_tasks
+        )
+        
+        if not success:
+            print(f"Error storing calendar schedule: {result.get('error', 'Unknown error')}")
+            return False, None
+        
+        return True, result
+        
+    except Exception as e:
+        print(f"Error storing calendar schedule: {e}")
+        traceback.print_exc()
+        return False, None
+
 @calendar_bp.route("/events", methods=["GET", "POST"])
 def get_calendar_events():
     """
@@ -354,10 +387,12 @@ def get_calendar_events():
     GET method: 
     - Query parameters: date (YYYY-MM-DD)
     - Requires Authorization header with Firebase ID token
+    - Merges calendar events with existing schedule and returns complete merged schedule
     
     POST method:
     - Request body: { "userId": str, "date": str }
     - Direct user ID-based authentication
+    - Returns only calendar events without merging
     
     Returns standardized response with calendar events as tasks
     """
@@ -449,23 +484,45 @@ def get_calendar_events():
         calendar_events = fetch_google_calendar_events(access_token, date)
         
         # Convert events to tasks
-        tasks = []
+        calendar_tasks = []
         for event in calendar_events:
             task_data = convert_calendar_event_to_task(event)
             if task_data:
-                tasks.append(task_data)
+                calendar_tasks.append(task_data)
         
-        # For GET requests, store the schedule (original /events behavior)
+        # Handle GET vs POST request differences
         if not is_post_request:
-            store_schedule_for_user(user_id, date, tasks)
-        
-        # Return unified response format
-        response = {
-            "success": True,
-            "tasks": tasks,
-            "count": len(tasks),
-            "date": date
-        }
+            # For GET requests: merge with existing schedule and return complete merged schedule
+            store_success, merged_result = store_schedule_for_user(user_id, date, calendar_tasks)
+            
+            if store_success and merged_result:
+                # Return complete merged schedule
+                response = {
+                    "success": True,
+                    "tasks": merged_result.get('schedule', []),
+                    "count": len(merged_result.get('schedule', [])),
+                    "date": date,
+                    "calendar_events_added": len(calendar_tasks),
+                    "metadata": merged_result.get('metadata', {})
+                }
+            else:
+                # Fallback to calendar tasks only if merge failed
+                response = {
+                    "success": True,
+                    "tasks": calendar_tasks,
+                    "count": len(calendar_tasks),
+                    "date": date,
+                    "calendar_events_added": len(calendar_tasks),
+                    "merge_failed": True
+                }
+        else:
+            # For POST requests: return only calendar events (no merging)
+            response = {
+                "success": True,
+                "tasks": calendar_tasks,
+                "count": len(calendar_tasks),
+                "date": date
+            }
         
         return jsonify(response)
         
@@ -477,38 +534,6 @@ def get_calendar_events():
             "error": f"Failed to fetch Google Calendar events: {str(e)}",
             "tasks": []
         }), 500 if request.method == "GET" else 200
-
-def store_schedule_for_user(user_id: str, date: str, calendar_tasks: List[Dict]) -> bool:
-    """
-    Store or update calendar tasks for a user on a specific date.
-    Uses centralized schedule service for consistent calendar sync operations.
-    
-    Args:
-        user_id: User's Google ID or Firebase UID
-        date: Date in YYYY-MM-DD format
-        calendar_tasks: List of calendar task objects to store
-        
-    Returns:
-        bool: True if operation succeeded, False otherwise
-    """
-    try:
-        # Use centralized calendar sync service
-        success, result = schedule_service.create_schedule_from_calendar_sync(
-            user_id=user_id,
-            date=date,
-            calendar_tasks=calendar_tasks
-        )
-        
-        if not success:
-            print(f"Error storing calendar schedule: {result.get('error', 'Unknown error')}")
-            return False
-        
-        return True
-        
-    except Exception as e:
-        print(f"Error storing calendar schedule: {e}")
-        traceback.print_exc()
-        return False
 
 @calendar_bp.route("/status/<user_id>", methods=["GET"])
 def get_calendar_status(user_id: str):
