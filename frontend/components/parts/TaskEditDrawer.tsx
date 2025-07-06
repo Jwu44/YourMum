@@ -50,9 +50,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   // Determine mode based on presence of task prop
   const isEditMode = Boolean(task);
 
-  // Add state flag to track save completion (following dev-guide simplicity)
-  const [isSaveComplete, setIsSaveComplete] = useState(false);
-
   // Initialize task state with all required fields
   const getEmptyTask = useCallback((): Task => ({
     id: '',
@@ -253,11 +250,8 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
         });
       }
 
-      // Reset form state
+      // Reset form state but don't manually close
       setEditedTask(getInitialTask());
-      
-      // 🔧 FIXED: Signal save completion instead of manual close
-      setIsSaveComplete(true);
       
       // Success toast
       toast({
@@ -279,7 +273,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   // Handle close with form reset
   const handleClose = useCallback(() => {
     setEditedTask(getInitialTask());
-    setIsSaveComplete(false); // Reset save completion flag
     onClose();
   }, [onClose, getInitialTask]);
 
@@ -289,15 +282,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       handleClose();
     }
   }, [handleClose]);
-
-  // 🔧 FIXED: Auto-close via vaul when save completes
-  useEffect(() => {
-    if (isSaveComplete && isOpen) {
-      // Let vaul handle the close by updating parent state
-      // This ensures proper modal cleanup
-      handleClose();
-    }
-  }, [isSaveComplete, isOpen, handleClose]);
 
   return (
     <Drawer 
