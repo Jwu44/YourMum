@@ -18,9 +18,6 @@ interface EditableScheduleProps {
   /** Callback function for updating a task */
   onUpdateTask: (task: Task) => void;
   
-  /** Callback function for deleting a task */
-  onDeleteTask: (taskId: string) => void;
-  
   /** Callback function for reordering tasks */
   onReorderTasks: (tasks: Task[]) => void;
   
@@ -44,6 +41,9 @@ interface EditableScheduleProps {
   
   /** Callback function for rejecting a suggestion */
   onRejectSuggestion: (suggestionId: string) => void;
+
+  /** Callback function for editing a task */
+  onEditTask?: (task: Task) => void;
 }
 
 /**
@@ -56,12 +56,12 @@ interface EditableScheduleProps {
 const EditableSchedule: React.FC<EditableScheduleProps> = ({ 
   tasks, 
   onUpdateTask, 
-  onDeleteTask, 
   onReorderTasks, 
   layoutPreference,
   suggestionsMap,
   onAcceptSuggestion,
-  onRejectSuggestion
+  onRejectSuggestion,
+  onEditTask
 }) => {
   /**
    * Minimal task processing for layout-specific rendering
@@ -205,10 +205,10 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             task={task}
             index={index}
             onUpdateTask={onUpdateTask}
-            onDeleteTask={onDeleteTask}
             moveTask={moveTask}
             isSection={task.is_section || task.type === 'section'}
             allTasks={processedTasks}
+            onEditTask={onEditTask}
           />
 
           {/* Render suggestions after each task if they exist */}
