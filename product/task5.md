@@ -1,11 +1,10 @@
-# TASK-05: Fix Bug
+# TASK-05: Deprecate "Edit" task flow
 Status: To do
 
-## Bug
-Whenever the /dashborad page loads, in the console logs I see it tries to fetch today's schedule twice via  Both fetches fail. Despite this, the schedule for the current day is able to be fetched successfully and rendered
-
-### Steps to reproduce:
-1. Go to /dashboard for any given day
-2. Bug: observe multiple 404 errors when fetching today and yesterday's schedule
+## Problem
+Currently the "Edit" task flow looks overly complicated and engineered. This is causing a bug where after editing a task, the whole dashboard becomes unclickable. Instead of trying to fix the bug, I would like to deprecate the whole "Edit" task flow 
 
 ## Requirements
+- Map out the current flow for editing a task which starts from clicking the ellipses on an EditableScheduleRow > Edit > Fill in details in TaskEditDrawer > Save
+- Then, deprecate all functions for editing a task for this flow
+- Fix up affected folders where the deprecation occurred
