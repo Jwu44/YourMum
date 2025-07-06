@@ -128,7 +128,7 @@ const Dashboard: React.FC = () => {
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     try {
       const currentDate = getDateString(currentDayIndex);
-      let updatedSchedule: Task[] = []; // Capture updated schedule
+      let updatedSchedule: Task[] = []; 
       
       // Update frontend state and capture the new schedule
       setScheduleDays(prevDays => {
@@ -168,11 +168,17 @@ const Dashboard: React.FC = () => {
         return newCache;
       });
 
-      // Use the UPDATED schedule for backend call (fixes race condition)
+      // Use the UPDATED schedule for backend call
       const updateResult = await updateSchedule(currentDate, updatedSchedule);
       
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Failed to update schedule');
+      }
+
+      // 🔧 NEW: Close edit drawer on successful update
+      if (isEditDrawerOpen) {
+        setIsEditDrawerOpen(false);
+        setEditingTask(undefined);
       }
 
       // Show success toast
@@ -185,7 +191,7 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error updating task:', error);
       
-      // Revert frontend state on error (following existing error handling pattern)
+      // Revert frontend state on error
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex));
@@ -195,13 +201,15 @@ const Dashboard: React.FC = () => {
         return newDays;
       });
       
+      // 🔧 KEEP DRAWER OPEN ON ERROR - no close logic here
+      
       toast({
         title: "Error",
         description: "Failed to update task. Please try again.",
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, scheduleCache, toast]);
+  }, [currentDayIndex, scheduleDays, scheduleCache, toast, isEditDrawerOpen]);
 
   /**
    * Handle edit task action from EditableScheduleRow

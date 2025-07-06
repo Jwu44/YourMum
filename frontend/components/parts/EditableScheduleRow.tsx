@@ -246,12 +246,16 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   /**
    * Handle edit task action
-   * Simple callback to parent component
+   * Add delay to allow dropdown menu overlay to fully close and cleanup
    */
   const handleEditTask = useCallback(() => {
     try {
       if (onEditTask) {
-        onEditTask(task);
+        // 🔧 FIX: Add small delay to allow dropdown overlay cleanup
+        // This prevents race condition between dropdown and drawer overlays
+        setTimeout(() => {
+          onEditTask(task);
+        }, 50); // Minimal delay for overlay cleanup
       }
     } catch (error) {
       console.error('Error triggering edit task:', error);
