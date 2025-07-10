@@ -159,6 +159,27 @@ def initialize_calendar_collections():
         print(f"Error initializing calendar collections: {e}")
         raise
 
+def initialize_slack_collections():
+    """Initialize Slack integration collections and indexes."""
+    try:
+        # Get database and collection
+        db = get_database()
+        processed_messages = db['Processed Slack Messages']
+        
+        # Create indexes for efficient duplicate checking and cleanup
+        slack_indexes = [
+            IndexModel([("message_key", ASCENDING)], unique=True),
+            IndexModel([("user_id", ASCENDING), ("processed_at", DESCENDING)]),
+            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=86400*30)  # 30 days TTL
+        ]
+        processed_messages.create_indexes(slack_indexes)
+        
+        print("Slack collections initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing Slack collections: {e}")
+        raise
+
 def initialize_db():
     """Initialize database connection and create necessary collections/indexes."""
     global _db_initialized
@@ -175,6 +196,7 @@ def initialize_db():
         initialize_ai_collections()
         initialize_user_collection()
         initialize_calendar_collections()
+        initialize_slack_collections()
 
         # Create or update collection with schema validation
         db = get_database()

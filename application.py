@@ -4,6 +4,7 @@ from flask import Flask
 from flask_cors import CORS
 from backend.apis.routes import api_bp
 from backend.apis.calendar_routes import calendar_bp
+from backend.apis.integration_routes import integration_bp
 from backend.db_config import initialize_db
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import jsonify
@@ -52,6 +53,7 @@ def create_app(testing=False):
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
+    app.register_blueprint(integration_bp, url_prefix="/api/integrations")
     
     try:
         # Initialize database connection only once
