@@ -20,7 +20,10 @@ export interface Task {
   rationale?: string;
   estimated_time?: string;
   energy_level_required?: 'low' | 'medium' | 'high';
-  gcal_event_id?: string; 
+  gcal_event_id?: string;
+  // New Slack integration fields
+  source?: 'slack';
+  slack_message_url?: string;
 }
 
 export interface FormData {

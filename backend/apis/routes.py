@@ -28,28 +28,6 @@ from backend.services.schedule_service import schedule_service
 
 api_bp = Blueprint("api", __name__)
 
-# # Add a global CORS handler for the API blueprint
-# @api_bp.after_request
-# def add_cors_headers(response):
-#     """Add CORS headers to all API responses"""
-#     # Get origin from the request
-#     origin = request.headers.get('Origin')
-    
-#     # Check if origin is allowed
-#     allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", 
-#                              "https://yourdai.app,https://yourdai-production.up.railway.app,http://localhost:3000,http://localhost:8000").split(",")
-    
-#     # If origin is in the allowed list, add CORS headers
-#     if origin in allowed_origins:
-#         response.headers.add('Access-Control-Allow-Origin', origin)
-#         response.headers.add('Access-Control-Allow-Headers', 
-#                            'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-#         response.headers.add('Access-Control-Allow-Methods', 
-#                            'GET, POST, PUT, DELETE, OPTIONS')
-#         response.headers.add('Access-Control-Allow-Credentials', 'true')
-    
-#     return response
-
 # Add a global OPTIONS request handler for all routes
 @api_bp.route('/<path:path>', methods=['OPTIONS'])
 @api_bp.route('/', methods=['OPTIONS'])
@@ -126,7 +104,18 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         if not user_id:
             return None
             
-        # Development bypass - return mock user for dev-user-123
+        # Get database instance
+        db = get_database()
+        users = db['users']
+        
+        # Find user by Google ID (which is the Firebase UID)
+        user = users.find_one({"googleId": user_id})
+        
+        # If user found in database, return it (applies to all users including dev users)
+        if user:
+            return user
+            
+        # Development bypass - return mock user only if user not found in database
         if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
             return {
                 'googleId': 'dev-user-123',
@@ -138,13 +127,8 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 # Add other required fields as needed
             }
             
-        # Get database instance
-        db = get_database()
-        users = db['users']
-        
-        # Find user by Google ID (which is the Firebase UID)
-        user = users.find_one({"googleId": user_id})
-        return user
+        # User not found and not a dev user
+        return None
     except Exception as e:
         print(f"Error getting user from token: {e}")
         traceback.print_exc()
