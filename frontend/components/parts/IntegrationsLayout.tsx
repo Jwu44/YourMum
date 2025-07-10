@@ -18,9 +18,6 @@ import { Plug, Slack } from 'lucide-react';
 import { SidebarLayout } from '@/components/parts/SidebarLayout';
 import SlackIntegrationCard from '@/components/parts/SlackIntegrationCard';
 
-// Types and Utils
-import { cn } from '@/lib/utils';
-
 /**
  * Integration service definition
  */
