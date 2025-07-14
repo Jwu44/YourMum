@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime
-from typing import Optional, Set, Dict, Union, List
+from typing import Optional, Dict, Union, List
 
 class RecurrenceType:
     """
@@ -85,10 +84,13 @@ class Task:
                  type: str = "task",
                  is_recurring: Optional[Union[Dict, RecurrenceType]] = None,
                  start_date: Optional[str] = None,
-                 # New microstep fields
+                # New microstep fields
                  rationale: Optional[str] = None,
                  estimated_time: Optional[str] = None,
-                 energy_level_required: Optional[str] = None):
+                 energy_level_required: Optional[str] = None,
+                 # New Slack integration fields
+                 source: Optional[str] = None,
+                 slack_message_url: Optional[str] = None):
                  
         """
         Initialize a task with all its attributes.
@@ -110,6 +112,10 @@ class Task:
         self.rationale = rationale
         self.estimated_time = estimated_time
         self.energy_level_required = energy_level_required
+
+        # Add Slack integration fields
+        self.source = source
+        self.slack_message_url = slack_message_url
 
         # Handle recurrence pattern
         if isinstance(is_recurring, dict):
@@ -139,6 +145,12 @@ class Task:
             "is_recurring": self.is_recurring.to_dict() if self.is_recurring else None,
             "start_date": self.start_date,
         }
+        
+        # Include Slack integration fields if they exist
+        if self.source:
+            base_dict["source"] = self.source
+        if self.slack_message_url:
+            base_dict["slack_message_url"] = self.slack_message_url
         
         # Only include microstep fields if they exist
         if self.is_microstep:
@@ -179,6 +191,8 @@ class Task:
             rationale=data.get("rationale"),
             estimated_time=data.get("estimated_time"),
             energy_level_required=data.get("energy_level_required"),
+            source=data.get("source"),
+            slack_message_url=data.get("slack_message_url"),
         )
 
     def add_category(self, category: str) -> None:

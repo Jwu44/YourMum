@@ -40,7 +40,14 @@ const Dashboard: React.FC = () => {
   const { state } = useForm();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(undefined);
+  
+  // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
+  
+  // Edit task drawer state - following dev-guide.md simplicity principle
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
+  
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map());
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
@@ -121,7 +128,9 @@ const Dashboard: React.FC = () => {
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     try {
       const currentDate = getDateString(currentDayIndex);
+      let updatedSchedule: Task[] = []; 
       
+      // Update frontend state and capture the new schedule
       setScheduleDays(prevDays => {
         const newDays = [...prevDays];
         if (newDays[currentDayIndex]) {
@@ -129,10 +138,13 @@ const Dashboard: React.FC = () => {
           const taskIndex = currentTasks.findIndex(t => t.id === updatedTask.id);
           
           if (taskIndex !== -1) {
-            newDays[currentDayIndex] = currentTasks.map(task => 
+            // Update existing task
+            updatedSchedule = currentTasks.map(task => 
               task.id === updatedTask.id ? { ...task, ...updatedTask } : task
             );
+            newDays[currentDayIndex] = updatedSchedule;
           } else {
+            // Add new task (for microsteps)
             const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id);
             if (parentIndex !== -1) {
               const insertIndex = parentIndex + 1 + currentTasks
@@ -141,72 +153,91 @@ const Dashboard: React.FC = () => {
               
               const newTasks = [...currentTasks];
               newTasks.splice(insertIndex, 0, updatedTask);
-              newDays[currentDayIndex] = newTasks;
+              updatedSchedule = newTasks;
+              newDays[currentDayIndex] = updatedSchedule;
             }
           }
         }
         return newDays;
       });
-  
+
+      // Update cache with the correct updated schedule
       setScheduleCache(prevCache => {
         const newCache = new Map(prevCache);
-        const currentTasks = prevCache.get(currentDate) || [];
-        const taskIndex = currentTasks.findIndex(t => t.id === updatedTask.id);
-        
-        if (taskIndex !== -1) {
-          const updatedTasks = currentTasks.map(task =>
-            task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-          );
-          newCache.set(currentDate, updatedTasks);
-        } else {
-          const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id);
-          if (parentIndex !== -1) {
-            const insertIndex = parentIndex + 1 + currentTasks
-              .slice(0, parentIndex + 1)
-              .filter(t => t.parent_id === updatedTask.parent_id).length;
-            
-            const newTasks = [...currentTasks];
-            newTasks.splice(insertIndex, 0, updatedTask);
-            newCache.set(currentDate, newTasks);
-          }
-        }
+        newCache.set(currentDate, updatedSchedule);
         return newCache;
       });
-  
-      const updateResult = await updateSchedule(
-        currentDate, 
-        scheduleDays[currentDayIndex]
-      );
+
+      // Use the UPDATED schedule for backend call
+      const updateResult = await updateSchedule(currentDate, updatedSchedule);
       
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Failed to update schedule');
       }
-  
-      if (!scheduleDays[currentDayIndex].find(t => t.id === updatedTask.id)) {
-        toast({
-          title: "Success",
-          description: "Microstep added to schedule",
-        });
+
+      // 🔧 NEW: Close edit drawer on successful update
+      if (isEditDrawerOpen) {
+        setIsEditDrawerOpen(false);
+        setEditingTask(undefined);
       }
+
+      // Show success toast
+      const isNewTask = !scheduleDays[currentDayIndex]?.find(t => t.id === updatedTask.id);
+      toast({
+        title: "Success", 
+        description: isNewTask ? "Microstep added to schedule" : "Task updated successfully",
+      });
+
     } catch (error) {
       console.error('Error updating task:', error);
+      
+      // Revert frontend state on error
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex));
+        if (cachedSchedule && newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = cachedSchedule;
+        }
+        return newDays;
+      });
+      
+      // 🔧 KEEP DRAWER OPEN ON ERROR - no close logic here
+      
       toast({
         title: "Error",
         description: "Failed to update task. Please try again.",
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, toast]);
+  }, [currentDayIndex, scheduleDays, scheduleCache, toast, isEditDrawerOpen]);
 
-  const handleScheduleTaskDelete = useCallback((taskId: string) => {
-    setScheduleDays(prevDays => {
-      const newDays = [...prevDays];
-      if (newDays[currentDayIndex]) {
-        newDays[currentDayIndex] = newDays[currentDayIndex].filter(task => task.id !== taskId);
-      }
-      return newDays;
-    });
-  }, [currentDayIndex]);
+  /**
+   * Handle edit task action from EditableScheduleRow
+   * Simple function following dev-guide.md simplicity principles
+   */
+  const handleEditTask = useCallback((task: Task) => {
+    try {
+      setEditingTask(task);
+      setIsEditDrawerOpen(true);
+    } catch (error) {
+      console.error('Error opening edit task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open edit dialog",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  /**
+   * Handle edit drawer close
+   * Following dev-guide.md simplicity: single responsibility
+   */
+  const handleEditDrawerClose = useCallback(() => {
+    // Simple state reset - let vaul handle modal cleanup
+    setIsEditDrawerOpen(false);
+    setEditingTask(undefined);
+  }, []);
   
   const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
     setScheduleDays(prevDays => {
@@ -603,7 +634,6 @@ const Dashboard: React.FC = () => {
                 <EditableSchedule
                   tasks={scheduleDays[currentDayIndex] || []}
                   onUpdateTask={handleScheduleTaskUpdate}
-                  onDeleteTask={handleScheduleTaskDelete}
                   onReorderTasks={handleReorderTasks}
                   layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
                   onRequestSuggestions={handleRequestSuggestions}
@@ -611,6 +641,7 @@ const Dashboard: React.FC = () => {
                   suggestionsMap={suggestionsMap}
                   onAcceptSuggestion={handleAcceptSuggestion}
                   onRejectSuggestion={handleRejectSuggestion}
+                  onEditTask={handleEditTask}
                 />
 
                 {isLoadingSuggestions && (
@@ -641,6 +672,14 @@ const Dashboard: React.FC = () => {
           isOpen={isTaskDrawerOpen}
           onClose={() => setIsTaskDrawerOpen(false)}
           onCreateTask={addTask}
+          currentDate={getDateString(currentDayIndex)}
+        />
+
+        <TaskEditDrawer
+          isOpen={isEditDrawerOpen}
+          onClose={handleEditDrawerClose}
+          task={editingTask}
+          onUpdateTask={handleScheduleTaskUpdate}
           currentDate={getDateString(currentDayIndex)}
         />
       </div>

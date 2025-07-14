@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { 
   Select,
   SelectContent,
@@ -26,13 +26,14 @@ import {
   RECURRENCE_OPTIONS 
 } from '../../lib/types';
 import { cn } from '@/lib/utils';
+import { toast } from "@/hooks/use-toast";
 
 interface TaskEditDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  task?: Task;
-  onUpdateTask?: (task: Task) => void;
-  onCreateTask?: (task: Task) => void;
+  task?: Task; // When provided, enables edit mode
+  onUpdateTask?: (task: Task) => void; // For edit mode
+  onCreateTask?: (task: Task) => void; // For create mode
   currentDate: string;
 }
 
@@ -41,15 +42,15 @@ const categories = ['Exercise', 'Relationships', 'Fun', 'Ambition', 'Work'];
 const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   isOpen,
   onClose,
-  task,
-  onUpdateTask,
+  task, // Re-enabled for edit mode
+  onUpdateTask, // Re-enabled for edit mode
   onCreateTask,
   currentDate,
 }) => {
-  // Determine if we're in create mode (no task provided)
-  const isCreateMode = !task;
+  // Determine mode based on presence of task prop
+  const isEditMode = Boolean(task);
 
-  // Initialize empty task state with all required fields
+  // Initialize task state with all required fields
   const getEmptyTask = useCallback((): Task => ({
     id: '',
     text: '',
@@ -68,55 +69,45 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     start_date: currentDate,
   }), [currentDate]);
 
-  // Initialize state with either empty task or existing task
-  const [editedTask, setEditedTask] = useState<Task>(() => {
-    if (isCreateMode) {
-      return getEmptyTask();
+  // Initialize with task data in edit mode, empty task in create mode
+  const getInitialTask = useCallback((): Task => {
+    if (isEditMode && task) {
+      return {
+        ...task,
+        // Ensure all required fields are present with proper defaults
+        start_time: task.start_time || '',
+        end_time: task.end_time || '',
+        categories: task.categories || [],
+        start_date: task.start_date || currentDate,
+      };
     }
-    return { ...task } as Task;
-  });
+    return getEmptyTask();
+  }, [isEditMode, task, getEmptyTask, currentDate]);
 
-  // Cleanup ref for pointer events
-  const needsCleanup = useRef(false);
+  const [editedTask, setEditedTask] = useState<Task>(() => getInitialTask());
 
-  // Effect for pointer events cleanup
+  // Reset form when drawer is opened/closed or task changes
   useEffect(() => {
-    const originalPointerEvents = document.body.style.pointerEvents;
-    
     if (isOpen) {
-      needsCleanup.current = true;
+      setEditedTask(getInitialTask());
     }
+  }, [isOpen, task, getInitialTask]);
 
-    return () => {
-      if (needsCleanup.current) {
-        document.body.style.pointerEvents = originalPointerEvents || 'auto';
-        needsCleanup.current = false;
-      }
-    };
-  }, [isOpen]);
-
-  // Reset form when drawer is opened/closed
-  useEffect(() => {
-    if (isOpen && isCreateMode) {
-      setEditedTask(getEmptyTask());
-    }
-  }, [isOpen, isCreateMode, currentDate, getEmptyTask]);
-
-  // Get current day of week from task's date or today
+  // Get current day of week from current date
   const getCurrentDayOfWeek = useCallback((): WeekDay => {
     try {
-      const date = task?.start_date ? parseISO(task.start_date) : new Date();
+      const date = new Date();
       return format(date, 'EEEE') as WeekDay;
     } catch (error) {
       console.error('Error getting day of week:', error);
       return format(new Date(), 'EEEE') as WeekDay;
     }
-  }, [task?.start_date]);
+  }, []);
 
   // Get week of month (first, second, third, fourth, last)
   const getWeekOfMonth = useCallback((): MonthWeek => {
     try {
-      const date = task?.start_date ? parseISO(task.start_date) : new Date();
+      const date = new Date();
       const dayOfMonth = date.getDate();
       
       if (dayOfMonth >= 1 && dayOfMonth <= 7) return 'first';
@@ -128,7 +119,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       console.error('Error getting week of month:', error);
       return 'first';
     }
-  }, [task?.start_date]);
+  }, []);
 
   // Format recurrence label with current day/week
   const getRecurrenceLabel = useCallback((option: typeof RECURRENCE_OPTIONS[0]): string => {
@@ -212,57 +203,112 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }
   };
 
-  // Handle save with form reset
-  const handleSave = useCallback(() => {
+  // Add proper error boundary handling
+  const validateTaskData = useCallback((task: Task): boolean => {
     try {
-      if (!editedTask.text.trim()) {
+      // Validate required fields following task.py schema
+      if (!task.text?.trim()) {
+        throw new Error('Task name is required');
+      }
+      
+      // Validate categories format
+      if (task.categories && !Array.isArray(task.categories)) {
+        throw new Error('Categories must be an array');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Task validation error:', error);
+      toast({
+        title: "Validation Error",
+        description: error instanceof Error ? error.message : "Invalid task data",
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [toast]);
+
+  // Update handleSave with validation
+  const handleSave = useCallback(async () => {
+    try {
+      // Validate before save
+      if (!validateTaskData(editedTask)) {
         return;
       }
 
-      if (isCreateMode && onCreateTask) {
-        onCreateTask({
+      if (isEditMode && onUpdateTask) {
+        // Edit mode: update existing task
+        await onUpdateTask({
+          ...editedTask,
+          id: task?.id || editedTask.id,
+        });
+      } else if (!isEditMode && onCreateTask) {
+        // Create mode: create new task
+        await onCreateTask({
           ...editedTask,
           id: '',
         });
-      } else if (onUpdateTask) {
-        onUpdateTask(editedTask);
       }
+
+      // Reset form state and close drawer after successful save
+      setEditedTask(getInitialTask());
+      
+      // Success toast
+      toast({
+        title: "Success",
+        description: isEditMode ? "Task updated successfully" : "Task created successfully",
+      });
+      
+      // Close the drawer after successful save
+      onClose();
+      
     } catch (error) {
       console.error('Error saving task:', error);
-    } finally {
-      setEditedTask(getEmptyTask());
-      onClose();
+      toast({
+        title: "Error",
+        description: "Failed to save task. Please try again.",
+        variant: "destructive",
+      });
+      // Don't close drawer on error - let user retry
     }
-  }, [editedTask, isCreateMode, onCreateTask, onUpdateTask, onClose, getEmptyTask]);
+  }, [editedTask, isEditMode, onUpdateTask, onCreateTask, task?.id, getInitialTask, validateTaskData, toast]);
 
   // Handle close with form reset
   const handleClose = useCallback(() => {
-    if (needsCleanup.current) {
-      document.body.style.pointerEvents = 'auto';
-      needsCleanup.current = false;
-    }
-    setEditedTask(getEmptyTask());
+    setEditedTask(getInitialTask());
     onClose();
-  }, [onClose, getEmptyTask]);
+  }, [onClose, getInitialTask]);
+
+  // 🔧 FIXED: Let vaul handle close via onOpenChange when save completes
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      handleClose();
+    }
+  }, [handleClose]);
 
   return (
     <Drawer 
       open={isOpen} 
-      onOpenChange={(open) => {
-        if (!open) handleClose();
-      }}
+      onOpenChange={handleOpenChange} // 🔧 FIXED: Single source of truth for close
       modal={true}
     >
       <DrawerContent
         className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-background shadow-lg outline-none"
         onPointerDownOutside={(e) => {
-          e.preventDefault();
+          // Only prevent closing if user has unsaved changes
+          const hasUnsavedChanges = editedTask.text !== (task?.text || '');
+          if (hasUnsavedChanges) {
+            e.preventDefault();
+            return;
+          }
           handleClose();
         }}
       >
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
-            <DrawerTitle>Create New Task</DrawerTitle>
+            <DrawerTitle>
+              {isEditMode ? 'Edit Task' : 'Create New Task'}
+            </DrawerTitle>
           </DrawerHeader>
           <div className="p-4 space-y-4">
             {/* Task Name */}
@@ -366,9 +412,11 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer with improved save button */}
           <DrawerFooter>
-            <Button onClick={handleSave}>Create</Button>
+            <Button onClick={handleSave}>
+              {isEditMode ? 'Save Changes' : 'Create'}
+            </Button>
           </DrawerFooter>
         </div>
       </DrawerContent>

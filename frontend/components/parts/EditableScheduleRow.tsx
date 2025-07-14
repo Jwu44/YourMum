@@ -1,20 +1,13 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions';
 import { TypographyH4 } from '../../app/fonts/text';
-import { MoreHorizontal, Sparkles, Loader2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Sparkles, Loader2, MoreHorizontal, Pencil } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useForm } from '../../lib/FormContext';
 import { useToast } from "@/hooks/use-toast";
-import TaskEditDrawer from './TaskEditDrawer';
 import { 
   Task
 } from '../../lib/types';
@@ -23,16 +16,22 @@ import {
 } from '../../lib/helper';
 import { isBrowser } from '../../lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface EditableScheduleRowProps {
   task: Task;
   index: number;
   onUpdateTask: (task: Task) => void;
-  onDeleteTask: (taskId: string) => void;
   moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => void;
   isSection: boolean;
   children?: React.ReactNode;
-  allTasks: Task[]; 
+  allTasks: Task[];
+  onEditTask?: (task: Task) => void; // New prop for edit functionality
 }
 
 // Interface for managing drag state
@@ -200,12 +199,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   task, 
   index,
   onUpdateTask, 
-  onDeleteTask,
   moveTask,
-  isSection
+  isSection,
+  onEditTask // New prop for edit functionality
 }) => {
   // Local UI states
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dragState, setDragState] = useState<DragState>({
     isDragTarget: false,
     dragType: null,
@@ -246,43 +244,28 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     });
   }, [task, onUpdateTask]);
 
-  const handleEdit = useCallback(() => {
-    setIsDrawerOpen(true);
-  }, []);
-
-  const handleDelete = useCallback(() => {
-    onDeleteTask(task.id);
-  }, [onDeleteTask, task.id]);
-
-  // Add cleanup effect
-  useEffect(() => {
-    return () => {
-      // Reset pointer-events when component unmounts
-      document.body.style.pointerEvents = 'auto';
-    };
-  }, []);
-
-  const handleDrawerClose = useCallback(() => {
-    // Ensure pointer-events is reset when drawer closes
-    document.body.style.pointerEvents = 'auto';
-    setIsDrawerOpen(false);
-  }, []);
-
-  const handleTaskUpdate = useCallback((updatedTask: Task) => {
-    // Ensure we maintain task structure properties
-    const cleanTask = {
-      ...updatedTask,
-      categories: updatedTask.categories || [],
-      is_subtask: task.is_subtask,
-      level: task.level,
-      section: task.section,
-      parent_id: task.parent_id,
-      type: task.type
-    };
-    
-    onUpdateTask(cleanTask);
-    setIsDrawerOpen(false);
-  }, [onUpdateTask, task]);
+  /**
+   * Handle edit task action
+   * Add delay to allow dropdown menu overlay to fully close and cleanup
+   */
+  const handleEditTask = useCallback(() => {
+    try {
+      if (onEditTask) {
+        // 🔧 FIX: Add small delay to allow dropdown overlay cleanup
+        // This prevents race condition between dropdown and drawer overlays
+        setTimeout(() => {
+          onEditTask(task);
+        }, 50); // Minimal delay for overlay cleanup
+      }
+    } catch (error) {
+      console.error('Error triggering edit task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open edit dialog",
+        variant: "destructive",
+      });
+    }
+  }, [task, onEditTask, toast]);
 
   // Enhanced drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -599,9 +582,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     }
   }, [suggestedMicrosteps.length]);
 
-  // Render task actions
+  // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
     <div className="flex items-center space-x-2">
+      {/* Decompose button - existing functionality */}
       {canDecompose && (
         <Button
           variant="ghost"
@@ -620,15 +604,27 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           )}
         </Button>
       )}
+
+      {/* Ellipses dropdown menu - new functionality */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Task actions"
+          >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem onClick={handleEdit}>Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={handleDelete}>Delete</DropdownMenuItem>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem 
+            onClick={handleEditTask}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -693,7 +689,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           </span>
         )}
 
-        {/* Task Actions */}
+        {/* Task Actions - only show for non-section tasks */}
         {!isSection && renderTaskActions()}
 
         {/* Enhanced Drag Indicators */}
@@ -709,17 +705,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           className="mt-2"
         />
       )}
-
-      {/* Edit Task Drawer */}
-      {isDrawerOpen ? (
-        <TaskEditDrawer
-          isOpen={isDrawerOpen}
-          onClose={handleDrawerClose}
-          task={task}
-          onUpdateTask={handleTaskUpdate}
-          currentDate={task.start_date || new Date().toISOString().split('T')[0]}
-        />
-      ) : null}
     </motion.div>
   );
 };

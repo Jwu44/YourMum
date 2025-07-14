@@ -1,5 +1,3 @@
-from typing import Dict, Any
-
 user_schema_validation = {
     "$jsonSchema": {
         "bsonType": "object",
@@ -37,6 +35,18 @@ user_schema_validation = {
                             }
                         }
                     }
+                }
+            },
+            # Add Slack integration fields
+            "slack": {
+                "bsonType": "object",
+                "properties": {
+                    "connected": { "bsonType": "bool" },
+                    "instanceId": { "bsonType": ["string", "null"] },
+                    "serverUrl": { "bsonType": ["string", "null"] },
+                    "oauthUrl": { "bsonType": ["string", "null"] },
+                    "connectedAt": { "bsonType": ["date", "null"] },
+                    "lastSyncTime": { "bsonType": ["date", "null"] }
                 }
             }
         }

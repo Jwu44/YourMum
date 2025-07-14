@@ -7,7 +7,7 @@
 "use client"
 
 import * as React from "react"
-import { Calendar, User, Plus, Archive, Settings } from "lucide-react"
+import { Calendar, User, Plus, Archive, Settings, Plug } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -51,6 +51,13 @@ const navigationItems: NavigationItem[] = [
     title: "Inputs",
     icon: Plus,
     href: "/dashboard/inputs",
+    isActive: false,
+  },
+  {
+    id: "integrations",
+    title: "Integrations",
+    icon: Plug,
+    href: "/dashboard/integrations",
     isActive: false,
   },
   {
