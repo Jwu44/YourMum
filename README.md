@@ -1,176 +1,157 @@
-# About
+# yourdAI 🤖📅
 
-A daily planner powered by Claude-Sonnet 3.5. If only there was a personalised planner that was tailored based on your lifestyle, body chemistry, habits, needs and preferences with the whole planner creation process streamlined...
+yourdAI transforms how knowledge workers manage their day to day by creating an AI-powered to do list that eliminates the friction between intention and execution. yourdai learns your unique energy patterns, automatically captures tasks from your scattered digital workspace, and generates intelligent daily schedules that align your most important work with your peak performance windows—giving you back time to focus on what truly matters while reducing the mental overhead of constant task management.
+[main dashboard]
 
-## Features
+## ✨ Key Value Props
 
-- Capture user's energy levels throughbout the day to understand when they feel their best, worst, normal or asleep 
-- Auto categorise tasks for the day into 5 pillars: Work, Exercise, Relationship, Fun, and Ambition
-- Get the user to rank the importance of these 5 pillars and combine with their energy levels to optimise task allocation
-- Customizable layout preferences (structured/unstructured, timeboxed/untimeboxed)
-- RESTful API for schedule generation and task categorization
+### ✏️ Personalisation
+- **Inputs Capture**: Configure your work schedule, life priorities, energy patterns, to do list structure... 
+[inputs  page] 
 
-## Main Dashboard
-![image](https://github.com/user-attachments/assets/e2197f8b-33f0-44a9-96e4-e61a6d4a8346)
+### 🦾 Automation
+- **Google Calendar Sync**: Automatically syncs your events and tasks from google calendar to yourdai
+[gcal auth page]
+- **Next Day Task Roll Over**: Rolls over unfinished tasks from your current day to the next day
+- **Slack Integration**: Auto-creates tasks from @mentions [👷 WIP]
+- **Action Overhead Admin Tasks**: [🔮 vision] yourdAI will identify simple overhead admin tasks and will automatically create drafts for them or have them actioned (e.g.. booking meeting rooms, email draft, reply to colleage etc.) 
 
-## Edit Inputs
-![image](https://github.com/user-attachments/assets/f1b9b690-fd09-41dc-8119-f0632be5078e)
+### 🏞️ Streamline
+- **Connect 3rd Party Apps**: Real time syncing with Google Calendar, Slack [👷 WIP] and more!
+[integrations page]
 
+## 🏗️ Architecture
 
-## Edit Tasks
-![image](https://github.com/user-attachments/assets/c77e22ab-32b9-42cf-9fb8-cef54000178e)
+### Frontend
+- **Framework**: Next.js 14 with TypeScript
+- **UI**: Tailwind CSS + shadcn/ui components
+- **State**: React Context with reducer patterns
+- **Auth**: Firebase Authentication
 
+### Backend
+- **API**: Flask with Blueprint architecture
+- **Database**: MongoDB with schema validation
+- **AI**: Anthropic Claude API (Sonnet & Haiku models)
+- **Caching**: Multi-layer (TTL, LRU, pattern-based)
 
-# Architecture
-![image](https://github.com/user-attachments/assets/436dd66c-5144-4b94-8487-e1203336601f)
+### External Services
+- **Google Calendar API**: OAuth 2.0 with selective sync
+- **Klavis AI**: Slack MCP server integration
+- **Firebase**: Authentication and user management
 
-# Tech Stack Summary
+## 🚀 Getting Started
 
-## Backend
-1. **Python**: Primary programming language
-2. **Flask**: Web framework for creating the REST API
+### Prerequisites
+- Node.js 18+ and npm/yarn
+- Python 3.11+
+- MongoDB instance
+- Firebase project
+- Anthropic API key
 
-### AI
-1. **Claude Sonnet 3.5**: API for NLP generation
-2. **PyTorch**: Deep learning framework, used as the backend for the Transformers library
+### Installation
 
-## Frontend 
-1. **React**: JavaScript library for building user interfaces
-2. **Evergreen UI**: React UI framework for building the user interface
-
-## Testing
-1. **Pytest**: For backend testing
-2. **Jest**: For frontend React component testing
-
-## DevOps
-1. **Ngrok**: Tunnelling to connect Colab Server to local
-2. **Docker**: For containerization and easier deployment 
-3. **NGINX**: As a reverse proxy server (if deployed to production)
-
-
-## Installation
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/Jwu44/yourdAI.git
-   ```
-
-2. Install the required dependencies in root folder:
-   ```
-   npm install
-   ```
-   
-3. Install the required dependencies in frontend folder:
-   ```
-   cd frontend
-   npm install
-   ```
-   
-## Usage
-
-i) Start virtual environment in root folder
-```
-source /venv/bin/activate    
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/yourdai.git
+cd yourdai
 ```
 
-ii) Terminal 1: Run backend server in root folder
-```
-python3 app.py
+2. **Backend Setup**
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Environment variables
+cp .env.example .env
+# Configure: MONGODB_URI, ANTHROPIC_API_KEY, FIREBASE_CONFIG
 ```
 
-iii) Terminal 2: Run frontend server in frontend folder
-```
+3. **Frontend Setup**
+```bash
 cd frontend
-npm start
+npm install
+
+# Environment variables
+cp .env.local.example .env.local
+# Configure: NEXT_PUBLIC_FIREBASE_CONFIG, API_URL
 ```
 
-iv) Terminal 3: Run nginx
-```
-sudo nginx
-```
+### Development
 
-v) Open Colab script and follow these instructions to execute the script:
-```
-a. Log in to hugging face using secret key
-b. Execute each code block
-c. Copy paste ngrok tunnel into colab_integration.py
-d. Run main script
+```bash
+# Backend (Port 8000)
+python3 application.py
+
+# Frontend (Port 3000)
+cd frontend && npm run dev
 ```
 
-### MongoDB commands
-```
-mmongosh mongodb+srv://Jwusterines:<db_password>@cluster1.b4lxs.mongodb.net/
-db.collection_name.deleteMany({})
-```
+## 🔧 Configuration
 
-### Nginx commands
-```
-brew services stop nginx
-brew services restart nginx
-sudo nginx -t
+### Environment Variables
+
+**Backend (.env)**
+```env
+MONGODB_URI=mongodb://localhost:27017/YourDaiSchedule
+ANTHROPIC_API_KEY=your_anthropic_key
+FIREBASE_ADMIN_CREDENTIALS=path/to/serviceAccount.json
 ```
 
-## API Documentation
+**Frontend (.env.local)**
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-### Generate Schedule
+## 📊 Data Models
 
-**Endpoint:** `/process_user_data`
-
-**Method:** POST
-
-**Request Body:**
-```json
-{
-  "name": "John Doe",
-  "age": 30,
-  "work_start_time": "09:00",
-  "work_end_time": "17:00",
-  "energy_levels": [
-    {"x": 8, "y": 60},
-    {"x": 12, "y": 80},
-    {"x": 15, "y": 70},
-    {"x": 20, "y": 40}
-  ],
-  "tasks": [
-    {"id": 1, "text": "Team meeting", "category": "Work"},
-    {"id": 2, "text": "Gym workout", "category": "Exercise"}
-  ],
-  "priorities": {
-    "health": 1,
-    "relationships": 2,
-    "fun_activities": 3,
-    "ambitions": 4
-  },
-  "layout_preference": {
-    "type": "to-do-list",
-    "subcategory": "structured-timeboxed"
-  }
+### Task Structure
+```typescript
+interface Task {
+  id: string;
+  text: string;
+  categories: Set<string>;
+  completed: boolean;
+  is_microstep: boolean;
+  parent_id?: string;
+  estimated_time?: number;
+  energy_level_required?: number;
+  is_recurring?: RecurrenceType;
+  source?: 'slack' | 'calendar' | 'manual';
 }
 ```
 
-**Response:**
-```json
-{
-  "schedule": "Generated schedule as a string"
+### User Preferences
+```typescript
+interface UserDocument {
+  googleId: string;
+  email: string;
+  preferences: {
+    work_hours: { start: string; end: string };
+    energy_patterns: string[];
+    layout: LayoutPreference;
+  };
+  integrations: {
+    calendar: CalendarSettings;
+    slack: SlackSettings;
+  };
 }
 ```
 
-### Categorize Task
+## 🧪 Testing
 
-**Endpoint:** `/categorize_task`
+```bash
+# Frontend tests
+cd frontend && npm test
 
-**Method:** POST
+# Backend tests  
+python -m pytest backend/tests/
 
-**Request Body:**
-```json
-{
-  "task": "Attend team meeting"
-}
+# Integration tests
+python -m pytest backend/tests/integration/
 ```
 
-**Response:**
-```json
-{
-  "category": "Work"
-}
-```
+📝 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+---
