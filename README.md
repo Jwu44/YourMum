@@ -1,24 +1,45 @@
 # yourdAI 🤖📅
+🔗 https://yourdai.app/ 
+[currently gated behind Vercel for beta testing]
 
-yourdAI transforms how knowledge workers manage their day to day by creating an AI-powered to do list that eliminates the friction between intention and execution. yourdai learns your unique energy patterns, automatically captures tasks from your scattered digital workspace, and generates intelligent daily schedules that align your most important work with your peak performance windows—giving you back time to focus on what truly matters while reducing the mental overhead of constant task management.
-[main dashboard]
+yourdAI transforms how knowledge workers manage their day to day by creating an AI-powered to do list that eliminates the friction between intention and execution. 
+
+yourdai learns your unique energy patterns, automatically captures tasks from your scattered digital workspace, and generates intelligent daily schedules that align your most important work with your peak performance windows—giving you back time to focus on what truly matters while reducing the mental overhead of constant task management.
+
+<img width="1920" height="965" alt="dashboard" src="https://github.com/user-attachments/assets/7e27e3d5-eb8f-4034-897f-ead699569f3f" />
 
 ## ✨ Key Value Props
 
 ### ✏️ Personalisation
 - **Inputs Capture**: Configure your work schedule, life priorities, energy patterns, to do list structure... 
-[inputs  page] 
+<img width="1667" height="600" alt="inputs config" src="https://github.com/user-attachments/assets/ab1e4c99-df9d-45f3-9720-f69acb1db8fd" />
+<img width="1666" height="600" alt="inputs config b" src="https://github.com/user-attachments/assets/b360a31e-965f-44d6-91df-d71dcd7f9f96" />
+<img width="1654" height="600" alt="inputs config c" src="https://github.com/user-attachments/assets/ed85a0c9-182b-4905-892e-961d45ed5510" />
+
+
 
 ### 🦾 Automation
-- **Google Calendar Sync**: Automatically syncs your events and tasks from google calendar to yourdai
-[gcal auth page]
+- **Google Calendar Sync**: Auto syncs your events and tasks from google calendar to yourdai
+<img width="1282" height="789" alt="Screenshot 2025-07-14 at 11 19 50 am" src="https://github.com/user-attachments/assets/0db83202-e3bc-4041-9084-0d88dd3b6bf0" />
+
+- **Categorise your tasks** Auto categorises your tasks for the day based on configured life priorities
+<img width="1337" height="898" alt="edit task" src="https://github.com/user-attachments/assets/2d2bda3b-3b88-4a48-ba68-510291b5dddb" />
+
 - **Next Day Task Roll Over**: Rolls over unfinished tasks from your current day to the next day
+<img width="1324" height="446" alt="next day" src="https://github.com/user-attachments/assets/6fb7caed-92e1-4c79-b45c-58f72ca71ba2" />
+
+- **Task Decompositionr**: Breaksdown complex tasks into more actionable mini steps
+<img width="900" height="320" alt="decompe task" src="https://github.com/user-attachments/assets/b96e99ec-97ab-414b-8866-86447ff3a948" />
+<img width="900" height="549" alt="decomposed" src="https://github.com/user-attachments/assets/53a3d279-d16e-4f75-aa2f-cbcc164c8384" />
+
+
 - **Slack Integration**: Auto-creates tasks from @mentions [👷 WIP]
 - **Action Overhead Admin Tasks**: [🔮 vision] yourdAI will identify simple overhead admin tasks and will automatically create drafts for them or have them actioned (e.g.. booking meeting rooms, email draft, reply to colleage etc.) 
 
 ### 🏞️ Streamline
 - **Connect 3rd Party Apps**: Real time syncing with Google Calendar, Slack [👷 WIP] and more!
-[integrations page]
+<img width="1659" height="750" alt="integrations" src="https://github.com/user-attachments/assets/f08fd459-8854-4858-b801-823b84b146f3" />
+
 
 ## 🏗️ Architecture
 
