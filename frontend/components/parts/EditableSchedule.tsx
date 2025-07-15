@@ -44,6 +44,9 @@ interface EditableScheduleProps {
 
   /** Callback function for editing a task */
   onEditTask?: (task: Task) => void;
+
+  /** Callback function for deleting a task */
+  onDeleteTask?: (task: Task) => void;
 }
 
 /**
@@ -61,7 +64,8 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   suggestionsMap,
   onAcceptSuggestion,
   onRejectSuggestion,
-  onEditTask
+  onEditTask,
+  onDeleteTask
 }) => {
   /**
    * Minimal task processing for layout-specific rendering
@@ -209,6 +213,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             isSection={task.is_section || task.type === 'section'}
             allTasks={processedTasks}
             onEditTask={onEditTask}
+            onDeleteTask={onDeleteTask}
           />
 
           {/* Render suggestions after each task if they exist */}

@@ -4,12 +4,16 @@ graph TD
         A3[User Routes] --- A4[Pages/Components]
         
         subgraph "Components"
-            A4 --> A5[UI Components]
+            A4 --> A5[UI Components - Radix/shadcn]
             A4 --> A6[Task Management]
             A4 --> A7[Schedule Visualization]
+            A4 --> A11[Integration Management]
             A6 --> A8[Editable Schedule]
             A6 --> A9[Task Editing]
             A6 --> A10[AI Suggestions]
+            A11 --> A12[Slack Integration Card]
+            A11 --> A13[Integrations Layout]
+            A11 --> A14[Floating Action Button]
         end
         
         subgraph "API Services"
@@ -17,6 +21,7 @@ graph TD
             B1 --> B2[Tasks API]
             B1 --> B3[Users API]
             B1 --> B4[Calendar API]
+            B1 --> B5[Integration API]
         end
         
         A4 --> B1
@@ -26,6 +31,7 @@ graph TD
         C1[API Routes] --> C2[Task Routes]
         C1 --> C3[User Routes]
         C1 --> C4[Calendar Routes]
+        C1 --> C5[Integration Routes]
         
         subgraph "Services"
             D1[AI Service]
@@ -36,36 +42,60 @@ graph TD
             
             D6[Calendar Service]
             D7[User Service]
+            D8[Slack Service]
+            D9[Schedule Service]
+            D9 --> D10[Multiple Ordering Patterns]
+            D9 --> D11[JSON Structure Generation]
         end
         
         C2 --> D1
         C3 --> D7
         C4 --> D6
+        C5 --> D8
+        C2 --> D9
     end
     
     subgraph "Database (MongoDB)"
-        E1[UserSchedules]
+        E1[Tasks]
         E2[Users]
         E3[CalendarEvents]
-        E4[AIsuggestions]
-        E5[MicrostepFeedback]
-        E6[DecompositionPatterns]
+        E4[AISuggestions]
+        E5[Schedules]
+        E6[IntegrationStatus]
+        E7[SlackWorkspaces]
     end
     
     subgraph "External Services"
         F1[Google Calendar API]
         F2[Anthropic Claude API]
+        F3[Slack API]
+        F4[Klavis AI MCP Server]
+    end
+    
+    subgraph "Deployment"
+        G1[Firebase Hosting - Frontend]
+        G2[Railway - Backend]
+        G3[MongoDB Atlas - Database]
+        G4[Docker Container]
+        G2 --> G4
     end
     
     D1 --> F2
     D6 --> F1
+    D8 --> F3
+    D8 --> F4
     
     D1 --> E1
     D1 --> E4
     D1 --> E5
-    D1 --> E6
     D6 --> E3
     D7 --> E2
+    D8 --> E6
+    D8 --> E7
+    D9 --> E5
     
     A2 -. Auth Token .-> C3
     B1 -. API Requests .-> C1
+    
+    F3 -. OAuth .-> D8
+    F4 -. Message Processing .-> D8

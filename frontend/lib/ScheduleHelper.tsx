@@ -276,6 +276,83 @@ export const createSchedule = async (date: string, tasks: Task[]): Promise<{
 };
 
 /**
+ * Delete a specific task from a schedule
+ * 
+ * @param taskId - ID of the task to delete
+ * @param date - Date in YYYY-MM-DD format
+ * @returns Promise with success status and updated schedule data
+ * @throws Error if authentication fails or task deletion fails
+ */
+export const deleteTask = async (taskId: string, date: string): Promise<{
+  success: boolean;
+  schedule?: Task[];
+  error?: string;
+  metadata?: {
+    totalTasks: number;
+    calendarEvents: number;
+    recurringTasks: number;
+    generatedAt: string;
+  };
+}> => {
+  try {
+    // Input validation - ensure date format is correct
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Input validation - ensure taskId is provided
+    if (!taskId || typeof taskId !== 'string') {
+      throw new Error('Task ID is required and must be a string');
+    }
+
+    // Get authentication token with proper error handling
+    const token = await getAuthToken();
+
+    // Prepare request payload
+    const requestPayload = { date };
+
+    // Make DELETE request to backend
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || 'Task deletion failed');
+    }
+
+    // Return structured response
+    return {
+      success: true,
+      schedule: data.schedule || [],
+      metadata: data.metadata || {
+        totalTasks: (data.schedule || []).length,
+        calendarEvents: 0,
+        recurringTasks: 0,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+};
+
+/**
  * Update an existing schedule with new tasks, or create if it doesn't exist
  * 
  * Implements upsert behavior: attempts to update existing schedule first,

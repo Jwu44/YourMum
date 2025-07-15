@@ -32,7 +32,7 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
-import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
+import { generateSchedule, loadSchedule, updateSchedule, deleteTask } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
@@ -238,6 +238,68 @@ const Dashboard: React.FC = () => {
     setIsEditDrawerOpen(false);
     setEditingTask(undefined);
   }, []);
+
+  /**
+   * Handle delete task action
+   * Removes task from schedule and updates backend
+   */
+  const handleDeleteTask = useCallback(async (taskToDelete: Task) => {
+    try {
+      const currentDate = getDateString(currentDayIndex);
+      
+      // Optimistically update frontend state first
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        if (newDays[currentDayIndex]) {
+          const currentTasks = newDays[currentDayIndex];
+          const updatedTasks = currentTasks.filter(task => task.id !== taskToDelete.id);
+          newDays[currentDayIndex] = updatedTasks;
+        }
+        return newDays;
+      });
+
+      // Update cache
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache);
+        const currentTasks = scheduleCache.get(currentDate) || [];
+        const updatedTasks = currentTasks.filter(task => task.id !== taskToDelete.id);
+        newCache.set(currentDate, updatedTasks);
+        return newCache;
+      });
+
+      // Call backend API to delete task
+      const deleteResult = await deleteTask(taskToDelete.id, currentDate);
+      
+      if (!deleteResult.success) {
+        throw new Error(deleteResult.error || 'Failed to delete task');
+      }
+
+      // Show success toast
+      toast({
+        title: "Success", 
+        description: "Task deleted successfully",
+      });
+
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      
+      // Revert frontend state on error
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex));
+        if (cachedSchedule && newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = cachedSchedule;
+        }
+        return newDays;
+      });
+      
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentDayIndex, scheduleCache, toast]);
   
   const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
     setScheduleDays(prevDays => {
@@ -642,6 +704,7 @@ const Dashboard: React.FC = () => {
                   onAcceptSuggestion={handleAcceptSuggestion}
                   onRejectSuggestion={handleRejectSuggestion}
                   onEditTask={handleEditTask}
+                  onDeleteTask={handleDeleteTask}
                 />
 
                 {isLoadingSuggestions && (
