@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions';
 import { TypographyH4 } from '../../app/fonts/text';
-import { Sparkles, Loader2, MoreHorizontal, Pencil } from 'lucide-react';
+import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useForm } from '../../lib/FormContext';
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ interface EditableScheduleRowProps {
   children?: React.ReactNode;
   allTasks: Task[];
   onEditTask?: (task: Task) => void; // New prop for edit functionality
+  onDeleteTask?: (task: Task) => void; // New prop for delete functionality
 }
 
 // Interface for managing drag state
@@ -201,7 +202,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onUpdateTask, 
   moveTask,
   isSection,
-  onEditTask // New prop for edit functionality
+  onEditTask, // New prop for edit functionality
+  onDeleteTask // New prop for delete functionality
 }) => {
   // Local UI states
   const [dragState, setDragState] = useState<DragState>({
@@ -266,6 +268,29 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       });
     }
   }, [task, onEditTask, toast]);
+
+  /**
+   * Handle delete task action
+   * Add delay to allow dropdown menu overlay to fully close and cleanup
+   */
+  const handleDeleteTask = useCallback(() => {
+    try {
+      if (onDeleteTask) {
+        // 🔧 FIX: Add small delay to allow dropdown overlay cleanup
+        // This prevents race condition between dropdown overlays
+        setTimeout(() => {
+          onDeleteTask(task);
+        }, 50); // Minimal delay for overlay cleanup
+      }
+    } catch (error) {
+      console.error('Error triggering delete task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    }
+  }, [task, onDeleteTask, toast]);
 
   // Enhanced drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -624,6 +649,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           >
             <Pencil className="h-4 w-4" />
             Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={handleDeleteTask}
+            className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -1,4 +1,4 @@
-# YourdAI Technical Specifications
+1# YourdAI Technical Specifications
 
 ## Data Models
 
@@ -85,10 +85,23 @@
 
 ## Integration Architecture
 
+### Core System Integration
 - **Backend → AI**: Service layer integration with Anthropic API
 - **Frontend → Backend**: REST API endpoints for AI capabilities
 - **Database**: MongoDB for persistent storage of all models
 - **Authentication**: Firebase for user authentication and security
+
+### Third-Party Integration System
+- **Slack Integration**: Klavis AI MCP server for Slack message processing
+  - OAuth flow for Slack workspace authorization
+  - Message processing and task creation from Slack channels
+  - Integration status management and error handling
+  - Service implementation in `slack_service.py`
+- **Modular Integration Architecture**: 
+  - Blueprint-based API structure (`integration_routes.py`)
+  - Centralized integration management UI (`IntegrationsLayout.tsx`)
+  - Extensible pattern for future integrations
+- **Calendar Integration**: Google Calendar API with two-way synchronization
 
 ## Interface Implementation
 
@@ -264,6 +277,7 @@
 #### AI Services
 - **Anthropic SDK (≥0.5.0)**: Claude AI API client
 - **cachetools**: Caching utilities for AI results
+- **klavis (≥1.0.1)**: Klavis AI MCP server for Slack integration
 
 #### Validation & Configuration
 - **Pydantic 2.5.2**: Data validation and settings management
@@ -295,18 +309,51 @@
    - Event Processing ➝ Task Conversion
    - Two-way Synchronization
 
+4. **Slack Integration**:
+   - Slack OAuth ➝ Workspace Authorization
+   - Klavis AI MCP Server ➝ Message Processing
+   - AI-Generated Tasks ➝ Backend Storage
+   - Integration Status ➝ UI Feedback
+
 ### Dependency Challenges
 
 1. **Version Management**:
-   - Multiple Firebase versions (11.0.2 in root, 11.1.0 in frontend)
+   - Multiple Firebase versions (11.0.2 in root, 11.4.0 in frontend)
    - Different ESLint versions across packages
+   - Testing library version inconsistencies
 
 2. **External Dependencies**:
    - Anthropic Claude API availability and latency
    - Google Calendar API rate limits
    - Firebase authentication service reliability
+   - Slack API rate limits and workspace permissions
+   - Klavis AI MCP server availability and processing latency
 
 3. **Integration Complexity**:
    - Coordinating Firebase Auth with backend session management
    - Maintaining calendar sync with conflict resolution
    - Managing environment-specific configuration
+   - Slack workspace authorization and token management
+   - MCP server communication and error handling
+
+## Deployment Architecture
+
+### Production Deployment
+- **Frontend**: Firebase Hosting with static export from Next.js
+- **Backend**: Railway deployment with Docker containerization
+- **Database**: MongoDB Atlas with connection pooling
+- **CDN**: Firebase hosting CDN for static assets
+- **Security**: CORS policies, HTTPS enforcement, secure headers
+
+### Development Environment
+- **Local Development**: Next.js dev server with Flask backend
+- **Authentication**: Firebase emulator for local auth testing
+- **Database**: Local MongoDB instance or Atlas connection
+- **API Development**: Flask development server with hot reload
+- **Testing**: Jest for frontend, pytest for backend
+
+### Configuration Management
+- **Environment Variables**: `.env` files for local, Railway for production
+- **Secrets Management**: Firebase Admin SDK keys, OAuth credentials
+- **Feature Flags**: Environment-based feature toggling
+- **Monitoring**: Error tracking and performance monitoring setup
