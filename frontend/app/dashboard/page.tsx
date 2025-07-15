@@ -39,7 +39,7 @@ const Dashboard: React.FC = () => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { state } = useForm();
   const { toast } = useToast();
-  const [date, setDate] = useState<Date | undefined>(undefined);
+
   
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -55,8 +55,28 @@ const Dashboard: React.FC = () => {
   const [shownSuggestionIds] = useState<Set<string>>(new Set());
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [isPreviousDayAvailable, setIsPreviousDayAvailable] = useState<boolean>(false);
   const hasInitiallyLoaded = useRef(false);
   
+  /**
+   * Check if previous day schedule exists and update button availability
+   * Called whenever currentDayIndex changes to maintain accurate button state
+   */
+  const checkPreviousDayAvailability = useCallback(async () => {
+    try {
+      const previousDayDate = getDateString(currentDayIndex - 1);
+      const result = await loadSchedule(previousDayDate);
+      setIsPreviousDayAvailable(
+        result.success && 
+        result.schedule !== undefined && 
+        result.schedule.length > 0
+      );
+    } catch (error) {
+      console.error('Error checking previous day availability:', error);
+      setIsPreviousDayAvailable(false);
+    }
+  }, [currentDayIndex]);
+
   useEffect(() => {
     const date = new Date();
     date.setDate(date.getDate() + currentDayIndex);
@@ -69,7 +89,10 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Failed to persist dashboard date:', error);
     }
-  }, [currentDayIndex]);
+
+    // Check previous day availability whenever currentDayIndex changes
+    checkPreviousDayAvailability();
+  }, [currentDayIndex, checkPreviousDayAvailability]);
 
   const addTask = useCallback(async (newTask: Task) => {
     try {
@@ -372,7 +395,6 @@ const Dashboard: React.FC = () => {
       }
       
       setCurrentDayIndex(prevIndex => prevIndex + 1);
-      setDate(new Date(nextDayDate));
       
       toast({
         title: "Success",
@@ -388,15 +410,82 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, scheduleDays, state, toast, scheduleCache]);
 
-  const handlePreviousDay = useCallback(() => {
-    if (currentDayIndex > 0) {
-      const prevDate = new Date(date!);
-      prevDate.setDate(prevDate.getDate() - 1);
+  const handlePreviousDay = useCallback(async () => {
+    const previousDayDate = getDateString(currentDayIndex - 1);
+    
+    // Check if previous day schedule is in cache
+    if (scheduleCache.has(previousDayDate)) {
+      const cachedSchedule = scheduleCache.get(previousDayDate)!;
+      
+      // Update UI to show cached previous day schedule
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        // Insert cached schedule at the appropriate index
+        if (currentDayIndex === 0) {
+          // Going from today to yesterday, insert at beginning
+          newDays.unshift(cachedSchedule);
+        } else {
+          // Going further back, insert at current position - 1
+          newDays[currentDayIndex - 1] = cachedSchedule;
+        }
+        return newDays;
+      });
       
       setCurrentDayIndex(prevIndex => prevIndex - 1);
-      setDate(prevDate);
+      return;
     }
-  }, [currentDayIndex, date]);
+
+    try {
+      // Load previous day schedule from backend
+      const result = await loadSchedule(previousDayDate);
+      
+      if (result.success && result.schedule && result.schedule.length > 0) {
+        const previousDaySchedule = result.schedule;
+        
+        // Update schedule state
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          if (currentDayIndex === 0) {
+            // Going from today to yesterday, insert at beginning
+            newDays.unshift(previousDaySchedule);
+          } else {
+            // Going further back, ensure array is large enough
+            while (newDays.length <= Math.abs(currentDayIndex - 1)) {
+              newDays.unshift([]);
+            }
+            newDays[Math.abs(currentDayIndex - 1)] = previousDaySchedule;
+          }
+          return newDays;
+        });
+        
+        // Cache the loaded schedule
+        setScheduleCache(prevCache => 
+          new Map(prevCache).set(previousDayDate, previousDaySchedule)
+        );
+        
+        setCurrentDayIndex(prevIndex => prevIndex - 1);
+        
+        toast({
+          title: "Success",
+          description: "Previous day's schedule loaded successfully.",
+        });
+      } else {
+        // No schedule found for previous day - this shouldn't happen 
+        // if button availability check is working correctly
+        toast({
+          title: "Notice",
+          description: "No schedule found for previous day.",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading previous day:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load previous day's schedule. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentDayIndex, scheduleCache, toast]);
 
   const handleRequestSuggestions = useCallback(async () => {
     setIsLoadingSuggestions(true);
@@ -682,6 +771,8 @@ const Dashboard: React.FC = () => {
           onNextDay={handleNextDay}
           onPreviousDay={handlePreviousDay}
           currentDate={currentDate}
+          isPreviousDayAvailable={isPreviousDayAvailable}
+          isCurrentDay={currentDayIndex === 0}
         />
 
         <div className="flex-1 overflow-y-auto">
