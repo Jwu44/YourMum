@@ -21,12 +21,6 @@ interface EditableScheduleProps {
   /** Callback function for reordering tasks */
   onReorderTasks: (tasks: Task[]) => void;
   
-  /** 
-   * Layout preference for the schedule
-   * Note: This is now mainly for reference as backend handles structure
-   */
-  layoutPreference: string | ScheduleLayoutType;
-  
   /** Callback function to request AI suggestions */
   onRequestSuggestions: () => Promise<void>;
   
@@ -59,8 +53,7 @@ interface EditableScheduleProps {
 const EditableSchedule: React.FC<EditableScheduleProps> = ({ 
   tasks, 
   onUpdateTask, 
-  onReorderTasks, 
-  layoutPreference,
+  onReorderTasks,
   suggestionsMap,
   onAcceptSuggestion,
   onRejectSuggestion,
