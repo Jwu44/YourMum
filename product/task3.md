@@ -1,6 +1,5 @@
 # TASK-03: Implement view previous day schedules 
-Status: To do
-
+Status: Done
 ## Problem
 Users don't have the ability to view existing schedules for previous dates
 
