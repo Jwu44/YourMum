@@ -12,7 +12,7 @@ import { TypographyH3 } from '@/app/fonts/text';
 interface DashboardHeaderProps {
     isLoadingSuggestions: boolean;
     onRequestSuggestions: () => Promise<void>;
-    onNextDay: () => Promise<void>;
+    onNextDay: () => void; // Changed from Promise<void> to void
     onPreviousDay: () => void;
     currentDate: Date | undefined;
     isCurrentDay: boolean;
