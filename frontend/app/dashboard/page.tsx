@@ -160,6 +160,21 @@ const Dashboard: React.FC = () => {
     return targetDateMidnight < creationDateMidnight;
   }, [userCreationDate]);
 
+  /**
+   * Determine if the next day button should be disabled
+   * Disabled when: viewing today OR next day schedule not in cache
+   */
+  const isNextDayDisabled = useCallback((): boolean => {
+    // Always disabled if we're viewing today
+    if (currentDayIndex === 0) {
+      return true;
+    }
+    
+    // Disabled if next day schedule is not cached
+    const nextDayDate = getDateString(currentDayIndex + 1);
+    return !scheduleCache.has(nextDayDate);
+  }, [currentDayIndex, scheduleCache]);
+
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     try {
       const currentDate = getDateString(currentDayIndex);
@@ -344,83 +359,46 @@ const Dashboard: React.FC = () => {
     });
   }, [currentDayIndex]);
 
-  const handleNextDay = useCallback(async () => {
+  /**
+   * Handle next day navigation - simplified to only navigate between cached schedules
+   * No longer generates new schedules - only navigates to previously loaded dates
+   */
+  const handleNextDay = useCallback(() => {
     const nextDayDate = getDateString(currentDayIndex + 1);
     console.log('Next day date:', nextDayDate);
     
+    // Only navigate if the schedule is already cached (previously loaded)
     if (scheduleCache.has(nextDayDate)) {
-      setScheduleDays(prevDays => [...prevDays, scheduleCache.get(nextDayDate)!]);
-      setCurrentDayIndex(prevIndex => prevIndex + 1);
-      return;
-    }
-  
-    try {
-      const existingSchedule = await loadSchedule(nextDayDate);
-      
-      if (existingSchedule.success && existingSchedule.schedule) {
-        const nextDaySchedule = existingSchedule.schedule;
-        setScheduleDays(prevDays => [...prevDays, nextDaySchedule]);
-        setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, nextDaySchedule));
-      } else {
-        const currentSchedule = scheduleDays[currentDayIndex];
-        const recurringTasks = currentSchedule.filter(task => task.is_recurring);
+      // Check if scheduleDays array needs to be extended
+      const targetIndex = currentDayIndex + 1;
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
         
-        const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
-          
-        const enhancedPreference = {
-          layout: state.layout_preference?.layout || 'todolist-structured',
-          subcategory: state.layout_preference?.subcategory || 'day-sections',
-          orderingPattern
-        };
-        
-        const formData = {
-          ...state,
-          tasks: [...state.tasks || [], ...recurringTasks],
-          layout_preference: enhancedPreference,
-          work_start_time: state.work_start_time || '09:00',
-          work_end_time: state.work_end_time || '17:00',
-          priorities: state.priorities || {
-            health: "",
-            relationships: "",
-            fun_activities: "",
-            ambitions: ""
-          },
-          energy_patterns: state.energy_patterns || []
-        };
-        
-        // Direct API call for next day
-        const result = await generateSchedule(formData);
-        
-        if (result.tasks && result.tasks.length > 0) {
-          const tasksWithDate = result.tasks.map(task => ({
-            ...task,
-            start_date: nextDayDate
-          }));
-          
-          setScheduleDays(prevDays => [...prevDays, tasksWithDate]);
-          setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, tasksWithDate));
-          
-          await updateSchedule(nextDayDate, tasksWithDate);
-        } else {
-          throw new Error('Failed to generate next day schedule');
+        // Ensure array is large enough to accommodate the target index
+        while (newDays.length <= targetIndex) {
+          newDays.push([]);
         }
-      }
+        
+        // Place cached schedule at the correct index
+        newDays[targetIndex] = scheduleCache.get(nextDayDate)!;
+        
+        return newDays;
+      });
       
       setCurrentDayIndex(prevIndex => prevIndex + 1);
       
       toast({
         title: "Success",
-        description: "Next day's schedule loaded successfully.",
+        description: "Navigated to next day.",
       });
-    } catch (error) {
-      console.error("Error handling next day:", error);
+    } else {
+      // Schedule not previously loaded - show informative message
       toast({
-        title: "Error",
-        description: "Failed to load next day's schedule. Please try again.",
-        variant: "destructive",
+        title: "No Schedule Available",
+        description: "This date hasn't been loaded yet. Use the left arrow to navigate to previous days first.",
       });
     }
-  }, [currentDayIndex, scheduleDays, state, toast, scheduleCache]);
+  }, [currentDayIndex, scheduleCache, toast]);
 
   const handlePreviousDay = useCallback(async () => {
     const previousDayOffset = currentDayIndex - 1;
@@ -825,8 +803,34 @@ const Dashboard: React.FC = () => {
         }
         
         // Show empty state if no schedule and no calendar events
-        console.log("No existing schedule or calendar events found, showing empty state");
-        setScheduleDays([[]]);
+        console.log("No existing schedule or calendar events found, creating empty schedule in backend");
+        
+        // Create empty schedule in backend with user inputs from FormContext
+        try {
+          const emptyScheduleResult = await updateSchedule(today, []);
+          if (emptyScheduleResult.success) {
+            setScheduleDays([[]]);
+            setScheduleCache(new Map([[today, []]]));
+            console.log("Empty schedule created successfully in backend");
+          } else {
+            // Show error toast and continue with frontend-only empty state
+            toast({
+              title: "Warning",
+              description: "Could not save empty schedule to database.",
+              variant: "destructive",
+            });
+            setScheduleDays([[]]);
+            console.log("Backend creation failed, continuing with frontend-only empty state");
+          }
+        } catch (createError) {
+          console.error("Error creating empty schedule in backend:", createError);
+          toast({
+            title: "Warning", 
+            description: "Could not save empty schedule to database.",
+            variant: "destructive",
+          });
+          setScheduleDays([[]]);
+        }
         
       } catch (error) {
         console.error("Error loading initial schedule:", error);
@@ -861,7 +865,7 @@ const Dashboard: React.FC = () => {
           onNextDay={handleNextDay}
           onPreviousDay={handlePreviousDay}
           currentDate={currentDate}
-          isCurrentDay={currentDayIndex === 0}
+          isCurrentDay={isNextDayDisabled()}
         />
 
         <div className="flex-1 overflow-y-auto">
