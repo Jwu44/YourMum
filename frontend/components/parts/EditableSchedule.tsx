@@ -4,8 +4,7 @@ import EditableScheduleRow from './EditableScheduleRow';
 import AISuggestionsList from './AISuggestionsList';
 import { 
   Task, 
-  AISuggestion, 
-  ScheduleLayoutType 
+  AISuggestion 
 } from '../../lib/types';
 
 /**
