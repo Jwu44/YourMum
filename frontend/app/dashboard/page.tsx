@@ -877,7 +877,6 @@ const Dashboard: React.FC = () => {
                   tasks={scheduleDays[Math.abs(currentDayIndex)] || []}
                   onUpdateTask={handleScheduleTaskUpdate}
                   onReorderTasks={handleReorderTasks}
-                  layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
                   onRequestSuggestions={handleRequestSuggestions}
                   isLoadingSuggestions={isLoadingSuggestions}
                   suggestionsMap={suggestionsMap}
