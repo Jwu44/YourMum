@@ -1,5 +1,5 @@
 # TASK-02: Implement "Delete" task flow
-Status: To do
+Status: Done
 
 ## Context
 Users need the ability to delete existing tasks

@@ -33,7 +33,7 @@ import {
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
 import { userApi } from '@/lib/api/users';
-import { generateSchedule, loadSchedule, updateSchedule, deleteTask } from '@/lib/ScheduleHelper';
+import { loadSchedule, updateSchedule, deleteTask } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);

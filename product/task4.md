@@ -1,6 +1,6 @@
 # TASK-04: Debug view previous day schedules 
-Status: In progress
-## Bug
+Status: Done
+## Bug - now resolved ✅
 I am facing a bug where after navigating to previous schedules via the left arrow, then using the right arrow I try to navigate to the current day, I am unable to proceed to the today's empty schedule.
 
 ## Steps to reproduce:
