@@ -219,14 +219,9 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       return true;
     } catch (error) {
       console.error('Task validation error:', error);
-      toast({
-        title: "Validation Error",
-        description: error instanceof Error ? error.message : "Invalid task data",
-        variant: "destructive",
-      });
       return false;
     }
-  }, [toast]);
+  }, []);
 
   // Update handleSave with validation
   const handleSave = useCallback(async () => {

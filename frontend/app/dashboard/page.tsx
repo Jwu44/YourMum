@@ -845,7 +845,7 @@ const Dashboard: React.FC = () => {
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, [state.formUpdate?.response]);
+  }, [state.formUpdate?.response, toast]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
