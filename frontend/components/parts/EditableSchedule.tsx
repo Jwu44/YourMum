@@ -68,22 +68,18 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onDeleteTask
 }) => {
   /**
-   * Minimal task processing for layout-specific rendering
+   * Direct task rendering from backend data
    * 
-   * Since the optimized backend returns properly structured tasks with sections
-   * and correct ordering, we only need minimal processing for layout-specific
-   * display requirements.
+   * Each schedule renders based on how it was originally generated, not the current
+   * user's layout preference. The backend returns the correct structure based on
+   * the layout preference that was used during schedule creation.
    */
   const processedTasks = useMemo(() => {
-    // For unstructured layout, filter out sections
-    if (layoutPreference === 'todolist-unstructured' || layoutPreference === 'unstructured') {
-      return tasks.filter(task => !task.is_section);
-    }
-    
-    // For structured layouts, use tasks as-is from optimized backend
-    // Backend already provides proper section structure and ordering
+    // Always render tasks as-is from the backend
+    // This preserves the original layout structure (structured vs unstructured)
+    // that was used when the schedule was first generated
     return tasks;
-  }, [tasks, layoutPreference]);
+  }, [tasks]);
 
   /**
    * Enhanced moveTask function to handle task reordering with proper indentation

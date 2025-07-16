@@ -1,4 +1,26 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+import { auth } from '@/auth/firebase';
+import { UserDocument } from '../types';
+
+// Add development bypass constants
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
+/**
+ * Get the current user's Firebase ID token for API authentication
+ */
+async function getAuthToken(): Promise<string> {
+  // In development mode with bypass enabled, return a mock token
+  if (IS_DEVELOPMENT && BYPASS_AUTH) {
+    return 'mock-token-for-development';
+  }
+  
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+  return await currentUser.getIdToken();
+}
 
 // Create a cache for categorization results
 const categoryCache = new Map<string, Promise<{categories: string[]}>>();
@@ -46,4 +68,54 @@ export const categorizeTask = async (taskText: string) => {
 // Optional: Add a method to clear the cache if needed
 export const clearCategorizationCache = () => {
     categoryCache.clear();
+};
+
+/**
+ * User API helper functions
+ */
+export const userApi = {
+  /**
+   * Get current authenticated user data including creation date
+   */
+  async getCurrentUser(): Promise<UserDocument> {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/auth/user`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get user data');
+      }
+      
+      const result = await response.json();
+      return result.user;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get user creation date as a Date object
+   */
+  async getUserCreationDate(): Promise<Date> {
+    try {
+      const userData = await this.getCurrentUser();
+      if (!userData.createdAt) {
+        // Fallback to a default early date if createdAt is not available
+        return new Date('2024-01-01');
+      }
+      return new Date(userData.createdAt);
+    } catch (error) {
+      console.error('Error getting user creation date:', error);
+      // Fallback to a default early date on error
+      return new Date('2024-01-01');
+    }
+  },
 };

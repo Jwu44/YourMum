@@ -15,7 +15,6 @@ interface DashboardHeaderProps {
     onNextDay: () => Promise<void>;
     onPreviousDay: () => void;
     currentDate: Date | undefined;
-    isPreviousDayAvailable: boolean;
     isCurrentDay: boolean;
 }
 
@@ -29,7 +28,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onNextDay,
     onPreviousDay,
     currentDate,
-    isPreviousDayAvailable,
     isCurrentDay
   }) => {
 
@@ -80,7 +78,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={() => onPreviousDay()}
-                      disabled={!isPreviousDayAvailable}
+                      disabled={false}
                       className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
                       aria-label="Previous day"
                     >
