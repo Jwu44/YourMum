@@ -75,10 +75,22 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex]);
 
-  // Fetch user creation date on component mount
+  // Fetch user creation date after auth is ready
   useEffect(() => {
+    // Wait for auth state to be ready before fetching user data
+    if (loading) {
+      console.log("TASK-07 FIX: Waiting for auth before fetching user creation date");
+      return;
+    }
+    
+    if (!user) {
+      console.log("TASK-07 FIX: No authenticated user, skipping user creation date fetch");
+      return;
+    }
+
     const fetchUserCreationDate = async () => {
       try {
+        console.log("TASK-07 FIX: Auth ready, fetching user creation date");
         const creationDate = await userApi.getUserCreationDate();
         setUserCreationDate(creationDate);
         console.log('User creation date:', creationDate);
@@ -90,7 +102,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchUserCreationDate();
-  }, []);
+  }, [user, loading]);
 
   const addTask = useCallback(async (newTask: Task) => {
     try {
