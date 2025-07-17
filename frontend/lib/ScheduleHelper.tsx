@@ -128,6 +128,7 @@ export const loadSchedule = async (date: string): Promise<{
   success: boolean;
   schedule?: Task[];
   error?: string;
+  inputs?: Record<string, any>;
   metadata?: {
     totalTasks: number;
     calendarEvents: number;
@@ -196,10 +197,15 @@ export const loadSchedule = async (date: string): Promise<{
  * 
  * @param date - Date in YYYY-MM-DD format
  * @param tasks - Array of tasks for the new schedule
+ * @param inputs - Optional user input data for schedule generation context
  * @returns Promise with success status and new schedule data
  * @throws Error if date format is invalid or tasks is not an array
  */
-export const createSchedule = async (date: string, tasks: Task[]): Promise<{
+export const createSchedule = async (
+  date: string, 
+  tasks: Task[], 
+  inputs?: Record<string, any>
+): Promise<{
   success: boolean;
   schedule?: Task[];
   error?: string;
@@ -221,11 +227,24 @@ export const createSchedule = async (date: string, tasks: Task[]): Promise<{
       throw new Error('Tasks must be an array');
     }
 
+    // Input validation - ensure inputs is an object if provided
+    if (inputs !== undefined && (typeof inputs !== 'object' || inputs === null || Array.isArray(inputs))) {
+      throw new Error('Inputs must be an object');
+    }
+
     // Get authentication token with proper error handling
     const token = await getAuthToken();
 
     // Prepare request payload
-    const requestPayload = { date, tasks };
+    const requestPayload: { date: string; tasks: Task[]; inputs?: Record<string, any> } = { 
+      date, 
+      tasks 
+    };
+    
+    // Include inputs if provided
+    if (inputs) {
+      requestPayload.inputs = inputs;
+    }
 
     // Call backend API to create schedule
     const response = await fetch(`${API_BASE_URL}/api/schedules`, {
@@ -271,6 +290,83 @@ export const createSchedule = async (date: string, tasks: Task[]): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create schedule'
+    };
+  }
+};
+
+/**
+ * Delete a specific task from a schedule
+ * 
+ * @param taskId - ID of the task to delete
+ * @param date - Date in YYYY-MM-DD format
+ * @returns Promise with success status and updated schedule data
+ * @throws Error if authentication fails or task deletion fails
+ */
+export const deleteTask = async (taskId: string, date: string): Promise<{
+  success: boolean;
+  schedule?: Task[];
+  error?: string;
+  metadata?: {
+    totalTasks: number;
+    calendarEvents: number;
+    recurringTasks: number;
+    generatedAt: string;
+  };
+}> => {
+  try {
+    // Input validation - ensure date format is correct
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Input validation - ensure taskId is provided
+    if (!taskId || typeof taskId !== 'string') {
+      throw new Error('Task ID is required and must be a string');
+    }
+
+    // Get authentication token with proper error handling
+    const token = await getAuthToken();
+
+    // Prepare request payload
+    const requestPayload = { date };
+
+    // Make DELETE request to backend
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || 'Task deletion failed');
+    }
+
+    // Return structured response
+    return {
+      success: true,
+      schedule: data.schedule || [],
+      metadata: data.metadata || {
+        totalTasks: (data.schedule || []).length,
+        calendarEvents: 0,
+        recurringTasks: 0,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
 };

@@ -32,14 +32,15 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar';
-import { generateSchedule, loadSchedule, updateSchedule } from '@/lib/ScheduleHelper';
+import { userApi } from '@/lib/api/users';
+import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper';
 
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { state } = useForm();
   const { toast } = useToast();
-  const [date, setDate] = useState<Date | undefined>(undefined);
+
   
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -55,6 +56,7 @@ const Dashboard: React.FC = () => {
   const [shownSuggestionIds] = useState<Set<string>>(new Set());
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [userCreationDate, setUserCreationDate] = useState<Date | null>(null);
   const hasInitiallyLoaded = useRef(false);
   
   useEffect(() => {
@@ -70,6 +72,23 @@ const Dashboard: React.FC = () => {
       console.error('Failed to persist dashboard date:', error);
     }
   }, [currentDayIndex]);
+
+  // Fetch user creation date on component mount
+  useEffect(() => {
+    const fetchUserCreationDate = async () => {
+      try {
+        const creationDate = await userApi.getUserCreationDate();
+        setUserCreationDate(creationDate);
+        console.log('User creation date:', creationDate);
+      } catch (error) {
+        console.error('Failed to fetch user creation date:', error);
+        // Set a fallback creation date
+        setUserCreationDate(new Date('2024-01-01'));
+      }
+    };
+
+    fetchUserCreationDate();
+  }, []);
 
   const addTask = useCallback(async (newTask: Task) => {
     try {
@@ -124,6 +143,22 @@ const Dashboard: React.FC = () => {
     date.setDate(date.getDate() + offset);
     return formatDateToString(date);
   };
+
+  /**
+   * Check if a date is before the user's creation date
+   */
+  const isDateBeforeUserCreation = useCallback((dateOffset: number): boolean => {
+    if (!userCreationDate) return false;
+    
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + dateOffset);
+    
+    // Compare dates at midnight to ignore time components
+    const targetDateMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const creationDateMidnight = new Date(userCreationDate.getFullYear(), userCreationDate.getMonth(), userCreationDate.getDate());
+    
+    return targetDateMidnight < creationDateMidnight;
+  }, [userCreationDate]);
 
   const handleScheduleTaskUpdate = useCallback(async (updatedTask: Task) => {
     try {
@@ -238,6 +273,68 @@ const Dashboard: React.FC = () => {
     setIsEditDrawerOpen(false);
     setEditingTask(undefined);
   }, []);
+
+  /**
+   * Handle delete task action
+   * Removes task from schedule and updates backend
+   */
+  const handleDeleteTask = useCallback(async (taskToDelete: Task) => {
+    try {
+      const currentDate = getDateString(currentDayIndex);
+      
+      // Optimistically update frontend state first
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        if (newDays[currentDayIndex]) {
+          const currentTasks = newDays[currentDayIndex];
+          const updatedTasks = currentTasks.filter(task => task.id !== taskToDelete.id);
+          newDays[currentDayIndex] = updatedTasks;
+        }
+        return newDays;
+      });
+
+      // Update cache
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache);
+        const currentTasks = scheduleCache.get(currentDate) || [];
+        const updatedTasks = currentTasks.filter(task => task.id !== taskToDelete.id);
+        newCache.set(currentDate, updatedTasks);
+        return newCache;
+      });
+
+      // Call backend API to delete task
+      const deleteResult = await deleteTask(taskToDelete.id, currentDate);
+      
+      if (!deleteResult.success) {
+        throw new Error(deleteResult.error || 'Failed to delete task');
+      }
+
+      // Show success toast
+      toast({
+        title: "Success", 
+        description: "Task deleted successfully",
+      });
+
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      
+      // Revert frontend state on error
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex));
+        if (cachedSchedule && newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = cachedSchedule;
+        }
+        return newDays;
+      });
+      
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentDayIndex, scheduleCache, toast]);
   
   const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
     setScheduleDays(prevDays => {
@@ -247,94 +344,439 @@ const Dashboard: React.FC = () => {
     });
   }, [currentDayIndex]);
 
-  const handleNextDay = useCallback(async () => {
-    const nextDayDate = getDateString(currentDayIndex + 1);
-    console.log('Next day date:', nextDayDate);
+  /**
+   * Filter tasks for next day based on task5.md requirements
+   * - Preserve all sections (is_section: true)
+   * - Include incomplete non-recurring tasks
+   * - Include recurring tasks that should appear on next day (reset to completed: false)
+   */
+  const filterTasksForNextDay = useCallback((
+    currentTasks: Task[], 
+    nextDate: Date
+  ): Task[] => {
+    const filteredTasks: Task[] = [];
     
-    if (scheduleCache.has(nextDayDate)) {
-      setScheduleDays(prevDays => [...prevDays, scheduleCache.get(nextDayDate)!]);
-      setCurrentDayIndex(prevIndex => prevIndex + 1);
-      return;
-    }
-  
-    try {
-      const existingSchedule = await loadSchedule(nextDayDate);
-      
-      if (existingSchedule.success && existingSchedule.schedule) {
-        const nextDaySchedule = existingSchedule.schedule;
-        setScheduleDays(prevDays => [...prevDays, nextDaySchedule]);
-        setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, nextDaySchedule));
-      } else {
-        const currentSchedule = scheduleDays[currentDayIndex];
-        const recurringTasks = currentSchedule.filter(task => task.is_recurring);
-        
-        const orderingPattern = state.layout_preference?.orderingPattern || 'timebox';
-          
-        const enhancedPreference = {
-          layout: state.layout_preference?.layout || 'todolist-structured',
-          subcategory: state.layout_preference?.subcategory || 'day-sections',
-          orderingPattern
-        };
-        
-        const formData = {
-          ...state,
-          tasks: [...state.tasks || [], ...recurringTasks],
-          layout_preference: enhancedPreference,
-          work_start_time: state.work_start_time || '09:00',
-          work_end_time: state.work_end_time || '17:00',
-          priorities: state.priorities || {
-            health: "",
-            relationships: "",
-            fun_activities: "",
-            ambitions: ""
-          },
-          energy_patterns: state.energy_patterns || []
-        };
-        
-        // Direct API call for next day
-        const result = await generateSchedule(formData);
-        
-        if (result.tasks && result.tasks.length > 0) {
-          const tasksWithDate = result.tasks.map(task => ({
-            ...task,
-            start_date: nextDayDate
-          }));
-          
-          setScheduleDays(prevDays => [...prevDays, tasksWithDate]);
-          setScheduleCache(prevCache => new Map(prevCache).set(nextDayDate, tasksWithDate));
-          
-          await updateSchedule(nextDayDate, tasksWithDate);
-        } else {
-          throw new Error('Failed to generate next day schedule');
-        }
+    for (const task of currentTasks) {
+      // Always preserve sections
+      if (task.is_section) {
+        filteredTasks.push({ ...task });
+        continue;
       }
       
-      setCurrentDayIndex(prevIndex => prevIndex + 1);
-      setDate(new Date(nextDayDate));
+      // Handle recurring tasks
+      if (task.is_recurring && shouldTaskRecurOnDate(task, nextDate)) {
+        // Reset recurring task to incomplete for next day
+        filteredTasks.push({
+          ...task,
+          completed: false,
+          start_date: formatDateToString(nextDate)
+        });
+        continue;
+      }
+      
+      // Include incomplete non-recurring tasks
+      if (!task.is_recurring && !task.completed) {
+        filteredTasks.push({
+          ...task,
+          start_date: formatDateToString(nextDate)
+        });
+      }
+    }
+    
+    return filteredTasks;
+  }, []);
+
+  /**
+   * Utility function to check if a date string is in the past
+   */
+  const isDateInPast = useCallback((dateStr: string): boolean => {
+    const targetDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    targetDate.setHours(0, 0, 0, 0);
+    return targetDate < today;
+  }, []);
+
+  /**
+   * Handle next day navigation - enhanced logic for task5.md requirements
+   * 1. Check if schedule exists for next day (cache first, then backend)
+   * 2. If YES: load existing schedule (preserve - don't override!)
+   * 3. If NO + past date: show empty state (no creation)
+   * 4. If NO + future date: create new schedule with filtered tasks
+   * 5. Navigate to next day regardless of success/failure
+   */
+  const handleNextDay = useCallback(async () => {
+    const nextDayDate = getDateString(currentDayIndex + 1);
+    console.log('Navigating from:', getDateString(currentDayIndex), 'to:', nextDayDate);
+    
+    try {
+      // Step 1: Check cache first
+      if (scheduleCache.has(nextDayDate)) {
+        console.log('Found existing schedule in cache, loading it');
+        
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = currentDayIndex + 1;
+          
+          // Ensure array is large enough
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = scheduleCache.get(nextDayDate)!;
+          return newDays;
+        });
+        
+        // Navigate to next day
+        setCurrentDayIndex(prevIndex => prevIndex + 1);
+        return;
+      }
+      
+      // Step 2: Try to load from backend
+      const loadResult = await loadSchedule(nextDayDate);
+      
+      if (loadResult.success && loadResult.schedule) {
+        console.log('Found existing schedule in backend, loading it');
+        
+        // Existing schedule found - load it (don't override!)
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = currentDayIndex + 1;
+          
+          // Ensure array is large enough
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = loadResult.schedule!;
+          return newDays;
+        });
+        
+        // Cache the loaded schedule
+        setScheduleCache(prevCache => {
+          const newCache = new Map(prevCache);
+          newCache.set(nextDayDate, loadResult.schedule!);
+          return newCache;
+        });
+        
+        // Navigate to next day
+        setCurrentDayIndex(prevIndex => prevIndex + 1);
+        
+        toast({
+          title: "Success",
+          description: `Loaded existing schedule for ${nextDayDate}`,
+        });
+        
+        return;
+      }
+      
+      // Step 3: No existing schedule found - check if past or future
+      if (isDateInPast(nextDayDate)) {
+        console.log('Next day is in the past and no schedule exists, showing empty state');
+        
+        // Show empty state for past dates
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = currentDayIndex + 1;
+          
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = [];
+          return newDays;
+        });
+        
+        // Navigate to next day
+        setCurrentDayIndex(prevIndex => prevIndex + 1);
+        return;
+      }
+      
+      // Step 4: Future date with no existing schedule - create new one
+      console.log('Next day is in the future and no schedule exists, creating new schedule');
+      
+      // Get current schedule and inputs for filtering
+      const currentDayDate = getDateString(currentDayIndex);
+      const currentLoadResult = await loadSchedule(currentDayDate);
+      
+      if (!currentLoadResult.success || !currentLoadResult.schedule) {
+        console.error('Failed to load current schedule for filtering');
+        throw new Error('Cannot load current schedule');
+      }
+      
+      const currentTasks = currentLoadResult.schedule;
+      const currentInputs = currentLoadResult.inputs || {};
+      
+      // Filter tasks for next day
+      const nextDate = new Date(nextDayDate);
+      const filteredTasks = filterTasksForNextDay(currentTasks, nextDate);
+      
+      // Create schedule with filtered tasks
+      const createResult = await createSchedule(nextDayDate, filteredTasks, currentInputs);
+      
+      if (createResult.success && createResult.schedule) {
+        console.log('Successfully created next day schedule');
+        
+        // Update schedule state
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = currentDayIndex + 1;
+          
+          // Ensure array is large enough
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = createResult.schedule!;
+          return newDays;
+        });
+        
+        // Cache the new schedule
+        setScheduleCache(prevCache => {
+          const newCache = new Map(prevCache);
+          newCache.set(nextDayDate, createResult.schedule!);
+          return newCache;
+        });
+        
+        toast({
+          title: "Success", 
+          description: `Created schedule for ${nextDayDate} with ${filteredTasks.length} tasks`,
+        });
+      } else {
+        throw new Error('Failed to create schedule with filtered tasks');
+      }
+      
+    } catch (error) {
+      console.error('Error in handleNextDay:', error);
+      
+      // Fallback: try creating empty schedule for future dates only
+      if (!isDateInPast(nextDayDate)) {
+        try {
+          const currentDayDate = getDateString(currentDayIndex);
+          const currentLoadResult = await loadSchedule(currentDayDate);
+          const currentInputs = currentLoadResult.inputs || {};
+          
+          const createResult = await createSchedule(nextDayDate, [], currentInputs);
+          
+          if (createResult.success && createResult.schedule) {
+            console.log('Created fallback empty schedule');
+            
+            setScheduleDays(prevDays => {
+              const newDays = [...prevDays];
+              const targetIndex = currentDayIndex + 1;
+              
+              while (newDays.length <= targetIndex) {
+                newDays.push([]);
+              }
+              
+              newDays[targetIndex] = createResult.schedule!;
+              return newDays;
+            });
+            
+            setScheduleCache(prevCache => {
+              const newCache = new Map(prevCache);
+              newCache.set(nextDayDate, createResult.schedule!);
+              return newCache;
+            });
+          } else {
+            throw new Error('Empty schedule creation failed');
+          }
+        } catch (fallbackError) {
+          console.error('Fallback creation also failed:', fallbackError);
+          
+          // Show empty schedule
+          setScheduleDays(prevDays => {
+            const newDays = [...prevDays];
+            const targetIndex = currentDayIndex + 1;
+            
+            while (newDays.length <= targetIndex) {
+              newDays.push([]);
+            }
+            
+            newDays[targetIndex] = [];
+            return newDays;
+          });
+        }
+        
+        toast({
+          title: "Error",
+          description: "Failed to create schedule. Showing empty schedule.",
+          variant: "destructive",
+        });
+      } else {
+        // For past dates, just show empty array
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = currentDayIndex + 1;
+          
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = [];
+          return newDays;
+        });
+      }
+    }
+    
+    // Navigate to next day regardless of success/failure
+    setCurrentDayIndex(prevIndex => prevIndex + 1);
+  }, [currentDayIndex, filterTasksForNextDay, scheduleCache, toast, isDateInPast]);
+
+  const handlePreviousDay = useCallback(async () => {
+    const previousDayOffset = currentDayIndex - 1;
+    
+    // Check if the previous day is before the user's account creation date
+    if (isDateBeforeUserCreation(previousDayOffset)) {
+      toast({
+        title: "Navigation Limit",
+        description: "Cannot navigate to dates before your account was created.",
+      });
+      return;
+    }
+    
+    const previousDayDate = getDateString(previousDayOffset);
+    
+    // Check if previous day schedule is in cache
+    if (scheduleCache.has(previousDayDate)) {
+      const cachedSchedule = scheduleCache.get(previousDayDate)!;
+      
+      // Update UI to show cached previous day schedule
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        
+        // Calculate target index where render logic expects to find the data
+        const targetIndex = Math.abs(currentDayIndex - 1);
+        
+        // Ensure array is large enough to accommodate the target index
+        while (newDays.length <= targetIndex) {
+          newDays.push([]);
+        }
+        
+        // Place cached schedule at the correct index for render logic
+        newDays[targetIndex] = cachedSchedule;
+        
+        return newDays;
+      });
+      
+      setCurrentDayIndex(prevIndex => prevIndex - 1);
+      return;
+    }
+
+    try {
+      // Load previous day schedule from backend
+      const result = await loadSchedule(previousDayDate);
+      
+      // Handle both successful results with schedules and empty schedules
+      if (result.success) {
+        const previousDaySchedule = result.schedule || [];
+        
+        // Update schedule state
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          
+          // Calculate target index where render logic expects to find the data
+          const targetIndex = Math.abs(currentDayIndex - 1);
+          
+          // Ensure array is large enough to accommodate the target index
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          // Place previous day schedule at the correct index for render logic
+          newDays[targetIndex] = previousDaySchedule;
+          
+          return newDays;
+        });
+        
+        // Cache the loaded schedule (even if empty)
+        setScheduleCache(prevCache => 
+          new Map(prevCache).set(previousDayDate, previousDaySchedule)
+        );
+        
+        setCurrentDayIndex(prevIndex => prevIndex - 1);
+        
+        // Show appropriate message based on whether schedule has tasks
+        if (previousDaySchedule.length > 0) {
+          toast({
+            title: "Success",
+            description: "Previous day's schedule loaded successfully.",
+          });
+        } else {
+          toast({
+            title: "Previous Day",
+            description: "No schedule found for this date.",
+          });
+        }
+      } else {
+        // Failed to load - show empty schedule anyway to allow navigation
+        const emptySchedule: Task[] = [];
+        
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          
+          // Calculate target index where render logic expects to find the data
+          const targetIndex = Math.abs(currentDayIndex - 1);
+          
+          // Ensure array is large enough to accommodate the target index
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          // Place empty schedule at the correct index for render logic
+          newDays[targetIndex] = emptySchedule;
+          
+          return newDays;
+        });
+        
+        // Cache the empty schedule
+        setScheduleCache(prevCache => 
+          new Map(prevCache).set(previousDayDate, emptySchedule)
+        );
+        
+        setCurrentDayIndex(prevIndex => prevIndex - 1);
+        
+        toast({
+          title: "Previous Day",
+          description: "No schedule found for this date.",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading previous day:", error);
+      
+      // Even on error, allow navigation with empty schedule
+      const emptySchedule: Task[] = [];
+      
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays];
+        
+        // Calculate target index where render logic expects to find the data
+        const targetIndex = Math.abs(currentDayIndex - 1);
+        
+        // Ensure array is large enough to accommodate the target index  
+        while (newDays.length <= targetIndex) {
+          newDays.push([]);
+        }
+        
+        // Place empty schedule at the correct index for render logic
+        newDays[targetIndex] = emptySchedule;
+        
+        return newDays;
+      });
+      
+      setScheduleCache(prevCache => 
+        new Map(prevCache).set(previousDayDate, emptySchedule)
+      );
+      
+      setCurrentDayIndex(prevIndex => prevIndex - 1);
       
       toast({
-        title: "Success",
-        description: "Next day's schedule loaded successfully.",
-      });
-    } catch (error) {
-      console.error("Error handling next day:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load next day's schedule. Please try again.",
+        title: "Previous Day",
+        description: "Unable to load schedule data, showing empty schedule.",
         variant: "destructive",
       });
     }
-  }, [currentDayIndex, scheduleDays, state, toast, scheduleCache]);
-
-  const handlePreviousDay = useCallback(() => {
-    if (currentDayIndex > 0) {
-      const prevDate = new Date(date!);
-      prevDate.setDate(prevDate.getDate() - 1);
-      
-      setCurrentDayIndex(prevIndex => prevIndex - 1);
-      setDate(prevDate);
-    }
-  }, [currentDayIndex, date]);
+  }, [currentDayIndex, scheduleCache, toast, isDateBeforeUserCreation]);
 
   const handleRequestSuggestions = useCallback(async () => {
     setIsLoadingSuggestions(true);
@@ -584,8 +1026,34 @@ const Dashboard: React.FC = () => {
         }
         
         // Show empty state if no schedule and no calendar events
-        console.log("No existing schedule or calendar events found, showing empty state");
-        setScheduleDays([[]]);
+        console.log("No existing schedule or calendar events found, creating empty schedule in backend");
+        
+        // Create empty schedule in backend with user inputs from FormContext
+        try {
+          const emptyScheduleResult = await updateSchedule(today, []);
+          if (emptyScheduleResult.success) {
+            setScheduleDays([[]]);
+            setScheduleCache(new Map([[today, []]]));
+            console.log("Empty schedule created successfully in backend");
+          } else {
+            // Show error toast and continue with frontend-only empty state
+            toast({
+              title: "Warning",
+              description: "Could not save empty schedule to database.",
+              variant: "destructive",
+            });
+            setScheduleDays([[]]);
+            console.log("Backend creation failed, continuing with frontend-only empty state");
+          }
+        } catch (createError) {
+          console.error("Error creating empty schedule in backend:", createError);
+          toast({
+            title: "Warning", 
+            description: "Could not save empty schedule to database.",
+            variant: "destructive",
+          });
+          setScheduleDays([[]]);
+        }
         
       } catch (error) {
         console.error("Error loading initial schedule:", error);
@@ -604,7 +1072,7 @@ const Dashboard: React.FC = () => {
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, [state.formUpdate?.response]);
+  }, [state.formUpdate?.response, toast]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -620,6 +1088,7 @@ const Dashboard: React.FC = () => {
           onNextDay={handleNextDay}
           onPreviousDay={handlePreviousDay}
           currentDate={currentDate}
+          isCurrentDay={false}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -629,19 +1098,19 @@ const Dashboard: React.FC = () => {
               <div className="loading-container-lg">
                 <div className="loading-spinner-lg" />
               </div>
-            ) : scheduleDays.length > 0 && scheduleDays[currentDayIndex]?.length > 0 ? (
+            ) : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0 ? (
               <div className="space-y-4">
                 <EditableSchedule
-                  tasks={scheduleDays[currentDayIndex] || []}
+                  tasks={scheduleDays[Math.abs(currentDayIndex)] || []}
                   onUpdateTask={handleScheduleTaskUpdate}
                   onReorderTasks={handleReorderTasks}
-                  layoutPreference={state.layout_preference?.layout || 'todolist-unstructured'}
                   onRequestSuggestions={handleRequestSuggestions}
                   isLoadingSuggestions={isLoadingSuggestions}
                   suggestionsMap={suggestionsMap}
                   onAcceptSuggestion={handleAcceptSuggestion}
                   onRejectSuggestion={handleRejectSuggestion}
                   onEditTask={handleEditTask}
+                  onDeleteTask={handleDeleteTask}
                 />
 
                 {isLoadingSuggestions && (

@@ -9,11 +9,30 @@
   - Visual drag indicators for task reordering and indentation
 - Google Calendar API integration
 - Added left side navbar
+- **Task deletion functionality** (TASK-02)
+  - Dropdown menu with delete option in schedule rows
+  - Backend API endpoint for task deletion
+  - Optimistic UI updates with error handling
+- **Previous day schedule navigation** (TASK-03)
+  - Left/right arrow navigation between days
+  - Schedule caching and loading from backend
+  - Navigation tooltips and user creation date limits
+- **Previous day navigation bug fixes** (TASK-04)
+  - Fixed array indexing issues for negative day offsets
+  - Resolved structured vs unstructured schedule rendering
+  - Improved empty schedule handling and navigation
+- **Slack Integration** ([PR #50](https://github.com/Jwu44/yourdAI/pull/50))
+  - Klavis AI-powered Slack webhook processing
+  - Task creation from @mentions in Slack
+  - OAuth flow and connection management
+- **Task editing functionality** ([PR #50](https://github.com/Jwu44/yourdAI/pull/50))
+  - Drawer-based task editing interface
+  - Modal overlay persistence fixes
+  - Enhanced task creation and update flows
+- **Centralized schedule service** ([PR #49](https://github.com/Jwu44/yourdAI/pull/49))
+  - Backend schedule operations consolidation
+  - Improved dashboard loading performance
+  - Upsert logic for schedule updates
 
 ## 🏗️ In Progress
-- Refactor schedule generation round 2
-
-## Known Issues
-- Some performance bottlenecks with large schedule generation
-- Need better syncing between backend DB and frontend state
-- Nested tasks maintenance during schedule updates requires improvement
+- Fixing bugs across yourdia

@@ -4,6 +4,7 @@ import { Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // UI Components
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Custom Components
 import { TypographyH3 } from '@/app/fonts/text';
@@ -11,9 +12,10 @@ import { TypographyH3 } from '@/app/fonts/text';
 interface DashboardHeaderProps {
     isLoadingSuggestions: boolean;
     onRequestSuggestions: () => Promise<void>;
-    onNextDay: () => Promise<void>;
+    onNextDay: () => void; // Changed from Promise<void> to void
     onPreviousDay: () => void;
     currentDate: Date | undefined;
+    isCurrentDay: boolean;
 }
 
 /**
@@ -25,7 +27,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onRequestSuggestions,
     onNextDay,
     onPreviousDay,
-    currentDate
+    currentDate,
+    isCurrentDay
   }) => {
 
   /**
@@ -68,24 +71,44 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             {formattedDate()}
           </TypographyH3>
             <div className="flex items-center gap-1 ml-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onPreviousDay()}
-                className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
-                aria-label="Previous day"
-              >
-                <ChevronLeft className="h-5 w-5 text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onNextDay()}
-                className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-5 w-5 text-primary" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onPreviousDay()}
+                      disabled={false}
+                      className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
+                      aria-label="Previous day"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-primary" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View previous day</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onNextDay()}
+                    disabled={isCurrentDay}
+                    className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-5 w-5 text-primary" />
+                  </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View next day</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
           </div>
         </div>
       </div>

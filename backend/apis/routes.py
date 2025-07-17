@@ -1061,7 +1061,8 @@ def create_schedule():
     Expected request body:
     {
         "date": str (YYYY-MM-DD format, required),
-        "tasks": List[Dict] (optional, defaults to empty array)
+        "tasks": List[Dict] (optional, defaults to empty array),
+        "inputs": Dict (optional, user input data for schedule context)
     }
     
     Headers:
@@ -1126,11 +1127,20 @@ def create_schedule():
                 "error": "Tasks must be an array"
             }), 400
 
+        # Validate inputs object (optional, defaults to None)
+        inputs = data.get('inputs')
+        if inputs is not None and not isinstance(inputs, dict):
+            return jsonify({
+                "success": False,
+                "error": "Inputs must be an object"
+            }), 400
+
         # Create schedule using centralized service
         success, result = schedule_service.create_empty_schedule(
             user_id=user_id,
             date=date,
-            tasks=tasks
+            tasks=tasks,
+            inputs=inputs
         )
         
         if not success:
@@ -1155,4 +1165,137 @@ def create_schedule():
 @api_bp.route("/schedules", methods=["OPTIONS"])
 def handle_create_schedule_options():
     """Handle CORS preflight requests for schedule creation endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/tasks/<task_id>", methods=["DELETE"])
+def delete_task(task_id):
+    """
+    Delete a specific task from a user's schedule.
+    
+    URL Parameters:
+        task_id: The ID of the task to delete
+        
+    Expected request body:
+    {
+        "date": str (YYYY-MM-DD format, required)
+    }
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task deleted successfully with updated schedule
+        400: Invalid request data, missing date, or trying to delete a section
+        401: Authentication required
+        404: Task not found or schedule doesn't exist
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate required date field
+        date = data.get('date')
+        if not date:
+            return jsonify({
+                "success": False,
+                "error": "Missing required field: date"
+            }), 400
+        
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Get existing schedule
+        success, result = schedule_service.get_schedule_by_date(user_id, date)
+        
+        if not success:
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Schedule not found")
+            }), 404
+
+        current_schedule = result.get('schedule', [])
+        
+        # Find the task to delete
+        task_to_delete = None
+        for task in current_schedule:
+            if task.get('id') == task_id:
+                task_to_delete = task
+                break
+        
+        if not task_to_delete:
+            return jsonify({
+                "success": False,
+                "error": "Task not found in schedule"
+            }), 404
+        
+        # Prevent deletion of section tasks
+        if task_to_delete.get('is_section', False) or task_to_delete.get('type') == 'section':
+            return jsonify({
+                "success": False,
+                "error": "Cannot delete section tasks. Only regular tasks can be deleted."
+            }), 400
+        
+        # Remove the task from the schedule
+        updated_schedule = [task for task in current_schedule if task.get('id') != task_id]
+        
+        # Update the schedule using schedule service
+        update_success, update_result = schedule_service.update_schedule_tasks(
+            user_id, date, updated_schedule
+        )
+        
+        if not update_success:
+            return jsonify({
+                "success": False,
+                "error": update_result.get("error", "Failed to update schedule")
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "message": "Task deleted successfully",
+            "taskId": task_id,
+            **update_result
+        })
+
+    except Exception as e:
+        print(f"Error in delete_task: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/tasks/<task_id>", methods=["OPTIONS"])
+def handle_delete_task_options(task_id):
+    """Handle CORS preflight requests for task deletion endpoint."""
     return jsonify({"status": "ok"})

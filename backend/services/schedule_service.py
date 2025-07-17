@@ -75,7 +75,8 @@ class ScheduleService:
             return True, {
                 "schedule": schedule_tasks,
                 "date": date,
-                "metadata": metadata
+                "metadata": metadata,
+                "inputs": schedule_doc.get('inputs', {})
             }
 
         except Exception as e:
@@ -265,7 +266,8 @@ class ScheduleService:
         self,
         user_id: str,
         date: str,
-        tasks: Optional[List[Dict[str, Any]]] = None
+        tasks: Optional[List[Dict[str, Any]]] = None,
+        inputs: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Create a basic schedule manually with optional initial tasks.
@@ -274,6 +276,7 @@ class ScheduleService:
             user_id: User's Google ID or Firebase UID
             date: Date string in YYYY-MM-DD format
             tasks: Optional list of initial task objects (defaults to empty list)
+            inputs: Optional user input data for schedule generation context
             
         Returns:
             Tuple of (success: bool, result: Dict) where result contains either
@@ -288,7 +291,8 @@ class ScheduleService:
                 user_id=user_id,
                 date=date,
                 tasks=initial_tasks,
-                source="manual"
+                source="manual",
+                inputs=inputs
             )
             
             # Validate document before storage

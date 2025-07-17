@@ -4,8 +4,7 @@ import EditableScheduleRow from './EditableScheduleRow';
 import AISuggestionsList from './AISuggestionsList';
 import { 
   Task, 
-  AISuggestion, 
-  ScheduleLayoutType 
+  AISuggestion 
 } from '../../lib/types';
 
 /**
@@ -20,12 +19,6 @@ interface EditableScheduleProps {
   
   /** Callback function for reordering tasks */
   onReorderTasks: (tasks: Task[]) => void;
-  
-  /** 
-   * Layout preference for the schedule
-   * Note: This is now mainly for reference as backend handles structure
-   */
-  layoutPreference: string | ScheduleLayoutType;
   
   /** Callback function to request AI suggestions */
   onRequestSuggestions: () => Promise<void>;
@@ -44,6 +37,9 @@ interface EditableScheduleProps {
 
   /** Callback function for editing a task */
   onEditTask?: (task: Task) => void;
+
+  /** Callback function for deleting a task */
+  onDeleteTask?: (task: Task) => void;
 }
 
 /**
@@ -56,30 +52,26 @@ interface EditableScheduleProps {
 const EditableSchedule: React.FC<EditableScheduleProps> = ({ 
   tasks, 
   onUpdateTask, 
-  onReorderTasks, 
-  layoutPreference,
+  onReorderTasks,
   suggestionsMap,
   onAcceptSuggestion,
   onRejectSuggestion,
-  onEditTask
+  onEditTask,
+  onDeleteTask
 }) => {
   /**
-   * Minimal task processing for layout-specific rendering
+   * Direct task rendering from backend data
    * 
-   * Since the optimized backend returns properly structured tasks with sections
-   * and correct ordering, we only need minimal processing for layout-specific
-   * display requirements.
+   * Each schedule renders based on how it was originally generated, not the current
+   * user's layout preference. The backend returns the correct structure based on
+   * the layout preference that was used during schedule creation.
    */
   const processedTasks = useMemo(() => {
-    // For unstructured layout, filter out sections
-    if (layoutPreference === 'todolist-unstructured' || layoutPreference === 'unstructured') {
-      return tasks.filter(task => !task.is_section);
-    }
-    
-    // For structured layouts, use tasks as-is from optimized backend
-    // Backend already provides proper section structure and ordering
+    // Always render tasks as-is from the backend
+    // This preserves the original layout structure (structured vs unstructured)
+    // that was used when the schedule was first generated
     return tasks;
-  }, [tasks, layoutPreference]);
+  }, [tasks]);
 
   /**
    * Enhanced moveTask function to handle task reordering with proper indentation
@@ -209,6 +201,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             isSection={task.is_section || task.type === 'section'}
             allTasks={processedTasks}
             onEditTask={onEditTask}
+            onDeleteTask={onDeleteTask}
           />
 
           {/* Render suggestions after each task if they exist */}
