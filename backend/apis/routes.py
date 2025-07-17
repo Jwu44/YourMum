@@ -1061,7 +1061,8 @@ def create_schedule():
     Expected request body:
     {
         "date": str (YYYY-MM-DD format, required),
-        "tasks": List[Dict] (optional, defaults to empty array)
+        "tasks": List[Dict] (optional, defaults to empty array),
+        "inputs": Dict (optional, user input data for schedule context)
     }
     
     Headers:
@@ -1126,11 +1127,20 @@ def create_schedule():
                 "error": "Tasks must be an array"
             }), 400
 
+        # Validate inputs object (optional, defaults to None)
+        inputs = data.get('inputs')
+        if inputs is not None and not isinstance(inputs, dict):
+            return jsonify({
+                "success": False,
+                "error": "Inputs must be an object"
+            }), 400
+
         # Create schedule using centralized service
         success, result = schedule_service.create_empty_schedule(
             user_id=user_id,
             date=date,
-            tasks=tasks
+            tasks=tasks,
+            inputs=inputs
         )
         
         if not success:

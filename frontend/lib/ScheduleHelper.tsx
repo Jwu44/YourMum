@@ -128,6 +128,7 @@ export const loadSchedule = async (date: string): Promise<{
   success: boolean;
   schedule?: Task[];
   error?: string;
+  inputs?: Record<string, any>;
   metadata?: {
     totalTasks: number;
     calendarEvents: number;
@@ -196,10 +197,15 @@ export const loadSchedule = async (date: string): Promise<{
  * 
  * @param date - Date in YYYY-MM-DD format
  * @param tasks - Array of tasks for the new schedule
+ * @param inputs - Optional user input data for schedule generation context
  * @returns Promise with success status and new schedule data
  * @throws Error if date format is invalid or tasks is not an array
  */
-export const createSchedule = async (date: string, tasks: Task[]): Promise<{
+export const createSchedule = async (
+  date: string, 
+  tasks: Task[], 
+  inputs?: Record<string, any>
+): Promise<{
   success: boolean;
   schedule?: Task[];
   error?: string;
@@ -221,11 +227,24 @@ export const createSchedule = async (date: string, tasks: Task[]): Promise<{
       throw new Error('Tasks must be an array');
     }
 
+    // Input validation - ensure inputs is an object if provided
+    if (inputs !== undefined && (typeof inputs !== 'object' || inputs === null || Array.isArray(inputs))) {
+      throw new Error('Inputs must be an object');
+    }
+
     // Get authentication token with proper error handling
     const token = await getAuthToken();
 
     // Prepare request payload
-    const requestPayload = { date, tasks };
+    const requestPayload: { date: string; tasks: Task[]; inputs?: Record<string, any> } = { 
+      date, 
+      tasks 
+    };
+    
+    // Include inputs if provided
+    if (inputs) {
+      requestPayload.inputs = inputs;
+    }
 
     // Call backend API to create schedule
     const response = await fetch(`${API_BASE_URL}/api/schedules`, {
