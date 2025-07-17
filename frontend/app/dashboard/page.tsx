@@ -16,6 +16,7 @@ import EditableSchedule from '@/components/parts/EditableSchedule';
 // Hooks and Context
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from '../../lib/FormContext';
+import { useAuth } from '@/auth/AuthContext';
 
 // Types
 import { 
@@ -40,6 +41,7 @@ const Dashboard: React.FC = () => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { state } = useForm();
   const { toast } = useToast();
+  const { user, loading } = useAuth();
 
   
   // Create task drawer state
@@ -998,8 +1000,20 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     // Prevent duplicate loads in React Strict Mode
     if (hasInitiallyLoaded.current) return;
+    
+    // Wait for auth state to be ready before attempting calendar fetch
+    if (loading) {
+      console.log("TASK-07 FIX: Waiting for auth state to stabilize before loading schedule");
+      return;
+    }
+    
+    if (!user) {
+      console.log("TASK-07 FIX: No authenticated user, skipping calendar fetch");
+      return;
+    }
 
     const loadInitialSchedule = async () => {
+      console.log("TASK-07 FIX: Auth ready, starting schedule load");
       setIsLoadingSchedule(true);
       
       try {
@@ -1072,7 +1086,7 @@ const Dashboard: React.FC = () => {
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, [state.formUpdate?.response, toast]);
+  }, [state.formUpdate?.response, toast, user, loading]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
