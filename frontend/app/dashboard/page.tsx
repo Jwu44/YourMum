@@ -16,6 +16,7 @@ import EditableSchedule from '@/components/parts/EditableSchedule';
 // Hooks and Context
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from '../../lib/FormContext';
+import { useAuth } from '@/auth/AuthContext';
 
 // Types
 import { 
@@ -40,6 +41,7 @@ const Dashboard: React.FC = () => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { state } = useForm();
   const { toast } = useToast();
+  const { user, loading } = useAuth();
 
   
   // Create task drawer state
@@ -73,10 +75,22 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex]);
 
-  // Fetch user creation date on component mount
+  // Fetch user creation date after auth is ready
   useEffect(() => {
+    // Wait for auth state to be ready before fetching user data
+    if (loading) {
+      console.log("TASK-07 FIX: Waiting for auth before fetching user creation date");
+      return;
+    }
+    
+    if (!user) {
+      console.log("TASK-07 FIX: No authenticated user, skipping user creation date fetch");
+      return;
+    }
+
     const fetchUserCreationDate = async () => {
       try {
+        console.log("TASK-07 FIX: Auth ready, fetching user creation date");
         const creationDate = await userApi.getUserCreationDate();
         setUserCreationDate(creationDate);
         console.log('User creation date:', creationDate);
@@ -88,7 +102,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchUserCreationDate();
-  }, []);
+  }, [user, loading]);
 
   const addTask = useCallback(async (newTask: Task) => {
     try {
@@ -998,8 +1012,20 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     // Prevent duplicate loads in React Strict Mode
     if (hasInitiallyLoaded.current) return;
+    
+    // Wait for auth state to be ready before attempting calendar fetch
+    if (loading) {
+      console.log("TASK-07 FIX: Waiting for auth state to stabilize before loading schedule");
+      return;
+    }
+    
+    if (!user) {
+      console.log("TASK-07 FIX: No authenticated user, skipping calendar fetch");
+      return;
+    }
 
     const loadInitialSchedule = async () => {
+      console.log("TASK-07 FIX: Auth ready, starting schedule load");
       setIsLoadingSchedule(true);
       
       try {
@@ -1072,7 +1098,7 @@ const Dashboard: React.FC = () => {
     if (!state.formUpdate?.response) {
       loadInitialSchedule();
     }
-  }, [state.formUpdate?.response, toast]);
+  }, [state.formUpdate?.response, toast, user, loading]);
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
