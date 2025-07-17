@@ -123,6 +123,7 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 'displayName': 'Dev User',
                 'photoURL': '',
                 'role': 'free',
+                'timezone': 'UTC',  # Add timezone field for consistency
                 'calendarSynced': False,
                 # Add other required fields as needed
             }
@@ -293,6 +294,12 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         # Fall back to email username if displayName is not provided
         display_name = user_data["email"].split('@')[0]
 
+    # Handle timezone field with default value
+    timezone_value = user_data.get("timezone", "UTC")  # Default to UTC if not provided
+    # Validate timezone format (basic validation)
+    if not isinstance(timezone_value, str) or not timezone_value.strip():
+        timezone_value = "UTC"
+
     # Prepare user data with all required fields and ensure no null values
     return {
         "googleId": user_data["googleId"],
@@ -300,6 +307,7 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "displayName": display_name,  # Use processed display_name
         "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
         "role": "free",  # Default role for new users
+        "timezone": timezone_value,  # Add timezone field with default
         "calendarSynced": has_calendar_access,
         "lastLogin": datetime.now(timezone.utc), 
         "calendar": calendar_settings,
