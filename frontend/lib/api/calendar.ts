@@ -27,6 +27,19 @@ async function getAuthToken(): Promise<string> {
   return await currentUser.getIdToken();
 }
 
+/**
+ * Detect user's timezone using browser API with UTC fallback
+ * @returns IANA timezone string (e.g., 'America/New_York', 'Australia/Sydney')
+ */
+function detectUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.warn('Failed to detect timezone, falling back to UTC:', error);
+    return 'UTC';
+  }
+}
+
 export const calendarApi = {
   /**
    * Connect user's Google Calendar with stored credentials
@@ -38,13 +51,18 @@ export const calendarApi = {
     scopes: string[];
   }) {
     const token = await getAuthToken();
+    const userTimezone = detectUserTimezone();
+    
     const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ credentials }),
+      body: JSON.stringify({ 
+        credentials,
+        timezone: userTimezone 
+      }),
     });
     
     if (!response.ok) {
@@ -119,8 +137,10 @@ export const calendarApi = {
   
       try {
         const token = await getAuthToken();
+        const userTimezone = detectUserTimezone();
+        
         const response = await fetch(
-          `${API_BASE_URL}/api/calendar/events?date=${encodeURIComponent(dateString)}`,
+          `${API_BASE_URL}/api/calendar/events?date=${encodeURIComponent(dateString)}&timezone=${encodeURIComponent(userTimezone)}`,
           {
             method: 'GET',
             headers: {

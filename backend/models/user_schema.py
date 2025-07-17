@@ -8,6 +8,10 @@ user_schema_validation = {
             "displayName": { "bsonType": "string" },
             "photoURL": { "bsonType": ["string", "null"] },
             "role": { "enum": ["free", "premium", "admin"] },
+            "timezone": { 
+                "bsonType": "string",
+                "description": "User's timezone in IANA format (e.g., 'Australia/Sydney', 'UTC')"
+            },
             "lastLogin": { "bsonType": "date" },
             "createdAt": { "bsonType": "date" },
             # Add calendar-related fields

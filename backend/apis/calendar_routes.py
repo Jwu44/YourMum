@@ -12,6 +12,7 @@ from firebase_admin import credentials, get_app
 import firebase_admin
 from backend.services.ai_service import categorize_task
 from backend.services.schedule_service import schedule_service
+import pytz  # Add pytz for timezone handling
 
 calendar_bp = Blueprint("calendar", __name__)
 
@@ -89,21 +90,44 @@ def get_user_id_from_token(token: str) -> Optional[str]:
         traceback.print_exc()
         return None
 
-def fetch_google_calendar_events(access_token: str, date: str) -> List[Dict]:
+def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str = "UTC") -> List[Dict]:
     """
     Fetch Google Calendar events for a specific date using the access token.
     
     Args:
         access_token (str): Google Calendar access token
         date (str): Date in YYYY-MM-DD format
+        user_timezone (str): User's timezone in IANA format (e.g., 'Australia/Sydney')
     
     Returns:
         List[Dict]: List of calendar events
     """
     try:
-        # Format date for API request (start and end of day in RFC3339 format)
-        start_time = f"{date}T00:00:00Z"
-        end_time = f"{date}T23:59:59Z"
+        # Convert date boundaries to user's timezone for precise event fetching
+        # This prevents timezone issues like fetching tomorrow's events for today
+        try:
+            user_tz = pytz.timezone(user_timezone)
+        except pytz.UnknownTimeZoneError:
+            print(f"Invalid timezone '{user_timezone}', falling back to UTC")
+            user_tz = pytz.UTC
+            
+        utc_tz = pytz.UTC
+        
+        # Create start and end of day in user's timezone
+        start_local = user_tz.localize(datetime.strptime(f"{date} 00:00:00", "%Y-%m-%d %H:%M:%S"))
+        end_local = user_tz.localize(datetime.strptime(f"{date} 23:59:59", "%Y-%m-%d %H:%M:%S"))
+        
+        # Convert to UTC for Google Calendar API
+        start_utc = start_local.astimezone(utc_tz)
+        end_utc = end_local.astimezone(utc_tz)
+        
+        # Format for RFC3339 (Google Calendar API format)
+        start_time = start_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end_time = end_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+        print(f"DEBUG: Fetching events for {date} in timezone {user_timezone}")
+        print(f"DEBUG: Local time range: {start_local} to {end_local}")
+        print(f"DEBUG: UTC time range: {start_time} to {end_time}")
         
         # Google Calendar API endpoint
         url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
@@ -137,7 +161,7 @@ def fetch_google_calendar_events(access_token: str, date: str) -> List[Dict]:
         traceback.print_exc()
         return []
 
-def convert_calendar_event_to_task(event: Dict) -> Optional[Dict]:
+def convert_calendar_event_to_task(event: Dict, date: str) -> Optional[Dict]:
     """
     Convert a Google Calendar event to a Task object.
     
@@ -190,7 +214,7 @@ def convert_calendar_event_to_task(event: Dict) -> Optional[Dict]:
             'start_time': start_time,
             'end_time': end_time,
             'is_recurring': None,
-            'start_date': datetime.now().strftime('%Y-%m-%d'),
+            'start_date': date,
             'gcal_event_id': event.get('id'),  # Store original event ID for reference
             'from_gcal': True  # Flag to identify calendar-sourced tasks
         }
@@ -480,13 +504,16 @@ def get_calendar_events():
                 "tasks": []
             }), 400 if not is_post_request else 200
         
-        # Fetch events from Google Calendar
-        calendar_events = fetch_google_calendar_events(access_token, date)
+        # Get user's timezone (with fallback to UTC)
+        user_timezone = user.get('timezone', 'UTC')
+        
+        # Fetch events from Google Calendar with timezone-aware boundaries
+        calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
         
         # Convert events to tasks
         calendar_tasks = []
         for event in calendar_events:
-            task_data = convert_calendar_event_to_task(event)
+            task_data = convert_calendar_event_to_task(event, date)
             if task_data:
                 calendar_tasks.append(task_data)
         
