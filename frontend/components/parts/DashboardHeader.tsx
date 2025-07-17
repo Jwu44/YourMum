@@ -90,16 +90,25 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onNextDay()}
-                disabled={isCurrentDay}
-                className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-5 w-5 text-primary" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onNextDay()}
+                    disabled={isCurrentDay}
+                    className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-5 w-5 text-primary" />
+                  </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View next day</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
           </div>
         </div>
       </div>
