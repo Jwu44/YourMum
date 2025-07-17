@@ -1,5 +1,5 @@
 # TASK-07: Debug double load on prod before synced google calendar events appear
-Status: Resolved ✅
+Status: To do
 
 ## Bug
 I am facing a bug where after google sso and I land on /dashboard, the dashboard page loads twice before I can see synced google calendar events for the day.
@@ -15,48 +15,415 @@ I am facing a bug where after google sso and I land on /dashboard, the dashboard
 
 ## Resources
 ### Console logs
-TASK-07 FIX: Auth ready, starting schedule load
-layout-db35b87bef89a0bd.js:1 RouteGuard State: 
-{user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
-20-d085f2d3adf909b7.js:1 
- GET https://yourdai-production.up.railway.app/api/auth/user 401 (Unauthorized)
+Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
+page-576bf0c8d9b5fe10.js:1 Got ID token for backend storage
+page-576bf0c8d9b5fe10.js:1 API Base URL: https://yourdai-production.up.railway.app
+page-576bf0c8d9b5fe10.js:1 Sign in successful: Justin Wu (justin.wu4444@gmail.com)
+page-576bf0c8d9b5fe10.js:1 Authenticated user detected on home page, redirecting to dashboard
+layout-6a7baededfda46d6.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/', isPublicPath: true, inAuthFlow: false, …}
+page-576bf0c8d9b5fe10.js:1 Has calendar access: true
+page-576bf0c8d9b5fe10.js:1 Waiting for auth state to stabilize before connecting to Google Calendar...
+page-21f895c5a0a879a7.js:1 Setting currentDate: Thu Jul 17 2025 15:28:55 GMT+1000 (Australian Eastern Standard Time)
+layout-6a7baededfda46d6.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
+20-d085f2d3adf909b7.js:1  GET https://yourdai-production.up.railway.app/api/auth/user 401 (Unauthorized)
+getCurrentUser @ 20-d085f2d3adf909b7.js:1
+await in getCurrentUser
+getUserCreationDate @ 20-d085f2d3adf909b7.js:1
+(anonymous) @ page-21f895c5a0a879a7.js:1
+(anonymous) @ page-21f895c5a0a879a7.js:1
+aW @ fd9d1056-d01e9804f4c81514.js:1
+oe @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+id @ fd9d1056-d01e9804f4c81514.js:1
+nb @ fd9d1056-d01e9804f4c81514.js:1
+(anonymous) @ fd9d1056-d01e9804f4c81514.js:1
+is @ fd9d1056-d01e9804f4c81514.js:1
+o1 @ fd9d1056-d01e9804f4c81514.js:1
+oZ @ fd9d1056-d01e9804f4c81514.js:1
+T @ 117-169eadb39a9ee5e7.js:1
 117-169eadb39a9ee5e7.js:1 Error fetching user data: Error: Authentication failed
     at Object.getCurrentUser (20-d085f2d3adf909b7.js:1:24536)
     at async Object.getUserCreationDate (20-d085f2d3adf909b7.js:1:24708)
-    at async page-103a65596ba82166.js:1:29592
+    at async page-21f895c5a0a879a7.js:1:29550
+push.92304.window.console.error @ 117-169eadb39a9ee5e7.js:1
+getCurrentUser @ 20-d085f2d3adf909b7.js:1
+await in getCurrentUser
+getUserCreationDate @ 20-d085f2d3adf909b7.js:1
+(anonymous) @ page-21f895c5a0a879a7.js:1
+(anonymous) @ page-21f895c5a0a879a7.js:1
+aW @ fd9d1056-d01e9804f4c81514.js:1
+oe @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+id @ fd9d1056-d01e9804f4c81514.js:1
+nb @ fd9d1056-d01e9804f4c81514.js:1
+(anonymous) @ fd9d1056-d01e9804f4c81514.js:1
+is @ fd9d1056-d01e9804f4c81514.js:1
+o1 @ fd9d1056-d01e9804f4c81514.js:1
+oZ @ fd9d1056-d01e9804f4c81514.js:1
+T @ 117-169eadb39a9ee5e7.js:1
 117-169eadb39a9ee5e7.js:1 Error getting user creation date: Error: Authentication failed
     at Object.getCurrentUser (20-d085f2d3adf909b7.js:1:24536)
     at async Object.getUserCreationDate (20-d085f2d3adf909b7.js:1:24708)
-    at async page-103a65596ba82166.js:1:29592
-page-103a65596ba82166.js:1 User creation date: Mon Jan 01 2024 11:00:00 GMT+1100 (Australian Eastern Daylight Time)
-page-3c02ea7ff0a31daf.js:1 User stored in backend successfully
-page-3c02ea7ff0a31daf.js:1 Authentication completed successfully
-page-3c02ea7ff0a31daf.js:1 Connecting to Google Calendar...
-page-3c02ea7ff0a31daf.js:1 Connected to Google Calendar
-page-3c02ea7ff0a31daf.js:1 TASK-07 FIX: Calendar credentials stored, dashboard will handle event fetching
-page-3c02ea7ff0a31daf.js:1 Navigating to: /dashboard
-117-169eadb39a9ee5e7.js:1 Error fetching calendar events: TypeError: Failed to fetch
-    at Object.fetchEvents (_next/static/chunks/…f0a31daf.js:1:37297)
-    at async t (page-103a65596ba82166.js:1:39163)
+    at async page-21f895c5a0a879a7.js:1:29550
+push.92304.window.console.error @ 117-169eadb39a9ee5e7.js:1
+getUserCreationDate @ 20-d085f2d3adf909b7.js:1
+await in getUserCreationDate
+(anonymous) @ page-21f895c5a0a879a7.js:1
+(anonymous) @ page-21f895c5a0a879a7.js:1
+aW @ fd9d1056-d01e9804f4c81514.js:1
+oe @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+id @ fd9d1056-d01e9804f4c81514.js:1
+nb @ fd9d1056-d01e9804f4c81514.js:1
+(anonymous) @ fd9d1056-d01e9804f4c81514.js:1
+is @ fd9d1056-d01e9804f4c81514.js:1
+o1 @ fd9d1056-d01e9804f4c81514.js:1
+oZ @ fd9d1056-d01e9804f4c81514.js:1
+T @ 117-169eadb39a9ee5e7.js:1
+page-21f895c5a0a879a7.js:1 User creation date: Mon Jan 01 2024 11:00:00 GMT+1100 (Australian Eastern Daylight Time)
+page-576bf0c8d9b5fe10.js:1 User stored in backend successfully
+page-576bf0c8d9b5fe10.js:1 Authentication completed successfully
+page-576bf0c8d9b5fe10.js:1 Connecting to Google Calendar...
+page-576bf0c8d9b5fe10.js:1 Connected to Google Calendar
+page-576bf0c8d9b5fe10.js:1 Navigating to: /dashboard
 Navigated to https://yourdai.app/dashboard
-layout-db35b87bef89a0bd.js:1 Setting up auth state listener
-layout-db35b87bef89a0bd.js:1 Checking redirect result...
-layout-db35b87bef89a0bd.js:1 Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
-layout-db35b87bef89a0bd.js:1 Got ID token for backend storage
-layout-db35b87bef89a0bd.js:1 API Base URL: https://yourdai-production.up.railway.app
-layout-db35b87bef89a0bd.js:1 Redirect result: null
-layout-db35b87bef89a0bd.js:1 No redirect result found
-page-103a65596ba82166.js:1 Setting currentDate: Thu Jul 17 2025 16:08:41 GMT+1000 (Australian Eastern Standard Time)
-page-103a65596ba82166.js:1 TASK-07 FIX: Auth ready, starting schedule load
-layout-db35b87bef89a0bd.js:1 RouteGuard State: 
-{user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
-page-103a65596ba82166.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
-layout-db35b87bef89a0bd.js:1 User stored in backend successfully
-layout-db35b87bef89a0bd.js:1 Authentication completed successfully
-page-103a65596ba82166.js:1 ⚠️ Rendering legacy structure
-﻿
-
-
+layout-6a7baededfda46d6.js:1 Setting up auth state listener
+layout-6a7baededfda46d6.js:1 Checking redirect result...
+layout-6a7baededfda46d6.js:1 Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
+layout-6a7baededfda46d6.js:1 Got ID token for backend storage
+layout-6a7baededfda46d6.js:1 API Base URL: https://yourdai-production.up.railway.app
+layout-6a7baededfda46d6.js:1 Redirect result: null
+layout-6a7baededfda46d6.js:1 No redirect result found
+page-21f895c5a0a879a7.js:1 Setting currentDate: Thu Jul 17 2025 15:29:01 GMT+1000 (Australian Eastern Standard Time)
+layout-6a7baededfda46d6.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
+page-21f895c5a0a879a7.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
+layout-6a7baededfda46d6.js:1 User stored in backend successfully
+layout-6a7baededfda46d6.js:1 Authentication completed successfully
+page-21f895c5a0a879a7.js:1 ⚠️ Rendering legacy structure
 
 ### Server logs
 WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
