@@ -61,13 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             scopes: scopes
           };
           
-          // Connect to calendar with retry mechanism
+          // Connect to calendar (credentials stored for later use)
           await calendarApi.connectCalendar(credentials);
           console.log("Connected to Google Calendar");
+          console.log("TASK-07 FIX: Calendar credentials stored, dashboard will handle event fetching");
           
-          // Fetch events for current day
-          const today = new Date().toISOString().split('T')[0];
-          await calendarApi.fetchEvents(today);
+          // Dashboard will handle fetching calendar events to prevent double-load
         } catch (calendarError) {
           console.error("Error connecting to calendar:", calendarError);
           // Continue to dashboard even if calendar connection fails
