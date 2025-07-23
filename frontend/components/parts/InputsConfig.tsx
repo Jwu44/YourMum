@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 // Icons
 import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Calendar, GripVertical, Users, Gamepad2, Zap, RotateCcw, TrendingUp, Layout, Grid, List, Layers, Shuffle } from 'lucide-react';
