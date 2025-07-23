@@ -18,25 +18,25 @@ const Footer = () => {
           <div>
             <h4 className="font-display font-semibold mb-4">Product</h4>
             <ul className="space-y-3">
-              <li><a href="#features" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Features</a></li>
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Pricing</a></li>
+                                  <li><a href="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">Features</a></li>
+                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Pricing</a></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-display font-semibold mb-4">Resources</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Blog</a></li>
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Help Center</a></li>
+                                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</a></li>
+                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Help Center</a></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-display font-semibold mb-4">Company</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">About</a></li>
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Contact</a></li>
-              <li><a href="#" className="text-sm text-muted-foreground hover:text-yourdai-purple transition-colors">Privacy Policy</a></li>
+                                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">About</a></li>
+                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact</a></li>
+                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a></li>
             </ul>
           </div>
         </div>

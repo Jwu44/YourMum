@@ -109,7 +109,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "text-lg cursor-pointer transition-all duration-200 select-none border-none bg-transparent p-1 rounded hover:bg-hover-selection",
+            "text-lg cursor-pointer transition-all duration-200 select-none border-none bg-transparent p-1 rounded hover-selection",
             isHovered && "scale-110"
           )}
           onMouseEnter={() => setIsHovered(true)}
@@ -126,8 +126,8 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
               key={emoji}
               onClick={() => handleEmojiSelect(emoji)}
               className={cn(
-                "w-8 h-8 flex items-center justify-center text-lg hover:bg-hover-selection rounded transition-colors",
-                emoji === currentEmoji && "bg-hover-selection"
+                "w-8 h-8 flex items-center justify-center text-lg hover-selection rounded transition-colors",
+                emoji === currentEmoji && "selection-active"
               )}
               title={`Select ${emoji}`}
             >
@@ -618,7 +618,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           onClick={handleDecompose}
           disabled={isDecomposing}
           className={cn(
-            "text-primary hover:text-primary/80",
+            "text-primary btn-hover-primary",
             isDecomposing && "opacity-50 cursor-not-allowed"
           )}
         >
@@ -636,7 +636,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover-selection"
             aria-label="Task actions"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -652,7 +652,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           </DropdownMenuItem>
           <DropdownMenuItem 
             onClick={handleDeleteTask}
-            className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive"
+                            className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
           >
             <Trash2 className="h-4 w-4" />
             Delete

@@ -79,7 +79,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
                 {category}
               </Badge>
             ))}
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 text-gray-600 font-bold text-lg hover:bg-gray-300 transition-colors">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-secondary-foreground font-bold text-lg hover-selection">
               +
             </span>
           </div>

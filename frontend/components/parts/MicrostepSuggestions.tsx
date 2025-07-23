@@ -58,7 +58,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-green-500 hover:text-green-400"
+                className="text-success hover:text-success/80"
                 onClick={() => onAccept(microstep)}
               >
                 <Check className="w-4 h-4" />
@@ -66,7 +66,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-red-500 hover:text-red-400"
+                className="text-destructive hover:text-destructive/80"
                 onClick={() => onReject(microstep)}
               >
                 <X className="w-4 h-4" />

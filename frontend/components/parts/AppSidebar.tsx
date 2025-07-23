@@ -172,7 +172,7 @@ export function AppSidebar(): JSX.Element {
               <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-12 transition-colors duration-200 hover:bg-sidebar-accent/50 cursor-pointer"
+                  className="h-12 hover-selection cursor-pointer"
                   data-testid={`nav-item-${item.id}`}
                   onClick={() => handleNavigation(item)}
                 >

@@ -334,12 +334,12 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                       variant={isSelected ? "default" : "outline"}
                       className={cn(
                         "cursor-pointer",
-                        isSelected && getCategoryVariant(category) === 'work' && "bg-blue-500 hover:bg-blue-400",
-                        isSelected && getCategoryVariant(category) === 'fun' && "bg-yellow-500 hover:bg-yellow-400",
-                        isSelected && getCategoryVariant(category) === 'relationships' && "bg-purple-500 hover:bg-purple-400",
-                        isSelected && getCategoryVariant(category) === 'ambition' && "bg-orange-500 hover:bg-orange-400",
-                        isSelected && getCategoryVariant(category) === 'exercise' && "bg-green-500 hover:bg-green-400",
-                        !isSelected && "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        isSelected && getCategoryVariant(category) === 'work' && "bg-info btn-hover-primary",
+                        isSelected && getCategoryVariant(category) === 'fun' && "bg-warning btn-hover-primary",
+                        isSelected && getCategoryVariant(category) === 'relationships' && "bg-primary btn-hover-primary",
+                        isSelected && getCategoryVariant(category) === 'ambition' && "bg-warning btn-hover-primary",
+                        isSelected && getCategoryVariant(category) === 'exercise' && "bg-success btn-hover-primary",
+                        !isSelected && "bg-secondary text-secondary-foreground btn-hover-secondary"
                       )}
                       onClick={() => handleCategorySelect(category)}
                     >

@@ -27,8 +27,7 @@ export default {
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))',
-					light: 'hsl(var(--primary-light))',
-					dark: 'hsl(var(--primary-dark))'
+					blue: 'hsl(var(--primary-blue))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -46,6 +45,14 @@ export default {
 					DEFAULT: 'hsl(var(--accent))',
 					foreground: 'hsl(var(--accent-foreground))'
 				},
+				hover: {
+					DEFAULT: 'hsl(var(--hover))',
+					foreground: 'hsl(var(--hover-foreground))'
+				},
+				selection: {
+					DEFAULT: 'hsl(var(--selection))',
+					foreground: 'hsl(var(--selection-foreground))'
+				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
 					foreground: 'hsl(var(--popover-foreground))'
@@ -53,9 +60,6 @@ export default {
 				card: {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
-				},
-				checkbox: {
-					border: 'hsl(var(--checkbox-border))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
@@ -67,19 +71,20 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				purple: {
-					DEFAULT: 'hsl(var(--primary-light))',
-					50: '#f3f0ff',
-					100: '#e9d5ff',
-					200: '#d6bbfb',
-					300: '#ba8ff7',
-					400: '#9b87f5',
-					500: '#7c3aed',
-					600: '#6d28d9',
-					700: '#5b21b6',
-					800: '#4c1d95',
-					900: '#3730a3',
-				}
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				info: {
+					DEFAULT: 'hsl(var(--info))',
+					foreground: 'hsl(var(--info-foreground))'
+				},
+				'yourdai-purple': 'hsl(var(--primary))',
+				'yourdai-blue': 'hsl(var(--primary-blue))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
