@@ -126,6 +126,20 @@ const InputConfigurationPage: React.FC = () => {
         });
         
         console.log('Loaded tasks from current schedule:', nonSectionTasks.length, 'out of', scheduleResult.schedule.length, 'total items');
+        
+        // Load inputs config if available
+        if (scheduleResult.inputs) {
+          // Update all form fields with the loaded inputs config
+          Object.entries(scheduleResult.inputs).forEach(([field, value]) => {
+            if (field !== 'tasks') { // Skip tasks as we handle them separately
+              dispatch({
+                type: 'UPDATE_FIELD',
+                field,
+                value
+              });
+            }
+          });
+        }
       } else {
         // No existing schedule found, keep tasks empty
         console.log('No existing schedule found for date:', targetDate);
@@ -134,6 +148,20 @@ const InputConfigurationPage: React.FC = () => {
           field: 'tasks',
           value: []
         });
+        
+        // Still try to load inputs config if available (even without schedule)
+        if (scheduleResult.inputs) {
+          // Update all form fields with the loaded inputs config
+          Object.entries(scheduleResult.inputs).forEach(([field, value]) => {
+            if (field !== 'tasks') { // Skip tasks as we handle them separately
+              dispatch({
+                type: 'UPDATE_FIELD',
+                field,
+                value
+              });
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading current schedule tasks:', error);
@@ -142,6 +170,13 @@ const InputConfigurationPage: React.FC = () => {
         type: 'UPDATE_FIELD',
         field: 'tasks',
         value: []
+      });
+      
+      // Show error toast for user feedback
+      toast({
+        title: "Error",
+        description: "Failed to load schedule configuration. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setIsLoadingTasks(false);
