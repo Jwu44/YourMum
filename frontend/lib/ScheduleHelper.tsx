@@ -177,6 +177,7 @@ export const loadSchedule = async (date: string): Promise<{
     return {
       success: true,
       schedule: result.schedule || [],
+      inputs: result.inputs || {},
       metadata: result.metadata
     };
 
