@@ -623,6 +623,89 @@ const Dashboard: React.FC = () => {
     setCurrentDayIndex(prevIndex => prevIndex + 1);
   }, [currentDayIndex, filterTasksForNextDay, scheduleCache, toast, isDateInPast]);
 
+  /**
+   * Navigate to a specific date selected from calendar
+   * @param selectedDate - Date selected from calendar dropdown
+   */
+  const handleNavigateToDate = useCallback(async (selectedDate: Date) => {
+    try {
+      // Calculate the day offset from today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      const timeDiff = selectedDate.getTime() - today.getTime();
+      const dayOffset = Math.round(timeDiff / (1000 * 60 * 60 * 24));
+      
+      console.log(`Navigating to ${formatDateToString(selectedDate)}, offset: ${dayOffset}`);
+      
+      const targetDateStr = formatDateToString(selectedDate);
+      
+      // Check cache first
+      if (scheduleCache.has(targetDateStr)) {
+        console.log('Found existing schedule in cache, loading it');
+        
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = Math.abs(dayOffset);
+          
+          // Ensure array is large enough
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = scheduleCache.get(targetDateStr)!;
+          return newDays;
+        });
+        
+        setCurrentDayIndex(dayOffset);
+        return;
+      }
+      
+      // Load schedule from backend
+      const loadResult = await loadSchedule(targetDateStr);
+      
+      if (loadResult.success) {
+        const targetSchedule = loadResult.schedule || [];
+        
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays];
+          const targetIndex = Math.abs(dayOffset);
+          
+          // Ensure array is large enough
+          while (newDays.length <= targetIndex) {
+            newDays.push([]);
+          }
+          
+          newDays[targetIndex] = targetSchedule;
+          return newDays;
+        });
+        
+        // Cache the loaded schedule
+        setScheduleCache(prevCache => 
+          new Map(prevCache).set(targetDateStr, targetSchedule)
+        );
+        
+        setCurrentDayIndex(dayOffset);
+        
+        toast({
+          title: "Success",
+          description: `Navigated to ${formatDateToString(selectedDate)}`,
+        });
+      } else {
+        throw new Error(loadResult.error || 'Failed to load schedule');
+      }
+      
+    } catch (error) {
+      console.error('Error navigating to date:', error);
+      toast({
+        title: "Error",
+        description: "Failed to navigate to selected date.",
+        variant: "destructive",
+      });
+    }
+  }, [scheduleCache, toast]);
+
   const handlePreviousDay = useCallback(async () => {
     const previousDayOffset = currentDayIndex - 1;
     
@@ -1083,10 +1166,9 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col h-full bg-background">
         
         <DashboardHeader
-          isLoadingSuggestions={isLoadingSuggestions}
-          onRequestSuggestions={handleRequestSuggestions}
           onNextDay={handleNextDay}
           onPreviousDay={handlePreviousDay}
+          onNavigateToDate={handleNavigateToDate}
           currentDate={currentDate}
           isCurrentDay={false}
         />
