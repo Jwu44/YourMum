@@ -1,108 +1,122 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 215 25% 27%;
+    --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 27%;
+    --card-foreground: 240 10% 3.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 27%;
+    --popover-foreground: 240 10% 3.9%;
 
-    /* Update primary to use the purple gradient color */
-    --primary-light: 260 84% 74%; /* #9b87f5 */
-    --primary-dark: 263 91% 58%;  /* #7c3aed */
-    --primary: var(--primary-light);
-    --primary-foreground: 215 25% 27%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 98%;
+    --primary-blue: 220 91% 65%;
 
-    --secondary: 220 13% 97%;
-    --secondary-foreground: 215 25% 27%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
 
-    --muted: 220 13% 97%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
 
-    /* Update accent to use the same purple as primary */
-    --accent: var(--primary-light);
-    --accent-foreground: 215 25% 27%;
-
-    /* Add hover selection colors */
-    --hover-selection: 0 0% 94%; /* Light grey for hover selection */
-    --hover-selection-foreground: 215 25% 27%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: var(--primary-light);
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
     
-    /* Checkbox border color */
-    --checkbox-border: 0 0% 0%; /* Black */
+    /* Hover and selection states using primary/secondary variations */
+    --hover: 240 4.8% 95.9%;
+    --hover-foreground: 240 5.9% 10%;
+    --selection: 262 83% 58%;
+    --selection-foreground: 0 0% 98%;
+    
+    --gradient-accent: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-blue)));
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 251 91% 95%;
-    --sidebar-primary-foreground: 215 25% 27%;
-    --sidebar-accent: 220 13% 95%;
-    --sidebar-accent-foreground: 215 25% 27%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 251 91% 95%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-ring: 262 83% 58%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 98%;
   }
 
   .dark {
-    --background: 215 28% 17%;
-    --foreground: 213 31% 91%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 215 28% 17%;
-    --card-foreground: 213 31% 91%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 215 28% 17%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 251 91% 95%;
-    --primary-foreground: 215 28% 17%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 98%;
+    --primary-blue: 220 91% 65%;
 
-    --secondary: 215 25% 27%;
-    --secondary-foreground: 213 31% 91%;
+    --gradient-accent: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-blue)));
 
-    --muted: 215 25% 27%;
-    --muted-foreground: 217 10% 65%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
-    --accent: 215 25% 27%;
-    --accent-foreground: 213 31% 91%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-    /* Add hover selection colors for dark mode */
-    --hover-selection: 215 25% 22%; /* Slightly lighter than background for dark mode */
-    --hover-selection-foreground: 213 31% 91%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 213 31% 91%;
+    /* Dark mode hover and selection states */
+    --hover: 240 3.7% 15.9%;
+    --hover-foreground: 0 0% 98%;
+    --selection: 262 83% 58%;
+    --selection-foreground: 0 0% 98%;
 
-    --border: 215 25% 27%;
-    --input: 215 25% 27%;
-    --ring: 251 91% 95%;
-    
-    /* Checkbox border color - use lighter color in dark mode for better visibility */
-    --checkbox-border: 0 0% 100%; /* White */
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
 
-    --sidebar-background: 215 28% 17%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 251 91% 95%;
-    --sidebar-primary-foreground: 215 28% 17%;
-    --sidebar-accent: 215 25% 27%;
-    --sidebar-accent-foreground: 213 31% 91%;
-    --sidebar-border: 215 25% 27%;
-    --sidebar-ring: 251 91% 95%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 262 83% 58%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 262 83% 58%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 98%;
   }
 }
 
@@ -112,64 +126,67 @@
   }
 
   body {
-    @apply bg-background text-foreground font-medium;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-  
-  /* Override SVG colors globally */
-  svg {
-    @apply text-foreground;
-    stroke: hsl(var(--foreground));
-  }
-  
-  /* Override white text in components */
-  h1, h2, h3, h4, h5, h6, p, span, a, button, input, textarea, select, label {
-    @apply text-foreground;
-  }
-  
-  /* Override dropdown and drawer styling */
-  .dropdown-content, .drawer-content, .dialog-content, .sheet-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Fix for spinners and loaders */
-  .animate-spin {
-    @apply border-foreground;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-/* Apply styles to specific Tailwind-generated classes */
 @layer components {
-  /* Typography elements */
-  .typography-h3 {
-    @apply text-foreground;
-  }
-  
-  /* Dropdown styling */
-  .dropdown-menu-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Drawer styling */
-  .drawer-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Task items */
-  .task-item {
-    @apply text-foreground;
-  }
-  
-  /* Button text */
-  .btn, .button {
-    @apply text-foreground;
-  }
-
-  /* Hover selection utilities */
+  /* Consistent hover and selection utilities */
   .hover-selection {
-    @apply hover:bg-[hsl(var(--hover-selection))] hover:text-[hsl(var(--hover-selection-foreground))];
+    @apply hover:bg-hover hover:text-hover-foreground transition-colors duration-200;
   }
-
+  
+  .selection-active {
+    @apply bg-selection text-selection-foreground;
+  }
+  
+  /* Interactive card components */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-lg hover:border-primary/20 cursor-pointer;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-lg hover:border-primary/20;
+  }
+  
+  /* Button hover states using primary/secondary variations */
+  .btn-hover-primary {
+    @apply hover:bg-primary/90 transition-colors duration-200;
+  }
+  
+  .btn-hover-secondary {
+    @apply hover:bg-secondary/80 transition-colors duration-200;
+  }
+  
+  /* Interactive elements */
+  .interactive-element {
+    @apply transition-all duration-200 hover:bg-hover hover:text-hover-foreground cursor-pointer;
+  }
+  
+  /* Selection states for lists and options */
+  .selectable-item {
+    @apply transition-colors duration-200 hover:bg-hover hover:text-hover-foreground cursor-pointer;
+  }
+  
+  .selectable-item.selected {
+    @apply bg-selection text-selection-foreground;
+  }
+  
+  /* Gradient utilities */
+  .gradient-text {
+    background: var(--gradient-accent);
+    @apply bg-clip-text text-transparent;
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  
+  .section-divider {
+    @apply w-full h-px bg-gradient-to-r from-transparent via-border to-transparent;
+  }
+  
   /* Loading states */
   .loading-container-lg {
     @apply flex items-center justify-center h-64;
@@ -195,32 +212,158 @@
   .empty-state-container {
     @apply flex flex-col items-center justify-center h-64 space-y-4;
   }
-}
-
-/* Custom gradients and effects */
-@layer utilities {
-  .gradient-purple {
-    background: linear-gradient(135deg, hsl(var(--primary-light)) 0%, hsl(var(--primary-dark)) 100%);
+  
+  /* InputsConfig Component Styles */
+  
+  /* Icon container for cards */
+  .icon-container {
+    @apply p-2 bg-primary/10 rounded-lg;
   }
   
-  .gradient-purple-soft {
-    background: linear-gradient(135deg, #f3f0ff 0%, #e9d5ff 100%);
+  /* Draggable priority card */
+  .draggable-card {
+    @apply flex items-center gap-3 p-4 bg-card rounded-lg border hover:border-primary/30 transition-all duration-200 hover:shadow-sm;
   }
   
-  .shadow-purple {
-    box-shadow: 0 4px 14px 0 rgba(155, 135, 245, 0.15);
+  .draggable-card.group {
+    /* group class should be added directly in HTML */
   }
   
-  .border-purple {
-    border-color: hsl(var(--primary-light));
-  }
-
-  /* Hover selection utilities */
-  .bg-hover-selection {
-    background-color: hsl(var(--hover-selection));
+  .draggable-card-grip {
+    @apply h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors cursor-move;
   }
   
-  .text-hover-selection-foreground {
-    color: hsl(var(--hover-selection-foreground));
+  /* Interactive checkbox cards */
+  .checkbox-card {
+    @apply flex items-center space-x-2 p-3 rounded-lg border transition-colors;
+  }
+  
+  .checkbox-card-checked {
+    @apply bg-selection/10 border-selection/30;
+  }
+  
+  .checkbox-card-unchecked {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground hover:border-primary/30 cursor-pointer;
+  }
+  
+  /* Energy pattern cards */
+  .energy-pattern-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border transition-all duration-200 cursor-pointer;
+  }
+  
+  .energy-pattern-card-checked {
+    @apply bg-selection/10 border-selection/30 shadow-sm;
+  }
+  
+  .energy-pattern-card-unchecked {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30;
+  }
+  
+  /* Radio group cards */
+  .radio-card {
+    @apply flex items-center space-x-3 p-3 rounded-lg border bg-card hover:bg-hover hover:text-hover-foreground transition-colors cursor-pointer;
+  }
+  
+  /* Task ordering selection cards */
+  .task-ordering-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all duration-200;
+  }
+  
+  .task-ordering-card.group {
+    /* group class should be added directly in HTML */
+  }
+  
+  .task-ordering-card-selected {
+    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+  }
+  
+  .task-ordering-card-unselected {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+  }
+  
+  /* Theme color classes for options */
+  .theme-yellow {
+    @apply text-warning;
+  }
+  
+  .theme-yellow-bg {
+    @apply bg-warning/10;
+  }
+  
+  .theme-orange {
+    @apply text-warning;
+  }
+  
+  .theme-orange-bg {
+    @apply bg-warning/15;
+  }
+  
+  .theme-red {
+    @apply text-destructive;
+  }
+  
+  .theme-red-bg {
+    @apply bg-destructive/10;
+  }
+  
+  .theme-purple {
+    @apply text-primary;
+  }
+  
+  .theme-purple-bg {
+    @apply bg-primary/10;
+  }
+  
+  .theme-gray {
+    @apply text-muted-foreground;
+  }
+  
+  .theme-gray-bg {
+    @apply bg-muted/20;
+  }
+  
+  .theme-blue {
+    @apply text-info;
+  }
+  
+  .theme-blue-bg {
+    @apply bg-info/10;
+  }
+  
+  .theme-green {
+    @apply text-success;
+  }
+  
+  .theme-green-bg {
+    @apply bg-success/10;
+  }
+  
+  /* Dark mode variants for theme colors */
+  .dark .theme-yellow-bg {
+    @apply bg-warning/20;
+  }
+  
+  .dark .theme-orange-bg {
+    @apply bg-warning/25;
+  }
+  
+  .dark .theme-red-bg {
+    @apply bg-destructive/20;
+  }
+  
+  .dark .theme-purple-bg {
+    @apply bg-primary/20;
+  }
+  
+  .dark .theme-gray-bg {
+    @apply bg-muted/30;
+  }
+  
+  .dark .theme-blue-bg {
+    @apply bg-info/20;
+  }
+  
+  .dark .theme-green-bg {
+    @apply bg-success/20;
   }
 }

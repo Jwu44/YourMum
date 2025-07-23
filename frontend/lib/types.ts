@@ -51,6 +51,7 @@ export interface Priority {
   name: string;
   icon: React.ElementType;
   color: string;
+  bgColor: string;
 }
 
 

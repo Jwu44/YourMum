@@ -70,7 +70,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                   <p className="text-sm text-foreground mb-1">{suggestion.text}</p>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                      <button className="text-xs text-muted-foreground hover-selection">
                         View rationale
                       </button>
                     </TooltipTrigger>
@@ -87,7 +87,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                     size="sm"
                     variant="ghost"
                     onClick={() => onAccept(suggestion)}
-                    className="text-green-500 hover:text-green-400"
+                    className="text-success hover:text-success/80"
                   >
                     <Check className="w-4 h-4" />
                   </Button>
@@ -95,7 +95,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                     size="sm"
                     variant="ghost"
                     onClick={() => onReject(suggestion.id)}
-                    className="text-red-500 hover:text-red-400"
+                    className="text-destructive hover:text-destructive/80"
                   >
                     <X className="w-4 h-4" />
                   </Button>

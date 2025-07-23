@@ -79,7 +79,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       size="icon"
                       onClick={() => onPreviousDay()}
                       disabled={false}
-                      className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
+                      className="h-9 w-9 hover-selection"
                       aria-label="Previous day"
                     >
                       <ChevronLeft className="h-5 w-5 text-primary" />
@@ -98,7 +98,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     size="icon"
                     onClick={() => onNextDay()}
                     disabled={isCurrentDay}
-                    className="h-9 w-9 transition-opacity opacity-100 hover:opacity-80"
+                    className="h-9 w-9 hover-selection"
                     aria-label="Next day"
                   >
                     <ChevronRight className="h-5 w-5 text-primary" />

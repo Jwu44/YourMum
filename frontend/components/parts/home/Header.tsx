@@ -48,7 +48,7 @@ const Header = ({ handleGetStarted }: WithHandleGetStarted) => {
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
           <Button 
-            className="bg-yourdai-purple hover:bg-yourdai-purple/90 text-white ml-4"
+            className="bg-primary hover:bg-primary/90 text-white ml-4"
             onClick={handleGetStarted}
           >
             Start for free
@@ -86,7 +86,7 @@ const Header = ({ handleGetStarted }: WithHandleGetStarted) => {
               Pricing
             </a>
             <Button 
-              className="bg-yourdai-purple hover:bg-yourdai-purple/90 text-white w-full mt-6"
+              className="bg-primary hover:bg-primary/90 text-white w-full mt-6"
               onClick={handleGetStarted}
             >
               Start for free
