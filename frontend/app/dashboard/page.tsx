@@ -16,6 +16,7 @@ import EditableSchedule from '@/components/parts/EditableSchedule';
 // Hooks and Context
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from '../../lib/FormContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Types
 import { 
@@ -40,6 +41,7 @@ const Dashboard: React.FC = () => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { state } = useForm();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   
   // Create task drawer state
@@ -1171,17 +1173,18 @@ const Dashboard: React.FC = () => {
           onNavigateToDate={handleNavigateToDate}
           currentDate={currentDate}
           isCurrentDay={false}
+          onAddTask={() => setIsTaskDrawerOpen(true)}
         />
 
         <div className="flex-1 overflow-y-auto">
-          <div className="w-full max-w-4xl mx-auto p-6">
+          <div className="w-full max-w-4xl mx-auto px-6 pb-6">
             
             {isLoadingSchedule ? (
               <div className="loading-container-lg">
                 <div className="loading-spinner-lg" />
               </div>
             ) : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0 ? (
-              <div className="space-y-4">
+              <>
                 <EditableSchedule
                   tasks={scheduleDays[Math.abs(currentDayIndex)] || []}
                   onUpdateTask={handleScheduleTaskUpdate}
@@ -1196,14 +1199,14 @@ const Dashboard: React.FC = () => {
                 />
 
                 {isLoadingSuggestions && (
-                  <div className="loading-container-sm">
+                  <div className="loading-container-sm mt-4">
                     <Loader2 className="loading-spinner-sm" />
                     <span className="loading-text">
                       Generating suggestions...
                     </span>
                   </div>
                 )}
-              </div>
+              </>
             ) : (
               <div className="empty-state-container">
                 <p className="text-lg text-foreground">
@@ -1217,7 +1220,9 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <FloatingActionButton onClick={() => setIsTaskDrawerOpen(true)} />
+        {isMobile && (
+          <FloatingActionButton onClick={() => setIsTaskDrawerOpen(true)} />
+        )}
         
         <TaskEditDrawer
           isOpen={isTaskDrawerOpen}

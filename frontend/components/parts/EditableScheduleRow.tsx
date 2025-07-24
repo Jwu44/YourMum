@@ -609,7 +609,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
       {/* Decompose button - existing functionality */}
       {canDecompose && (
         <Button
@@ -617,15 +617,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           size="sm"
           onClick={handleDecompose}
           disabled={isDecomposing}
-          className={cn(
-            "hover-selection",
-            isDecomposing && "opacity-50 cursor-not-allowed"
-          )}
+          className="h-8 w-8 p-0 gradient-accent hover:opacity-90 text-primary-foreground hover:scale-105 transition-all duration-200"
         >
           {isDecomposing ? (
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="h-4 w-4 animate-sparkle" />
           )}
         </Button>
       )}
@@ -636,7 +633,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover-selection"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
             aria-label="Task actions"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -652,7 +649,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           </DropdownMenuItem>
           <DropdownMenuItem 
             onClick={handleDeleteTask}
-                            className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
+            className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
           >
             <Trash2 className="h-4 w-4" />
             Delete
@@ -679,11 +676,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
         className={cn(
-          "relative flex items-center p-2 my-1 rounded",
+          "relative flex items-center",
           isSection ? "cursor-default" : "cursor-move",
           isDecomposing && "animate-pulse",
           task.level && task.level > 0 ? "pl-8" : "",
-          isSection ? "mt-4 mb-2" : ""
+          // Section styling
+          isSection ? "mt-6 mb-4" : 
+          // Task card styling following TaskList.tsx reference
+          "group gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft"
         )}
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
@@ -700,21 +700,24 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="mr-2 border-checkbox-border"
+                className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
               />
             </div>
           </>
         )}
 
         {isSection ? (
-          <div className="w-full border-b border-border px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-3 px-4 py-3">
             {getSectionIcon(task.text, handleEmojiChange)}
             <TypographyH4 className="text-foreground font-semibold mb-0">
               {task.text}
             </TypographyH4>
           </div>
         ) : (
-          <span className={`flex-1 text-foreground ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
+          <span className={cn(
+            "flex-1 text-foreground transition-all duration-200",
+            task.completed && "line-through text-muted-foreground"
+          )}>
             {task.start_time && task.end_time ? 
               `${task.start_time} - ${task.end_time}: ` : ''}
             {task.text}

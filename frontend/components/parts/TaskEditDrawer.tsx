@@ -409,7 +409,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 
           {/* Footer with improved save button */}
           <DrawerFooter>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground">
               {isEditMode ? 'Save Changes' : 'Create'}
             </Button>
           </DrawerFooter>
