@@ -1,56 +1,46 @@
-import { Heart } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
 const Footer = () => {
   return (
-    <footer className="py-12 md:py-16 border-t border-border">
-      <div className="container max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
-          <div className="md:col-span-4 lg:col-span-1">
-            <a href="#" className="text-2xl font-display font-bold text-yourdai-dark dark:text-white flex items-center mb-4">
-              <span className="bg-yourdai-purple text-white p-1 rounded-md mr-2 text-sm">YD</span>
-              your<span className="text-yourdai-purple">dai</span>
-            </a>
-            <p className="text-muted-foreground text-sm mb-6 max-w-xs">
-              Personalized AI scheduling that adapts to your unique energy patterns and priorities.
+    <footer className="bg-white border-t border-gray-200 py-12">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="grid md:grid-cols-4 gap-8">
+          <div className="md:col-span-2">
+            <div className="flex items-center mb-4">
+              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">yourdai</span>
+            </div>
+            <p className="text-gray-600 mb-4 max-w-md">
+              Transform your productivity with AI-powered daily planning. 
+              Accomplish more, stress less, and achieve your goals with intelligent task management.
             </p>
           </div>
           
           <div>
-            <h4 className="font-display font-semibold mb-4">Product</h4>
-            <ul className="space-y-3">
-                                  <li><a href="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">Features</a></li>
-                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Pricing</a></li>
+            <h3 className="font-semibold text-gray-900 mb-4">Product</h3>
+            <ul className="space-y-2 text-gray-600">
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Features</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Pricing</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">API</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Integrations</a></li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-display font-semibold mb-4">Resources</h4>
-            <ul className="space-y-3">
-                                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</a></li>
-                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Help Center</a></li>
-            </ul>
-          </div>
-          
-          <div>
-            <h4 className="font-display font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
-                                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">About</a></li>
-                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact</a></li>
-                    <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a></li>
+            <h3 className="font-semibold text-gray-900 mb-4">Support</h3>
+            <ul className="space-y-2 text-gray-600">
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Help Center</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Contact Us</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-purple-600 transition-colors">Terms of Service</a></li>
             </ul>
           </div>
         </div>
         
-        <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} yourdai. All rights reserved.
-          </p>
-          
-          <div className="flex items-center mt-4 md:mt-0">
-            <p className="text-xs text-muted-foreground flex items-center">
-              Made with <Heart size={12} className="mx-1 text-yourdai-purple" /> for a more productive world
-            </p>
-          </div>
+        <div className="border-t border-gray-200 mt-8 pt-8 text-center text-gray-500">
+          <p>&copy; 2024 yourdai. All rights reserved. Built with ❤️ for productivity enthusiasts.</p>
         </div>
       </div>
     </footer>

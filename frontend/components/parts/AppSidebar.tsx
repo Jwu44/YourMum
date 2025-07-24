@@ -7,9 +7,10 @@
 "use client"
 
 import * as React from "react"
-import { Calendar, User, Plus, Archive, Settings, Plug } from "lucide-react"
+import { User, Plus, Archive, Settings, Plug } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 import {
   Sidebar,
@@ -152,14 +153,18 @@ export function AppSidebar(): JSX.Element {
       {/* Header Section */}
       <SidebarHeader className="border-b border-sidebar-border p-5">
         <Link href="/dashboard" className="cursor-pointer">
-          <div className="flex items-center gap-2">
-            <Calendar 
-              className="h-6 w-6 text-primary" 
+          <div className="flex items-center h-12">
+            <Image 
+              src="/yourdai_logo.png"
+              alt="yourdai logo"
+              width={126}
+              height={24}
+              className="h-6 w-auto"
               data-testid="sidebar-header-icon" 
+              priority
+              quality={100}
+              style={{ imageRendering: 'crisp-edges' }}
             />
-            <span className="text-lg font-semibold text-sidebar-foreground">
-              yourdai
-            </span>
           </div>
         </Link>
       </SidebarHeader>

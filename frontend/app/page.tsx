@@ -2,9 +2,11 @@
 import { useEffect } from "react";
 import { useAuth } from '@/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import Header from "@/components/parts/home/Header";
+import Navigation from "@/components/parts/home/Navigation";
 import Hero from "@/components/parts/home/Hero";
-import DemoSection from "@/components/parts/home/DemoSection";
+import Features from "@/components/parts/home/Features";
+import HowItWorks from "@/components/parts/home/HowItWorks";
+import Pricing from "@/components/parts/home/Pricing";
 import CTA from "@/components/parts/home/CTA";
 import Footer from "@/components/parts/home/Footer";
 
@@ -84,9 +86,9 @@ const HomePage = () => {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-yourdai-dark">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
+          <div className="w-8 h-8 border-t-2 border-primary border-solid rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -99,11 +101,13 @@ const HomePage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-background text-foreground dark:bg-yourdai-dark dark:text-white">
-      <Header handleGetStarted={handleGetStarted} />
+    <div className="min-h-screen bg-background text-foreground">
+      <Navigation handleGetStarted={handleGetStarted} />
       <main>
         <Hero handleGetStarted={handleGetStarted} />
-        <DemoSection />
+        <Features />
+        <HowItWorks />
+        <Pricing handleGetStarted={handleGetStarted} />
         <CTA handleGetStarted={handleGetStarted} />
       </main>
       <Footer />

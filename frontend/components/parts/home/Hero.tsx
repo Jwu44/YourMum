@@ -1,78 +1,136 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { WithHandleGetStarted } from '@/lib/types';
-import Image from "next/image"; 
 
 const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
   return (
-    <section className="pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden relative">
-      {/* Dark gradient background with stars effect */}
-      <div className="absolute inset-0 bg-gradient-to-b from-yourdai-dark/90 via-yourdai-dark/80 to-background -z-10"></div>
-      <div className="absolute inset-0 bg-[url('/lovable-uploads/d84a38cb-1e85-404b-8d12-19dded0eb863.png')] bg-cover bg-center opacity-40 -z-20"></div>
-      
-      {/* Animated decorative elements */}
-      <div className="absolute top-20 left-10 w-64 h-64 bg-yourdai-purple/20 rounded-full blur-3xl -z-10 animate-pulse-slow"></div>
-      <div className="absolute bottom-20 right-10 w-80 h-80 bg-yourdai-blue/20 rounded-full blur-3xl -z-10 animate-pulse-slow animate-delay-500"></div>
-      
-      <div className="container max-w-7xl mx-auto px-4 relative z-10">
-        <div className="text-center max-w-4xl mx-auto">
-          {/* Announcement badge */}
-          <div className="mb-6 inline-block">
-            <span className="py-1.5 px-4 bg-yourdai-purple/30 text-white/90 font-medium text-sm rounded-full animate-fade-in">
-              Now in Public Beta
-            </span>
+    <section className="relative bg-gradient-hero min-h-screen flex items-center justify-center px-4 pt-16">
+      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+        <div className="text-center lg:text-left animate-fade-in">
+          <div className="flex items-center justify-center lg:justify-start mb-6">
+            <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center mr-3 shadow-glow">
+              <CheckCircle className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">yourdai</h1>
           </div>
           
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-bold mb-6 tracking-tight animate-fade-in animate-delay-100 text-balance text-white">
-            Powerful planning for 
-            <span className="text-yourdai-purple"> your daily life</span>
-          </h1>
+          <h2 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            Your AI-Powered 
+            <span className="text-primary block bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Daily Planner</span>
+          </h2>
           
-          <p className="text-lg md:text-xl text-white/80 mb-8 max-w-3xl mx-auto animate-fade-in animate-delay-200 text-balance">
-            yourdai learns your unique energy patterns and aligns tasks with your productivity windows, 
-            breaking down complex goals into manageable steps while balancing work and personal values.
+          <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+            Transform your productivity with intelligent task management. 
+            Let AI help you prioritize, schedule, and accomplish more every day.
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-in animate-delay-300">
-            <Button 
-              className="bg-yourdai-purple hover:bg-yourdai-purple/90 text-white px-8 py-6 rounded-xl font-medium text-lg transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
-              onClick={handleGetStarted}
-            >
-              Start Free Trial
+          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+            <Button variant="premium" size="lg" className="px-8 py-4 text-lg" onClick={handleGetStarted}>
+              Get Started Free
             </Button>
-            <Button variant="outline" className="group px-8 py-6 rounded-xl font-medium text-lg border-white/20 text-white hover:border-white/40 hover:bg-white/5 transition-all duration-300 w-full sm:w-auto">
-              See How It Works
-              <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
+            <Button variant="hero" size="lg" className="px-8 py-4 text-lg">
+              Watch Demo
             </Button>
           </div>
           
-          {/* App Preview with improved styling */}
-          <div className="relative max-w-5xl mx-auto animate-fade-in animate-delay-500">
-            <div className="neo-blur overflow-hidden rounded-2xl shadow-2xl">
-              <Image 
-                src="/dashboard-crossed.png" 
-                alt="yourdai app interface" 
-                width={1024} 
-                height={576}
-                className="w-full rounded-xl transform hover:scale-[1.02] transition-all duration-700 ease-in-out"
-              />
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 text-primary mr-2" />
+              Free to start
             </div>
-            {/* Glow effect */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-yourdai-purple/40 to-yourdai-blue/40 rounded-[22px] blur-xl -z-10 opacity-70"></div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 text-primary mr-2" />
+              No credit card
+            </div>
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 text-primary mr-2" />
+              AI-powered
+            </div>
+          </div>
+        </div>
+        
+        <div className="relative animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="bg-card rounded-2xl shadow-elegant border border-border p-6 max-w-md mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <span className="font-semibold text-card-foreground">Tuesday, July 15</span>
+              </div>
+            </div>
             
-            {/* Small floating UI element */}
-            <div className="absolute -bottom-10 -right-4 w-56 glass-panel-dark p-3 rounded-lg shadow-lg border border-white/10 transform rotate-2 animate-fade-in animate-delay-700">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 bg-yourdai-purple/90 rounded-md flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">AI</span>
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center mb-3">
+                  <span className="text-lg">🌅</span>
+                  <h3 className="font-semibold text-card-foreground ml-2">Morning</h3>
                 </div>
-                <div className="text-left">
-                  <p className="text-white text-xs">Energy peak detected at 10am</p>
-                  <p className="text-white/60 text-xs">Scheduling high-focus tasks</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">gym</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">check slack</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">write prd</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="flex items-center mb-3">
+                  <span className="text-lg">☀️</span>
+                  <h3 className="font-semibold text-card-foreground ml-2">Afternoon</h3>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">wil 1:1 meeting</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">design jam with designers</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="flex items-center mb-3">
+                  <span className="text-lg">🌙</span>
+                  <h3 className="font-semibold text-card-foreground ml-2">Evening</h3>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-border rounded-sm mr-3"></div>
+                      <span className="text-card-foreground">dinner with Asta</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+            
+            <div className="absolute bottom-4 right-4">
+              <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center shadow-glow">
+                <span className="text-primary-foreground text-xl">+</span>
+              </div>
+            </div>
           </div>
+          
+          <div className="absolute -top-4 -right-4 w-20 h-20 bg-primary/20 rounded-full opacity-50"></div>
+          <div className="absolute -bottom-6 -left-6 w-16 h-16 bg-accent/30 rounded-full opacity-30"></div>
         </div>
       </div>
     </section>
