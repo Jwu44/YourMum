@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { format as dateFormat } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 // UI Components
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,16 @@ import { userApi } from '@/lib/api/users';
 import { loadSchedule } from '@/lib/ScheduleHelper';
 import { formatDateToString } from '@/lib/helper';
 
+// Hooks
+import { useIsMobile } from '@/hooks/use-mobile';
+
 interface DashboardHeaderProps {
     onNextDay: () => void;
     onPreviousDay: () => void;
     onNavigateToDate?: (date: Date) => void;
     currentDate: Date | undefined;
     isCurrentDay: boolean;
+    onAddTask?: () => void; // New prop for Add Task functionality
 }
 
 /**
@@ -33,8 +37,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onPreviousDay,
     onNavigateToDate,
     currentDate,
-    isCurrentDay
+    isCurrentDay,
+    onAddTask
   }) => {
+
+  // Mobile detection hook
+  const isMobile = useIsMobile();
 
   // State for calendar dropdown
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -187,22 +195,21 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   }, [isCalendarOpen, loadAvailableDates, availableDates.size]);
 
   return (
-    <div className="flex justify-between items-center mb-6">
-      {/* Left section: Title with navigation and AI Suggestions */}
-      <div className="flex items-center gap-4">
-        {/* Date display with navigation chevrons */}
-        <div className="flex items-center gap-2">
-          {/* Calendar navigation dropdown - Positioned before the date */}
+    <div className="w-full max-w-4xl mx-auto px-6">
+      <div className="flex items-center justify-between">
+        {/* Left-aligned date navigation section */}
+        <div className="flex items-center gap-4">
+          {/* Calendar navigation dropdown */}
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-9 w-9"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                 aria-label="Open calendar navigation"
                 data-testid="calendar-dropdown-trigger"
               >
-                <Calendar className="!h-[20px] !w-[20px] text-foreground" />
+                <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
               </Button>
             </PopoverTrigger>
             <PopoverContent 
@@ -225,51 +232,65 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               )}
             </PopoverContent>
           </Popover>
-  
-          <TypographyH3 className="text-foreground">
-            {formattedDate()}
-          </TypographyH3>
-            <div className="flex items-center gap-1 ml-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onPreviousDay()}
-                      disabled={false}
-                      className="h-9 w-9 hover-selection"
-                      aria-label="Previous day"
-                    >
-                      <ChevronLeft className="h-5 w-5 text-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View previous day</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
+
+          <div className="flex items-center gap-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
+                    onClick={() => onPreviousDay()}
+                    disabled={false}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View previous day</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <h1 className="text-xl font-semibold text-foreground">
+              {formattedDate()}
+            </h1>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onNextDay()}
                     disabled={isCurrentDay}
-                    className="h-9 w-9 hover-selection"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     aria-label="Next day"
                   >
-                    <ChevronRight className="h-5 w-5 text-foreground" />
+                    <ChevronRight size={16} />
                   </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View next day</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View next day</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
+        
+        {/* Right-aligned Create Task button - only show on desktop */}
+        {!isMobile && onAddTask && (
+          <Button
+            size="sm"
+            onClick={onAddTask}
+            className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
+          >
+            <Plus size={16} />
+            Create Task
+          </Button>
+        )}
       </div>
     </div>
   );

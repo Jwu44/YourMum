@@ -153,7 +153,7 @@ export function AppSidebar(): JSX.Element {
       {/* Header Section */}
       <SidebarHeader className="border-b border-sidebar-border p-5">
         <Link href="/dashboard" className="cursor-pointer">
-          <div className="flex items-center h-12">
+          <div className="flex items-center h-12 px-3 py-2 rounded-lg hover-selection transition-all duration-200">
             <Image 
               src="/yourdai_logo.png"
               alt="yourdai logo"
@@ -202,7 +202,7 @@ export function AppSidebar(): JSX.Element {
           data-testid="user-profile"
         >
           <div 
-            className="flex items-center justify-center w-8 h-8 bg-primary rounded-full"
+            className="flex items-center justify-center w-8 h-8 gradient-accent rounded-full"
             data-testid="user-avatar"
           >
             <span className="text-sm font-medium text-primary-foreground">
