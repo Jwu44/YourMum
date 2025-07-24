@@ -410,352 +410,354 @@ const InputConfigurationPage: React.FC = () => {
 
   return (
     <SidebarLayout>
-      <div className="max-w-4xl mx-auto">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Input Configuration</h1>
-          <p className="text-muted-foreground mt-2">
-            Add your preferences to personalise your schedule.
-          </p>
-          {/* Show loading indicator while loading tasks */}
-          {isLoadingTasks && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Loading current schedule tasks...
+      <div className="flex-1 overflow-y-auto">
+        <div className="w-full max-w-4xl mx-auto px-6 pb-6">
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Input Configuration</h1>
+            <p className="text-muted-foreground mt-2">
+              Add your preferences to personalise your schedule.
             </p>
-          )}
-        </div>
+            {/* Show loading indicator while loading tasks */}
+            {isLoadingTasks && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Loading current schedule tasks...
+              </p>
+            )}
+          </div>
 
-        <div className="grid gap-6">
-          {/* 1. Work Schedule Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="icon-container">
-                  <Clock className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span>Work Schedule</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {(state.working_days || []).length} days
-                  </Badge>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Set your working hours and days to optimize task scheduling
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Working Hours */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-muted-foreground" />
-                    Work Start Time
-                  </label>
-                  <Input 
-                    type="time" 
-                    value={state.work_start_time || "10:30"}
-                    onChange={(e) => handleFieldChange('work_start_time', e.target.value)}
-                    className="w-full font-mono text-center"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-muted-foreground" />
-                    Work End Time
-                  </label>
-                  <Input 
-                    type="time" 
-                    value={state.work_end_time || "15:30"}
-                    onChange={(e) => handleFieldChange('work_end_time', e.target.value)}
-                    className="w-full font-mono text-center"
-                  />
-                </div>
-              </div>
-              
-              {/* Working Days */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Working Days
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {workingDays.map((day) => {
-                    const isChecked = (state.working_days || []).includes(day.fullLabel);
-                    return (
-                      <div
-                        key={day.id}
-                        className={`checkbox-card ${
-                          isChecked 
-                            ? "checkbox-card-checked" 
-                            : "checkbox-card-unchecked"
-                        }`}
-                      >
-                        <Checkbox 
-                          id={day.id} 
-                          checked={isChecked}
-                          onCheckedChange={(checked) => handleWorkingDayChange(day.fullLabel, !!checked)}
-                        />
-                        <label
-                          htmlFor={day.id}
-                          className="text-sm font-medium cursor-pointer"
-                          title={day.fullLabel}
-                        >
-                          {day.label}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 2. Priority Settings Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="icon-container">
-                  <Target className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span>Priority Settings</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {priorities.length} categories
-                  </Badge>
-                </div>
-              </CardTitle>
-              <CardDescription>
-              Higher priority categories will be scheduled first during optimal energy periods.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-3 block">
-                  Priority Order (Drag to reorder)
-                </label>
-                <div className="space-y-2">
-                  <Reorder.Group axis="y" values={priorities} onReorder={handleReorderPriorities}>
-                    {priorities.map((item, index) => (
-                      <Reorder.Item key={item.id} value={item}>
-                        <DraggableCard item={item} index={index} />
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 3. Energy Patterns Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="icon-container">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span>Energy Patterns</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {(state.energy_patterns || []).length} selected
-                  </Badge>
-                </div>
-              </CardTitle>
-              <CardDescription>
-              Based on your selections, we&apos;ll schedule demanding tasks during your peak energy times.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-3 block">
-                  Select your energy patterns
-                </label>
-                <div className="space-y-2">
-                  {energyOptions.map((option) => {
-                    const isChecked = (state.energy_patterns || []).includes(option.value);
-                    return (
-                      <div
-                        key={option.value}
-                        className={`energy-pattern-card ${
-                          isChecked 
-                            ? "energy-pattern-card-checked" 
-                            : "energy-pattern-card-unchecked"
-                        }`}
-                      >
-                        <Checkbox 
-                          id={`checkbox-${option.value}`}
-                          checked={isChecked}
-                          onCheckedChange={() => handleEnergyChange(option.value)}
-                        />
-                        <div className={`p-2 rounded-lg ${option.bgColor}`}>
-                          <option.icon className={`h-4 w-4 ${option.color}`} />
-                        </div>
-                        <label
-                          htmlFor={`checkbox-${option.value}`}
-                          className="text-sm font-medium cursor-pointer flex-1"
-                        >
-                          {option.label}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 4. Layout Preferences Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="icon-container">
-                  <Layout className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span>Layout Preferences</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {state.layout_preference?.layout?.includes('structured') ? 'Structured' : 'Unstructured'}
-                  </Badge>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Customize how your tasks and interface are displayed
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <label className="text-sm font-medium mb-3 block">Layout Type</label>
-                <RadioGroup
-                  value={state.layout_preference?.layout || 'todolist-structured'}
-                  onValueChange={(value) => handleLayoutChange('layout', value)}
-                  className="space-y-2"
-                >
-                  <div className="radio-card">
-                    <RadioGroupItem value="todolist-structured" id="structured" />
-                    <Grid className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <label htmlFor="structured" className="text-sm font-medium cursor-pointer">
-                        Structured
-                      </label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Organized with clear categories
-                      </p>
-                    </div>
+          <div className="grid gap-6">
+            {/* 1. Work Schedule Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="icon-container">
+                    <Clock className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="radio-card">
-                    <RadioGroupItem value="todolist-unstructured" id="unstructured" />
-                    <List className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <label htmlFor="unstructured" className="text-sm font-medium cursor-pointer">
-                        Unstructured
-                      </label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Flexible, free-form layout
-                      </p>
-                    </div>
+                  <div>
+                    <span>Work Schedule</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {(state.working_days || []).length} days
+                    </Badge>
                   </div>
-                </RadioGroup>
-              </div>
+                </CardTitle>
+                <CardDescription>
+                  Set your working hours and days to optimize task scheduling
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Working Hours */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-muted-foreground" />
+                      Work Start Time
+                    </label>
+                    <Input 
+                      type="time" 
+                      value={state.work_start_time || "10:30"}
+                      onChange={(e) => handleFieldChange('work_start_time', e.target.value)}
+                      className="w-full font-mono text-center"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-muted-foreground" />
+                      Work End Time
+                    </label>
+                    <Input 
+                      type="time" 
+                      value={state.work_end_time || "15:30"}
+                      onChange={(e) => handleFieldChange('work_end_time', e.target.value)}
+                      className="w-full font-mono text-center"
+                    />
+                  </div>
+                </div>
+                
+                {/* Working Days */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    Working Days
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {workingDays.map((day) => {
+                      const isChecked = (state.working_days || []).includes(day.fullLabel);
+                      return (
+                        <div
+                          key={day.id}
+                          className={`checkbox-card ${
+                            isChecked 
+                              ? "checkbox-card-checked" 
+                              : "checkbox-card-unchecked"
+                          }`}
+                        >
+                          <Checkbox 
+                            id={day.id} 
+                            checked={isChecked}
+                            onCheckedChange={(checked) => handleWorkingDayChange(day.fullLabel, !!checked)}
+                          />
+                          <label
+                            htmlFor={day.id}
+                            className="text-sm font-medium cursor-pointer"
+                            title={day.fullLabel}
+                          >
+                            {day.label}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Subcategory dropdown - only show if structured is selected */}
-              {state.layout_preference?.layout === 'todolist-structured' && (
+            {/* 2. Priority Settings Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="icon-container">
+                    <Target className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <span>Priority Settings</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {priorities.length} categories
+                    </Badge>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  Higher priority categories will be scheduled first during optimal energy periods.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Subcategory</label>
-                  <Select
-                    value={state.layout_preference?.subcategory || 'day-sections'}
-                    onValueChange={(value) => handleLayoutChange('subcategory', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day-sections">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>Day Sections</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="priority">
-                        <div className="flex items-center gap-2">
-                          <Layers className="h-4 w-4" />
-                          <span>Priority</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="category">
-                        <div className="flex items-center gap-2">
-                          <Layout className="h-4 w-4" />
-                          <span>Category</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium mb-3 block">
+                    Priority Order (Drag to reorder)
+                  </label>
+                  <div className="space-y-2">
+                    <Reorder.Group axis="y" values={priorities} onReorder={handleReorderPriorities}>
+                      {priorities.map((item, index) => (
+                        <Reorder.Item key={item.id} value={item}>
+                          <DraggableCard item={item} index={index} />
+                        </Reorder.Item>
+                      ))}
+                    </Reorder.Group>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* 5. Task Ordering Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="icon-container">
-                  <CheckSquare className="h-5 w-5 text-primary" />
-                </div>
+            {/* 3. Energy Patterns Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="icon-container">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <span>Energy Patterns</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {(state.energy_patterns || []).length} selected
+                    </Badge>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  Based on your selections, we&apos;ll schedule demanding tasks during your peak energy times.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <span>Task Ordering</span>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Configure how tasks are sorted and organized in your lists
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-3 block">
-                  Select task ordering pattern
-                </label>
-                <div className="space-y-2">
-                  {taskOrderingOptions.map((option) => {
-                    const isSelected = state.layout_preference?.orderingPattern === option.value;
-                    return (
-                      <div
-                        key={option.value}
-                        className={`task-ordering-card group ${
-                          isSelected
-                            ? "task-ordering-card-selected"
-                            : "task-ordering-card-unselected"
-                        }`}
-                        onClick={() => handleTaskOrderingChange(option.value)}
-                      >
-                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
-                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">{option.label}</span>
-                            {isSelected}
+                  <label className="text-sm font-medium mb-3 block">
+                    Select your energy patterns
+                  </label>
+                  <div className="space-y-2">
+                    {energyOptions.map((option) => {
+                      const isChecked = (state.energy_patterns || []).includes(option.value);
+                      return (
+                        <div
+                          key={option.value}
+                          className={`energy-pattern-card ${
+                            isChecked 
+                              ? "energy-pattern-card-checked" 
+                              : "energy-pattern-card-unchecked"
+                          }`}
+                        >
+                          <Checkbox 
+                            id={`checkbox-${option.value}`}
+                            checked={isChecked}
+                            onCheckedChange={() => handleEnergyChange(option.value)}
+                          />
+                          <div className={`p-2 rounded-lg ${option.bgColor}`}>
+                            <option.icon className={`h-4 w-4 ${option.color}`} />
                           </div>
-                          <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                            {option.description}
-                          </p>
+                          <label
+                            htmlFor={`checkbox-${option.value}`}
+                            className="text-sm font-medium cursor-pointer flex-1"
+                          >
+                            {option.label}
+                          </label>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleSave} 
-              disabled={isLoading || isLoadingTasks}
-              size="lg"
-            >
-              {isLoading ? 'Saving...' : 'Save Configuration'}
-            </Button>
+            {/* 4. Layout Preferences Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="icon-container">
+                    <Layout className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <span>Layout Preferences</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {state.layout_preference?.layout?.includes('structured') ? 'Structured' : 'Unstructured'}
+                    </Badge>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  Customize how your tasks and interface are displayed
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <label className="text-sm font-medium mb-3 block">Layout Type</label>
+                  <RadioGroup
+                    value={state.layout_preference?.layout || 'todolist-structured'}
+                    onValueChange={(value) => handleLayoutChange('layout', value)}
+                    className="space-y-2"
+                  >
+                    <div className="radio-card">
+                      <RadioGroupItem value="todolist-structured" id="structured" />
+                      <Grid className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1">
+                        <label htmlFor="structured" className="text-sm font-medium cursor-pointer">
+                          Structured
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Organized with clear categories
+                        </p>
+                      </div>
+                    </div>
+                    <div className="radio-card">
+                      <RadioGroupItem value="todolist-unstructured" id="unstructured" />
+                      <List className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1">
+                        <label htmlFor="unstructured" className="text-sm font-medium cursor-pointer">
+                          Unstructured
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Flexible, free-form layout
+                        </p>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Subcategory dropdown - only show if structured is selected */}
+                {state.layout_preference?.layout === 'todolist-structured' && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Subcategory</label>
+                    <Select
+                      value={state.layout_preference?.subcategory || 'day-sections'}
+                      onValueChange={(value) => handleLayoutChange('subcategory', value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select subcategory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day-sections">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>Day Sections</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="priority">
+                          <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4" />
+                            <span>Priority</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="category">
+                          <div className="flex items-center gap-2">
+                            <Layout className="h-4 w-4" />
+                            <span>Category</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 5. Task Ordering Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="icon-container">
+                    <CheckSquare className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <span>Task Ordering</span>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  Configure how tasks are sorted and organized in your lists
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-3 block">
+                    Select task ordering pattern
+                  </label>
+                  <div className="space-y-2">
+                    {taskOrderingOptions.map((option) => {
+                      const isSelected = state.layout_preference?.orderingPattern === option.value;
+                      return (
+                        <div
+                          key={option.value}
+                          className={`task-ordering-card group ${
+                            isSelected
+                              ? "task-ordering-card-selected"
+                              : "task-ordering-card-unselected"
+                          }`}
+                          onClick={() => handleTaskOrderingChange(option.value)}
+                        >
+                          <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
+                            <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">{option.label}</span>
+                              {isSelected}
+                            </div>
+                            <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                              {option.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSave} 
+                disabled={isLoading || isLoadingTasks}
+                size="lg"
+              >
+                {isLoading ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

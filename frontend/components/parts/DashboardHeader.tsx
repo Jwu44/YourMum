@@ -8,9 +8,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
-// Custom Components
-import { TypographyH3 } from '@/app/fonts/text';
-
 // API and Helpers
 import { userApi } from '@/lib/api/users';
 import { loadSchedule } from '@/lib/ScheduleHelper';
