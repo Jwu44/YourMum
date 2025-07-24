@@ -618,14 +618,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           onClick={handleDecompose}
           disabled={isDecomposing}
           className={cn(
-            "text-primary btn-hover-primary",
+            "hover-selection",
             isDecomposing && "opacity-50 cursor-not-allowed"
           )}
         >
           {isDecomposing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
           ) : (
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4 text-primary" />
           )}
         </Button>
       )}

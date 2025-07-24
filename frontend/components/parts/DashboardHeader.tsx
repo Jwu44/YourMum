@@ -202,7 +202,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 aria-label="Open calendar navigation"
                 data-testid="calendar-dropdown-trigger"
               >
-                <Calendar className="!h-[20px] !w-[20px] text-primary" />
+                <Calendar className="!h-[20px] !w-[20px] text-foreground" />
               </Button>
             </PopoverTrigger>
             <PopoverContent 
@@ -241,7 +241,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       className="h-9 w-9 hover-selection"
                       aria-label="Previous day"
                     >
-                      <ChevronLeft className="h-5 w-5 text-primary" />
+                      <ChevronLeft className="h-5 w-5 text-foreground" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -260,7 +260,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     className="h-9 w-9 hover-selection"
                     aria-label="Next day"
                   >
-                    <ChevronRight className="h-5 w-5 text-primary" />
+                    <ChevronRight className="h-5 w-5 text-foreground" />
                   </Button>
                   </TooltipTrigger>
                   <TooltipContent>
