@@ -54,3 +54,31 @@ export async function updateUserProfile (
   const data = await response.json()
   return data.user
 }
+
+/**
+ * Delete user account and all associated data
+ * @param token Firebase auth token
+ * @returns Deletion result with success status and any warnings
+ */
+export async function deleteUserAccount (token: string): Promise<{
+  success: boolean
+  message: string
+  deleted_documents?: number
+  warnings?: string[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/user`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || 'Failed to delete account')
+  }
+
+  const data = await response.json()
+  return data
+}
