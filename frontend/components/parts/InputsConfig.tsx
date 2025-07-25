@@ -413,7 +413,7 @@ const InputConfigurationPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto">
         <div className="w-full max-w-4xl mx-auto px-6 pb-6">
           {/* Page Header */}
-          <div className="mb-8">
+          <div className="mb-8 pt-8">
             <h1 className="text-3xl font-bold tracking-tight">Input Configuration</h1>
             <p className="text-muted-foreground mt-2">
               Add your preferences to personalise your schedule.

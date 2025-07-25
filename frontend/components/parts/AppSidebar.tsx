@@ -41,13 +41,6 @@ interface NavigationItem {
  */
 const navigationItems: NavigationItem[] = [
   {
-    id: "profile",
-    title: "Profile",
-    icon: User,
-    href: "#",
-    isActive: false,
-  },
-  {
     id: "inputs",
     title: "Inputs",
     icon: Plus,
@@ -67,14 +60,7 @@ const navigationItems: NavigationItem[] = [
     icon: Archive,
     href: "#",
     isActive: false,
-  },
-  {
-    id: "settings",
-    title: "Settings",
-    icon: Settings,
-    href: "#",
-    isActive: false,
-  },
+  }
 ]
 
 /**
@@ -143,6 +129,13 @@ export function AppSidebar(): JSX.Element {
     }
   }, [router, handleInputsNavigation]);
 
+  /**
+   * Handle navigation to settings page
+   */
+  const handleSettingsNavigation = React.useCallback(() => {
+    router.push('/settings');
+  }, [router]);
+
   return (
     <Sidebar 
       variant="sidebar" 
@@ -198,8 +191,17 @@ export function AppSidebar(): JSX.Element {
       {/* Footer Section */}
       <SidebarFooter className="border-t border-sidebar-border p-5">
         <div 
-          className="flex items-center gap-3 p-3 bg-sidebar-accent/30 rounded-lg mb-2"
+          className="flex items-center gap-3 p-3 bg-sidebar-accent/30 rounded-lg mb-2 cursor-pointer hover-selection transition-all duration-200"
           data-testid="user-profile"
+          onClick={handleSettingsNavigation}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSettingsNavigation();
+            }
+          }}
         >
           <div 
             className="flex items-center justify-center w-8 h-8 gradient-accent rounded-full"

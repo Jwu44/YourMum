@@ -280,6 +280,9 @@ export interface UserDocument {
   displayName: string;
   photoURL?: string;
   role: UserRole;
+  timezone?: string;
+  jobTitle?: string;
+  age?: number;
   calendarSynced: boolean;
   lastLogin: string;
   createdAt: string;
@@ -471,4 +474,12 @@ export interface CalendarCredentials {
   accessToken: string;
   expiresAt: number;
   scopes: string[];
+}
+
+// Profile form data interface for settings page
+export interface ProfileFormData {
+  displayName: string;
+  email: string;
+  jobTitle: string;
+  age: string; // String to handle form input, will be converted to number
 }

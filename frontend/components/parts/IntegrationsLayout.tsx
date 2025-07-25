@@ -79,7 +79,7 @@ const IntegrationsPage: React.FC = () => {
     <SidebarLayout>
       <div className="max-w-4xl mx-auto">
         {/* Page Header */}
-        <div className="mb-8">
+        <div className="mb-8 pt-8">
           <div className="flex items-center gap-3 mb-4">
             <Plug className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
