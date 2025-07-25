@@ -7,7 +7,7 @@
 "use client"
 
 import * as React from "react"
-import { User, Plus, Archive, Settings, Plug } from "lucide-react"
+import { Plus, Archive, Plug } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
