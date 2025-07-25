@@ -123,11 +123,6 @@ const Dashboard: React.FC = () => {
       setScheduleCache(prevCache =>
         new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
       )
-
-      toast({
-        title: 'Success',
-        description: 'Task added successfully.'
-      })
     } catch (error) {
       console.error('Error adding task:', error)
       toast({
@@ -215,13 +210,6 @@ const Dashboard: React.FC = () => {
         setIsEditDrawerOpen(false)
         setEditingTask(undefined)
       }
-
-      // Show success toast
-      const isNewTask = !scheduleDays[currentDayIndex]?.find(t => t.id === updatedTask.id)
-      toast({
-        title: 'Success',
-        description: isNewTask ? 'Microstep added to schedule' : 'Task updated successfully'
-      })
     } catch (error) {
       console.error('Error updating task:', error)
 
@@ -311,7 +299,8 @@ const Dashboard: React.FC = () => {
       // Show success toast
       toast({
         title: 'Success',
-        description: 'Task deleted successfully'
+        description: 'Task deleted successfully',
+        variant: 'success'
       })
     } catch (error) {
       console.error('Error deleting task:', error)
