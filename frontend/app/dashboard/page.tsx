@@ -524,11 +524,6 @@ const Dashboard: React.FC = () => {
           newCache.set(nextDayDate, createResult.schedule!)
           return newCache
         })
-
-        toast({
-          title: 'Success',
-          description: `Created schedule for ${nextDayDate} with ${filteredTasks.length} tasks`
-        })
       } else {
         throw new Error('Failed to create schedule with filtered tasks')
       }
