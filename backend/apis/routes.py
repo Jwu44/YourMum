@@ -1443,3 +1443,58 @@ def delete_task(task_id):
 def handle_delete_task_options(task_id):
     """Handle CORS preflight requests for task deletion endpoint."""
     return jsonify({"status": "ok"})
+
+@api_bp.route("/auth/logout", methods=["DELETE"])
+def logout_user():
+    """
+    Log out the authenticated user by invalidating their session.
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Successfully logged out with cache control headers
+        401: Authentication required or invalid token
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        # Create response with success message
+        response = jsonify({
+            "message": "Logged out successfully"
+        })
+        
+        # Add cache control headers to prevent caching of sensitive logout responses
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response, 200
+        
+    except Exception as e:
+        print(f"Error during logout: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": "Failed to logout"
+        }), 500
+
+@api_bp.route("/auth/logout", methods=["OPTIONS"])
+def handle_logout_options():
+    """Handle CORS preflight requests for logout endpoint."""
+    return jsonify({"status": "ok"})
