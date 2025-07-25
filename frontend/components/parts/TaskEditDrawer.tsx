@@ -248,12 +248,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       // Reset form state and close drawer after successful save
       setEditedTask(getInitialTask())
 
-      // Success toast
-      toast({
-        title: 'Success',
-        description: isEditMode ? 'Task updated successfully' : 'Task created successfully'
-      })
-
       // Close the drawer after successful save
       onClose()
     } catch (error) {
