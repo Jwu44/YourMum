@@ -1,46 +1,46 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, Clock, BarChart, Sun, Sparkles, Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Brain, Clock, BarChart, Sun, Sparkles, Check, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   TooltipProvider
-} from "@/components/ui/tooltip";
-import type { AISuggestion } from '@/lib/types';
-import { cn } from "@/lib/utils";
+} from '@/components/ui/tooltip'
+import type { AISuggestion } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 interface AISuggestionsListProps {
-  suggestions: AISuggestion[];
-  onAccept: (suggestion: AISuggestion) => void;
-  onReject: (suggestionId: string) => void;
-  className?: string;
+  suggestions: AISuggestion[]
+  onAccept: (suggestion: AISuggestion) => void
+  onReject: (suggestionId: string) => void
+  className?: string
 }
 
 const getTypeIcon = (type: string) => {
-  switch(type) {
+  switch (type) {
     case 'Energy Optimization':
-      return <Sun className="h-4 w-4" />;
+      return <Sun className="h-4 w-4" />
     case 'Procrastination Prevention':
-      return <Clock className="h-4 w-4" />;
+      return <Clock className="h-4 w-4" />
     case 'Priority Rebalancing':
-      return <BarChart className="h-4 w-4" />;
+      return <BarChart className="h-4 w-4" />
     case 'Task Structure':
-      return <Brain className="h-4 w-4" />;
+      return <Brain className="h-4 w-4" />
     default:
-      return <Sparkles className="h-4 w-4" />;
+      return <Sparkles className="h-4 w-4" />
   }
-};
+}
 
 const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
-    suggestions,
-    onAccept,
-    onReject,
-    className = ''
-  }) => {
-    return (
+  suggestions,
+  onAccept,
+  onReject,
+  className = ''
+}) => {
+  return (
       <TooltipProvider>
         <AnimatePresence>
           <div className={`space-y-2 ${className}`}>
@@ -57,10 +57,10 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                     <span className="text-muted-foreground">
                       {getTypeIcon(suggestion.type)}
                     </span>
-                    <Badge 
+                    <Badge
                       className={cn(
-                        "ml-2",
-                        suggestion.confidence > 0.8 ? "bg-green-600" : "bg-yellow-600"
+                        'ml-2',
+                        suggestion.confidence > 0.8 ? 'bg-green-600' : 'bg-yellow-600'
                       )}
                       variant="secondary"
                     >
@@ -74,8 +74,8 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                         View rationale
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent 
-                      side="bottom" 
+                    <TooltipContent
+                      side="bottom"
                       className="max-w-xs bg-popover text-popover-foreground"
                     >
                       <p>{suggestion.rationale}</p>
@@ -86,7 +86,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => onAccept(suggestion)}
+                    onClick={() => { onAccept(suggestion) }}
                     className="text-success hover:text-success/80"
                   >
                     <Check className="w-4 h-4" />
@@ -94,7 +94,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => onReject(suggestion.id)}
+                    onClick={() => { onReject(suggestion.id) }}
                     className="text-destructive hover:text-destructive/80"
                   >
                     <X className="w-4 h-4" />
@@ -105,7 +105,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
           </div>
         </AnimatePresence>
       </TooltipProvider>
-    );
-  };
+  )
+}
 
-export default React.memo(AISuggestionsList);
+export default React.memo(AISuggestionsList)

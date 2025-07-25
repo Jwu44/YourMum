@@ -1,7 +1,7 @@
-import React from 'react';
+import React from 'react'
 
 interface FloatingActionButtonProps {
-  onClick: () => void;
+  onClick: () => void
 }
 
 const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick }) => {
@@ -27,7 +27,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick }) 
         />
       </svg>
     </button>
-  );
-};
+  )
+}
 
-export default FloatingActionButton;
+export default FloatingActionButton

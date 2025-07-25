@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { CheckCircle } from "lucide-react";
-import { WithHandleGetStarted } from '@/lib/types';
+import { Button } from '@/components/ui/button'
+import { CheckCircle } from 'lucide-react'
+import { type WithHandleGetStarted } from '@/lib/types'
 
 const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
   return (
@@ -13,23 +13,23 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
             </div>
             <h1 className="text-3xl font-bold text-foreground">yourdai</h1>
           </div>
-          
+
           <h2 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
-            Your AI-Powered 
+            Your AI-Powered
             <span className="text-primary block bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Daily Planner</span>
           </h2>
-          
+
           <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-            Transform your productivity with intelligent task management. 
+            Transform your productivity with intelligent task management.
             Let AI help you prioritize, schedule, and accomplish more every day.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
             <Button variant="premium" size="lg" className="px-8 py-4 text-lg" onClick={handleGetStarted}>
               Get Started Free
             </Button>
           </div>
-          
+
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
             <div className="flex items-center">
               <CheckCircle className="w-4 h-4 text-primary mr-2" />
@@ -45,7 +45,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
             </div>
           </div>
         </div>
-        
+
         <div className="relative animate-scale-in" style={{ animationDelay: '0.3s' }}>
           <div className="bg-card rounded-2xl shadow-elegant border border-border p-6 max-w-md mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -53,7 +53,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
                 <span className="font-semibold text-card-foreground">Tuesday, July 15</span>
               </div>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <div className="flex items-center mb-3">
@@ -81,7 +81,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <div className="flex items-center mb-3">
                   <span className="text-lg">☀️</span>
@@ -102,7 +102,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <div className="flex items-center mb-3">
                   <span className="text-lg">🌙</span>
@@ -118,20 +118,20 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="absolute bottom-4 right-4">
               <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center shadow-glow">
                 <span className="text-primary-foreground text-xl">+</span>
               </div>
             </div>
           </div>
-          
+
           <div className="absolute -top-4 -right-4 w-20 h-20 bg-primary/20 rounded-full opacity-50"></div>
           <div className="absolute -bottom-6 -left-6 w-16 h-16 bg-accent/30 rounded-full opacity-30"></div>
         </div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default Hero;
+export default Hero

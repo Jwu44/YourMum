@@ -1,26 +1,26 @@
-import { Sparkles, Zap, Workflow } from "lucide-react";
+import { Sparkles, Zap, Workflow } from 'lucide-react'
 
 const Features = () => {
   const features = [
     {
       icon: Sparkles,
-      title: "Personalisation",
-      description: "Configure your work schedule, life priorities, and energy patterns. yourdai learns how you work best.",
-      highlight: "Smart personalization"
+      title: 'Personalisation',
+      description: 'Configure your work schedule, life priorities, and energy patterns. yourdai learns how you work best.',
+      highlight: 'Smart personalization'
     },
     {
       icon: Zap,
-      title: "Automation",
-      description: "Let AI handle the heavy lifting with smart integrations and intelligent task management.",
-      highlight: "Intelligent automation"
+      title: 'Automation',
+      description: 'Let AI handle the heavy lifting with smart integrations and intelligent task management.',
+      highlight: 'Intelligent automation'
     },
     {
       icon: Workflow,
-      title: "Integration",
-      description: "Connect all your productivity tools in one unified experience with real-time syncing.",
-      highlight: "Seamless workflow"
+      title: 'Integration',
+      description: 'Connect all your productivity tools in one unified experience with real-time syncing.',
+      highlight: 'Seamless workflow'
     }
-  ];
+  ]
 
   return (
     <section className="py-32 bg-muted/30">
@@ -33,11 +33,11 @@ const Features = () => {
           Three core pillars that make yourdai the smartest way to plan your day
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
         {features.map((feature, index) => (
-          <div 
-            key={feature.title} 
+          <div
+            key={feature.title}
             className="text-center group animate-slide-up"
             style={{ animationDelay: `${index * 0.1}s` }}
           >
@@ -58,7 +58,7 @@ const Features = () => {
       </div>
     </div>
   </section>
-  );
-};
+  )
+}
 
-export default Features; 
+export default Features

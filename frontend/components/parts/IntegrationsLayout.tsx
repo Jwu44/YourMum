@@ -4,30 +4,30 @@
  * Implements TASK-07 requirements for Slack MCP Server integration
  */
 
-"use client"
+'use client'
 
-import React from 'react';
+import React from 'react'
 
 // UI Components
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Icons
-import { Plug, Slack } from 'lucide-react';
+import { Plug, Slack } from 'lucide-react'
 
 // Components
-import { SidebarLayout } from '@/components/parts/SidebarLayout';
-import SlackIntegrationCard from '@/components/parts/SlackIntegrationCard';
+import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import SlackIntegrationCard from '@/components/parts/SlackIntegrationCard'
 
 /**
  * Integration service definition
  */
 interface IntegrationService {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  status: 'available' | 'coming_soon';
-  component?: React.ComponentType;
+  id: string
+  name: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+  status: 'available' | 'coming_soon'
+  component?: React.ComponentType
 }
 
 /**
@@ -35,15 +35,15 @@ interface IntegrationService {
  */
 const integrationServices: IntegrationService[] = [
   {
-    id: "slack",
-    name: "Slack",
-    description: "Connect your Slack workspace to automatically create tasks from @mentions",
+    id: 'slack',
+    name: 'Slack',
+    description: 'Connect your Slack workspace to automatically create tasks from @mentions',
     icon: Slack,
-    status: "available",
-    component: SlackIntegrationCard,
-  },
+    status: 'available',
+    component: SlackIntegrationCard
+  }
   // Future integrations can be added here
-];
+]
 
 /**
  * Coming soon integration placeholder card
@@ -68,8 +68,8 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
         </div>
       </CardHeader>
     </Card>
-  );
-};
+  )
+}
 
 /**
  * Main Integrations Page Component
@@ -93,10 +93,10 @@ const IntegrationsPage: React.FC = () => {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {integrationServices.map((service) => {
             if (service.status === 'available' && service.component) {
-              const ServiceComponent = service.component;
-              return <ServiceComponent key={service.id} />;
+              const ServiceComponent = service.component
+              return <ServiceComponent key={service.id} />
             } else {
-              return <ComingSoonCard key={service.id} service={service} />;
+              return <ComingSoonCard key={service.id} service={service} />
             }
           })}
         </div>
@@ -112,13 +112,13 @@ const IntegrationsPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Visit our{" "}
-                <a 
-                  href="#" 
+                Visit our{' '}
+                <a
+                  href="#"
                   className="text-primary hover:underline"
                 >
                   documentation
-                </a>{" "}
+                </a>{' '}
                 for detailed setup guides and troubleshooting tips.
               </p>
             </CardContent>
@@ -126,7 +126,7 @@ const IntegrationsPage: React.FC = () => {
         </div>
       </div>
     </SidebarLayout>
-  );
-};
+  )
+}
 
-export default IntegrationsPage; 
+export default IntegrationsPage

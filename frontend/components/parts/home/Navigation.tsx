@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { CheckCircle, Menu, X } from "lucide-react";
-import { WithHandleGetStarted } from '@/lib/types';
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { CheckCircle, Menu, X } from 'lucide-react'
+import { type WithHandleGetStarted } from '@/lib/types'
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
     <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-md border-b border-border z-50">
@@ -38,7 +38,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => { setIsMenuOpen(!isMenuOpen) }}
             >
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
@@ -74,7 +74,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
         )}
       </div>
     </nav>
-  );
-};
+  )
+}
 
-export default Navigation; 
+export default Navigation
