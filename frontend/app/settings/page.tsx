@@ -21,7 +21,7 @@ import { SidebarLayout } from '@/components/parts/SidebarLayout'
  * - Account section (logout, delete account buttons)
  */
 export default function SettingsPage () {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { toast } = useToast()
 
   // User profile data from backend
@@ -39,6 +39,9 @@ export default function SettingsPage () {
   const [isSaving, setIsSaving] = useState(false)
   const [originalData, setOriginalData] = useState<ProfileFormData | null>(null)
   const [hasValidationErrors, setHasValidationErrors] = useState(false)
+
+  // Logout state
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Load user profile data when component mounts or user changes
   useEffect(() => {
@@ -181,6 +184,51 @@ export default function SettingsPage () {
     }
   }
 
+  /**
+   * Handle user logout
+   */
+  const handleLogout = async () => {
+    if (isLoggingOut) return // Prevent double clicks
+
+    setIsLoggingOut(true)
+    
+    try {
+      // Step 1: Call Firebase signOut
+      await signOut()
+      
+      // Step 2: Call backend logout API to clear session
+      const token = await user?.getIdToken()
+      if (token) {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be'
+        
+        const response = await fetch(`${apiBaseUrl}/api/auth/logout`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to logout from backend')
+        }
+      }
+
+      // Step 3: Redirect to home page immediately after successful logout
+      window.location.assign('/')
+      
+    } catch (error) {
+      console.error('Logout error:', error)
+      setIsLoggingOut(false)
+      
+      // Show error toast
+      toast({
+        title: 'Failed to log out. Please try again.',
+        variant: 'destructive'
+      })
+    }
+  }
+
   // Determine if Save button should be disabled
   const isSaveDisabled = !hasChanges() || hasValidationErrors || isSaving
 
@@ -302,15 +350,19 @@ export default function SettingsPage () {
                 <div>
                   <p className="text-sm font-medium">Log out of this device</p>
                 </div>
-                <Button variant="outline">
-                  Log out
+                <Button 
+                  variant="outline"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? 'Logging out...' : 'Log out'}
                 </Button>
               </div>
 
               {/* Delete account */}
-              <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Permanently delete your account</p>
+                  <p className="text-sm font-medium">Delete your account</p>
                 </div>
                 <Button variant="destructive">
                   Delete
