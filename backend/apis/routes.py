@@ -262,6 +262,122 @@ def create_or_update_user():
             "message": str(e)
         }), 500
 
+@api_bp.route("/auth/user", methods=["PUT"])
+def update_auth_user():
+    """
+    Update authenticated user profile data.
+    
+    Expected JSON body:
+        - displayName: string (optional)
+        - jobTitle: string (optional) 
+        - age: integer (optional)
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        - 200: User successfully updated
+        - 400: Invalid data or validation errors
+        - 401: Authentication required
+        - 500: Internal server error
+    """
+    try:
+        # Verify authentication
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+        
+        if not user:
+            return jsonify({
+                "error": "Authentication failed"
+            }), 401
+
+        # Validate request data
+        updates = request.json
+        if not updates:
+            return jsonify({
+                "error": "No update data provided"
+            }), 400
+
+        # Validate and sanitize fields
+        sanitized_updates = {}
+        
+        # Handle displayName
+        if 'displayName' in updates:
+            display_name = updates['displayName']
+            if display_name is not None and not isinstance(display_name, str):
+                return jsonify({"error": "displayName must be a string"}), 400
+            if display_name is not None:
+                sanitized_updates['displayName'] = display_name.strip()
+        
+        # Handle jobTitle
+        if 'jobTitle' in updates:
+            job_title = updates['jobTitle']
+            if job_title is not None and not isinstance(job_title, str):
+                return jsonify({"error": "jobTitle must be a string"}), 400
+            if job_title is not None:
+                job_title = job_title.strip()
+                if len(job_title) > 50:
+                    return jsonify({"error": "jobTitle must be 50 characters or less"}), 400
+                sanitized_updates['jobTitle'] = job_title
+        
+        # Handle age
+        if 'age' in updates:
+            age = updates['age']
+            if age is not None:
+                try:
+                    age_value = int(age)
+                    if age_value < 1 or age_value > 150:
+                        return jsonify({"error": "Age must be between 1 and 150"}), 400
+                    sanitized_updates['age'] = age_value
+                except (ValueError, TypeError):
+                    return jsonify({"error": "Age must be a valid number"}), 400
+
+        # Add metadata
+        sanitized_updates['metadata'] = {
+            'lastModified': datetime.now(timezone.utc)
+        }
+
+        # Update user in database
+        db = get_database()
+        users = db['users']
+        
+        result = users.update_one(
+            {"googleId": user['googleId']},
+            {"$set": sanitized_updates}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({
+                "error": "No changes made to user profile"
+            }), 400
+
+        # Get updated user
+        updated_user = users.find_one({"googleId": user['googleId']})
+        if not updated_user:
+            return jsonify({
+                "error": "Failed to retrieve updated user data"
+            }), 500
+
+        serialized_user = process_user_for_response(updated_user)
+
+        return jsonify({
+            "user": serialized_user,
+            "message": "User profile updated successfully"
+        }), 200
+
+    except Exception as e:
+        print(f"Error in update_auth_user: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal server error"
+        }), 500
+
 def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Helper function to prepare user data for database storage.
@@ -300,6 +416,24 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(timezone_value, str) or not timezone_value.strip():
         timezone_value = "UTC"
 
+    # Handle jobTitle field (optional, max 50 characters)
+    job_title = user_data.get("jobTitle")
+    if job_title and isinstance(job_title, str):
+        job_title = job_title.strip()[:50]  # Truncate to 50 characters if needed
+    else:
+        job_title = None
+
+    # Handle age field (optional, numeric only)
+    age = user_data.get("age")
+    if age is not None:
+        try:
+            age = int(age)
+            # Validate age range
+            if age < 1 or age > 150:
+                age = None
+        except (ValueError, TypeError):
+            age = None
+
     # Prepare user data with all required fields and ensure no null values
     return {
         "googleId": user_data["googleId"],
@@ -308,6 +442,8 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
         "role": "free",  # Default role for new users
         "timezone": timezone_value,  # Add timezone field with default
+        "jobTitle": job_title,  # Add jobTitle field (optional)
+        "age": age,  # Add age field (optional)
         "calendarSynced": has_calendar_access,
         "lastLogin": datetime.now(timezone.utc), 
         "calendar": calendar_settings,

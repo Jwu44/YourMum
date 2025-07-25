@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from '@/auth/AuthContext';
 import { RouteGuard } from '@/auth/RouteGuard';
 import { FormProvider } from "@/lib/FormContext";
+import { ToasterClient } from "@/components/ui/toaster-client";
 
 export const metadata: Metadata = {
   title: "yourdAI",
@@ -46,6 +47,7 @@ export default function RootLayout({
             </RouteGuard>
           </FormProvider>
         </AuthProvider>
+        <ToasterClient />
       </body>
     </html>
   );
