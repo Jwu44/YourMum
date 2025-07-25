@@ -1,33 +1,33 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { AuthProvider } from '@/auth/AuthContext';
-import { RouteGuard } from '@/auth/RouteGuard';
-import { FormProvider } from "@/lib/FormContext";
-import { ToasterClient } from "@/components/ui/toaster-client";
+import type { Metadata } from 'next'
+import './globals.css'
+import { AuthProvider } from '@/auth/AuthContext'
+import { RouteGuard } from '@/auth/RouteGuard'
+import { FormProvider } from '@/lib/FormContext'
+import { ToasterClient } from '@/components/ui/toaster-client'
 
 export const metadata: Metadata = {
-  title: "yourdAI",
-  description: "your personalised and automated to do list",
+  title: 'yourdAI',
+  description: 'your personalised and automated to do list',
   icons: {
     icon: [
-      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico" }
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' }
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
     ]
   },
-  manifest: "/site.webmanifest",
+  manifest: '/site.webmanifest',
   other: {
-    "apple-mobile-web-app-title": "yourdAI"
+    'apple-mobile-web-app-title': 'yourdAI'
   }
-};
+}
 
-export default function RootLayout({
-  children,
+export default function RootLayout ({
+  children
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en">
@@ -50,5 +50,5 @@ export default function RootLayout({
         <ToasterClient />
       </body>
     </html>
-  );
+  )
 }

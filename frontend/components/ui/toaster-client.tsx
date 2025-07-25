@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
-import { Toaster } from "./toaster"
+import { Toaster } from './toaster'
 
-export function ToasterClient() {
+export function ToasterClient () {
   return <Toaster />
-} 
+}

@@ -1,28 +1,28 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { format as dateFormat } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import React, { useCallback, useState, useEffect, useRef } from 'react'
+import { format as dateFormat } from 'date-fns'
+import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 
 // UI Components
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 
 // API and Helpers
-import { userApi } from '@/lib/api/users';
-import { loadSchedule } from '@/lib/ScheduleHelper';
-import { formatDateToString } from '@/lib/helper';
+import { userApi } from '@/lib/api/users'
+import { loadSchedule } from '@/lib/ScheduleHelper'
+import { formatDateToString } from '@/lib/helper'
 
 // Hooks
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface DashboardHeaderProps {
-    onNextDay: () => void;
-    onPreviousDay: () => void;
-    onNavigateToDate?: (date: Date) => void;
-    currentDate: Date | undefined;
-    isCurrentDay: boolean;
-    onAddTask?: () => void; // New prop for Add Task functionality
+  onNextDay: () => void
+  onPreviousDay: () => void
+  onNavigateToDate?: (date: Date) => void
+  currentDate: Date | undefined
+  isCurrentDay: boolean
+  onAddTask?: () => void // New prop for Add Task functionality
 }
 
 /**
@@ -30,34 +30,33 @@ interface DashboardHeaderProps {
  * Navigation buttons are always enabled to avoid unnecessary API calls for schedule checking
  */
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
-    onNextDay,
-    onPreviousDay,
-    onNavigateToDate,
-    currentDate,
-    isCurrentDay,
-    onAddTask
-  }) => {
-
+  onNextDay,
+  onPreviousDay,
+  onNavigateToDate,
+  currentDate,
+  isCurrentDay,
+  onAddTask
+}) => {
   // Mobile detection hook
-  const isMobile = useIsMobile();
+  const isMobile = useIsMobile()
 
   // State for calendar dropdown
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+
   // State for date range management
-  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
-  const [userCreationDate, setUserCreationDate] = useState<Date | null>(null);
-  
+  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
+  const [userCreationDate, setUserCreationDate] = useState<Date | null>(null)
+
   // Cache reference to avoid repeated API calls
   const datesCache = useRef<{
-    userCreationDate: Date | null;
-    availableDates: Set<string>;
-    lastUpdated: number;
+    userCreationDate: Date | null
+    availableDates: Set<string>
+    lastUpdated: number
   }>({
     userCreationDate: null,
     availableDates: new Set(),
     lastUpdated: 0
-  });
+  })
 
   /**
    * Memoized date formatting to prevent unnecessary recalculations
@@ -65,13 +64,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
    */
   const formattedDate = useCallback(() => {
     try {
-      if (!currentDate) return 'Invalid Date';
-      return dateFormat(currentDate, 'EEE, d MMM');
+      if (!currentDate) return 'Invalid Date'
+      return dateFormat(currentDate, 'EEE, d MMM')
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid Date';
+      console.error('Error formatting date:', error)
+      return 'Invalid Date'
     }
-  }, [currentDate]);
+  }, [currentDate])
 
   /**
    * Get available dates for the calendar
@@ -79,94 +78,93 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
    */
   const loadAvailableDates = useCallback(async () => {
     // Check cache first (valid for 5 minutes)
-    const now = Date.now();
-    const cacheValidTime = 5 * 60 * 1000; // 5 minutes
-    
-    if (datesCache.current.lastUpdated && 
+    const now = Date.now()
+    const cacheValidTime = 5 * 60 * 1000 // 5 minutes
+
+    if (datesCache.current.lastUpdated &&
         (now - datesCache.current.lastUpdated) < cacheValidTime &&
         datesCache.current.userCreationDate) {
-      setUserCreationDate(datesCache.current.userCreationDate);
-      setAvailableDates(datesCache.current.availableDates);
-      return;
+      setUserCreationDate(datesCache.current.userCreationDate)
+      setAvailableDates(datesCache.current.availableDates)
+      return
     }
-    
+
     try {
       // Get user creation date
-      const creationDate = await userApi.getUserCreationDate();
-      setUserCreationDate(creationDate);
-      
-      const today = new Date();
-      const availableDatesSet = new Set<string>();
-      
+      const creationDate = await userApi.getUserCreationDate()
+      setUserCreationDate(creationDate)
+
+      const today = new Date()
+      const availableDatesSet = new Set<string>()
+
       // Add all dates from user creation to today (always available)
-      const currentDate = new Date(creationDate);
+      const currentDate = new Date(creationDate)
       while (currentDate <= today) {
-        availableDatesSet.add(formatDateToString(currentDate));
-        currentDate.setDate(currentDate.getDate() + 1);
+        availableDatesSet.add(formatDateToString(currentDate))
+        currentDate.setDate(currentDate.getDate() + 1)
       }
-      
+
       // Check future dates (next 30 days) for existing schedules
       // Performance optimization: limit range to reasonable bounds
-      const checkPromises: Promise<any>[] = [];
+      const checkPromises: Array<Promise<any>> = []
       for (let i = 1; i <= 30; i++) {
-        const futureDate = new Date(today);
-        futureDate.setDate(today.getDate() + i);
-        const dateStr = formatDateToString(futureDate);
-        
+        const futureDate = new Date(today)
+        futureDate.setDate(today.getDate() + i)
+        const dateStr = formatDateToString(futureDate)
+
         checkPromises.push(
           loadSchedule(dateStr).then(result => ({
             date: dateStr,
             hasSchedule: result.success && result.schedule && result.schedule.length > 0
           }))
-        );
+        )
       }
-      
+
       // Execute all schedule checks in parallel for performance
-      const results = await Promise.allSettled(checkPromises);
-      
+      const results = await Promise.allSettled(checkPromises)
+
       results.forEach(result => {
         if (result.status === 'fulfilled' && result.value.hasSchedule) {
-          availableDatesSet.add(result.value.date);
+          availableDatesSet.add(result.value.date)
         }
-      });
-      
+      })
+
       // Update cache and state
       datesCache.current = {
         userCreationDate: creationDate,
         availableDates: availableDatesSet,
         lastUpdated: now
-      };
-      
-      setAvailableDates(availableDatesSet);
-      
+      }
+
+      setAvailableDates(availableDatesSet)
     } catch (error) {
-      console.error('Error loading available dates:', error);
+      console.error('Error loading available dates:', error)
       // Fallback: just allow dates from creation to today
       if (userCreationDate) {
-        const today = new Date();
-        const fallbackDates = new Set<string>();
-        const currentDate = new Date(userCreationDate);
-        
+        const today = new Date()
+        const fallbackDates = new Set<string>()
+        const currentDate = new Date(userCreationDate)
+
         while (currentDate <= today) {
-          fallbackDates.add(formatDateToString(currentDate));
-          currentDate.setDate(currentDate.getDate() + 1);
+          fallbackDates.add(formatDateToString(currentDate))
+          currentDate.setDate(currentDate.getDate() + 1)
         }
-        
-        setAvailableDates(fallbackDates);
+
+        setAvailableDates(fallbackDates)
       }
     } finally {
       // Loading state management removed for simplicity
     }
-  }, [userCreationDate]);
+  }, [userCreationDate])
 
   /**
    * Check if a date is available for selection
    * @param date - Date to check
    */
   const isDateAvailable = useCallback((date: Date): boolean => {
-    const dateStr = formatDateToString(date);
-    return availableDates.has(dateStr);
-  }, [availableDates]);
+    const dateStr = formatDateToString(date)
+    return availableDates.has(dateStr)
+  }, [availableDates])
 
   /**
    * Handle date selection from calendar
@@ -176,20 +174,20 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     if (date && isDateAvailable(date)) {
       // Navigate to selected date using parent callback
       if (onNavigateToDate) {
-        onNavigateToDate(date);
+        onNavigateToDate(date)
       }
-      setIsCalendarOpen(false);
+      setIsCalendarOpen(false)
     }
-  }, [isDateAvailable, onNavigateToDate]);
+  }, [isDateAvailable, onNavigateToDate])
 
   /**
    * Load available dates when calendar is first opened
    */
   useEffect(() => {
     if (isCalendarOpen && availableDates.size === 0) {
-      loadAvailableDates();
+      loadAvailableDates()
     }
-  }, [isCalendarOpen, loadAvailableDates, availableDates.size]);
+  }, [isCalendarOpen, loadAvailableDates, availableDates.size])
 
   return (
     <div className="w-full max-w-4xl mx-auto px-6">
@@ -209,16 +207,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
               </Button>
             </PopoverTrigger>
-            <PopoverContent 
-              className="w-auto p-0" 
+            <PopoverContent
+              className="w-auto p-0"
               align="start"
               data-testid="calendar-dropdown"
             >
-              {availableDates.size === 0 ? (
+              {availableDates.size === 0
+                ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   Loading available dates...
                 </div>
-              ) : (
+                  )
+                : (
                 <CalendarComponent
                   mode="single"
                   selected={currentDate}
@@ -226,7 +226,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   disabled={(date) => !isDateAvailable(date)}
                   initialFocus
                 />
-              )}
+                  )}
             </PopoverContent>
           </Popover>
 
@@ -237,7 +237,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onPreviousDay()}
+                    onClick={() => { onPreviousDay() }}
                     disabled={false}
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     aria-label="Previous day"
@@ -250,18 +250,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+
             <h1 className="text-xl font-semibold text-foreground">
               {formattedDate()}
             </h1>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onNextDay()}
+                    onClick={() => { onNextDay() }}
                     disabled={isCurrentDay}
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     aria-label="Next day"
@@ -276,7 +276,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </TooltipProvider>
           </div>
         </div>
-        
+
         {/* Right-aligned Create Task button - only show on desktop */}
         {!isMobile && onAddTask && (
           <Button
@@ -290,7 +290,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default React.memo(DashboardHeader);
+export default React.memo(DashboardHeader)

@@ -3,8 +3,8 @@
  * @description Route file for the Input Configuration page
  */
 
-import InputConfigurationPage from '@/components/parts/InputsConfig';
+import InputConfigurationPage from '@/components/parts/InputsConfig'
 
-export default function InputsPage() {
-  return <InputConfigurationPage />;
+export default function InputsPage () {
+  return <InputConfigurationPage />
 }

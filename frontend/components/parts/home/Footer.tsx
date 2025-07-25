@@ -1,4 +1,4 @@
-import { CheckCircle } from "lucide-react";
+import { CheckCircle } from 'lucide-react'
 
 const Footer = () => {
   return (
@@ -13,18 +13,18 @@ const Footer = () => {
               <span className="text-xl font-bold text-foreground">yourdai</span>
             </div>
             <p className="text-muted-foreground mb-4 max-w-md">
-              Transform your productivity with AI-powered daily planning. 
+              Transform your productivity with AI-powered daily planning.
               Accomplish more, stress less, and achieve your goals with intelligent task management.
             </p>
           </div>
         </div>
-        
+
         <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
           <p>&copy; 2025 yourdai. All rights reserved.</p>
         </div>
       </div>
     </footer>
-  );
-};
+  )
+}
 
-export default Footer;
+export default Footer

@@ -1,42 +1,42 @@
-import { Button } from "@/components/ui/button";
-import { Check, Star } from "lucide-react";
-import { WithHandleGetStarted } from '@/lib/types';
+import { Button } from '@/components/ui/button'
+import { Check, Star } from 'lucide-react'
+import { type WithHandleGetStarted } from '@/lib/types'
 
 const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
   const plans = [
     {
-      name: "Free",
-      price: "$0",
-      period: "forever",
-      description: "Perfect for getting started with AI-powered planning",
+      name: 'Free',
+      price: '$0',
+      period: 'forever',
+      description: 'Perfect for getting started with AI-powered planning',
       features: [
-        "Up to 50 tasks per month",
-        "Basic AI scheduling",
-        "Calendar integration",
-        "Mobile app access",
-        "Email support"
+        'Up to 50 tasks per month',
+        'Basic AI scheduling',
+        'Calendar integration',
+        'Mobile app access',
+        'Email support'
       ],
-      cta: "Get Started Free",
+      cta: 'Get Started Free',
       popular: false
     },
     {
-      name: "Pro",
-      price: "$12",
-      period: "per month",
-      description: "Ideal for professionals and power users",
+      name: 'Pro',
+      price: '$12',
+      period: 'per month',
+      description: 'Ideal for professionals and power users',
       features: [
-        "Unlimited tasks",
-        "Advanced AI insights",
-        "Team collaboration (up to 5 members)",
-        "Priority support",
-        "Custom integrations",
-        "Productivity analytics",
-        "Time tracking"
+        'Unlimited tasks',
+        'Advanced AI insights',
+        'Team collaboration (up to 5 members)',
+        'Priority support',
+        'Custom integrations',
+        'Productivity analytics',
+        'Time tracking'
       ],
-      cta: "Start Free Trial",
+      cta: 'Start Free Trial',
       popular: true
     }
-  ];
+  ]
 
   return (
     <section className="py-20 bg-background" id="pricing">
@@ -57,8 +57,8 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
               key={index}
               className={`relative bg-card rounded-2xl p-8 border transition-all duration-300 hover:shadow-elegant ${
                 plan.popular
-                  ? "border-primary shadow-glow scale-105"
-                  : "border-border hover:border-primary/50"
+                  ? 'border-primary shadow-glow scale-105'
+                  : 'border-border hover:border-primary/50'
               }`}
             >
               {plan.popular && (
@@ -91,10 +91,10 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
               <Button
                 className={`w-full ${
                   plan.popular
-                    ? "bg-gradient-primary hover:opacity-90 shadow-glow"
-                    : ""
+                    ? 'bg-gradient-primary hover:opacity-90 shadow-glow'
+                    : ''
                 }`}
-                variant={plan.popular ? "premium" : "outline"}
+                variant={plan.popular ? 'premium' : 'outline'}
                 size="lg"
                 onClick={handleGetStarted}
               >
@@ -116,7 +116,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
         </div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default PricingSection; 
+export default PricingSection

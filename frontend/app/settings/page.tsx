@@ -1,88 +1,88 @@
-"use client"
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/auth/AuthContext';
-import { ProfileFormData, UserDocument } from '@/lib/types';
-import { fetchUserProfile, updateUserProfile } from '@/lib/api/settings';
-import { SidebarLayout } from '@/components/parts/SidebarLayout';
+import React, { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/auth/AuthContext'
+import { type ProfileFormData, type UserDocument } from '@/lib/types'
+import { fetchUserProfile, updateUserProfile } from '@/lib/api/settings'
+import { SidebarLayout } from '@/components/parts/SidebarLayout'
 
 /**
  * Settings page component implementing TASK-14 requirements
- * 
+ *
  * Layout:
  * - Settings heading
  * - Profile section (always editable: name, email, job title, age) with save/cancel
  * - Billing section (subscription display, manage button)
  * - Account section (logout, delete account buttons)
  */
-export default function SettingsPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
+export default function SettingsPage () {
+  const { user } = useAuth()
+  const { toast } = useToast()
+
   // User profile data from backend
-  const [userProfile, setUserProfile] = useState<UserDocument | null>(null);
-  
+  const [userProfile, setUserProfile] = useState<UserDocument | null>(null)
+
   // Form state for profile section
   const [profileData, setProfileData] = useState<ProfileFormData>({
     displayName: '',
     email: '',
     jobTitle: '',
     age: ''
-  });
-  
+  })
+
   // Form control states
-  const [isSaving, setIsSaving] = useState(false);
-  const [originalData, setOriginalData] = useState<ProfileFormData | null>(null);
-  const [hasValidationErrors, setHasValidationErrors] = useState(false);
+  const [isSaving, setIsSaving] = useState(false)
+  const [originalData, setOriginalData] = useState<ProfileFormData | null>(null)
+  const [hasValidationErrors, setHasValidationErrors] = useState(false)
 
   // Load user profile data when component mounts or user changes
   useEffect(() => {
     const loadUserProfile = async () => {
-      if (!user) return;
-      
+      if (!user) return
+
       try {
-        const token = await user.getIdToken();
-        const profile = await fetchUserProfile(token);
-        setUserProfile(profile);
-        
+        const token = await user.getIdToken()
+        const profile = await fetchUserProfile(token)
+        setUserProfile(profile)
+
         const formData: ProfileFormData = {
           displayName: profile.displayName || '',
           email: profile.email || '',
           jobTitle: profile.jobTitle || '',
           age: profile.age ? profile.age.toString() : ''
-        };
-        setProfileData(formData);
-        setOriginalData(formData);
+        }
+        setProfileData(formData)
+        setOriginalData(formData)
       } catch (error) {
-        console.error('Error loading user profile:', error);
+        console.error('Error loading user profile:', error)
         toast({
-          title: "Error loading profile",
-          description: "Failed to load user profile data.",
-          variant: "destructive"
-        });
+          title: 'Error loading profile',
+          description: 'Failed to load user profile data.',
+          variant: 'destructive'
+        })
       }
-    };
+    }
 
-    loadUserProfile();
-  }, [user, toast]);
+    loadUserProfile()
+  }, [user, toast])
 
   /**
    * Check if current form data has changes compared to original data
    */
   const hasChanges = (): boolean => {
-    if (!originalData) return false;
-    
+    if (!originalData) return false
+
     return (
       profileData.displayName !== originalData.displayName ||
       profileData.jobTitle !== originalData.jobTitle ||
       profileData.age !== originalData.age
-    );
-  };
+    )
+  }
 
   /**
    * Validate input and show error if invalid
@@ -92,28 +92,28 @@ export default function SettingsPage() {
    */
   const validateField = (field: keyof ProfileFormData, value: string): boolean => {
     if (field === 'age' && value) {
-      const ageValue = parseInt(value);
+      const ageValue = parseInt(value)
       if (isNaN(ageValue) || ageValue < 1 || ageValue > 150) {
         toast({
-          title: "Invalid age",
-          description: "Please enter a valid age between 1 and 150.",
-          variant: "destructive"
-        });
-        return false;
+          title: 'Invalid age',
+          description: 'Please enter a valid age between 1 and 150.',
+          variant: 'destructive'
+        })
+        return false
       }
     }
-    
+
     if (field === 'jobTitle' && value && value.length > 50) {
       toast({
-        title: "Job title too long",
-        description: "Job title must be 50 characters or less.",
-        variant: "destructive"
-      });
-      return false;
+        title: 'Job title too long',
+        description: 'Job title must be 50 characters or less.',
+        variant: 'destructive'
+      })
+      return false
     }
-    
-    return true;
-  };
+
+    return true
+  }
 
   /**
    * Handle input changes for profile form with real-time validation
@@ -123,67 +123,66 @@ export default function SettingsPage() {
     setProfileData(prev => ({
       ...prev,
       [field]: value
-    }));
+    }))
 
     // Validate field and update validation state
-    const isValid = validateField(field, value);
-    setHasValidationErrors(!isValid);
-  };
+    const isValid = validateField(field, value)
+    setHasValidationErrors(!isValid)
+  }
 
   /**
    * Save profile changes
    */
   const handleSaveProfile = async () => {
-    if (!user || !hasChanges() || hasValidationErrors) return;
+    if (!user || !hasChanges() || hasValidationErrors) return
 
-    setIsSaving(true);
+    setIsSaving(true)
     try {
       // Prepare update data
-      const ageValue = profileData.age ? parseInt(profileData.age) : undefined;
-      
+      const ageValue = profileData.age ? parseInt(profileData.age) : undefined
+
       const updateData = {
         displayName: profileData.displayName,
         jobTitle: profileData.jobTitle || undefined,
         age: ageValue
-      };
+      }
 
-      const token = await user.getIdToken();
-      const updatedProfile = await updateUserProfile(token, updateData);
-      setUserProfile(updatedProfile);
+      const token = await user.getIdToken()
+      const updatedProfile = await updateUserProfile(token, updateData)
+      setUserProfile(updatedProfile)
 
       // Update original data to reflect saved state
-      setOriginalData(profileData);
-      setHasValidationErrors(false);
-      
-      toast({
-        title: "Profile updated successfully!",
-        variant: "success"
-      });
+      setOriginalData(profileData)
+      setHasValidationErrors(false)
 
-    } catch (error) {
-      console.error('Error updating profile:', error);
       toast({
-        title: "Update failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive"
-      });
+        title: 'Profile updated successfully!',
+        variant: 'success'
+      })
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      toast({
+        title: 'Update failed',
+        description: 'Failed to update profile. Please try again.',
+        variant: 'destructive'
+      })
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   /**
    * Cancel profile editing and reset to original backend data
    */
   const handleCancelEdit = () => {
     if (originalData) {
-      setProfileData(originalData);
-      setHasValidationErrors(false);
+      setProfileData(originalData)
+      setHasValidationErrors(false)
     }
-  };
+  }
 
   // Determine if Save button should be disabled
-  const isSaveDisabled = !hasChanges() || hasValidationErrors || isSaving;
+  const isSaveDisabled = !hasChanges() || hasValidationErrors || isSaving
 
   return (
     <SidebarLayout>
@@ -196,7 +195,7 @@ export default function SettingsPage() {
               Manage your profile, billing, and account settings.
             </p>
           </div>
-          
+
           <div className="grid gap-6">
           {/* Profile Section */}
           <Card>
@@ -211,7 +210,7 @@ export default function SettingsPage() {
                   <Input
                     id="displayName"
                     value={profileData.displayName}
-                    onChange={(e) => handleInputChange('displayName', e.target.value)}
+                    onChange={(e) => { handleInputChange('displayName', e.target.value) }}
                   />
                 </div>
 
@@ -232,7 +231,7 @@ export default function SettingsPage() {
                   <Input
                     id="jobTitle"
                     value={profileData.jobTitle}
-                    onChange={(e) => handleInputChange('jobTitle', e.target.value)}
+                    onChange={(e) => { handleInputChange('jobTitle', e.target.value) }}
                     maxLength={50}
                     placeholder="Enter your job title"
                   />
@@ -245,7 +244,7 @@ export default function SettingsPage() {
                     id="age"
                     type="number"
                     value={profileData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
+                    onChange={(e) => { handleInputChange('age', e.target.value) }}
                     min="1"
                     max="150"
                     placeholder="Enter your age"
@@ -255,15 +254,15 @@ export default function SettingsPage() {
 
               {/* Profile Action Buttons - Right Aligned */}
               <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCancelEdit}
                   disabled={isSaving}
                 >
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleSaveProfile} 
+                <Button
+                  onClick={handleSaveProfile}
                   disabled={isSaveDisabled}
                 >
                   {isSaving ? 'Saving...' : 'Save'}
@@ -323,5 +322,5 @@ export default function SettingsPage() {
         </div>
       </div>
     </SidebarLayout>
-  );
-} 
+  )
+}
