@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { CheckCircle } from 'lucide-react'
 import { type WithHandleGetStarted } from '@/lib/types'
+import Image from 'next/image'
 
 const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
   return (
@@ -8,10 +9,16 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
       <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
         <div className="text-center lg:text-left animate-fade-in">
           <div className="flex items-center justify-center lg:justify-start mb-6">
-            <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center mr-3 shadow-glow">
-              <CheckCircle className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">yourdai</h1>
+            <Image
+              src="/yourdai_logo.png"
+              alt="yourdai logo"
+              width={152}
+              height={40}
+              className="h-10 w-auto"
+              priority
+              quality={100}
+              style={{ imageRendering: 'crisp-edges' }}
+            />
           </div>
 
           <h2 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
@@ -26,7 +33,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
             <Button variant="premium" size="lg" className="px-8 py-4 text-lg" onClick={handleGetStarted}>
-              Get Started Free
+              Start yourdai
             </Button>
           </div>
 

@@ -1,4 +1,5 @@
-import { CheckCircle } from 'lucide-react'
+
+import Image from 'next/image'
 
 const Footer = () => {
   return (
@@ -7,10 +8,16 @@ const Footer = () => {
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <div className="flex items-center mb-4">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center mr-3">
-                <CheckCircle className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold text-foreground">yourdai</span>
+              <Image
+                src="/yourdai_logo.png"
+                alt="yourdai logo"
+                width={124}
+                height={32}
+                className="h-8 w-auto"
+                priority
+                quality={100}
+                style={{ imageRendering: 'crisp-edges' }}
+              />
             </div>
             <p className="text-muted-foreground mb-4 max-w-md">
               Transform your productivity with AI-powered daily planning.

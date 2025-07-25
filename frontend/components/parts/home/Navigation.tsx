@@ -1,21 +1,28 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { type WithHandleGetStarted } from '@/lib/types'
+import Image from 'next/image'
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-md border-b border-border z-50">
+    <nav className="fixed top-0 w-full bg-background/40 backdrop-blur-xl border-b border-border/50 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center mr-3">
-              <CheckCircle className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">yourdai</span>
+            <Image
+              src="/yourdai_logo.png"
+              alt="yourdai logo"
+              width={124}
+              height={32}
+              className="h-8 w-auto"
+              priority
+              quality={100}
+              style={{ imageRendering: 'crisp-edges' }}
+            />
           </div>
 
           {/* Desktop Navigation */}
@@ -28,7 +35,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
 
             <div className="flex items-center space-x-3">
               <Button size="sm" className="bg-gradient-primary hover:opacity-90 shadow-glow" onClick={handleGetStarted}>
-                Start yourdai
+                Get started
               </Button>
             </div>
           </div>
