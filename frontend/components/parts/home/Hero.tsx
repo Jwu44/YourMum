@@ -28,9 +28,6 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
             <Button variant="premium" size="lg" className="px-8 py-4 text-lg" onClick={handleGetStarted}>
               Get Started Free
             </Button>
-            <Button variant="hero" size="lg" className="px-8 py-4 text-lg">
-              Watch Demo
-            </Button>
           </div>
           
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">

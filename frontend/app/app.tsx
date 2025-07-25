@@ -8,12 +8,6 @@ export default function Home() {
         <nav>
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href="/tasks">Tasks</Link></li>
-            <li><Link href="/energy-patterns">Energy Patterns</Link></li>
-            <li><Link href="/priorities">Priorities</Link></li>
-            <li><Link href="/structure-preference">Structure Preference</Link></li>
-            <li><Link href="/subcategory-preference">Subcategory Preference</Link></li>
-            <li><Link href="/timebox-preference">Layout Preference</Link></li>
             <li><Link href="/dashboard">Dashboard</Link></li>
           </ul>
         </nav>
