@@ -1,6 +1,10 @@
 from flask import Blueprint, jsonify, request
 from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
+from backend.services.slack_service import SlackService
 import traceback
+
+# Initialize Slack service
+slack_service = SlackService()
 from bson import ObjectId
 from datetime import datetime, timezone 
 from backend.models.task import Task
@@ -1492,6 +1496,142 @@ def logout_user():
         return jsonify({
             "success": False,
             "error": "Failed to logout"
+        }), 500
+
+
+@api_bp.route("/auth/user", methods=["DELETE"])
+def delete_user_account():
+    """
+    Delete user account and all associated data.
+    
+    This endpoint performs a complete account deletion including:
+    - Disconnecting external integrations (Slack, Google Calendar)
+    - Deleting all user data from MongoDB collections
+    - Firebase account remains inactive (not deleted)
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Account successfully deleted
+        401: Authentication required or invalid token
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        user_google_id = user.get('googleId')
+        user_email = user.get('email', 'Unknown')
+        
+        print(f"Starting account deletion for user: {user_email} (ID: {user_google_id})")
+        
+        # Track failures for error reporting
+        failures = []
+        
+        # Step 1: Disconnect Slack integration if exists
+        try:
+            slack_data = user.get("slack", {})
+            instance_id = slack_data.get("instanceId")
+            
+            if instance_id:
+                print(f"Disconnecting Slack integration for user {user_google_id}")
+                success, result = slack_service.disconnect_slack_integration(user_google_id, instance_id)
+                if not success:
+                    failures.append(f"Slack disconnection: {result.get('error', 'Unknown error')}")
+                    print(f"Slack disconnection failed: {result}")
+                else:
+                    print("Slack integration disconnected successfully")
+            else:
+                print("No Slack integration found for user")
+        except Exception as e:
+            failures.append(f"Slack disconnection error: {str(e)}")
+            print(f"Error disconnecting Slack: {e}")
+        
+        # Step 2: Get database and clean up all user-related data
+        db = get_database()
+        
+        # Collections to clean up - delete all user-related data
+        collections_to_clean = [
+            'UserSchedules',           # User's daily schedules
+            'AIsuggestions',           # AI-generated suggestions
+            'MicrostepFeedback',       # User's task feedback
+            'DecompositionPatterns',   # User's task decomposition patterns
+            'calendar_events',         # User's synced calendar events
+            'Processed Slack Messages' # User's Slack message tracking
+        ]
+        
+        # Delete from each collection
+        total_deleted = 0
+        for collection_name in collections_to_clean:
+            try:
+                collection = db[collection_name]
+                result = collection.delete_many({"googleId": user_google_id})
+                deleted_count = result.deleted_count
+                total_deleted += deleted_count
+                print(f"Deleted {deleted_count} documents from {collection_name}")
+            except Exception as e:
+                failures.append(f"{collection_name} cleanup: {str(e)}")
+                print(f"Error cleaning {collection_name}: {e}")
+        
+        # Step 3: Delete main user document (do this last)
+        try:
+            users_collection = db['users']
+            user_result = users_collection.delete_one({"googleId": user_google_id})
+            if user_result.deleted_count > 0:
+                print(f"Deleted main user document for {user_email}")
+                total_deleted += user_result.deleted_count
+            else:
+                failures.append("Main user document not found")
+                print(f"Main user document not found for {user_google_id}")
+        except Exception as e:
+            failures.append(f"User document deletion: {str(e)}")
+            print(f"Error deleting main user document: {e}")
+        
+        # Step 4: Clear Google Calendar integration data (handled by user document deletion)
+        # The calendar credentials are stored in the user document, so they're already cleaned up
+        
+        print(f"Account deletion completed. Total documents deleted: {total_deleted}")
+        
+        # Create response
+        response_data = {
+            "success": True,
+            "message": "Account deleted successfully",
+            "deleted_documents": total_deleted
+        }
+        
+        # Include warnings if there were any failures
+        if failures:
+            response_data["warnings"] = failures
+            print(f"Account deletion completed with warnings: {failures}")
+        
+        # Add cache control headers to prevent caching
+        response = jsonify(response_data)
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response, 200
+        
+    except Exception as e:
+        print(f"Error during account deletion: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": "Failed to delete account"
         }), 500
 
 @api_bp.route("/auth/logout", methods=["OPTIONS"])

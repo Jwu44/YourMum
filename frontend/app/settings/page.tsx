@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/auth/AuthContext'
 import { type ProfileFormData, type UserDocument } from '@/lib/types'
-import { fetchUserProfile, updateUserProfile } from '@/lib/api/settings'
+import { fetchUserProfile, updateUserProfile, deleteUserAccount } from '@/lib/api/settings'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
 
 /**
  * Settings page component implementing TASK-14 requirements
@@ -42,6 +43,10 @@ export default function SettingsPage () {
 
   // Logout state
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Account deletion state
+  const [isDeletionDialogOpen, setIsDeletionDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Load user profile data when component mounts or user changes
   useEffect(() => {
@@ -229,6 +234,57 @@ export default function SettingsPage () {
     }
   }
 
+  /**
+   * Handle account deletion confirmation
+   */
+  const handleDeleteAccount = async () => {
+    if (!user || isDeleting) return // Prevent multiple deletion attempts
+
+    setIsDeleting(true)
+    
+    try {
+      // Get Firebase auth token
+      const token = await user.getIdToken()
+      
+      // Call backend API to delete account
+      const result = await deleteUserAccount(token)
+      
+      // Show success message
+      toast({
+        title: 'Account deleted successfully',
+        description: result.warnings?.length 
+          ? `Warning: ${result.warnings.join(', ')}` 
+          : 'Your account and all data have been permanently deleted.',
+        variant: 'success'
+      })
+      
+      // Close dialog
+      setIsDeletionDialogOpen(false)
+      
+      // Sign out from Firebase and redirect immediately
+      await signOut()
+      window.location.assign('/')
+      
+    } catch (error) {
+      console.error('Account deletion error:', error)
+      setIsDeleting(false)
+      
+      // Show error toast
+      toast({
+        title: 'Failed to delete account',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  /**
+   * Handle opening the delete account confirmation dialog
+   */
+  const handleOpenDeleteDialog = () => {
+    setIsDeletionDialogOpen(true)
+  }
+
   // Determine if Save button should be disabled
   const isSaveDisabled = !hasChanges() || hasValidationErrors || isSaving
 
@@ -364,7 +420,11 @@ export default function SettingsPage () {
                 <div>
                   <p className="text-sm font-medium">Delete your account</p>
                 </div>
-                <Button variant="destructive">
+                <Button 
+                  variant="destructive"
+                  onClick={handleOpenDeleteDialog}
+                  disabled={isDeleting}
+                >
                   Delete
                 </Button>
               </div>
@@ -373,6 +433,14 @@ export default function SettingsPage () {
           </div>
         </div>
       </div>
+
+      {/* Account deletion confirmation dialog */}
+      <AccountDeletionDialog
+        open={isDeletionDialogOpen}
+        onOpenChange={setIsDeletionDialogOpen}
+        onConfirmDelete={handleDeleteAccount}
+        isDeleting={isDeleting}
+      />
     </SidebarLayout>
   )
 }
