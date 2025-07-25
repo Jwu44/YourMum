@@ -7,7 +7,6 @@ import Hero from "@/components/parts/home/Hero";
 import Features from "@/components/parts/home/Features";
 import HowItWorks from "@/components/parts/home/HowItWorks";
 import Pricing from "@/components/parts/home/Pricing";
-import CTA from "@/components/parts/home/CTA";
 import Footer from "@/components/parts/home/Footer";
 
 const HomePage = () => {
@@ -42,8 +41,8 @@ const HomePage = () => {
 
   // Add smooth scroll effect for navigation
   useEffect(() => {
-    // Set dark mode by default
-    document.documentElement.classList.add('dark');
+    // Set light mode by default (removed dark mode)
+    document.documentElement.classList.remove('dark');
     
     // Smooth scroll for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -108,7 +107,6 @@ const HomePage = () => {
         <Features />
         <HowItWorks />
         <Pricing handleGetStarted={handleGetStarted} />
-        <CTA handleGetStarted={handleGetStarted} />
       </main>
       <Footer />
     </div>

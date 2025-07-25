@@ -35,23 +35,6 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       ],
       cta: "Start Free Trial",
       popular: true
-    },
-    {
-      name: "Team",
-      price: "$25",
-      period: "per user/month",
-      description: "Built for teams that want to achieve more together",
-      features: [
-        "Everything in Pro",
-        "Unlimited team members",
-        "Advanced team analytics",
-        "Custom workflows",
-        "Admin controls",
-        "SSO integration",
-        "24/7 phone support"
-      ],
-      cta: "Contact Sales",
-      popular: false
     }
   ];
 

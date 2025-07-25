@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Menu, X, ChevronDown } from "lucide-react";
+import { CheckCircle, Menu, X } from "lucide-react";
 import { WithHandleGetStarted } from '@/lib/types';
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
@@ -21,42 +21,14 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <div className="flex items-center space-x-6">
-              <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
-                Features
-              </a>
-              <div className="relative group">
-                <button className="flex items-center text-muted-foreground hover:text-foreground transition-colors">
-                  Solutions
-                  <ChevronDown className="w-4 h-4 ml-1" />
-                </button>
-                <div className="absolute top-full left-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-elegant opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="p-2">
-                    <a href="#" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors">
-                      Personal Planning
-                    </a>
-                    <a href="#" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors">
-                      Team Management
-                    </a>
-                    <a href="#" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors">
-                      Enterprise
-                    </a>
-                  </div>
-                </div>
-              </div>
               <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                 Pricing
-              </a>
-              <a href="#about" className="text-muted-foreground hover:text-foreground transition-colors">
-                About
               </a>
             </div>
 
             <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" onClick={handleGetStarted}>
-                Sign In
-              </Button>
               <Button size="sm" className="bg-gradient-primary hover:opacity-90 shadow-glow" onClick={handleGetStarted}>
-                Start Free Trial
+                Start yourdai
               </Button>
             </div>
           </div>
