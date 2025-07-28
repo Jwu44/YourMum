@@ -29,6 +29,12 @@ import uuid
 
 # Add import for the new schedule service
 from backend.services.schedule_service import schedule_service
+from backend.services.archive_service import (
+    archive_task,
+    get_archived_tasks,
+    move_archived_task_to_today,
+    delete_archived_task
+)
 
 api_bp = Blueprint("api", __name__)
 
@@ -1637,4 +1643,272 @@ def delete_user_account():
 @api_bp.route("/auth/logout", methods=["OPTIONS"])
 def handle_logout_options():
     """Handle CORS preflight requests for logout endpoint."""
+    return jsonify({"status": "ok"})
+
+# Archive functionality endpoints
+@api_bp.route("/archive/task", methods=["POST"])
+def api_archive_task():
+    """
+    Archive a task for the authenticated user.
+    
+    Expected request body:
+    {
+        "taskId": str (required),
+        "taskData": Dict (required - complete task object),
+        "originalDate": str (required - YYYY-MM-DD format)
+    }
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task archived successfully
+        400: Invalid request data or validation errors
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate required fields
+        required_fields = ['taskId', 'taskData', 'originalDate']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+
+        task_data = data['taskData']
+        original_date = data['originalDate']
+
+        # Validate task data has required fields
+        if not task_data.get('id') or not task_data.get('text'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid task data - missing id or text"
+            }), 400
+
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(original_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Archive the task
+        result = archive_task(user_id, task_data, original_date)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        print(f"Error in api_archive_task: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task", methods=["OPTIONS"])
+def handle_archive_task_options():
+    """Handle CORS preflight requests for archive task endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/tasks", methods=["GET"])
+def api_get_archived_tasks():
+    """
+    Get all archived tasks for the authenticated user.
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Archived tasks retrieved successfully
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Get archived tasks
+        result = get_archived_tasks(user_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        print(f"Error in api_get_archived_tasks: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/tasks", methods=["OPTIONS"])
+def handle_get_archived_tasks_options():
+    """Handle CORS preflight requests for get archived tasks endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/task/<task_id>/move-to-today", methods=["POST"])
+def api_move_archived_task_to_today(task_id):
+    """
+    Move an archived task to today's schedule.
+    
+    URL Parameters:
+        task_id: The ID of the task to move
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task moved successfully with task data for adding to schedule
+        401: Authentication required
+        404: Task not found in archive
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Move the archived task to today
+        result = move_archived_task_to_today(user_id, task_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            return jsonify(result), status_code
+
+    except Exception as e:
+        print(f"Error in api_move_archived_task_to_today: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task/<task_id>/move-to-today", methods=["OPTIONS"])
+def handle_move_archived_task_options(task_id):
+    """Handle CORS preflight requests for move archived task endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/task/<task_id>", methods=["DELETE"])
+def api_delete_archived_task(task_id):
+    """
+    Permanently delete an archived task.
+    
+    URL Parameters:
+        task_id: The ID of the task to delete
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task deleted successfully
+        401: Authentication required
+        404: Task not found in archive
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Delete the archived task
+        result = delete_archived_task(user_id, task_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            return jsonify(result), status_code
+
+    except Exception as e:
+        print(f"Error in api_delete_archived_task: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task/<task_id>", methods=["OPTIONS"])
+def handle_delete_archived_task_options(task_id):
+    """Handle CORS preflight requests for delete archived task endpoint."""
     return jsonify({"status": "ok"})

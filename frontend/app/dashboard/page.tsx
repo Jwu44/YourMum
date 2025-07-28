@@ -35,6 +35,7 @@ import {
 import { calendarApi } from '@/lib/api/calendar'
 import { userApi } from '@/lib/api/users'
 import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
+import { archiveTask } from '@/lib/api/archive'
 
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([])
@@ -318,6 +319,76 @@ const Dashboard: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to delete task. Please try again.',
+        variant: 'destructive'
+      })
+    }
+  }, [currentDayIndex, scheduleCache, toast])
+
+  /**
+   * Handle archive task action
+   * Removes task from schedule and archives it for future use
+   */
+  const handleArchiveTask = useCallback(async (taskToArchive: Task) => {
+    try {
+      const currentDate = getDateString(currentDayIndex)
+
+      // Optimistically update frontend state first
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        if (newDays[currentDayIndex]) {
+          const currentTasks = newDays[currentDayIndex]
+          const updatedTasks = currentTasks.filter(task => task.id !== taskToArchive.id)
+          newDays[currentDayIndex] = updatedTasks
+        }
+        return newDays
+      })
+
+      // Update cache
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache)
+        const currentTasks = scheduleCache.get(currentDate) || []
+        const updatedTasks = currentTasks.filter(task => task.id !== taskToArchive.id)
+        newCache.set(currentDate, updatedTasks)
+        return newCache
+      })
+
+      // Call backend API to archive task
+      const archiveResult = await archiveTask(taskToArchive, currentDate)
+
+      if (!archiveResult.success) {
+        throw new Error(archiveResult.error || 'Failed to archive task')
+      }
+
+      // Delete from current schedule after successful archive
+      const deleteResult = await deleteTask(taskToArchive.id, currentDate)
+
+      if (!deleteResult.success) {
+        // If delete fails but archive succeeded, show warning
+        console.warn('Task archived but failed to remove from schedule:', deleteResult.error)
+      }
+
+      // Show success toast
+      toast({
+        title: 'Success',
+        description: 'Task archived successfully',
+        variant: 'success'
+      })
+    } catch (error) {
+      console.error('Error archiving task:', error)
+
+      // Revert frontend state on error
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
+        if (cachedSchedule && newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = cachedSchedule
+        }
+        return newDays
+      })
+
+      toast({
+        title: 'Error',
+        description: 'Failed to archive task. Please try again.',
         variant: 'destructive'
       })
     }
@@ -1174,6 +1245,7 @@ const Dashboard: React.FC = () => {
                   onRejectSuggestion={handleRejectSuggestion}
                   onEditTask={handleEditTask}
                   onDeleteTask={handleDeleteTask}
+                  onArchiveTask={handleArchiveTask}
                 />
 
                 {isLoadingSuggestions && (

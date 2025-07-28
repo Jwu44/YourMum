@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
 import { TypographyH4 } from '../../app/fonts/text'
-import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
@@ -35,6 +35,7 @@ interface EditableScheduleRowProps {
   allTasks: Task[]
   onEditTask?: (task: Task) => void // New prop for edit functionality
   onDeleteTask?: (task: Task) => void // New prop for delete functionality
+  onArchiveTask?: (task: Task) => void // New prop for archive functionality
 }
 
 /**
@@ -207,7 +208,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   moveTask,
   isSection,
   onEditTask, // New prop for edit functionality
-  onDeleteTask // New prop for delete functionality
+  onDeleteTask, // New prop for delete functionality
+  onArchiveTask // New prop for archive functionality
 }) => {
   // Use our new drag drop hook instead of complex local state
   const dragDropHook = useDragDropTask({
@@ -294,6 +296,28 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       })
     }
   }, [task, onDeleteTask, toast])
+
+  /**
+   * Handle archive task action
+   * Add delay to allow dropdown menu overlay to fully close and cleanup
+   */
+  const handleArchiveTask = useCallback(() => {
+    try {
+      if (onArchiveTask) {
+        // Add small delay to allow dropdown overlay cleanup
+        setTimeout(() => {
+          onArchiveTask(task)
+        }, 50) // Minimal delay for overlay cleanup
+      }
+    } catch (error) {
+      console.error('Error triggering archive task:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to archive task',
+        variant: 'destructive'
+      })
+    }
+  }, [task, onArchiveTask, toast])
 
   // TODO: Remove old drag handlers - replaced by @dnd-kit hook
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
@@ -495,6 +519,16 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             <Pencil className="h-4 w-4" />
             Edit
           </DropdownMenuItem>
+          {/* Archive option - only show for non-section tasks */}
+          {!isSection && !task.is_section && onArchiveTask && (
+            <DropdownMenuItem
+              onClick={handleArchiveTask}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Archive className="h-4 w-4" />
+              Archive
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={handleDeleteTask}
             className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
