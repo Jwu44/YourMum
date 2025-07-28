@@ -345,4 +345,84 @@ describe('TaskEditDrawer Vaul Integration Fix', () => {
       expect(bodyElement?.style.pointerEvents).not.toBe('none');
     });
   });
+
+  describe('Enter Key Functionality', () => {
+    it('should trigger save when Enter is pressed in task name input', async () => {
+      render(
+        <FormProvider>
+          <TaskEditDrawer
+            isOpen={true}
+            onClose={mockOnClose}
+            task={mockTask}
+            onUpdateTask={mockOnUpdateTask}
+            currentDate="2024-01-01"
+          />
+        </FormProvider>
+      );
+
+      // Find the task name input
+      const taskNameInput = screen.getByLabelText('Task Name');
+      expect(taskNameInput).toBeInTheDocument();
+
+      // Simulate Enter key press
+      fireEvent.keyDown(taskNameInput, { key: 'Enter', code: 'Enter' });
+
+      // Wait for save to be called
+      await waitFor(() => {
+        expect(mockOnUpdateTask).toHaveBeenCalled();
+      });
+    });
+
+    it('should trigger save when Enter is pressed in start time input', async () => {
+      render(
+        <FormProvider>
+          <TaskEditDrawer
+            isOpen={true}
+            onClose={mockOnClose}
+            task={mockTask}
+            onUpdateTask={mockOnUpdateTask}
+            currentDate="2024-01-01"
+          />
+        </FormProvider>
+      );
+
+      // Find the start time input
+      const startTimeInput = screen.getByLabelText('Start Time');
+      expect(startTimeInput).toBeInTheDocument();
+
+      // Simulate Enter key press
+      fireEvent.keyDown(startTimeInput, { key: 'Enter', code: 'Enter' });
+
+      // Wait for save to be called
+      await waitFor(() => {
+        expect(mockOnUpdateTask).toHaveBeenCalled();
+      });
+    });
+
+    it('should trigger save when Enter is pressed in end time input', async () => {
+      render(
+        <FormProvider>
+          <TaskEditDrawer
+            isOpen={true}
+            onClose={mockOnClose}
+            task={mockTask}
+            onUpdateTask={mockOnUpdateTask}
+            currentDate="2024-01-01"
+          />
+        </FormProvider>
+      );
+
+      // Find the end time input
+      const endTimeInput = screen.getByLabelText('End Time');
+      expect(endTimeInput).toBeInTheDocument();
+
+      // Simulate Enter key press
+      fireEvent.keyDown(endTimeInput, { key: 'Enter', code: 'Enter' });
+
+      // Wait for save to be called
+      await waitFor(() => {
+        expect(mockOnUpdateTask).toHaveBeenCalled();
+      });
+    });
+  });
 });
