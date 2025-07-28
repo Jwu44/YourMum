@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { type Task } from '../lib/types'
@@ -11,13 +11,21 @@ import { type Task } from '../lib/types'
  * - Modular architecture with clear separation of concerns
  * - TypeScript strict mode with proper interfaces
  * - Optimized transforms for smooth horizontal dragging
+ * - Enhanced with Notion-style indentation detection
  */
 
 interface UseDragDropTaskProps {
   task: Task
   index: number
   isSection: boolean
-  moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => void
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
+}
+
+// Enhanced state for indentation detection
+interface IndentationState {
+  dragType: 'indent' | 'outdent' | 'reorder' | null
+  cursorPosition: { x: number; y: number } | null
+  targetTaskLeftEdge: number | null
 }
 
 interface DragDropTaskReturn {
@@ -31,14 +39,21 @@ interface DragDropTaskReturn {
   isDragging: boolean
   isOver: boolean
   
+  // Enhanced indentation state
+  indentationState: IndentationState
+  
   // Visual feedback helpers
   getRowClassName: () => string
   getGripClassName: () => string
+  
+  // Cursor tracking for indentation
+  updateCursorPosition: (x: number, y: number, targetElement?: HTMLElement) => void
 }
 
 /**
  * Hook that provides drag and drop functionality for task rows
  * 🔧 FIX: Optimized for smooth horizontal and vertical dragging performance
+ * ✨ NEW: Enhanced with Notion-style indentation detection based on cursor position
  */
 export const useDragDropTask = ({
   task,
@@ -47,6 +62,13 @@ export const useDragDropTask = ({
   moveTask
 }: UseDragDropTaskProps): DragDropTaskReturn => {
   
+  // State for tracking indentation intentions
+  const [indentationState, setIndentationState] = useState<IndentationState>({
+    dragType: null,
+    cursorPosition: null,
+    targetTaskLeftEdge: null
+  })
+
   const {
     attributes,
     listeners,
@@ -60,7 +82,8 @@ export const useDragDropTask = ({
     data: {
       type: isSection ? 'section' : 'task',
       task,
-      index
+      index,
+      indentationState // Include indentation state in drag data
     },
     disabled: isSection // Sections cannot be dragged for now
   })
@@ -116,6 +139,68 @@ export const useDragDropTask = ({
     }
   }, [isDragging])
 
+  // Cursor tracking for indentation detection
+  const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement) => {
+    try {
+      if (!targetElement || isSection) {
+        // Reset state if no target or target is section
+        setIndentationState({
+          dragType: null,
+          cursorPosition: null,
+          targetTaskLeftEdge: null
+        });
+        return;
+      }
+
+      const targetRect = targetElement.getBoundingClientRect();
+      const targetTask = targetElement.getAttribute('data-task-level');
+      const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
+      
+      // Calculate content left edge (accounting for existing indentation)
+      const contentLeftEdge = targetRect.left + (targetLevel * 20); // 20px per level
+      
+      // 20px threshold for indent/outdent detection
+      const indentThreshold = contentLeftEdge + 20;
+      const outdentThreshold = contentLeftEdge - 20;
+      
+      let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
+      
+      if (x > indentThreshold && targetLevel < 3) {
+        // Cursor is right of content + 20px AND target can be indented
+        dragType = 'indent';
+      } else if (x < outdentThreshold && (task.level || 0) > 0) {
+        // Cursor is left of content - 20px AND current task can be outdented
+        dragType = 'outdent';
+      }
+      
+      setIndentationState({
+        dragType,
+        cursorPosition: { x, y },
+        targetTaskLeftEdge: contentLeftEdge
+      });
+      
+    } catch (error) {
+      console.error('Error updating cursor position:', error);
+      // Fallback to reorder mode
+      setIndentationState({
+        dragType: 'reorder',
+        cursorPosition: { x, y },
+        targetTaskLeftEdge: null
+      });
+    }
+     }, [isSection, task.level]);
+
+  // Reset indentation state when drag ends
+  useEffect(() => {
+    if (!isDragging && !isOver) {
+      setIndentationState({
+        dragType: null,
+        cursorPosition: null,
+        targetTaskLeftEdge: null
+      });
+    }
+  }, [isDragging, isOver]);
+
   return {
     // @dnd-kit props to spread on the draggable element
     attributes: {
@@ -131,8 +216,14 @@ export const useDragDropTask = ({
     isDragging,
     isOver,
     
+    // Enhanced indentation state
+    indentationState,
+    
     // Helper functions
     getRowClassName,
-    getGripClassName
+    getGripClassName,
+    
+    // Cursor tracking for indentation
+    updateCursorPosition
   }
 } 

@@ -12,11 +12,12 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Icons
-import { Plug, Slack } from 'lucide-react'
+import { Plug, Slack, Calendar } from 'lucide-react'
 
 // Components
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import SlackIntegrationCard from '@/components/parts/SlackIntegrationCard'
+import GoogleCalendarIntegrationCard from '@/components/parts/GoogleCalendarIntegrationCard'
 
 /**
  * Integration service definition
@@ -34,6 +35,14 @@ interface IntegrationService {
  * Available integration services
  */
 const integrationServices: IntegrationService[] = [
+  {
+    id: 'google-calendar',
+    name: 'Google Calendar',
+    description: 'Sync your calendar events as tasks in your daily schedule',
+    icon: Calendar,
+    status: 'available',
+    component: GoogleCalendarIntegrationCard
+  },
   {
     id: 'slack',
     name: 'Slack',

@@ -104,7 +104,8 @@ export const calendarApi = {
     }
 
     const result = await response.json()
-    return result.data
+    // Backend returns calendar status directly, not nested under 'data'
+    return result
   },
 
   /**

@@ -36,7 +36,7 @@ interface EditableScheduleRowProps {
   task: Task
   index: number
   onUpdateTask: (task: Task) => void
-  moveTask: (dragIndex: number, hoverIndex: number, shouldIndent: boolean, targetSection: string | null) => void
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
   isSection: boolean
   children?: React.ReactNode
   allTasks: Task[]
@@ -332,15 +332,48 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
 
-  // Implements purple line indicator behaviour (simplified)
+  // Implements Notion-style purple line indicator behaviour
   const getDragIndicators = useCallback(() => {
-    if (!dragDropHook.isOver) return null
+    if (!dragDropHook.isOver || !dragDropHook.indentationState.dragType) return null
 
-    // Simple purple line indicator - @dnd-kit handles collision detection
-    return (
-      <div className="absolute right-0 left-0 h-0.5 bg-purple-500 opacity-75 bottom-[-1px]" />
-    )
-  }, [dragDropHook.isOver])
+    const { dragType } = dragDropHook.indentationState;
+
+    try {
+      switch (dragType) {
+        case 'indent':
+          // Purple bar with 10% darker section on left (Notion-style)
+          return (
+            <div className="absolute right-0 left-0 h-0.5 bottom-[-1px] flex">
+              {/* Darker purple section (10% of width) */}
+              <div className="bg-purple-700 opacity-90" style={{ width: '10%' }} />
+              {/* Normal purple section (90% of width) */}
+              <div className="bg-purple-500 opacity-75" style={{ width: '90%' }} />
+            </div>
+          );
+
+        case 'outdent':
+          // Single shade purple bar
+          return (
+            <div className="absolute right-0 left-0 h-0.5 bg-purple-500 opacity-75 bottom-[-1px]" />
+          );
+
+        case 'reorder':
+          // Standard purple bar for reordering
+          return (
+            <div className="absolute right-0 left-0 h-0.5 bg-purple-500 opacity-60 bottom-[-1px]" />
+          );
+
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.error('Error rendering drag indicators:', error);
+      // Fallback to simple indicator
+      return (
+        <div className="absolute right-0 left-0 h-0.5 bg-purple-500 opacity-75 bottom-[-1px]" />
+      );
+    }
+  }, [dragDropHook.isOver, dragDropHook.indentationState.dragType])
 
   /**
    * Handles task decomposition into microsteps
@@ -580,6 +613,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       <div
         ref={dragDropHook.setNodeRef}
         {...dragDropHook.attributes}
+        data-task-level={task.level || 0}
         className={cn(
           dragDropHook.getRowClassName(),
           isSection ? 'cursor-default' : '',
@@ -598,6 +632,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           willChange: dragDropHook.isDragging ? 'transform' : 'auto',
           // Disable transitions during drag for better performance
           transition: dragDropHook.isDragging ? 'none' : undefined
+        }}
+        onMouseEnter={(e) => {
+          // Track cursor position for indentation detection when entering drop zone
+          if (dragDropHook.isOver) {
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget);
+          }
+        }}
+        onMouseMove={(e) => {
+          // Track cursor position for indentation detection
+          if (dragDropHook.isOver) {
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget);
+          }
         }}
       >
         {/* Task/Section Content */}
