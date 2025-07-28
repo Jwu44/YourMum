@@ -491,7 +491,7 @@ def get_calendar_events():
         if not calendar_data.get('connected') or not calendar_data.get('credentials'):
             return jsonify({
                 "success": False,
-                "error": "User not connected to Google Calendar",
+                "error": "Google Calendar not connected. Please connect your calendar in the Integrations page to sync events.",
                 "tasks": []
             }), 400 if not is_post_request else 200
         
