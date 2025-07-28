@@ -295,7 +295,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
             <DrawerTitle>
-              {isEditMode ? 'Edit Task' : 'Create New Task'}
+              {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
           <div className="p-4 space-y-4">

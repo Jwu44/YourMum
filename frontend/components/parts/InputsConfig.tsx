@@ -750,7 +750,7 @@ const InputConfigurationPage: React.FC = () => {
                 disabled={isLoading || isLoadingTasks}
                 size="lg"
               >
-                {isLoading ? 'Saving...' : 'Save Configuration'}
+                {isLoading ? 'Saving...' : 'Save'}
               </Button>
             </div>
           </div>

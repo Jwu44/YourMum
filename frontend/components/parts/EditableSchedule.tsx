@@ -43,6 +43,9 @@ interface EditableScheduleProps {
 
   /** Callback function for deleting a task */
   onDeleteTask?: (task: Task) => void
+
+  /** Callback function for archiving a task */
+  onArchiveTask?: (task: Task) => void
 }
 
 /**
@@ -62,7 +65,8 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onAcceptSuggestion,
   onRejectSuggestion,
   onEditTask,
-  onDeleteTask
+  onDeleteTask,
+  onArchiveTask
 }) => {
   // Use our drag drop provider hook
   const dragDropProvider = useDragDropProvider({
@@ -218,6 +222,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
                 allTasks={processedTasks}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
+                onArchiveTask={onArchiveTask}
               />
 
               {/* Render suggestions after each task if they exist */}
