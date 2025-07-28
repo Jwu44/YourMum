@@ -283,6 +283,17 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       <DrawerContent
         className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-background shadow-lg outline-none"
         onPointerDownOutside={(e) => {
+          // Allow time picker interactions - check if click is on time input or its picker
+          const target = e.target as HTMLElement
+          
+          // Don't close drawer if clicking on time inputs, their pickers, or select dropdowns
+          if (target?.closest('input[type="time"]') || 
+              target?.closest('.time-input-custom') ||
+              target?.closest('[data-radix-popper-content-wrapper]') ||
+              target?.closest('[data-radix-select-content]')) {
+            return
+          }
+          
           // Only prevent closing if user has unsaved changes
           const hasUnsavedChanges = editedTask.text !== (task?.text || '')
           if (hasUnsavedChanges) {
@@ -352,27 +363,55 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
               <label htmlFor="start_time" className="block text-sm font-medium text-foreground">
                 Start Time
               </label>
-              <Input
-                id="start_time"
-                name="start_time"
-                value={editedTask.start_time || ''}
-                onChange={handleInputChange}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="mt-1"
-              />
+              <div 
+                className="relative"
+                onPointerDown={(e) => {
+                  // Prevent drawer from closing when interacting with time input
+                  e.stopPropagation()
+                }}
+              >
+                <Input
+                  id="start_time"
+                  name="start_time"
+                  type="time"
+                  value={editedTask.start_time || ''}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                  onClick={(e) => {
+                    // Try to trigger time picker on click
+                    e.currentTarget.showPicker?.()
+                  }}
+                  className="mt-1 w-full font-mono text-center time-input-custom"
+                  autoComplete="off"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="end_time" className="block text-sm font-medium text-foreground">
                 End Time
               </label>
-              <Input
-                id="end_time"
-                name="end_time"
-                value={editedTask.end_time || ''}
-                onChange={handleInputChange}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="mt-1"
-              />
+              <div 
+                className="relative"
+                onPointerDown={(e) => {
+                  // Prevent drawer from closing when interacting with time input
+                  e.stopPropagation()
+                }}
+              >
+                <Input
+                  id="end_time"
+                  name="end_time"
+                  type="time"
+                  value={editedTask.end_time || ''}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                  onClick={(e) => {
+                    // Try to trigger time picker on click
+                    e.currentTarget.showPicker?.()
+                  }}
+                  className="mt-1 w-full font-mono text-center time-input-custom"
+                  autoComplete="off"
+                />
+              </div>
             </div>
 
             {/* Recurrence Selection */}
