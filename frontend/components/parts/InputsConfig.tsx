@@ -444,61 +444,55 @@ const InputConfigurationPage: React.FC = () => {
                 {/* Working Hours */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Timer className="h-4 w-4 text-muted-foreground" />
+                    <label className="text-sm font-medium">
                       Work Start Time
                     </label>
-                    <Input
-                      type="time"
-                      value={state.work_start_time || '10:30'}
-                      onChange={(e) => { handleFieldChange('work_start_time', e.target.value) }}
-                      className="w-full font-mono text-center"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="time"
+                        value={state.work_start_time || '09:00'}
+                        onChange={(e) => { handleFieldChange('work_start_time', e.target.value) }}
+                        className="w-full font-mono text-center time-input-custom"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Timer className="h-4 w-4 text-muted-foreground" />
+                    <label className="text-sm font-medium">
                       Work End Time
                     </label>
-                    <Input
-                      type="time"
-                      value={state.work_end_time || '15:30'}
-                      onChange={(e) => { handleFieldChange('work_end_time', e.target.value) }}
-                      className="w-full font-mono text-center"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="time"
+                        value={state.work_end_time || '17:00'}
+                        onChange={(e) => { handleFieldChange('work_end_time', e.target.value) }}
+                        className="w-full font-mono text-center time-input-custom"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Working Days */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     Working Days
                   </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="flex gap-3">
                     {workingDays.map((day) => {
-                      const isChecked = (state.working_days || []).includes(day.fullLabel)
+                      const isSelected = (state.working_days || []).includes(day.fullLabel)
                       return (
                         <div
                           key={day.id}
-                          className={`checkbox-card ${
-                            isChecked
-                              ? 'checkbox-card-checked'
-                              : 'checkbox-card-unchecked'
+                          className={`working-day-bubble ${
+                            isSelected
+                              ? 'working-day-bubble-selected'
+                              : 'working-day-bubble-unselected'
                           }`}
+                          onClick={() => { handleWorkingDayChange(day.fullLabel, !isSelected) }}
+                          title={day.fullLabel}
                         >
-                          <Checkbox
-                            id={day.id}
-                            checked={isChecked}
-                            onCheckedChange={(checked) => { handleWorkingDayChange(day.fullLabel, !!checked) }}
-                          />
-                          <label
-                            htmlFor={day.id}
-                            className="text-sm font-medium cursor-pointer"
-                            title={day.fullLabel}
-                          >
+                          <span className="text-sm font-medium">
                             {day.label}
-                          </label>
+                          </span>
                         </div>
                       )
                     })}
