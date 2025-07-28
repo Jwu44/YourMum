@@ -58,7 +58,7 @@ const navigationItems: NavigationItem[] = [
     id: 'archive',
     title: 'Archive',
     icon: Archive,
-    href: '#',
+    href: '/dashboard/archive',
     isActive: false
   }
 ]

@@ -80,6 +80,16 @@ def get_calendar_events_collection():
     db = get_database()
     return db['calendar_events']
 
+def get_archive_collection():
+    """
+    Get the Archive collection from the database
+    
+    Returns:
+        MongoDB collection for archived tasks
+    """
+    db = get_database()
+    return db['Archive']
+
 # Initialization functions - grouped together
 def initialize_ai_collections():
     """Initialize collections and indexes for AI suggestions feature."""
@@ -180,6 +190,27 @@ def initialize_slack_collections():
         print(f"Error initializing Slack collections: {e}")
         raise
 
+def initialize_archive_collections():
+    """Initialize Archive collections and indexes."""
+    try:
+        # Get archive collection
+        archive_collection = get_archive_collection()
+        
+        # Create indexes for efficient queries
+        archive_indexes = [
+            IndexModel([("userId", ASCENDING)], unique=True),  # One document per user
+            IndexModel([("userId", ASCENDING), ("archivedTasks.archivedAt", DESCENDING)]),  # For chronological sorting
+            IndexModel([("userId", ASCENDING), ("archivedTasks.taskId", ASCENDING)]),  # For finding specific tasks
+            IndexModel([("lastModified", ASCENDING)])  # For maintenance queries
+        ]
+        archive_collection.create_indexes(archive_indexes)
+        
+        print("Archive collections initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing Archive collections: {e}")
+        raise
+
 def initialize_db():
     """Initialize database connection and create necessary collections/indexes."""
     global _db_initialized
@@ -197,6 +228,7 @@ def initialize_db():
         initialize_user_collection()
         initialize_calendar_collections()
         initialize_slack_collections()
+        initialize_archive_collections()
 
         # Create or update collection with schema validation
         db = get_database()
