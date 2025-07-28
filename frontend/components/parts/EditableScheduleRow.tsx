@@ -531,7 +531,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
           minHeight: isSection ? '48px' : 'auto',
-          transform: dragDropHook.transform
+          transform: dragDropHook.transform,
+          // 🔧 FIX: Performance optimizations for smooth dragging
+          willChange: dragDropHook.isDragging ? 'transform' : 'auto',
+          // Disable transitions during drag for better performance
+          transition: dragDropHook.isDragging ? 'none' : undefined
         }}
       >
         {/* Task/Section Content */}

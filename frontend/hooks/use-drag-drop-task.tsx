@@ -10,7 +10,7 @@ import { type Task } from '../lib/types'
  * - Simple implementation using @dnd-kit
  * - Modular architecture with clear separation of concerns
  * - TypeScript strict mode with proper interfaces
- * - Reusable helper function for common drag operations
+ * - Optimized transforms for smooth horizontal dragging
  */
 
 interface UseDragDropTaskProps {
@@ -21,9 +21,9 @@ interface UseDragDropTaskProps {
 }
 
 interface DragDropTaskReturn {
-  // @dnd-kit sortable props
-  attributes: Record<string, any>
-  listeners: Record<string, any> | undefined
+  // @dnd-kit sortable props - properly typed instead of 'any'
+  attributes: Record<string, unknown>
+  listeners: Record<string, unknown> | undefined
   setNodeRef: (node: HTMLElement | null) => void
   transform: string | undefined
   
@@ -38,7 +38,7 @@ interface DragDropTaskReturn {
 
 /**
  * Hook that provides drag and drop functionality for task rows
- * Replaces complex custom implementation with simple @dnd-kit integration
+ * 🔧 FIX: Optimized for smooth horizontal and vertical dragging performance
  */
 export const useDragDropTask = ({
   task,
@@ -65,28 +65,36 @@ export const useDragDropTask = ({
     disabled: isSection // Sections cannot be dragged for now
   })
 
-  // Transform CSS for smooth dragging animation
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  // 🔧 FIX: Optimized transform CSS for smooth dragging
+  // Use translate3d for hardware acceleration and handle null transform
+  const optimizedTransform = transform ? 
+    `translate3d(${transform.x}px, ${transform.y}px, 0)` : 
+    undefined
 
   /**
    * Get CSS classes for the row based on drag state
-   * Follows Notion's visual feedback approach
+   * 🔧 FIX: Enhanced for better performance and visual feedback
    */
   const getRowClassName = useCallback((): string => {
-    const baseClasses = 'relative flex items-center transition-all duration-200'
-    
-    if (isDragging) {
-      return `${baseClasses} opacity-50 rotate-1 scale-105` // Dragging state - semi-transparent with slight tilt
+    try {
+      // Remove transition during dragging for smoother performance
+      const baseClasses = isDragging 
+        ? 'relative flex items-center' // No transition during drag
+        : 'relative flex items-center transition-all duration-200'
+      
+      if (isDragging) {
+        return `${baseClasses} opacity-50 rotate-1 scale-105 z-50` // Higher z-index for proper layering
+      }
+      
+      if (isOver) {
+        return `${baseClasses} bg-purple-50 border-purple-200` // Drop target - purple tint
+      }
+      
+      return baseClasses
+    } catch (error) {
+      console.error('Error getting row className:', error)
+      return 'relative flex items-center transition-all duration-200' // Fallback
     }
-    
-    if (isOver) {
-      return `${baseClasses} bg-purple-50 border-purple-200` // Drop target - purple tint
-    }
-    
-    return baseClasses
   }, [isDragging, isOver])
 
   /**
@@ -94,21 +102,30 @@ export const useDragDropTask = ({
    * Shows interactive state when hovering/dragging
    */
   const getGripClassName = useCallback((): string => {
-    const baseClasses = 'opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-2'
-    
-    if (isDragging) {
-      return `${baseClasses} opacity-100 cursor-grabbing text-purple-600`
+    try {
+      const baseClasses = 'opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-2'
+      
+      if (isDragging) {
+        return `${baseClasses} opacity-100 cursor-grabbing text-purple-600`
+      }
+      
+      return `${baseClasses} cursor-grab hover:text-purple-600`
+    } catch (error) {
+      console.error('Error getting grip className:', error)
+      return 'opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-2' // Fallback
     }
-    
-    return `${baseClasses} cursor-grab hover:text-purple-600`
   }, [isDragging])
 
   return {
     // @dnd-kit props to spread on the draggable element
-    attributes,
+    attributes: {
+      ...attributes,
+      // 🔧 FIX: Add touch-action for better pointer handling
+      'data-touch-action': 'none' // Will be handled via CSS
+    },
     listeners,
     setNodeRef,
-    transform: style.transform,
+    transform: optimizedTransform, // Use optimized transform with translate3d
     
     // Drag state
     isDragging,
