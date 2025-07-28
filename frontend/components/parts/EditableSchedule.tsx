@@ -68,12 +68,6 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   onDeleteTask,
   onArchiveTask
 }) => {
-  // Use our drag drop provider hook
-  const dragDropProvider = useDragDropProvider({
-    tasks,
-    onReorderTasks
-  })
-
   /**
    * Tasks are now pre-processed by the optimized backend
    * We can render them directly without complex layout logic
@@ -91,7 +85,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   const moveTask = useCallback((
     dragIndex: number,
     hoverIndex: number,
-    shouldIndent: boolean,
+    dragType: 'indent' | 'outdent' | 'reorder',
     targetSection: string | null
   ) => {
     const draggedTask = { ...processedTasks[dragIndex] }
@@ -127,7 +121,8 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       const targetTask = processedTasks[hoverIndex]
       const updatedDraggedTask = { ...draggedTask }
 
-      if (shouldIndent && !targetTask.is_section) {
+      if (dragType === 'indent' && !targetTask.is_section) {
+        // Indent: Make dragged task a child of target task
         const newLevel = Math.min((targetTask.level || 0) + 1, 3)
 
         updatedDraggedTask.is_subtask = true
@@ -137,6 +132,16 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
         const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
         newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
+      } else if (dragType === 'outdent' && !targetTask.is_section) {
+        // Outdent: Move to same level as target task
+        const newLevel = targetTask.level || 0
+
+        updatedDraggedTask.is_subtask = newLevel > 0
+        updatedDraggedTask.level = newLevel
+        updatedDraggedTask.parent_id = targetTask.parent_id
+        updatedDraggedTask.section = targetTask.section
+
+        newTasks.splice(hoverIndex, 0, updatedDraggedTask)
       } else {
         if (targetTask.is_section) {
           newTasks.splice(hoverIndex + 1, 0, {
@@ -181,6 +186,13 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     const finalTasks = updateSectionIndices(newTasks)
     onReorderTasks(finalTasks)
   }, [processedTasks, onReorderTasks])
+
+  // Use our drag drop provider hook (after moveTask is defined)
+  const dragDropProvider = useDragDropProvider({
+    tasks,
+    onReorderTasks,
+    moveTask
+  })
 
   /**
    * Log optimization status for debugging

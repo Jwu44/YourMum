@@ -36,6 +36,7 @@ import { type Task } from '../lib/types'
 interface UseDragDropProviderProps {
   tasks: Task[]
   onReorderTasks: (newTasks: Task[]) => void
+  moveTask?: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
 }
 
 interface DragDropProviderReturn {
@@ -57,7 +58,8 @@ interface DragDropProviderReturn {
  */
 export const useDragDropProvider = ({
   tasks,
-  onReorderTasks
+  onReorderTasks,
+  moveTask
 }: UseDragDropProviderProps): DragDropProviderReturn => {
   
   // 🔧 FIX: Replace PointerSensor with MouseSensor + TouchSensor for better performance
@@ -114,8 +116,8 @@ export const useDragDropProvider = ({
   }, [])
 
   /**
-   * Handle drag end - update task order
-   * Simplifies the complex moveTask logic
+   * Handle drag end - update task order with indentation support
+   * Enhanced to support Notion-style indentation based on cursor position
    */
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     try {
@@ -129,9 +131,23 @@ export const useDragDropProvider = ({
       const newIndex = tasks.findIndex(task => task.id === over.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // Use @dnd-kit's arrayMove utility for simple reordering
-        const newTasks = arrayMove(tasks, oldIndex, newIndex)
-        onReorderTasks(newTasks)
+        // Extract indentation state from active drag data
+        const activeData = active.data.current
+        const indentationState = activeData?.indentationState
+        const dragType = indentationState?.dragType || 'reorder'
+
+        // Determine if moving to a section
+        const overData = over.data.current
+        const targetSection = overData?.type === 'section' ? overData.task.text : null
+
+                 // Use the enhanced moveTask if available, otherwise fall back to simple reordering
+         if (moveTask && typeof moveTask === 'function') {
+           moveTask(oldIndex, newIndex, dragType, targetSection)
+         } else {
+           // Fallback to simple reordering
+           const newTasks = arrayMove(tasks, oldIndex, newIndex)
+           onReorderTasks(newTasks)
+         }
       }
     } catch (error) {
       console.error('Error handling drag end:', error)

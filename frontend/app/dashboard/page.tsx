@@ -36,6 +36,7 @@ import { calendarApi } from '@/lib/api/calendar'
 import { userApi } from '@/lib/api/users'
 import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
 import { archiveTask } from '@/lib/api/archive'
+import { auth } from '@/auth/firebase'
 
 const Dashboard: React.FC = () => {
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([])
@@ -1137,15 +1138,37 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0)
 
-        // Single API call approach: Try calendar sync first
-        // The backend handles merging with existing schedules automatically
-        const calendarResponse = await calendarApi.fetchEvents(today)
+        // Check calendar connection status before attempting to fetch events
+        const currentUser = auth.currentUser
+        if (currentUser) {
+          try {
+            console.log('Checking calendar connection for user:', currentUser.uid)
+            const hasValidConnection = await calendarApi.hasValidCalendarConnection()
+            console.log('Calendar connection status:', hasValidConnection)
+            
+            if (hasValidConnection) {
+              console.log('Calendar connected, attempting to fetch events for:', today)
+              // Try calendar sync if connected - backend handles merging with existing schedules
+              const calendarResponse = await calendarApi.fetchEvents(today)
 
-        if (calendarResponse.success) {
-          // Calendar API returns the complete merged schedule
-          setScheduleDays([calendarResponse.tasks])
-          setScheduleCache(new Map([[today, calendarResponse.tasks]]))
-          return
+              if (calendarResponse.success) {
+                console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
+                // Calendar API returns the complete merged schedule
+                setScheduleDays([calendarResponse.tasks])
+                setScheduleCache(new Map([[today, calendarResponse.tasks]]))
+                return
+              } else {
+                console.log('Calendar fetch failed:', calendarResponse.error)
+              }
+            } else {
+              console.log('Calendar not connected, skipping calendar sync')
+            }
+          } catch (calendarError) {
+            console.error('Error checking calendar connection:', calendarError)
+            // Continue with fallback loading if calendar check fails
+          }
+        } else {
+          console.log('No authenticated user found')
         }
 
         // Fallback: Load existing schedule if calendar sync fails

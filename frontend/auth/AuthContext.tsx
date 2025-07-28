@@ -291,6 +291,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Reconnect Google Calendar for existing authenticated users
+   * This triggers the OAuth flow specifically for calendar access
+   */
+  const reconnectCalendar = async () => {
+    try {
+      setError(null);
+      console.log("Starting calendar reconnection process");
+      
+      if (!user) {
+        throw new Error('User must be authenticated to reconnect calendar');
+      }
+      
+      // Configure provider to request calendar access and force consent screen
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+      provider.setCustomParameters({
+        prompt: 'consent'  // Force the consent screen to appear
+      });
+      
+      console.log("Initiating calendar reconnection with popup");
+      
+      try {
+        // Use popup for calendar reconnection (no redirect needed)
+        const result = await signInWithPopup(auth, provider);
+        console.log("Calendar reconnection successful");
+        
+        // Get credentials from result
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential && credential.accessToken) {
+          await processCalendarAccess(credential);
+        } else {
+          throw new Error('No calendar access token received');
+        }
+      } catch (popupError: any) {
+        console.error("Calendar reconnection popup failed:", popupError.message);
+        throw new Error('Calendar reconnection failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Calendar reconnection error:', error);
+      setError('Failed to reconnect calendar');
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,                // Add this to satisfy AuthState
     currentUser: user,   // This is your renamed property
@@ -298,6 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error,
     signIn,
     signOut,
+    reconnectCalendar,
   };
 
   return (
