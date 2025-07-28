@@ -281,6 +281,10 @@ All colors MUST be HSL.
   /* Draggable priority card */
   .draggable-card {
     @apply flex items-center gap-3 p-4 bg-card rounded-lg border hover:border-primary/30 transition-all duration-200 hover:shadow-sm;
+    
+    /* 🔧 FIX: Performance optimizations for smooth dragging */
+    will-change: auto;
+    transform: translateZ(0); /* Force hardware acceleration */
   }
   
   .draggable-card.group {
@@ -289,6 +293,38 @@ All colors MUST be HSL.
   
   .draggable-card-grip {
     @apply h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors cursor-move;
+    
+    /* 🔧 FIX: Touch optimization for better drag initiation */
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* 🔧 FIX: Drag performance optimizations */
+  [data-touch-action="none"] {
+    touch-action: none;
+  }
+
+  /* Optimizations for dragging state */
+  [data-dragging="true"] {
+    will-change: transform;
+    transform: translateZ(0);
+    /* Disable transitions during drag for better performance */
+    transition: none !important;
+  }
+
+  /* Task row optimizations */
+  .task-row {
+    /* Optimize for frequent transform updates */
+    will-change: auto;
+    transform: translateZ(0);
+  }
+
+  .task-row[data-dragging="true"] {
+    will-change: transform;
+    /* Remove transitions during drag */
+    transition: none !important;
+    /* Ensure proper layering */
+    z-index: 1000;
   }
   
   /* Interactive checkbox cards */
