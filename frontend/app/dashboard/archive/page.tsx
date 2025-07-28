@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, Calendar, AlertCircle } from 'lucide-react'
+import { Archive, Calendar, AlertCircle, Trash2 } from 'lucide-react'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -16,12 +16,12 @@ import { Badge } from '@/components/ui/badge'
 
 // Components
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
-import { ArchivedTaskItem } from '@/components/parts/ArchivedTaskItem'
+import EditableScheduleRow from '@/components/parts/EditableScheduleRow'
 
 // Hooks and Services
 import { useToast } from '@/hooks/use-toast'
 import { getArchivedTasks, moveArchivedTaskToToday, deleteArchivedTask } from '@/lib/api/archive'
-import { createSchedule } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule } from '@/lib/ScheduleHelper'
 
 // Types
 import { type Task } from '@/lib/types'
@@ -87,34 +87,41 @@ const ArchivePage: React.FC = () => {
       // Get today's date
       const todayDate = new Date().toISOString().split('T')[0]
 
-      // Check if today's schedule exists, if not create it
+      // Load existing schedule for today and add the moved task
       try {
-        const scheduleResult = await createSchedule(
-          todayDate,
-          [moveResult.task!] // Add the moved task
-        )
+        const existingScheduleResult = await loadSchedule(todayDate)
+        
+        let existingTasks: Task[] = []
+        if (existingScheduleResult.success && existingScheduleResult.schedule) {
+          existingTasks = existingScheduleResult.schedule
+        }
 
-        if (!scheduleResult.success) {
-          // If schedule creation fails, try to load existing schedule and add task
-          console.warn('Failed to create new schedule, task moved but may need manual addition')
+        // Add the moved task to existing tasks (at the bottom)
+        const updatedTasks = [...existingTasks, moveResult.task!]
+
+        // Update the schedule with the combined tasks
+        const updateResult = await updateSchedule(todayDate, updatedTasks)
+
+        if (!updateResult.success) {
+          console.warn('Failed to update schedule with moved task:', updateResult.error)
+          toast({
+            title: 'Warning',
+            description: 'Task moved but may not appear in today\'s schedule immediately',
+            variant: 'default'
+          })
+        } else {
         }
       } catch (scheduleError) {
         console.warn('Schedule operation failed:', scheduleError)
+        toast({
+          title: 'Warning', 
+          description: 'Task moved but may not appear in today\'s schedule immediately',
+          variant: 'default'
+        })
       }
 
       // Remove the task from archived tasks list
       setArchivedTasks(prev => prev.filter(archived => archived.taskId !== taskId))
-
-      toast({
-        title: 'Success',
-        description: 'Task moved to today\'s schedule',
-        variant: 'default'
-      })
-
-      // Optionally redirect to dashboard
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 1500)
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to move task to today'
@@ -155,6 +162,66 @@ const ArchivePage: React.FC = () => {
       })
     }
   }, [toast])
+
+  /**
+   * Handle archive-specific actions for EditableScheduleRow
+   */
+  const handleArchiveTaskAction = useCallback((task: Task, action: 'move' | 'delete') => {
+    // Find the archived task by matching the task ID
+    const archivedTask = archivedTasks.find(archived => archived.task.id === task.id)
+    if (!archivedTask) return
+
+    if (action === 'move') {
+      handleMoveToToday(archivedTask.taskId)
+    } else if (action === 'delete') {
+      handleDeleteArchivedTask(archivedTask.taskId)
+    }
+  }, [archivedTasks, handleMoveToToday, handleDeleteArchivedTask])
+
+  /**
+   * Custom handlers for EditableScheduleRow in archive context
+   */
+  const handleEditTask = useCallback((task: Task) => {
+    // In archive context, "edit" means move to today
+    handleArchiveTaskAction(task, 'move')
+  }, [handleArchiveTaskAction])
+
+  const handleDeleteTask = useCallback((task: Task) => {
+    handleArchiveTaskAction(task, 'delete')
+  }, [handleArchiveTaskAction])
+
+  // Disable archive action since we're already in archive
+  const handleArchiveTask = useCallback(() => {
+    // No-op in archive context
+  }, [])
+
+  // Disable task updates in archive context
+  const handleUpdateTask = useCallback(() => {
+    // No-op in archive context - archived tasks shouldn't be updated
+  }, [])
+
+  // Disable drag and drop in archive context
+  const handleMoveTask = useCallback(() => {
+    // No-op in archive context - archived tasks shouldn't be reordered
+  }, [])
+
+  /**
+   * Create custom dropdown items for archive context
+   */
+  const createCustomDropdownItems = useCallback((archivedTask: ArchivedTask) => [
+    {
+      label: 'Move to today',
+      icon: Calendar,
+      onClick: () => handleMoveToToday(archivedTask.taskId),
+      variant: 'default' as const
+    },
+    {
+      label: 'Delete',
+      icon: Trash2,
+      onClick: () => handleDeleteArchivedTask(archivedTask.taskId),
+      variant: 'destructive' as const
+    }
+  ], [handleMoveToToday, handleDeleteArchivedTask])
 
   /**
    * Load archived tasks when component mounts
@@ -229,7 +296,7 @@ const ArchivePage: React.FC = () => {
 
           {/* Empty State */}
           {!isLoading && !error && archivedTasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16">
+            <div className="flex items-center justify-center min-h-[40vh]">
               <div className="text-center max-w-md">
                 <Archive className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No archived tasks yet</h3>
@@ -239,7 +306,7 @@ const ArchivePage: React.FC = () => {
                 <Button 
                   onClick={() => router.push('/dashboard')}
                   variant="outline"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 mx-auto"
                 >
                   <Calendar className="h-4 w-4" />
                   Go to Dashboard
@@ -251,7 +318,7 @@ const ArchivePage: React.FC = () => {
           {/* Archived Tasks List */}
           {!isLoading && !error && archivedTasks.length > 0 && (
             <div className="space-y-4">
-              {archivedTasks.map((archivedTask) => (
+              {archivedTasks.map((archivedTask, index) => (
                 <div key={archivedTask.taskId} className="space-y-2">
                   {/* Archive metadata */}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -265,11 +332,18 @@ const ArchivePage: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Archived task item */}
-                  <ArchivedTaskItem
+                  {/* Archived task displayed as EditableScheduleRow */}
+                  <EditableScheduleRow
                     task={archivedTask.task}
-                    onMoveToToday={() => handleMoveToToday(archivedTask.taskId)}
-                    onDelete={() => handleDeleteArchivedTask(archivedTask.taskId)}
+                    index={index}
+                    onUpdateTask={handleUpdateTask}
+                    moveTask={handleMoveTask}
+                    isSection={false}
+                    allTasks={archivedTasks.map(at => at.task)}
+                    onEditTask={handleEditTask} // Maps to "Move to today"
+                    onDeleteTask={handleDeleteTask} // Maps to "Delete permanently"
+                    onArchiveTask={handleArchiveTask} // Disabled in archive context
+                    customDropdownItems={createCustomDropdownItems(archivedTask)}
                   />
                 </div>
               ))}

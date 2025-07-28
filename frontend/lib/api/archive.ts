@@ -1,13 +1,23 @@
 import { type Task } from '../types'
 
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://yourdai-backend.onrender.com/api'
-  : 'http://localhost:5001/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+
+// Add development bypass constants
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
 /**
  * Get authorization headers for API requests
  */
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  // In development mode with bypass enabled, return mock headers
+  if (IS_DEVELOPMENT && BYPASS_AUTH) {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer mock-token-for-development'
+    }
+  }
+
   // Get Firebase auth token
   const { getAuth } = await import('firebase/auth')
   const auth = getAuth()
@@ -34,7 +44,7 @@ export const archiveTask = async (
   try {
     const headers = await getAuthHeaders()
     
-    const response = await fetch(`${API_BASE_URL}/archive/task`, {
+    const response = await fetch(`${API_BASE_URL}/api/archive/task`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -76,7 +86,7 @@ export const getArchivedTasks = async (): Promise<{
   try {
     const headers = await getAuthHeaders()
     
-    const response = await fetch(`${API_BASE_URL}/archive/tasks`, {
+    const response = await fetch(`${API_BASE_URL}/api/archive/tasks`, {
       method: 'GET',
       headers
     })
@@ -112,7 +122,7 @@ export const moveArchivedTaskToToday = async (
   try {
     const headers = await getAuthHeaders()
     
-    const response = await fetch(`${API_BASE_URL}/archive/task/${taskId}/move-to-today`, {
+    const response = await fetch(`${API_BASE_URL}/api/archive/task/${taskId}/move-to-today`, {
       method: 'POST',
       headers
     })
@@ -142,7 +152,7 @@ export const deleteArchivedTask = async (
   try {
     const headers = await getAuthHeaders()
     
-    const response = await fetch(`${API_BASE_URL}/archive/task/${taskId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/archive/task/${taskId}`, {
       method: 'DELETE',
       headers
     })
