@@ -389,11 +389,6 @@ const InputConfigurationPage: React.FC = () => {
       // Generate schedule with updated preferences and existing tasks
       await generateSchedule(payload)
 
-      toast({
-        title: 'Success',
-        description: 'Configuration saved and schedule updated successfully'
-      })
-
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error) {
