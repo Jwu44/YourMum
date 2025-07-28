@@ -1,7 +1,10 @@
 import React, { useMemo, useCallback } from 'react'
 import { Pane } from 'evergreen-ui'
+import { DndContext } from '@dnd-kit/core'
+import { SortableContext } from '@dnd-kit/sortable'
 import EditableScheduleRow from './EditableScheduleRow'
 import AISuggestionsList from './AISuggestionsList'
+import { useDragDropProvider } from '../../hooks/use-drag-drop-provider'
 import {
   type Task,
   type AISuggestion
@@ -53,23 +56,25 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   tasks,
   onUpdateTask,
   onReorderTasks,
+  onRequestSuggestions,
+  isLoadingSuggestions,
   suggestionsMap,
   onAcceptSuggestion,
   onRejectSuggestion,
   onEditTask,
   onDeleteTask
 }) => {
+  // Use our drag drop provider hook
+  const dragDropProvider = useDragDropProvider({
+    tasks,
+    onReorderTasks
+  })
+
   /**
-   * Direct task rendering from backend data
-   *
-   * Each schedule renders based on how it was originally generated, not the current
-   * user's layout preference. The backend returns the correct structure based on
-   * the layout preference that was used during schedule creation.
+   * Tasks are now pre-processed by the optimized backend
+   * We can render them directly without complex layout logic
    */
   const processedTasks = useMemo(() => {
-    // Always render tasks as-is from the backend
-    // This preserves the original layout structure (structured vs unstructured)
-    // that was used when the schedule was first generated
     return tasks
   }, [tasks])
 
@@ -189,47 +194,60 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   }, [tasks])
 
   return (
-    <Pane>
-      {/* Direct rendering of pre-structured tasks */}
-      {processedTasks.map((task, index) => (
-        <React.Fragment key={`${task.id}-${task.type || 'task'}`}>
-          <EditableScheduleRow
-            task={task}
-            index={index}
-            onUpdateTask={onUpdateTask}
-            moveTask={moveTask}
-            isSection={task.is_section || task.type === 'section'}
-            allTasks={processedTasks}
-            onEditTask={onEditTask}
-            onDeleteTask={onDeleteTask}
-          />
+    <DndContext
+      sensors={dragDropProvider.sensors}
+      collisionDetection={dragDropProvider.collisionDetection}
+      onDragStart={dragDropProvider.onDragStart}
+      onDragOver={dragDropProvider.onDragOver}
+      onDragEnd={dragDropProvider.onDragEnd}
+    >
+      <SortableContext
+        items={dragDropProvider.items}
+        strategy={dragDropProvider.strategy}
+      >
+        <Pane>
+          {/* Direct rendering of pre-structured tasks */}
+          {processedTasks.map((task, index) => (
+            <React.Fragment key={`${task.id}-${task.type || 'task'}`}>
+              <EditableScheduleRow
+                task={task}
+                index={index}
+                onUpdateTask={onUpdateTask}
+                moveTask={moveTask}
+                isSection={task.is_section || task.type === 'section'}
+                allTasks={processedTasks}
+                onEditTask={onEditTask}
+                onDeleteTask={onDeleteTask}
+              />
 
-          {/* Render suggestions after each task if they exist */}
-          {suggestionsMap.has(task.id) && (
-            <div className="suggestion-container">
+              {/* Render suggestions after each task if they exist */}
+              {suggestionsMap.has(task.id) && (
+                <div className="suggestion-container">
+                  <AISuggestionsList
+                    suggestions={suggestionsMap.get(task.id) || []}
+                    onAccept={onAcceptSuggestion}
+                    onReject={onRejectSuggestion}
+                    className="suggestion-list"
+                  />
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+
+          {/* Render suggestions for schedule start if they exist */}
+          {suggestionsMap.has('schedule-start') && (
+            <div className="schedule-start-container">
               <AISuggestionsList
-                suggestions={suggestionsMap.get(task.id) || []}
+                suggestions={suggestionsMap.get('schedule-start') || []}
                 onAccept={onAcceptSuggestion}
                 onReject={onRejectSuggestion}
                 className="suggestion-list"
               />
             </div>
           )}
-        </React.Fragment>
-      ))}
-
-      {/* Render suggestions for schedule start if they exist */}
-      {suggestionsMap.has('schedule-start') && (
-        <div className="schedule-start-container">
-          <AISuggestionsList
-            suggestions={suggestionsMap.get('schedule-start') || []}
-            onAccept={onAcceptSuggestion}
-            onReject={onRejectSuggestion}
-            className="suggestion-list"
-          />
-        </div>
-      )}
-    </Pane>
+        </Pane>
+      </SortableContext>
+    </DndContext>
   )
 }
 

@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
 import { TypographyH4 } from '../../app/fonts/text'
-import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
@@ -14,7 +14,6 @@ import {
 import {
   handleMicrostepDecomposition
 } from '../../lib/helper'
-import { isBrowser } from '../../lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
@@ -22,6 +21,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+
+// Import our new drag drop hook
+import { useDragDropTask } from '../../hooks/use-drag-drop-task'
 
 interface EditableScheduleRowProps {
   task: Task
@@ -33,21 +35,6 @@ interface EditableScheduleRowProps {
   allTasks: Task[]
   onEditTask?: (task: Task) => void // New prop for edit functionality
   onDeleteTask?: (task: Task) => void // New prop for delete functionality
-}
-
-// Interface for managing drag state
-interface DragState {
-  isDragTarget: boolean
-  dragType: 'above' | 'below' | 'indent' | null
-  indentationLevel: number
-  cursorPastCheckbox: boolean
-}
-
-// Add this interface for the drag indicator props
-interface DragIndicatorProps {
-  left: number
-  width: string | number
-  opacity: number
 }
 
 /**
@@ -196,6 +183,23 @@ const getSectionIcon = (sectionName: string, onEmojiChange?: (emoji: string) => 
   )
 }
 
+/**
+ * EditableScheduleRow Component
+ * 
+ * Renders a single task or section row with drag and drop functionality.
+ * 
+ * Follows dev-guide principles:
+ * - Simple implementation using @dnd-kit for drag and drop
+ * - Modular architecture with clear separation of concerns
+ * - Focus on rendering with drag logic handled by custom hooks
+ * 
+ * Features:
+ * - Drag and drop reordering with purple visual feedback
+ * - Microstep decomposition for complex tasks
+ * - Edit and delete actions
+ * - Section and task rendering with proper styling
+ * - Mobile-friendly touch support
+ */
 const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   task,
   index,
@@ -205,16 +209,15 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onEditTask, // New prop for edit functionality
   onDeleteTask // New prop for delete functionality
 }) => {
-  // Local UI states
-  const [dragState, setDragState] = useState<DragState>({
-    isDragTarget: false,
-    dragType: null,
-    indentationLevel: 0,
-    cursorPastCheckbox: false
+  // Use our new drag drop hook instead of complex local state
+  const dragDropHook = useDragDropTask({
+    task,
+    index,
+    isSection,
+    moveTask
   })
 
-  // Refs for DOM measurements
-  const rowRef = useRef<HTMLDivElement>(null)
+  // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
 
   // New state for microsteps
@@ -292,174 +295,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     }
   }, [task, onDeleteTask, toast])
 
-  // Enhanced drag and drop handlers
-  const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    if (isBrowser() && e.dataTransfer) {
-      e.dataTransfer.setData('text/plain', index.toString())
-      e.dataTransfer.effectAllowed = 'move'
-      if (rowRef.current) {
-        rowRef.current.style.opacity = '0.5'
-      }
-    }
-  }, [index])
+  // TODO: Remove old drag handlers - replaced by @dnd-kit hook
+  // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
+  // @dnd-kit handles all drag events through the hook
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    if (!isBrowser() || !e.dataTransfer || isSection) {
-      return
-    }
-
-    e.dataTransfer.dropEffect = 'move'
-
-    try {
-      const rect = rowRef.current?.getBoundingClientRect()
-      const checkboxRect = checkboxRef.current?.getBoundingClientRect()
-
-      if (!rect || !checkboxRect) {
-        return
-      }
-
-      // Calculate cursor position relative to checkbox
-      const cursorPastCheckbox = e.clientX > (checkboxRect.right)
-
-      // Calculate available indentation levels based on current task level
-      const maxIndentLevel = cursorPastCheckbox
-        ? Math.min((task.level || 0) + 1, 3)
-        : 0 // Limit max indent to 3 levels
-
-      // Calculate vertical position for drag type
-      const mouseY = e.clientY - rect.top
-      const threshold = rect.height / 3
-
-      const newDragState: DragState = {
-        isDragTarget: true,
-        dragType: null,
-        indentationLevel: maxIndentLevel,
-        cursorPastCheckbox
-      }
-
-      if (mouseY < threshold) {
-        newDragState.dragType = 'above'
-      } else if (mouseY > rect.height - threshold) {
-        newDragState.dragType = 'below'
-      } else {
-        newDragState.dragType = 'indent'
-      }
-
-      setDragState(newDragState)
-    } catch (error) {
-      console.error('Error in handleDragOver:', error)
-      // Reset to safe state on error
-      setDragState({
-        isDragTarget: false,
-        dragType: null,
-        indentationLevel: 0,
-        cursorPastCheckbox: false
-      })
-    }
-  }, [isSection, task.level])
-
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setDragState({
-      isDragTarget: false,
-      dragType: null,
-      indentationLevel: 0,
-      cursorPastCheckbox: false
-    })
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    if (isBrowser() && e.dataTransfer) {
-      const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10)
-
-      if (isSection) {
-        moveTask(dragIndex, index, false, task.text)
-      } else {
-        // Only indent if we're in indent mode and cursor is past checkbox
-        const shouldIndent = dragState.dragType === 'indent' && dragState.cursorPastCheckbox
-
-        // If dropping below, we need to adjust the target index
-        const targetIndex = dragState.dragType === 'below' ? index + 1 : index
-
-        moveTask(dragIndex, targetIndex, shouldIndent, null)
-      }
-    }
-
-    // Reset drag state
-    setDragState({
-      isDragTarget: false,
-      dragType: null,
-      indentationLevel: 0,
-      cursorPastCheckbox: false
-    })
-  }, [index, moveTask, dragState, isSection, task.text])
-
-  const handleDragEnd = useCallback(() => {
-    if (rowRef.current) {
-      rowRef.current.style.opacity = '1'
-    }
-  }, [])
-
-  // Implements blue line indicator behaviour
+  // Implements purple line indicator behaviour (simplified)
   const getDragIndicators = useCallback(() => {
-    if (!dragState.isDragTarget) return null
+    if (!dragDropHook.isOver) return null
 
-    if (!dragState.cursorPastCheckbox || dragState.dragType === 'above') {
-      // Single line for regular reordering
-      return (
-        <div
-          className="absolute right-0 left-0 h-0.5 bg-blue-500"
-          style={{
-            opacity: 0.5,
-            bottom: '-1px' // Position at bottom of row
-          }}
-        />
-      )
-    }
-
-    if (dragState.dragType === 'indent') {
-      const totalLevels = dragState.indentationLevel + 1
-      const indicators: DragIndicatorProps[] = []
-
-      for (let i = 0; i < totalLevels; i++) {
-        const isFirstLine = i === 0
-        const leftOffset = i * 20 // 20px indent per level
-        const opacity = 0.3 + (i * 0.2) // Increasing opacity for each level
-
-        indicators.push({
-          left: leftOffset,
-          width: isFirstLine ? 8 : `calc(100% - ${leftOffset}px)`,
-          opacity
-        })
-      }
-
-      return (
-        <div className="absolute inset-0 pointer-events-none">
-          {indicators.map((indicator, index) => (
-            <React.Fragment key={index}>
-              <div
-                className="absolute h-0.5 bg-blue-500"
-                style={{
-                  left: indicator.left,
-                  width: indicator.width,
-                  opacity: indicator.opacity,
-                  bottom: '-1px', // Position at bottom of row
-                  transform: 'none' // Remove vertical centering
-                }}
-              />
-              {index < indicators.length - 1 && (
-                <div className="w-1" /> // 2px spacing between lines
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      )
-    }
-
-    return null
-  }, [dragState])
+    // Simple purple line indicator - @dnd-kit handles collision detection
+    return (
+      <div className="absolute right-0 left-0 h-0.5 bg-purple-500 opacity-75 bottom-[-1px]" />
+    )
+  }, [dragDropHook.isOver])
 
   /**
    * Handles task decomposition into microsteps
@@ -668,16 +516,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       className="relative"
     >
       <div
-        ref={rowRef}
-        draggable={!isSection && isBrowser()}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onDragEnd={handleDragEnd}
+        ref={dragDropHook.setNodeRef}
+        {...dragDropHook.attributes}
         className={cn(
-          'relative flex items-center',
-          isSection ? 'cursor-default' : 'cursor-move',
+          dragDropHook.getRowClassName(),
+          isSection ? 'cursor-default' : '',
           isDecomposing && 'animate-pulse',
           task.level && task.level > 0 ? 'pl-8' : '',
           // Section styling
@@ -687,12 +530,21 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         )}
         style={{
           marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
-          minHeight: isSection ? '48px' : 'auto'
+          minHeight: isSection ? '48px' : 'auto',
+          transform: dragDropHook.transform
         }}
       >
         {/* Task/Section Content */}
         {!isSection && (
           <>
+            {/* Drag Handle - only visible on hover */}
+            <div 
+              className={dragDropHook.getGripClassName()}
+              {...dragDropHook.listeners}
+            >
+              <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+            </div>
+            
             <div ref={checkboxRef} className="flex items-center">
               {task.is_subtask && (
                 <div className="w-4 h-4 mr-2 border-l border-b border-muted" />
