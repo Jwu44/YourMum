@@ -25,6 +25,13 @@ import {
 // Import our new drag drop hook
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
 
+interface CustomDropdownItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  onClick: () => void
+  variant?: 'default' | 'destructive'
+}
+
 interface EditableScheduleRowProps {
   task: Task
   index: number
@@ -36,6 +43,7 @@ interface EditableScheduleRowProps {
   onEditTask?: (task: Task) => void // New prop for edit functionality
   onDeleteTask?: (task: Task) => void // New prop for delete functionality
   onArchiveTask?: (task: Task) => void // New prop for archive functionality
+  customDropdownItems?: CustomDropdownItem[] // Custom dropdown items for specific contexts
 }
 
 /**
@@ -209,7 +217,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   isSection,
   onEditTask, // New prop for edit functionality
   onDeleteTask, // New prop for delete functionality
-  onArchiveTask // New prop for archive functionality
+  onArchiveTask, // New prop for archive functionality
+  customDropdownItems // Custom dropdown items for specific contexts
 }) => {
   // Use our new drag drop hook instead of complex local state
   const dragDropHook = useDragDropTask({
@@ -512,30 +521,49 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={handleEditTask}
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <Pencil className="h-4 w-4" />
-            Edit
-          </DropdownMenuItem>
-          {/* Archive option - only show for non-section tasks */}
-          {!isSection && !task.is_section && onArchiveTask && (
-            <DropdownMenuItem
-              onClick={handleArchiveTask}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <Archive className="h-4 w-4" />
-              Archive
-            </DropdownMenuItem>
+          {customDropdownItems ? (
+            // Use custom dropdown items when provided
+            customDropdownItems.map((item, index) => (
+              <DropdownMenuItem
+                key={index}
+                onClick={item.onClick}
+                className={`flex items-center gap-2 cursor-pointer ${
+                  item.variant === 'destructive' ? 'text-destructive hover-selection' : ''
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            // Default dropdown items
+            <>
+              <DropdownMenuItem
+                onClick={handleEditTask}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              {/* Archive option - only show for non-section tasks */}
+              {!isSection && !task.is_section && onArchiveTask && (
+                <DropdownMenuItem
+                  onClick={handleArchiveTask}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Archive className="h-4 w-4" />
+                  Archive
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={handleDeleteTask}
+                className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </>
           )}
-          <DropdownMenuItem
-            onClick={handleDeleteTask}
-            className="flex items-center gap-2 cursor-pointer text-destructive hover-selection"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

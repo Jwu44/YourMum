@@ -309,6 +309,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 name="text"
                 value={editedTask.text}
                 onChange={handleInputChange}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 className="mt-1"
               />
             </div>
@@ -356,6 +357,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 name="start_time"
                 value={editedTask.start_time || ''}
                 onChange={handleInputChange}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 className="mt-1"
               />
             </div>
@@ -368,6 +370,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 name="end_time"
                 value={editedTask.end_time || ''}
                 onChange={handleInputChange}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 className="mt-1"
               />
             </div>
