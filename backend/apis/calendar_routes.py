@@ -275,7 +275,10 @@ def connect_google_calendar():
         db = get_database()
         users = db['users']
         
-        # Update user with calendar credentials
+        print(f"DEBUG: Connecting calendar for user {user_id}")
+        print(f"DEBUG: Calendar credentials provided: {bool(credentials.get('accessToken'))}")
+        
+        # Update user with calendar credentials and connection status
         result = users.update_one(
             {"googleId": user_id},
             {"$set": {
@@ -283,9 +286,12 @@ def connect_google_calendar():
                 "calendar.credentials": credentials,
                 "calendar.syncStatus": "completed",
                 "calendar.lastSyncTime": datetime.now(timezone.utc),
-                "calendarSynced": True
+                "calendarSynced": True,
+                "metadata.lastModified": datetime.now(timezone.utc)
             }}
         )
+        
+        print(f"DEBUG: Calendar connection update result - modified count: {result.modified_count}")
         
         if result.modified_count == 0:
             return jsonify({
