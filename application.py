@@ -42,13 +42,18 @@ def create_app(testing=False):
     # init firebase app
     try:
         # Try to delete any existing Firebase apps
-        for firebase_app in firebase_admin._apps.values():
+        # Create a list copy to avoid "dictionary changed size during iteration" error
+        existing_apps = list(firebase_admin._apps.values())
+        for firebase_app in existing_apps:
             firebase_admin.delete_app(firebase_app)
+        print("Cleared existing Firebase apps")
+        
         # Then initialize
         initialize_firebase()
-        print("Firebase initialized successfully xd")
+        print("Firebase initialized successfully")
     except Exception as e:
         print(f"Firebase initialization error: {str(e)}")
+        print("Continuing without Firebase - calendar features will be disabled")
                          
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
