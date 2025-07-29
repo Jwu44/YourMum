@@ -57,65 +57,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (hasCalendarAccess) {
-        try {
-
-          console.log("Starting calendar connection process...");
-          
-          // Get intended final destination
-          const finalDestination = localStorage.getItem('authRedirectDestination') || '/dashboard';
-          localStorage.setItem('finalRedirectDestination', finalDestination);
-          localStorage.removeItem('authRedirectDestination');
-          
-          // Set initial progress
-          localStorage.setItem('calendarConnectionProgress', 'connecting');
-          
-          // Small delay to ensure Firebase auth state is fully established
-          console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Update progress to verifying
-          localStorage.setItem('calendarConnectionProgress', 'verifying');
-          
-          // Create credentials object
-          console.log("Connecting to Google Calendar...");
-          const credentials: CalendarCredentials = {
-            accessToken: credential.accessToken,
-            expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
-            scopes: scopes
-          };
-          
-          // Connect to calendar (credentials stored for later use)
-          await calendarApi.connectCalendar(credentials);
-          console.log("Connected to Google Calendar");
-          console.log("TASK-07 FIX: Calendar credentials stored, dashboard will handle event fetching");
-          
-          // Mark as complete
-          localStorage.setItem('calendarConnectionProgress', 'complete');
-          
-          // Now redirect to connecting page to show completion and handle final redirect
-          console.log("Calendar connection complete, showing completion screen");
-          setIsOAuthInProgress(false);
-          window.location.href = '/connecting';
-          
-        } catch (calendarError) {
-          console.error("Error connecting to calendar:", calendarError);
-          setIsOAuthInProgress(false);
-          
-          // Store error information for the connecting page to handle
-          const errorMessage = calendarError instanceof Error ? calendarError.message : 'Failed to connect to Google Calendar';
-          localStorage.setItem('calendarConnectionError', JSON.stringify({
-            error: errorMessage,
-            timestamp: Date.now(),
-            action: 'redirect_to_integrations'
-          }));
-          
-          // Clear progress and redirect to connecting page to handle error
-          localStorage.removeItem('calendarConnectionProgress');
-          localStorage.removeItem('finalRedirectDestination');
-          
-          console.log("Calendar connection failed, redirecting to connecting page for error handling");
-          window.location.href = '/connecting';
-        }
+        console.log("Starting calendar connection process...");
+        
+        // Small delay to ensure Firebase auth state is fully established
+        console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Create credentials object and connect to calendar
+        console.log("Connecting to Google Calendar...");
+        const credentials: CalendarCredentials = {
+          accessToken: credential.accessToken,
+          expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+          scopes: scopes
+        };
+        
+        // Connect to calendar - this should be atomic (either succeeds or fails)
+        await calendarApi.connectCalendar(credentials);
+        console.log("Connected to Google Calendar successfully");
+        
+        // Success - redirect to dashboard
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        setIsOAuthInProgress(false);
+        window.location.href = redirectTo;
+        
       } else {
         // No calendar access, redirect directly to dashboard
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
@@ -129,16 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error processing calendar access:", error);
       setIsOAuthInProgress(false);
+      setError(error instanceof Error ? error.message : 'Failed to connect calendar');
       
-      // Store error information for fallback handling
-      const errorMessage = error instanceof Error ? error.message : 'Authentication process failed';
-      localStorage.setItem('calendarConnectionError', JSON.stringify({
-        error: errorMessage,
-        timestamp: Date.now(),
-        action: 'redirect_to_dashboard'
-      }));
-      
-      // Fallback to dashboard
+      // Redirect to dashboard and let user retry from integrations page
       const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
       localStorage.removeItem('authRedirectDestination');
       window.location.href = redirectTo;
@@ -376,26 +334,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Initiating calendar reconnection with popup");
       
-      try {
-        // Use popup for calendar reconnection (no redirect needed)
-        const result = await signInWithPopup(auth, provider);
-        console.log("Calendar reconnection successful");
-        
-        // Get credentials from result
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential && credential.accessToken) {
-          await processCalendarAccess(credential);
-        } else {
-          throw new Error('No calendar access token received');
-        }
-      } catch (popupError: any) {
-        console.error("Calendar reconnection popup failed:", popupError.message);
-        throw new Error('Calendar reconnection failed. Please try again.');
+      // Use popup for calendar reconnection (no redirect needed)
+      const result = await signInWithPopup(auth, provider);
+      console.log("Calendar reconnection successful");
+      
+      // Get credentials from result
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error('No calendar access token received');
       }
+      
+      // Get scopes and connect to calendar
+      const scopes = await getScopes(credential.accessToken);
+      const hasCalendarAccess = scopes.some(scope => 
+        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+      );
+      
+      if (!hasCalendarAccess) {
+        throw new Error('Calendar access not granted');
+      }
+      
+      // Create credentials and connect
+      const credentials: CalendarCredentials = {
+        accessToken: credential.accessToken,
+        expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+        scopes: scopes
+      };
+      
+      await calendarApi.connectCalendar(credentials);
+      console.log("Calendar reconnected successfully");
+      
     } catch (error) {
       console.error('Calendar reconnection error:', error);
-      setError('Failed to reconnect calendar');
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reconnect calendar';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
