@@ -75,12 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await calendarApi.connectCalendar(credentials);
         console.log("Connected to Google Calendar successfully");
         
-        // Update user in backend with calendar connection status after successful connection
-        if (auth.currentUser) {
-          console.log("Updating user with successful calendar connection");
-          await storeUserInBackend(auth.currentUser, true);
-        }
-        
         // Small delay to ensure all async operations complete before resetting OAuth state
         await new Promise(resolve => setTimeout(resolve, 500));
         
@@ -195,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
     // Cleanup subscription
     return () => unsubscribe();
-  }, [isOAuthInProgress]); // Add isOAuthInProgress to dependency array
+  }, []); // Empty dependency array - setup once on mount
   
   // Handle redirect result and check for calendar access
   useEffect(() => {
