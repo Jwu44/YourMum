@@ -76,6 +76,20 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex])
 
+  // TASK-21: Check for calendar connection errors and show toast
+  useEffect(() => {
+    const calendarError = localStorage.getItem('calendarConnectionError')
+    if (calendarError) {
+      toast({
+        title: 'Calendar Connection Issue',
+        description: calendarError,
+        variant: 'destructive'
+      })
+      // Clear the error flag
+      localStorage.removeItem('calendarConnectionError')
+    }
+  }, [toast])
+
   // Fetch user creation date on component mount
   useEffect(() => {
     const fetchUserCreationDate = async () => {
@@ -1138,34 +1152,26 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0)
 
-        // Check calendar connection status before attempting to fetch events
+        // TASK-21 FIX: With race condition fixed, calendar connection should be reliable
+        // Try calendar sync first if user has calendar access
         const currentUser = auth.currentUser
         if (currentUser) {
           try {
-            console.log('Checking calendar connection for user:', currentUser.uid)
-            const hasValidConnection = await calendarApi.hasValidCalendarConnection()
-            console.log('Calendar connection status:', hasValidConnection)
-            
-            if (hasValidConnection) {
-              console.log('Calendar connected, attempting to fetch events for:', today)
-              // Try calendar sync if connected - backend handles merging with existing schedules
-              const calendarResponse = await calendarApi.fetchEvents(today)
+            console.log('Attempting to fetch calendar events for:', today)
+            const calendarResponse = await calendarApi.fetchEvents(today)
 
-              if (calendarResponse.success) {
-                console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
-                // Calendar API returns the complete merged schedule
-                setScheduleDays([calendarResponse.tasks])
-                setScheduleCache(new Map([[today, calendarResponse.tasks]]))
-                return
-              } else {
-                console.log('Calendar fetch failed:', calendarResponse.error)
-              }
+            if (calendarResponse.success) {
+              console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
+              // Calendar API returns the complete merged schedule
+              setScheduleDays([calendarResponse.tasks])
+              setScheduleCache(new Map([[today, calendarResponse.tasks]]))
+              return
             } else {
-              console.log('Calendar not connected, skipping calendar sync')
+              console.log('Calendar fetch failed or no calendar connected:', calendarResponse.error)
             }
           } catch (calendarError) {
-            console.error('Error checking calendar connection:', calendarError)
-            // Continue with fallback loading if calendar check fails
+            console.error('Error fetching calendar events:', calendarError)
+            // Continue with fallback loading if calendar fetch fails
           }
         } else {
           console.log('No authenticated user found')
