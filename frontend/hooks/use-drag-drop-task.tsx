@@ -23,7 +23,7 @@ interface UseDragDropTaskProps {
 
 // Enhanced state for indentation detection
 interface IndentationState {
-  dragType: 'indent' | 'outdent' | 'reorder' | null
+  dragType: 'indent' | 'outdent' | 'reorder'
   cursorPosition: { x: number; y: number } | null
   targetTaskLeftEdge: number | null
 }
@@ -63,8 +63,9 @@ export const useDragDropTask = ({
 }: UseDragDropTaskProps): DragDropTaskReturn => {
   
   // State for tracking indentation intentions
+  // 🔧 FIX: Initialize with 'reorder' as default to ensure purple bar always shows
   const [indentationState, setIndentationState] = useState<IndentationState>({
-    dragType: null,
+    dragType: 'reorder',
     cursorPosition: null,
     targetTaskLeftEdge: null
   })
@@ -88,32 +89,33 @@ export const useDragDropTask = ({
     disabled: isSection // Sections cannot be dragged for now
   })
 
-  // 🔧 FIX: Optimized transform CSS for smooth dragging
-  // Use translate3d for hardware acceleration and handle null transform
-  const optimizedTransform = transform ? 
+  // 🔧 FIX: Prevent task shuffling - only apply transforms to actively dragged items
+  // This ensures other tasks remain in their original positions during drag operations
+  // Only the task being dragged gets position transforms, while drop targets show visual feedback
+  const optimizedTransform = (transform && isDragging) ? 
     `translate3d(${transform.x}px, ${transform.y}px, 0)` : 
     undefined
 
   /**
    * Get CSS classes for the row based on drag state
-   * 🔧 FIX: Enhanced for better performance and visual feedback
+   * 🔧 FIX: Prevent visual shuffling - only dragged items get transform styles
    */
   const getRowClassName = useCallback((): string => {
     try {
-      // Remove transition during dragging for smoother performance
-      const baseClasses = isDragging 
-        ? 'relative flex items-center' // No transition during drag
-        : 'relative flex items-center transition-all duration-200'
+      const baseClasses = 'relative flex items-center'
       
       if (isDragging) {
+        // Only the actively dragged item gets transform styling
         return `${baseClasses} opacity-50 rotate-1 scale-105 z-50` // Higher z-index for proper layering
       }
       
       if (isOver) {
-        return `${baseClasses} bg-purple-50 border-purple-200` // Drop target - purple tint
+        // Drop targets only get subtle background tint, no position changes  
+        return `${baseClasses} transition-all duration-200 bg-purple-50 border-purple-200`
       }
       
-      return baseClasses
+      // All other tasks remain completely static with normal transitions
+      return `${baseClasses} transition-all duration-200`
     } catch (error) {
       console.error('Error getting row className:', error)
       return 'relative flex items-center transition-all duration-200' // Fallback
@@ -144,34 +146,67 @@ export const useDragDropTask = ({
     try {
       if (!targetElement || isSection) {
         // Reset state if no target or target is section
+        // 🔧 FIX: Use 'reorder' instead of null to ensure purple bar shows
         setIndentationState({
-          dragType: null,
+          dragType: 'reorder',
           cursorPosition: null,
           targetTaskLeftEdge: null
         });
         return;
       }
 
+
       const targetRect = targetElement.getBoundingClientRect();
       const targetTask = targetElement.getAttribute('data-task-level');
       const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
       
-      // Calculate content left edge (accounting for existing indentation)
-      const contentLeftEdge = targetRect.left + (targetLevel * 20); // 20px per level
+      // 🔧 FIX: Calculate actual content left edge accounting for task structure
+      // Try to find the actual text content element for more precise positioning
       
-      // 20px threshold for indent/outdent detection
+      // Look for the task text content span element
+      const textElement = targetElement.querySelector('span[data-task-content="true"]') || 
+                          targetElement.querySelector('span[class*="flex-1"]');
+      
+      let contentLeftEdge: number;
+      
+      if (textElement) {
+        // Use actual text element position for precise calculation
+        const textRect = textElement.getBoundingClientRect();
+        contentLeftEdge = textRect.left;
+      } else {
+        // Fallback: calculate based on task structure
+        // Task structure: [marginLeft for indentation] + [grip handle] + [checkbox] + [text content]
+        
+        const rowLeftEdge = targetRect.left;
+        
+        // Account for CSS marginLeft indentation (20px per level for subtasks)
+        const indentationOffset = targetLevel * 20;
+        
+        // Account for internal task elements:
+        // - Padding (p-4 = 16px left padding)
+        // - Grip handle (width ~16px + mr-2 = 8px margin = ~24px total when visible)
+        // - Checkbox area (~24px width + margins)
+        // Approximate total offset for content start: ~64px from row edge
+        const internalElementsOffset = 64;
+        
+        contentLeftEdge = rowLeftEdge + indentationOffset + internalElementsOffset;
+      }
+      
+      // 20px threshold for indent/outdent detection from content edge
       const indentThreshold = contentLeftEdge + 20;
       const outdentThreshold = contentLeftEdge - 20;
       
       let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
       
-      if (x > indentThreshold && targetLevel < 3) {
-        // Cursor is right of content + 20px AND target can be indented
+      // Check indent conditions: cursor right of content + 20px AND target can accept more levels
+      if (x > indentThreshold && targetLevel < 3) { // Max level 3, so can indent up to level 2 (will become level 3)
         dragType = 'indent';
-      } else if (x < outdentThreshold && (task.level || 0) > 0) {
-        // Cursor is left of content - 20px AND current task can be outdented
+      } 
+      // Check outdent conditions: cursor left of content - 20px AND current task can be outdented
+      else if (x < outdentThreshold && (task.level || 0) > 0) {
         dragType = 'outdent';
       }
+      
       
       setIndentationState({
         dragType,
@@ -194,7 +229,7 @@ export const useDragDropTask = ({
   useEffect(() => {
     if (!isDragging && !isOver) {
       setIndentationState({
-        dragType: null,
+        dragType: 'reorder',
         cursorPosition: null,
         targetTaskLeftEdge: null
       });
