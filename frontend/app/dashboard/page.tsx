@@ -81,11 +81,11 @@ const Dashboard: React.FC = () => {
     const calendarError = localStorage.getItem('calendarConnectionError')
     if (calendarError) {
       toast({
-        title: 'Calendar Connection Issue',
-        description: calendarError,
+        title: 'Calendar Connection Failed',
+        description: `${calendarError}. You can reconnect your calendar in Settings > Integrations.`,
         variant: 'destructive'
       })
-      // Clear the error flag
+      // Clear the error flag immediately to prevent showing again
       localStorage.removeItem('calendarConnectionError')
     }
   }, [toast])
@@ -1152,8 +1152,7 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0)
 
-        // TASK-21 FIX: With race condition fixed, calendar connection should be reliable
-        // Try calendar sync first if user has calendar access
+        // TASK-21 FIX: Try calendar sync first if user is authenticated
         const currentUser = auth.currentUser
         if (currentUser) {
           try {
@@ -1167,14 +1166,13 @@ const Dashboard: React.FC = () => {
               setScheduleCache(new Map([[today, calendarResponse.tasks]]))
               return
             } else {
-              console.log('Calendar fetch failed or no calendar connected:', calendarResponse.error)
+              console.log('Calendar not connected, loading regular schedule:', calendarResponse.error)
+              // Don't show error toast here - calendar might legitimately not be connected
             }
           } catch (calendarError) {
             console.error('Error fetching calendar events:', calendarError)
-            // Continue with fallback loading if calendar fetch fails
+            // Don't show error toast - this could be expected if calendar isn't set up
           }
-        } else {
-          console.log('No authenticated user found')
         }
 
         // Fallback: Load existing schedule if calendar sync fails
@@ -1229,7 +1227,7 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    if (!state.formUpdate?.response) {
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
       loadInitialSchedule()
     }
   }, [state.formUpdate?.response, toast])
