@@ -309,7 +309,8 @@ const getAuthToken = async (): Promise<string> => {
   if (!currentUser) {
     throw new Error('User not authenticated')
   }
-  return await currentUser.getIdToken()
+  // Force refresh token to ensure it's valid and not expired
+  return await currentUser.getIdToken(true)
 }
 
 /**
