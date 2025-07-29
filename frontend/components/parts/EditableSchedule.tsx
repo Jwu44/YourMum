@@ -79,6 +79,11 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   /**
    * Enhanced moveTask function to handle task reordering with proper indentation
    *
+   * 🔧 FIX: Updated to properly handle indent/outdent operations based on cursor position
+   * - Indent: Insert directly after target task at target's level + 1
+   * - Outdent: Move to same level as parent task and position below parent
+   * - Reorder: Simple position change without level modification
+   *
    * This maintains the existing drag-and-drop functionality while working with
    * the optimized backend structure.
    */
@@ -88,8 +93,16 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     dragType: 'indent' | 'outdent' | 'reorder',
     targetSection: string | null
   ) => {
-    const draggedTask = { ...processedTasks[dragIndex] }
-    const newTasks = processedTasks.filter((_, index) => index !== dragIndex)
+    try {
+      // Validate indices
+      if (dragIndex < 0 || dragIndex >= processedTasks.length || 
+          hoverIndex < 0 || hoverIndex >= processedTasks.length) {
+        console.error('Invalid drag/hover indices:', { dragIndex, hoverIndex, tasksLength: processedTasks.length })
+        return
+      }
+
+      const draggedTask = { ...processedTasks[dragIndex] }
+      const newTasks = processedTasks.filter((_, index) => index !== dragIndex)
 
     if (targetSection) {
       // Moving to a section
@@ -122,26 +135,56 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       const updatedDraggedTask = { ...draggedTask }
 
       if (dragType === 'indent' && !targetTask.is_section) {
-        // Indent: Make dragged task a child of target task
+        // 🔧 FIX: Indent - Insert directly after target task at target's level + 1
         const newLevel = Math.min((targetTask.level || 0) + 1, 3)
 
-        updatedDraggedTask.is_subtask = true
+        updatedDraggedTask.is_subtask = newLevel > 0
         updatedDraggedTask.level = newLevel
         updatedDraggedTask.parent_id = targetTask.id
         updatedDraggedTask.section = targetTask.section
 
+        // Insert directly after the target task (requirement clarification #1)
         const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
         newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
       } else if (dragType === 'outdent' && !targetTask.is_section) {
-        // Outdent: Move to same level as target task
-        const newLevel = targetTask.level || 0
-
-        updatedDraggedTask.is_subtask = newLevel > 0
-        updatedDraggedTask.level = newLevel
-        updatedDraggedTask.parent_id = targetTask.parent_id
-        updatedDraggedTask.section = targetTask.section
-
-        newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+        // 🔧 FIX: Outdent - Move to same level as parent task and sit below parent
+        // Find the parent task if current task is indented
+        const currentTaskLevel = draggedTask.level || 0
+        
+        if (currentTaskLevel > 0) {
+          // Find the parent task
+          const parentTask = processedTasks.find(t => t.id === draggedTask.parent_id)
+          
+          if (parentTask) {
+            // Move to same level as parent (requirement clarification #2)
+            const newLevel = parentTask.level || 0
+            
+            updatedDraggedTask.is_subtask = newLevel > 0
+            updatedDraggedTask.level = newLevel
+            updatedDraggedTask.parent_id = parentTask.parent_id
+            updatedDraggedTask.section = parentTask.section
+            
+            // Find position to insert after parent (below parent task)
+            const parentIndex = newTasks.findIndex(t => t.id === parentTask.id)
+            if (parentIndex !== -1) {
+              newTasks.splice(parentIndex + 1, 0, updatedDraggedTask)
+            } else {
+              // Fallback: insert at hover position
+              newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+            }
+          } else {
+            // No parent found, move to level 0
+            updatedDraggedTask.is_subtask = false
+            updatedDraggedTask.level = 0
+            updatedDraggedTask.parent_id = null
+            updatedDraggedTask.section = targetTask.section
+            
+            newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+          }
+        } else {
+          // Already at level 0, just reorder
+          newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+        }
       } else {
         if (targetTask.is_section) {
           newTasks.splice(hoverIndex + 1, 0, {
@@ -185,6 +228,10 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
 
     const finalTasks = updateSectionIndices(newTasks)
     onReorderTasks(finalTasks)
+    } catch (error) {
+      console.error('Error in moveTask:', error)
+      // Don't update tasks if there's an error - maintain current state
+    }
   }, [processedTasks, onReorderTasks])
 
   // Use our drag drop provider hook (after moveTask is defined)
