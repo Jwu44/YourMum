@@ -6,6 +6,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AppSidebar } from '../components/parts/AppSidebar';
+import { SidebarProvider } from '../components/ui/sidebar';
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
@@ -18,17 +19,23 @@ jest.mock('next/navigation', () => ({
 
 describe('AppSidebar', () => {
   beforeEach(() => {
-    render(<AppSidebar />);
+    render(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    );
   });
 
   describe('Header Section', () => {
-    it('renders the YourdAI brand name', () => {
-      expect(screen.getByText('YourdAI')).toBeInTheDocument();
+    it('displays the yourdai logo as clickable link to dashboard', () => {
+      const logoImage = screen.getByTestId('sidebar-header-icon');
+      expect(logoImage).toBeInTheDocument();
+      expect(logoImage.closest('a')).toHaveAttribute('href', '/dashboard');
     });
 
-    it('displays the Calendar icon in header', () => {
-      const calendarIcon = screen.getByTestId('sidebar-header-icon');
-      expect(calendarIcon).toBeInTheDocument();
+    it('has proper alt text for the logo', () => {
+      const logoImage = screen.getByTestId('sidebar-header-icon');
+      expect(logoImage).toHaveAttribute('alt', 'yourdai logo');
     });
   });
 

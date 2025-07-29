@@ -72,11 +72,12 @@ class ScheduleService:
                 "source": metadata_doc.get('source', 'unknown')
             })
 
+            inputs = schedule_doc.get('inputs', {})
             return True, {
                 "schedule": schedule_tasks,
                 "date": date,
                 "metadata": metadata,
-                "inputs": schedule_doc.get('inputs', {})
+                "inputs": inputs
             }
 
         except Exception as e:

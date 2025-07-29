@@ -1,125 +1,64 @@
-import { Button } from "@/components/ui/button";
-import { Check, Star } from "lucide-react";
-import { WithHandleGetStarted } from '@/lib/types';
+import { Button } from '@/components/ui/button'
+import { ArrowRight, Star } from 'lucide-react'
+import { type WithHandleGetStarted } from '@/lib/types'
 
 const CTA = ({ handleGetStarted }: WithHandleGetStarted) => {
   return (
-    <section id="pricing" className="py-24 md:py-32 relative overflow-hidden bg-yourdai-dark/95">
-      {/* Background elements */}
-      <div className="absolute inset-0 bg-[url('/lovable-uploads/c5624cbe-d4c1-4dc3-9667-f8290cd104c4.png')] bg-cover bg-center opacity-30 -z-20"></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-yourdai-dark/90 to-yourdai-dark/90 -z-10"></div>
-      
-      {/* Decorative elements */}
-      <div className="absolute top-1/3 left-10 w-64 h-64 bg-yourdai-blue/20 rounded-full blur-3xl -z-10 animate-pulse-slow"></div>
-      <div className="absolute top-1/4 right-10 w-80 h-80 bg-yourdai-purple/20 rounded-full blur-3xl -z-10 animate-pulse-slow animate-delay-500"></div>
-      
-      <div className="container max-w-6xl mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-5xl font-display font-bold mb-6 animate-fade-in animate-delay-100 text-white text-balance">
-            Transform your productivity with <span className="text-yourdai-purple">yourdai</span>
-          </h2>
-          
-          <p className="text-white/70 text-lg mb-10 max-w-3xl mx-auto animate-fade-in animate-delay-200 text-balance">
-            Join thousands of users who have transformed their daily productivity with personalized, 
-            AI-powered scheduling that adapts to their unique energy patterns and priorities.
-          </p>
-        </div>
-        
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Free tier */}
-          <div className="flex-1 glass-panel-dark border border-white/10 rounded-2xl p-8 animate-fade-in animate-delay-300">
-            <div className="mb-4">
-              <h3 className="text-white text-xl font-bold mb-2">Free Trial</h3>
-              <p className="text-white/60 text-sm mb-6">Experience the basics</p>
-              
-              <div className="flex items-end gap-1 mb-6">
-                <span className="text-white text-4xl font-bold">$0</span>
-                <span className="text-white/60 text-sm mb-1">/14 days</span>
-              </div>
-              
-              <Button 
-                className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                onClick={handleGetStarted}
-              >
-                Start Free Trial
-              </Button>
-            </div>
-            
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-white/60" />
-                <span className="text-white/80">Basic task management</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-white/60" />
-                <span className="text-white/80">Simple scheduling tools</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-white/60" />
-                <span className="text-white/80">Limited AI suggestions</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-white/60" />
-                <span className="text-white/80">Up to 10 tasks</span>
-              </div>
-            </div>
+    <section className="py-20 bg-gradient-primary text-primary-foreground relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/90 to-primary opacity-95"></div>
+      <div className="relative max-w-4xl mx-auto px-4 text-center">
+        <div className="mb-8 animate-fade-in">
+          <div className="flex justify-center mb-4">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
+            ))}
           </div>
-          
-          {/* Pro tier */}
-          <div className="flex-1 glass-panel-dark border-2 border-yourdai-purple/50 rounded-2xl p-8 relative animate-fade-in animate-delay-400">
-            {/* Popular badge */}
-            <div className="absolute -top-4 right-8 py-1 px-3 bg-yourdai-purple text-white text-xs font-bold rounded-full">
-              MOST POPULAR
-            </div>
-            
-            <div className="mb-4">
-              <h3 className="text-white text-xl font-bold mb-2">Pro</h3>
-              <p className="text-white/60 text-sm mb-6">Personalized productivity</p>
-              
-              <div className="flex items-end gap-1 mb-6">
-                <span className="text-white text-4xl font-bold">$9</span>
-                <span className="text-white/60 text-sm mb-1">/month</span>
-              </div>
-              
-              <Button 
-                className="w-full bg-yourdai-purple hover:bg-yourdai-purple/90 text-white"
-                onClick={handleGetStarted}
-              >
-                Get Started
-              </Button>
-            </div>
-            
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Energy-aware scheduling</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Task decomposition</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Values-based prioritization</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Unlimited tasks & projects</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Advanced AI insights</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-400" />
-                <span className="text-white font-medium">Priority support</span>
-              </div>
-            </div>
+          <p className="text-primary-foreground/80 text-lg">
+            &ldquo;yourdai has completely transformed how I manage my daily tasks.
+            The AI suggestions are spot-on and I&apos;m more productive than ever!&rdquo;
+          </p>
+          <p className="text-primary-foreground/70 mt-2">- Sarah Johnson, Product Manager</p>
+        </div>
+
+        <h2 className="text-3xl lg:text-5xl font-bold text-primary-foreground mb-6 animate-slide-up">
+          Ready to supercharge your productivity?
+        </h2>
+        <p className="text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
+          Join thousands of users who have already transformed their daily planning with yourdai&apos;s AI-powered approach.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <Button
+            variant="premium"
+            size="lg"
+            className="bg-background text-primary hover:bg-background/90 px-8 py-4 text-lg shadow-elegant"
+            onClick={handleGetStarted}
+          >
+            Start Free Trial
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+          <div className="text-primary-foreground/70 text-sm">
+            14-day free trial • No credit card required
+          </div>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+            <div className="text-3xl font-bold text-primary-foreground mb-2">10,000+</div>
+            <div className="text-primary-foreground/70">Active Users</div>
+          </div>
+          <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <div className="text-3xl font-bold text-primary-foreground mb-2">95%</div>
+            <div className="text-primary-foreground/70">Satisfaction Rate</div>
+          </div>
+          <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+            <div className="text-3xl font-bold text-primary-foreground mb-2">2M+</div>
+            <div className="text-primary-foreground/70">Tasks Completed</div>
           </div>
         </div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default CTA;
+export default CTA

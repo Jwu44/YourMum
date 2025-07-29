@@ -1,14 +1,14 @@
-import React from 'react';
+import React from 'react'
 
 interface FloatingActionButtonProps {
-  onClick: () => void;
+  onClick: () => void
 }
 
 const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-6 right-6 w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-lg z-50"
+      className="fixed bottom-6 right-6 w-14 h-14 gradient-accent rounded-full flex items-center justify-center shadow-lg z-50"
       aria-label="Add task"
     >
       <svg
@@ -27,7 +27,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick }) 
         />
       </svg>
     </button>
-  );
-};
+  )
+}
 
-export default FloatingActionButton;
+export default FloatingActionButton

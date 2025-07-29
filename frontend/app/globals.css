@@ -1,108 +1,134 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
 @layer base {
   :root {
+    /* Primary Gradient Colors */
+    --primary: 262 83% 58%;         /* A rich purple */
+    --primary-blue: 220 91% 65%;    /* Bright blue */
+
+    /* Gradient for branding elements */
+    --gradient-accent: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-blue)));
+
+    /* Supporting UI Colors */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    /* Background and Layout Colors - Neutral theme */
     --background: 0 0% 100%;
-    --foreground: 215 25% 27%;
-
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 27%;
-
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 27%;
+    --popover-foreground: 240 10% 3.9%;
 
-    /* Update primary to use the purple gradient color */
-    --primary-light: 260 84% 74%; /* #9b87f5 */
-    --primary-dark: 263 91% 58%;  /* #7c3aed */
-    --primary: var(--primary-light);
-    --primary-foreground: 215 25% 27%;
+    /* Interactive States */
+    --hover: 258 25% 94%;
+    --hover-foreground: 258 15% 15%;
+    --selection: 262 83% 58%;
+    --selection-foreground: 0 0% 98%;
 
-    --secondary: 220 13% 97%;
-    --secondary-foreground: 215 25% 27%;
+    /* Borders and Inputs */
+    --border: 258 15% 88%;
+    --input: 258 15% 88%;
+    --ring: 262 83% 58%;
 
-    --muted: 220 13% 97%;
-    --muted-foreground: 215 16% 47%;
-
-    /* Update accent to use the same purple as primary */
-    --accent: var(--primary-light);
-    --accent-foreground: 215 25% 27%;
-
-    /* Add hover selection colors */
-    --hover-selection: 0 0% 94%; /* Light grey for hover selection */
-    --hover-selection-foreground: 215 25% 27%;
-
+    /* Status Colors - Updated to complement purple-blue theme */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 220 91% 65%;
+    --info-foreground: 0 0% 98%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: var(--primary-light);
-    
-    /* Checkbox border color */
-    --checkbox-border: 0 0% 0%; /* Black */
+    /* Sidebar Colors - Neutral grey theme */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-ring: 262 83% 58%;
+
+    /* Shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
+    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.4);
 
     --radius: 0.75rem;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 251 91% 95%;
-    --sidebar-primary-foreground: 215 25% 27%;
-    --sidebar-accent: 220 13% 95%;
-    --sidebar-accent-foreground: 215 25% 27%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 251 91% 95%;
   }
 
   .dark {
-    --background: 215 28% 17%;
-    --foreground: 213 31% 91%;
+    /* Primary Gradient Colors - Same for consistency */
+    --primary: 262 83% 58%;
+    --primary-blue: 220 91% 65%;
 
-    --card: 215 28% 17%;
-    --card-foreground: 213 31% 91%;
+    /* Gradient for branding elements */
+    --gradient-accent: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-blue)));
 
-    --popover: 215 28% 17%;
-    --popover-foreground: 213 31% 91%;
+    /* Supporting UI Colors - Dark variants */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 258 15% 18%;
+    --secondary-foreground: 258 10% 85%;
+    --muted: 258 15% 18%;
+    --muted-foreground: 258 8% 65%;
+    --accent: 258 15% 18%;
+    --accent-foreground: 258 10% 85%;
 
-    --primary: 251 91% 95%;
-    --primary-foreground: 215 28% 17%;
+    /* Background and Layout Colors - Dark theme with neutral greys */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-    --secondary: 215 25% 27%;
-    --secondary-foreground: 213 31% 91%;
+    /* Interactive States - Dark variants */
+    --hover: 258 20% 16%;
+    --hover-foreground: 258 8% 92%;
+    --selection: 262 83% 58%;
+    --selection-foreground: 0 0% 98%;
 
-    --muted: 215 25% 27%;
-    --muted-foreground: 217 10% 65%;
+    /* Borders and Inputs - Dark theme */
+    --border: 258 15% 22%;
+    --input: 258 15% 22%;
+    --ring: 262 83% 58%;
 
-    --accent: 215 25% 27%;
-    --accent-foreground: 213 31% 91%;
+    /* Status Colors - Darker variants */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 98%;
+    --info: 220 91% 70%;
+    --info-foreground: 0 0% 98%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 98%;
 
-    /* Add hover selection colors for dark mode */
-    --hover-selection: 215 25% 22%; /* Slightly lighter than background for dark mode */
-    --hover-selection-foreground: 213 31% 91%;
+    /* Sidebar Colors - Dark theme with neutral greys */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 262 83% 58%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 213 31% 91%;
-
-    --border: 215 25% 27%;
-    --input: 215 25% 27%;
-    --ring: 251 91% 95%;
-    
-    /* Checkbox border color - use lighter color in dark mode for better visibility */
-    --checkbox-border: 0 0% 100%; /* White */
-
-    --sidebar-background: 215 28% 17%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 251 91% 95%;
-    --sidebar-primary-foreground: 215 28% 17%;
-    --sidebar-accent: 215 25% 27%;
-    --sidebar-accent-foreground: 213 31% 91%;
-    --sidebar-border: 215 25% 27%;
-    --sidebar-ring: 251 91% 95%;
+    /* Shadows - Dark theme */
+    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.5);
+    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.6);
   }
 }
 
@@ -112,64 +138,113 @@
   }
 
   body {
-    @apply bg-background text-foreground font-medium;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-  
-  /* Override SVG colors globally */
-  svg {
-    @apply text-foreground;
-    stroke: hsl(var(--foreground));
-  }
-  
-  /* Override white text in components */
-  h1, h2, h3, h4, h5, h6, p, span, a, button, input, textarea, select, label {
-    @apply text-foreground;
-  }
-  
-  /* Override dropdown and drawer styling */
-  .dropdown-content, .drawer-content, .dialog-content, .sheet-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Fix for spinners and loaders */
-  .animate-spin {
-    @apply border-foreground;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-/* Apply styles to specific Tailwind-generated classes */
 @layer components {
-  /* Typography elements */
-  .typography-h3 {
-    @apply text-foreground;
-  }
-  
-  /* Dropdown styling */
-  .dropdown-menu-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Drawer styling */
-  .drawer-content {
-    @apply bg-background text-foreground border-border;
-  }
-  
-  /* Task items */
-  .task-item {
-    @apply text-foreground;
-  }
-  
-  /* Button text */
-  .btn, .button {
-    @apply text-foreground;
-  }
-
-  /* Hover selection utilities */
+  /* Consistent hover and selection utilities */
   .hover-selection {
-    @apply hover:bg-[hsl(var(--hover-selection))] hover:text-[hsl(var(--hover-selection-foreground))];
+    @apply hover:bg-hover hover:text-hover-foreground transition-colors duration-200;
+  }
+  
+  .selection-active {
+    @apply bg-selection text-selection-foreground;
+  }
+  
+  /* Interactive card components */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-lg hover:border-primary/20 cursor-pointer;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-lg hover:border-primary/20;
+  }
+  
+  /* Button hover states using primary/secondary variations */
+  .btn-hover-primary {
+    @apply hover:bg-primary/90 transition-colors duration-200;
+  }
+  
+  .btn-hover-secondary {
+    @apply hover:bg-secondary/80 transition-colors duration-200;
+  }
+  
+  /* Interactive elements */
+  .interactive-element {
+    @apply transition-all duration-200 hover:bg-hover hover:text-hover-foreground cursor-pointer;
+  }
+  
+  /* Selection states for lists and options */
+  .selectable-item {
+    @apply transition-colors duration-200 hover:bg-hover hover:text-hover-foreground cursor-pointer;
+  }
+  
+  .selectable-item.selected {
+    @apply bg-selection text-selection-foreground;
+  }
+  
+  /* Gradient utilities */
+  .gradient-text {
+    background: var(--gradient-accent);
+    @apply bg-clip-text text-transparent;
+  }
+  
+  .gradient-icon {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  
+  /* For SVG icons, we need a different approach */
+  .gradient-svg {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  
+  /* Fallback for browsers that don't support background-clip on SVG */
+  @supports not (-webkit-background-clip: text) {
+    .gradient-svg {
+      color: hsl(var(--primary));
+      background: none;
+    }
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
   }
 
+  /* Custom gradient backgrounds for home page */
+  .bg-gradient-primary {
+    background: var(--gradient-accent);
+  }
+  
+  .bg-gradient-hero {
+    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 50%, hsl(var(--accent)) 100%);
+  }
+  
+  .bg-gradient-section {
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)/0.3) 50%, hsl(var(--background)) 100%);
+  }
+
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .section-divider {
+    @apply w-full h-px bg-gradient-to-r from-transparent via-border to-transparent;
+  }
+  
   /* Loading states */
   .loading-container-lg {
     @apply flex items-center justify-center h-64;
@@ -195,32 +270,262 @@
   .empty-state-container {
     @apply flex flex-col items-center justify-center h-64 space-y-4;
   }
-}
+  
+  /* InputsConfig Component Styles */
+  
+  /* Icon container for cards */
+  .icon-container {
+    @apply p-2 bg-primary/10 rounded-lg;
+  }
+  
+  /* Draggable priority card */
+  .draggable-card {
+    @apply flex items-center gap-3 p-4 bg-card rounded-lg border hover:border-primary/30 transition-all duration-200 hover:shadow-sm;
+    
+    /* 🔧 FIX: Performance optimizations for smooth dragging */
+    will-change: auto;
+    transform: translateZ(0); /* Force hardware acceleration */
+  }
+  
+  .draggable-card.group {
+    /* group class should be added directly in HTML */
+  }
+  
+  .draggable-card-grip {
+    @apply h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors cursor-move;
+    
+    /* 🔧 FIX: Touch optimization for better drag initiation */
+    touch-action: none;
+    user-select: none;
+  }
 
-/* Custom gradients and effects */
-@layer utilities {
-  .gradient-purple {
-    background: linear-gradient(135deg, hsl(var(--primary-light)) 0%, hsl(var(--primary-dark)) 100%);
-  }
-  
-  .gradient-purple-soft {
-    background: linear-gradient(135deg, #f3f0ff 0%, #e9d5ff 100%);
-  }
-  
-  .shadow-purple {
-    box-shadow: 0 4px 14px 0 rgba(155, 135, 245, 0.15);
-  }
-  
-  .border-purple {
-    border-color: hsl(var(--primary-light));
+  /* 🔧 FIX: Drag performance optimizations */
+  [data-touch-action="none"] {
+    touch-action: none;
   }
 
-  /* Hover selection utilities */
-  .bg-hover-selection {
-    background-color: hsl(var(--hover-selection));
+  /* Optimizations for dragging state */
+  [data-dragging="true"] {
+    will-change: transform;
+    transform: translateZ(0);
+    /* Disable transitions during drag for better performance */
+    transition: none !important;
+  }
+
+  /* Task row optimizations */
+  .task-row {
+    /* Optimize for frequent transform updates */
+    will-change: auto;
+    transform: translateZ(0);
+  }
+
+  .task-row[data-dragging="true"] {
+    will-change: transform;
+    /* Remove transitions during drag */
+    transition: none !important;
+    /* Ensure proper layering */
+    z-index: 1000;
   }
   
-  .text-hover-selection-foreground {
-    color: hsl(var(--hover-selection-foreground));
+  /* Interactive checkbox cards */
+  .checkbox-card {
+    @apply flex items-center space-x-2 p-3 rounded-lg border transition-colors;
+  }
+  
+  .checkbox-card-checked {
+    @apply bg-selection/10 border-selection/30;
+  }
+  
+  .checkbox-card-unchecked {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground hover:border-primary/30 cursor-pointer;
+  }
+  
+  /* Energy pattern cards */
+  .energy-pattern-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border transition-all duration-200 cursor-pointer;
+  }
+  
+  .energy-pattern-card-checked {
+    @apply bg-selection/10 border-selection/30 shadow-sm;
+  }
+  
+  .energy-pattern-card-unchecked {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30;
+  }
+  
+  /* Radio group cards */
+  .radio-card {
+    @apply flex items-center space-x-3 p-3 rounded-lg border bg-card hover:bg-hover hover:text-hover-foreground transition-colors cursor-pointer;
+  }
+  
+  /* Task ordering selection cards */
+  .task-ordering-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all duration-200;
+  }
+  
+  .task-ordering-card.group {
+    /* group class should be added directly in HTML */
+  }
+  
+  .task-ordering-card-selected {
+    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+  }
+  
+  .task-ordering-card-unselected {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+  }
+  
+  /* Working day bubble cards */
+  .working-day-bubble {
+    @apply px-4 py-2 rounded-full border cursor-pointer transition-all duration-200 select-none;
+    flex: 1;
+    text-align: center;
+    min-width: 0; /* Allow shrinking below content size */
+  }
+  
+  .working-day-bubble-selected {
+    @apply bg-primary/10 border-primary text-primary shadow-sm;
+  }
+  
+  .working-day-bubble-unselected {
+    @apply bg-card border-border hover:bg-hover hover:text-hover-foreground hover:border-primary/30;
+  }
+  
+  /* Theme color classes for options */
+  .theme-yellow {
+    @apply text-warning;
+  }
+  
+  .theme-yellow-bg {
+    @apply bg-warning/10;
+  }
+  
+  .theme-orange {
+    @apply text-warning;
+  }
+  
+  .theme-orange-bg {
+    @apply bg-warning/15;
+  }
+  
+  .theme-red {
+    @apply text-destructive;
+  }
+  
+  .theme-red-bg {
+    @apply bg-destructive/10;
+  }
+  
+  .theme-purple {
+    @apply text-primary;
+  }
+  
+  .theme-purple-bg {
+    @apply bg-primary/10;
+  }
+  
+  .theme-gray {
+    @apply text-muted-foreground;
+  }
+  
+  .theme-gray-bg {
+    @apply bg-muted/20;
+  }
+  
+  .theme-blue {
+    @apply text-info;
+  }
+  
+  .theme-blue-bg {
+    @apply bg-info/10;
+  }
+  
+  .theme-green {
+    @apply text-success;
+  }
+  
+  .theme-green-bg {
+    @apply bg-success/10;
+  }
+  
+  /* Dark mode variants for theme colors */
+  .dark .theme-yellow-bg {
+    @apply bg-warning/20;
+  }
+  
+  .dark .theme-orange-bg {
+    @apply bg-warning/25;
+  }
+  
+  .dark .theme-red-bg {
+    @apply bg-destructive/20;
+  }
+  
+  .dark .theme-purple-bg {
+    @apply bg-primary/20;
+  }
+  
+  .dark .theme-gray-bg {
+    @apply bg-muted/30;
+  }
+  
+  .dark .theme-blue-bg {
+    @apply bg-info/20;
+  }
+  
+  .dark .theme-green-bg {
+    @apply bg-success/20;
+  }
+
+  /* Time input custom styling */
+  .time-input-custom {
+    padding-right: 40px !important; /* Add space for the clock icon */
+  }
+  
+  .time-input-custom::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    background-size: 20px 20px;
+    z-index: 9999;
+  }
+  
+  .time-input-custom::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+  
+  /* Firefox time input styling */
+  .time-input-custom::-moz-time-picker-indicator {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    z-index: 9999;
+  }
+  
+  .time-input-custom::-moz-time-picker-indicator:hover {
+    opacity: 1;
+  }
+  
+  /* Ensure time picker modal appears above drawers */
+  input[type="time"]::-webkit-datetime-edit {
+    position: relative;
+    z-index: 10000;
+  }
+  
+  /* Time picker dropdown/modal styling */
+  input[type="time"]::-webkit-calendar-picker-indicator + * {
+    z-index: 10001 !important;
   }
 }

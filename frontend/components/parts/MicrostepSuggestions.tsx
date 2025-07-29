@@ -1,15 +1,15 @@
-import React from 'react';
-import { Task } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Check, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Checkbox } from '@/components/ui/checkbox'; // Add this import
+import React from 'react'
+import { type Task } from '@/lib/types'
+import { Button } from '@/components/ui/button'
+import { Check, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Checkbox } from '@/components/ui/checkbox' // Add this import
 
 interface MicrostepSuggestionsProps {
-  microsteps: Task[];
-  onAccept: (microstep: Task) => void;
-  onReject: (microstep: Task) => void;
-  className?: string;
+  microsteps: Task[]
+  onAccept: (microstep: Task) => void
+  onReject: (microstep: Task) => void
+  className?: string
 }
 
 const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
@@ -52,22 +52,22 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
                 )}
               </div>
             </div>
-            
+
             {/* Action buttons */}
             <div className="flex items-center space-x-2">
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-green-500 hover:text-green-400"
-                onClick={() => onAccept(microstep)}
+                className="text-success hover:text-success/80"
+                onClick={() => { onAccept(microstep) }}
               >
                 <Check className="w-4 h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-red-500 hover:text-red-400"
-                onClick={() => onReject(microstep)}
+                className="text-destructive hover:text-destructive/80"
+                onClick={() => { onReject(microstep) }}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -76,7 +76,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
         ))}
       </motion.div>
     </AnimatePresence>
-  );
-};
+  )
+}
 
-export default React.memo(MicrostepSuggestions);
+export default React.memo(MicrostepSuggestions)

@@ -1,6 +1,10 @@
 from flask import Blueprint, jsonify, request
 from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
+from backend.services.slack_service import SlackService
 import traceback
+
+# Initialize Slack service
+slack_service = SlackService()
 from bson import ObjectId
 from datetime import datetime, timezone 
 from backend.models.task import Task
@@ -25,6 +29,12 @@ import uuid
 
 # Add import for the new schedule service
 from backend.services.schedule_service import schedule_service
+from backend.services.archive_service import (
+    archive_task,
+    get_archived_tasks,
+    move_archived_task_to_today,
+    delete_archived_task
+)
 
 api_bp = Blueprint("api", __name__)
 
@@ -123,6 +133,7 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 'displayName': 'Dev User',
                 'photoURL': '',
                 'role': 'free',
+                'timezone': 'UTC',  # Add timezone field for consistency
                 'calendarSynced': False,
                 # Add other required fields as needed
             }
@@ -261,6 +272,122 @@ def create_or_update_user():
             "message": str(e)
         }), 500
 
+@api_bp.route("/auth/user", methods=["PUT"])
+def update_auth_user():
+    """
+    Update authenticated user profile data.
+    
+    Expected JSON body:
+        - displayName: string (optional)
+        - jobTitle: string (optional) 
+        - age: integer (optional)
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        - 200: User successfully updated
+        - 400: Invalid data or validation errors
+        - 401: Authentication required
+        - 500: Internal server error
+    """
+    try:
+        # Verify authentication
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header.split(' ')[1]
+        user = get_user_from_token(token)
+        
+        if not user:
+            return jsonify({
+                "error": "Authentication failed"
+            }), 401
+
+        # Validate request data
+        updates = request.json
+        if not updates:
+            return jsonify({
+                "error": "No update data provided"
+            }), 400
+
+        # Validate and sanitize fields
+        sanitized_updates = {}
+        
+        # Handle displayName
+        if 'displayName' in updates:
+            display_name = updates['displayName']
+            if display_name is not None and not isinstance(display_name, str):
+                return jsonify({"error": "displayName must be a string"}), 400
+            if display_name is not None:
+                sanitized_updates['displayName'] = display_name.strip()
+        
+        # Handle jobTitle
+        if 'jobTitle' in updates:
+            job_title = updates['jobTitle']
+            if job_title is not None and not isinstance(job_title, str):
+                return jsonify({"error": "jobTitle must be a string"}), 400
+            if job_title is not None:
+                job_title = job_title.strip()
+                if len(job_title) > 50:
+                    return jsonify({"error": "jobTitle must be 50 characters or less"}), 400
+                sanitized_updates['jobTitle'] = job_title
+        
+        # Handle age
+        if 'age' in updates:
+            age = updates['age']
+            if age is not None:
+                try:
+                    age_value = int(age)
+                    if age_value < 1 or age_value > 150:
+                        return jsonify({"error": "Age must be between 1 and 150"}), 400
+                    sanitized_updates['age'] = age_value
+                except (ValueError, TypeError):
+                    return jsonify({"error": "Age must be a valid number"}), 400
+
+        # Add metadata
+        sanitized_updates['metadata'] = {
+            'lastModified': datetime.now(timezone.utc)
+        }
+
+        # Update user in database
+        db = get_database()
+        users = db['users']
+        
+        result = users.update_one(
+            {"googleId": user['googleId']},
+            {"$set": sanitized_updates}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({
+                "error": "No changes made to user profile"
+            }), 400
+
+        # Get updated user
+        updated_user = users.find_one({"googleId": user['googleId']})
+        if not updated_user:
+            return jsonify({
+                "error": "Failed to retrieve updated user data"
+            }), 500
+
+        serialized_user = process_user_for_response(updated_user)
+
+        return jsonify({
+            "user": serialized_user,
+            "message": "User profile updated successfully"
+        }), 200
+
+    except Exception as e:
+        print(f"Error in update_auth_user: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal server error"
+        }), 500
+
 def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Helper function to prepare user data for database storage.
@@ -293,6 +420,30 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         # Fall back to email username if displayName is not provided
         display_name = user_data["email"].split('@')[0]
 
+    # Handle timezone field with default value
+    timezone_value = user_data.get("timezone", "UTC")  # Default to UTC if not provided
+    # Validate timezone format (basic validation)
+    if not isinstance(timezone_value, str) or not timezone_value.strip():
+        timezone_value = "UTC"
+
+    # Handle jobTitle field (optional, max 50 characters)
+    job_title = user_data.get("jobTitle")
+    if job_title and isinstance(job_title, str):
+        job_title = job_title.strip()[:50]  # Truncate to 50 characters if needed
+    else:
+        job_title = None
+
+    # Handle age field (optional, numeric only)
+    age = user_data.get("age")
+    if age is not None:
+        try:
+            age = int(age)
+            # Validate age range
+            if age < 1 or age > 150:
+                age = None
+        except (ValueError, TypeError):
+            age = None
+
     # Prepare user data with all required fields and ensure no null values
     return {
         "googleId": user_data["googleId"],
@@ -300,6 +451,9 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "displayName": display_name,  # Use processed display_name
         "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
         "role": "free",  # Default role for new users
+        "timezone": timezone_value,  # Add timezone field with default
+        "jobTitle": job_title,  # Add jobTitle field (optional)
+        "age": age,  # Add age field (optional)
         "calendarSynced": has_calendar_access,
         "lastLogin": datetime.now(timezone.utc), 
         "calendar": calendar_settings,
@@ -1298,4 +1452,463 @@ def delete_task(task_id):
 @api_bp.route("/tasks/<task_id>", methods=["OPTIONS"])
 def handle_delete_task_options(task_id):
     """Handle CORS preflight requests for task deletion endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/auth/logout", methods=["DELETE"])
+def logout_user():
+    """
+    Log out the authenticated user by invalidating their session.
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Successfully logged out with cache control headers
+        401: Authentication required or invalid token
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        # Create response with success message
+        response = jsonify({
+            "message": "Logged out successfully"
+        })
+        
+        # Add cache control headers to prevent caching of sensitive logout responses
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response, 200
+        
+    except Exception as e:
+        print(f"Error during logout: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": "Failed to logout"
+        }), 500
+
+
+@api_bp.route("/auth/user", methods=["DELETE"])
+def delete_user_account():
+    """
+    Delete user account and all associated data.
+    
+    This endpoint performs a complete account deletion including:
+    - Disconnecting external integrations (Slack, Google Calendar)
+    - Deleting all user data from MongoDB collections
+    - Firebase account remains inactive (not deleted)
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Account successfully deleted
+        401: Authentication required or invalid token
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        user_google_id = user.get('googleId')
+        user_email = user.get('email', 'Unknown')
+        
+        print(f"Starting account deletion for user: {user_email} (ID: {user_google_id})")
+        
+        # Track failures for error reporting
+        failures = []
+        
+        # Step 1: Disconnect Slack integration if exists
+        try:
+            slack_data = user.get("slack", {})
+            instance_id = slack_data.get("instanceId")
+            
+            if instance_id:
+                print(f"Disconnecting Slack integration for user {user_google_id}")
+                success, result = slack_service.disconnect_slack_integration(user_google_id, instance_id)
+                if not success:
+                    failures.append(f"Slack disconnection: {result.get('error', 'Unknown error')}")
+                    print(f"Slack disconnection failed: {result}")
+                else:
+                    print("Slack integration disconnected successfully")
+            else:
+                print("No Slack integration found for user")
+        except Exception as e:
+            failures.append(f"Slack disconnection error: {str(e)}")
+            print(f"Error disconnecting Slack: {e}")
+        
+        # Step 2: Get database and clean up all user-related data
+        db = get_database()
+        
+        # Collections to clean up - delete all user-related data
+        collections_to_clean = [
+            'UserSchedules',           # User's daily schedules
+            'AIsuggestions',           # AI-generated suggestions
+            'MicrostepFeedback',       # User's task feedback
+            'DecompositionPatterns',   # User's task decomposition patterns
+            'calendar_events',         # User's synced calendar events
+            'Processed Slack Messages' # User's Slack message tracking
+        ]
+        
+        # Delete from each collection
+        total_deleted = 0
+        for collection_name in collections_to_clean:
+            try:
+                collection = db[collection_name]
+                result = collection.delete_many({"googleId": user_google_id})
+                deleted_count = result.deleted_count
+                total_deleted += deleted_count
+                print(f"Deleted {deleted_count} documents from {collection_name}")
+            except Exception as e:
+                failures.append(f"{collection_name} cleanup: {str(e)}")
+                print(f"Error cleaning {collection_name}: {e}")
+        
+        # Step 3: Delete main user document (do this last)
+        try:
+            users_collection = db['users']
+            user_result = users_collection.delete_one({"googleId": user_google_id})
+            if user_result.deleted_count > 0:
+                print(f"Deleted main user document for {user_email}")
+                total_deleted += user_result.deleted_count
+            else:
+                failures.append("Main user document not found")
+                print(f"Main user document not found for {user_google_id}")
+        except Exception as e:
+            failures.append(f"User document deletion: {str(e)}")
+            print(f"Error deleting main user document: {e}")
+        
+        # Step 4: Clear Google Calendar integration data (handled by user document deletion)
+        # The calendar credentials are stored in the user document, so they're already cleaned up
+        
+        print(f"Account deletion completed. Total documents deleted: {total_deleted}")
+        
+        # Create response
+        response_data = {
+            "success": True,
+            "message": "Account deleted successfully",
+            "deleted_documents": total_deleted
+        }
+        
+        # Include warnings if there were any failures
+        if failures:
+            response_data["warnings"] = failures
+            print(f"Account deletion completed with warnings: {failures}")
+        
+        # Add cache control headers to prevent caching
+        response = jsonify(response_data)
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response, 200
+        
+    except Exception as e:
+        print(f"Error during account deletion: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": "Failed to delete account"
+        }), 500
+
+@api_bp.route("/auth/logout", methods=["OPTIONS"])
+def handle_logout_options():
+    """Handle CORS preflight requests for logout endpoint."""
+    return jsonify({"status": "ok"})
+
+# Archive functionality endpoints
+@api_bp.route("/archive/task", methods=["POST"])
+def api_archive_task():
+    """
+    Archive a task for the authenticated user.
+    
+    Expected request body:
+    {
+        "taskId": str (required),
+        "taskData": Dict (required - complete task object),
+        "originalDate": str (required - YYYY-MM-DD format)
+    }
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task archived successfully
+        400: Invalid request data or validation errors
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Validate required fields
+        required_fields = ['taskId', 'taskData', 'originalDate']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+
+        task_data = data['taskData']
+        original_date = data['originalDate']
+
+        # Validate task data has required fields
+        if not task_data.get('id') or not task_data.get('text'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid task data - missing id or text"
+            }), 400
+
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(original_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Archive the task
+        result = archive_task(user_id, task_data, original_date)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        print(f"Error in api_archive_task: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task", methods=["OPTIONS"])
+def handle_archive_task_options():
+    """Handle CORS preflight requests for archive task endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/tasks", methods=["GET"])
+def api_get_archived_tasks():
+    """
+    Get all archived tasks for the authenticated user.
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Archived tasks retrieved successfully
+        401: Authentication required
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Get archived tasks
+        result = get_archived_tasks(user_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        print(f"Error in api_get_archived_tasks: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/tasks", methods=["OPTIONS"])
+def handle_get_archived_tasks_options():
+    """Handle CORS preflight requests for get archived tasks endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/task/<task_id>/move-to-today", methods=["POST"])
+def api_move_archived_task_to_today(task_id):
+    """
+    Move an archived task to today's schedule.
+    
+    URL Parameters:
+        task_id: The ID of the task to move
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task moved successfully with task data for adding to schedule
+        401: Authentication required
+        404: Task not found in archive
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Move the archived task to today
+        result = move_archived_task_to_today(user_id, task_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            return jsonify(result), status_code
+
+    except Exception as e:
+        print(f"Error in api_move_archived_task_to_today: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task/<task_id>/move-to-today", methods=["OPTIONS"])
+def handle_move_archived_task_options(task_id):
+    """Handle CORS preflight requests for move archived task endpoint."""
+    return jsonify({"status": "ok"})
+
+@api_bp.route("/archive/task/<task_id>", methods=["DELETE"])
+def api_delete_archived_task(task_id):
+    """
+    Permanently delete an archived task.
+    
+    URL Parameters:
+        task_id: The ID of the task to delete
+    
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+    
+    Returns:
+        200: Task deleted successfully
+        401: Authentication required
+        404: Task not found in archive
+        500: Internal server error
+    """
+    try:
+        # Extract user ID (requires authentication)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+            
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Delete the archived task
+        result = delete_archived_task(user_id, task_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            status_code = 404 if "not found" in result.get("error", "").lower() else 500
+            return jsonify(result), status_code
+
+    except Exception as e:
+        print(f"Error in api_delete_archived_task: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/archive/task/<task_id>", methods=["OPTIONS"])
+def handle_delete_archived_task_options(task_id):
+    """Handle CORS preflight requests for delete archived task endpoint."""
     return jsonify({"status": "ok"})

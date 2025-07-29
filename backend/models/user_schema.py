@@ -8,6 +8,21 @@ user_schema_validation = {
             "displayName": { "bsonType": "string" },
             "photoURL": { "bsonType": ["string", "null"] },
             "role": { "enum": ["free", "premium", "admin"] },
+            "timezone": { 
+                "bsonType": "string",
+                "description": "User's timezone in IANA format (e.g., 'Australia/Sydney', 'UTC')"
+            },
+            "jobTitle": {
+                "bsonType": ["string", "null"],
+                "maxLength": 50,
+                "description": "User's job title (optional, max 50 characters)"
+            },
+            "age": {
+                "bsonType": ["int", "null"],
+                "minimum": 1,
+                "maximum": 150,
+                "description": "User's age (optional, numeric input only)"
+            },
             "lastLogin": { "bsonType": "date" },
             "createdAt": { "bsonType": "date" },
             # Add calendar-related fields

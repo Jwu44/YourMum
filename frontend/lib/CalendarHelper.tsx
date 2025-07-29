@@ -1,9 +1,9 @@
-import { calendarApi } from '@/lib/api/calendar';
-import { Task, FormData } from '@/lib/types';
-import { categorizeTask } from '@/lib/api/users';
-import { v4 as uuidv4 } from 'uuid';
+import { calendarApi } from '@/lib/api/calendar'
+import { type Task, type FormData } from '@/lib/types'
+import { categorizeTask } from '@/lib/api/users'
+import { v4 as uuidv4 } from 'uuid'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 /**
  * Sync today's calendar events and add them to the current schedule
@@ -11,54 +11,53 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
  * @returns Promise with sync result
  */
 export const syncTodaysCalendarEvents = async (userData: FormData): Promise<{
-  success: boolean;
-  tasks: Task[];
-  count: number;
-  error?: string;
+  success: boolean
+  tasks: Task[]
+  count: number
+  error?: string
 }> => {
   try {
-    console.log("Starting calendar sync for today");
-    
+    console.log('Starting calendar sync for today')
+
     // Check if user has calendar connected
     if (!userData.user?.calendar?.connected) {
-      console.log("User calendar not connected");
+      console.log('User calendar not connected')
       return {
         success: false,
         tasks: [],
         count: 0,
-        error: "Calendar not connected"
-      };
+        error: 'Calendar not connected'
+      }
     }
 
     // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-    
+    const today = new Date().toISOString().split('T')[0]
+
     // Fetch calendar events using the calendar API
-    const result = await calendarApi.fetchEvents(today);
-    
+    const result = await calendarApi.fetchEvents(today)
+
     if (!result.success) {
-      console.error("Failed to fetch calendar events:", result.error);
+      console.error('Failed to fetch calendar events:', result.error)
       return {
         success: false,
         tasks: [],
         count: 0,
         error: result.error
-      };
+      }
     }
 
-    console.log(`Successfully synced ${result.count} calendar events`);
-    return result;
-    
+    console.log(`Successfully synced ${result.count} calendar events`)
+    return result
   } catch (error) {
-    console.error("Error syncing today's calendar events:", error);
+    console.error("Error syncing today's calendar events:", error)
     return {
       success: false,
       tasks: [],
       count: 0,
-      error: error instanceof Error ? error.message : "Unknown error occurred"
-    };
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }
   }
-};
+}
 
 /**
  * Check if user has calendar connected and valid credentials
@@ -67,13 +66,13 @@ export const syncTodaysCalendarEvents = async (userData: FormData): Promise<{
  */
 export const hasValidCalendarConnection = async (userId: string): Promise<boolean> => {
   try {
-    const status = await calendarApi.getCalendarStatus(userId);
-    return status.connected && Boolean(status.credentials);
+    const status = await calendarApi.getCalendarStatus(userId)
+    return status.connected && Boolean(status.credentials)
   } catch (error) {
-    console.error("Error checking calendar connection:", error);
-    return false;
+    console.error('Error checking calendar connection:', error)
+    return false
   }
-};
+}
 
 /**
  * Convert a Google Calendar event to a yourdai Task
@@ -83,47 +82,47 @@ export const hasValidCalendarConnection = async (userId: string): Promise<boolea
  * @returns Promise<Task | null>
  */
 export const convertCalendarEventToTask = async (
-  event: any, 
+  event: any,
   targetDate: string
 ): Promise<Task | null> => {
   try {
     // Extract event details
-    const eventName = event.summary || 'Untitled Event';
-    
+    const eventName = event.summary || 'Untitled Event'
+
     // Skip cancelled events
     if (event.status === 'cancelled' || !eventName.trim()) {
-      return null;
+      return null
     }
 
     // Categorize the event
-    let categories: string[] = ['Calendar'];
+    let categories: string[] = ['Calendar']
     try {
-      const result = await categorizeTask(eventName);
-      categories = result?.categories || ['Calendar'];
+      const result = await categorizeTask(eventName)
+      categories = result?.categories || ['Calendar']
     } catch (error) {
-      console.error('Error categorizing calendar event:', error);
+      console.error('Error categorizing calendar event:', error)
     }
 
     // Extract start and end times
-    let startTime: string | undefined;
-    let endTime: string | undefined;
+    let startTime: string | undefined
+    let endTime: string | undefined
 
     if (event.start?.dateTime) {
-      const startDt = new Date(event.start.dateTime);
-      startTime = startDt.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: false 
-      });
+      const startDt = new Date(event.start.dateTime)
+      startTime = startDt.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
     }
 
     if (event.end?.dateTime) {
-      const endDt = new Date(event.end.dateTime);
-      endTime = endDt.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: false 
-      });
+      const endDt = new Date(event.end.dateTime)
+      endTime = endDt.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
     }
 
     // Create Task object
@@ -143,16 +142,15 @@ export const convertCalendarEventToTask = async (
       end_time: endTime,
       is_recurring: null,
       start_date: targetDate,
-      gcal_event_id: event.id,
-    };
+      gcal_event_id: event.id
+    }
 
-    return task;
-
+    return task
   } catch (error) {
-    console.error('Error converting calendar event to task:', error);
-    return null;
+    console.error('Error converting calendar event to task:', error)
+    return null
   }
-};
+}
 
 /**
  * Sync calendar events for a specific date
@@ -161,60 +159,59 @@ export const convertCalendarEventToTask = async (
  * @returns Promise with sync result
  */
 export const syncCalendarEventsForDate = async (
-  date: string, 
+  date: string,
   userId: string
 ): Promise<{
-  success: boolean;
-  tasks: Task[];
-  count: number;
-  error?: string;
+  success: boolean
+  tasks: Task[]
+  count: number
+  error?: string
 }> => {
   try {
-    console.log(`Syncing calendar events for ${date}`);
-    
+    console.log(`Syncing calendar events for ${date}`)
+
     // Use the backend sync endpoint
     const response = await fetch(`${API_BASE_URL}/api/calendar/events`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         userId,
         date
       })
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
-    const result = await response.json();
-    
+    const result = await response.json()
+
     if (!result.success) {
       return {
         success: false,
         tasks: [],
         count: 0,
         error: result.error || 'Failed to sync calendar events'
-      };
+      }
     }
 
     return {
       success: true,
       tasks: result.events || [],
       count: result.eventsSynced || 0
-    };
-
+    }
   } catch (error) {
-    console.error(`Error syncing calendar events for ${date}:`, error);
+    console.error(`Error syncing calendar events for ${date}:`, error)
     return {
       success: false,
       tasks: [],
       count: 0,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+    }
   }
-};
+}
 
 /**
  * Initialize calendar integration for a new user
@@ -223,44 +220,43 @@ export const syncCalendarEventsForDate = async (
  * @returns Promise with initialization result
  */
 export const initializeCalendarIntegration = async (userData: FormData): Promise<{
-  success: boolean;
-  message: string;
-  todaysTasks?: Task[];
+  success: boolean
+  message: string
+  todaysTasks?: Task[]
 }> => {
   try {
-    console.log("Initializing calendar integration");
-    
+    console.log('Initializing calendar integration')
+
     // Check calendar connection
     if (!userData.user?.googleId) {
-      throw new Error("User ID not available");
+      throw new Error('User ID not available')
     }
 
-    const hasConnection = await hasValidCalendarConnection(userData.user.googleId);
+    const hasConnection = await hasValidCalendarConnection(userData.user.googleId)
     if (!hasConnection) {
-      throw new Error("Calendar not properly connected");
+      throw new Error('Calendar not properly connected')
     }
 
     // Sync today's events
-    const syncResult = await syncTodaysCalendarEvents(userData);
-    
+    const syncResult = await syncTodaysCalendarEvents(userData)
+
     if (syncResult.success) {
       return {
         success: true,
         message: `Calendar integration initialized. Synced ${syncResult.count} events for today.`,
         todaysTasks: syncResult.tasks
-      };
+      }
     } else {
       return {
         success: false,
         message: `Calendar connected but sync failed: ${syncResult.error}`
-      };
+      }
     }
-
   } catch (error) {
-    console.error("Error initializing calendar integration:", error);
+    console.error('Error initializing calendar integration:', error)
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to initialize calendar integration"
-    };
+      message: error instanceof Error ? error.message : 'Failed to initialize calendar integration'
+    }
   }
-};
+}

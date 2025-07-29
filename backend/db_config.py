@@ -80,6 +80,16 @@ def get_calendar_events_collection():
     db = get_database()
     return db['calendar_events']
 
+def get_archive_collection():
+    """
+    Get the Archive collection from the database
+    
+    Returns:
+        MongoDB collection for archived tasks
+    """
+    db = get_database()
+    return db['Archive']
+
 # Initialization functions - grouped together
 def initialize_ai_collections():
     """Initialize collections and indexes for AI suggestions feature."""
@@ -180,6 +190,27 @@ def initialize_slack_collections():
         print(f"Error initializing Slack collections: {e}")
         raise
 
+def initialize_archive_collections():
+    """Initialize Archive collections and indexes."""
+    try:
+        # Get archive collection
+        archive_collection = get_archive_collection()
+        
+        # Create indexes for efficient queries
+        archive_indexes = [
+            IndexModel([("userId", ASCENDING)], unique=True),  # One document per user
+            IndexModel([("userId", ASCENDING), ("archivedTasks.archivedAt", DESCENDING)]),  # For chronological sorting
+            IndexModel([("userId", ASCENDING), ("archivedTasks.taskId", ASCENDING)]),  # For finding specific tasks
+            IndexModel([("lastModified", ASCENDING)])  # For maintenance queries
+        ]
+        archive_collection.create_indexes(archive_indexes)
+        
+        print("Archive collections initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing Archive collections: {e}")
+        raise
+
 def initialize_db():
     """Initialize database connection and create necessary collections/indexes."""
     global _db_initialized
@@ -197,6 +228,7 @@ def initialize_db():
         initialize_user_collection()
         initialize_calendar_collections()
         initialize_slack_collections()
+        initialize_archive_collections()
 
         # Create or update collection with schema validation
         db = get_database()
@@ -242,19 +274,36 @@ def update_user_login(users_collection: Collection, google_id: str) -> bool:
 def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Create or update user with proper validation and error handling."""
     try:
-        # Prepare user document with required fields
+        # Check if user already exists to preserve calendar connection state
+        existing_user = users_collection.find_one({"googleId": user_data["googleId"]})
+        
+        # Prepare base user document with required fields
         user_doc = {
             "googleId": user_data["googleId"],
             "email": user_data["email"],
             "displayName": user_data.get("displayName", ""),
             "photoURL": user_data.get("photoURL"),
             "role": user_data.get("role", "free"),
-            "calendarSynced": user_data.get("calendarSynced", False),
+            "timezone": user_data.get("timezone", "UTC"),
+            "jobTitle": user_data.get("jobTitle"),
+            "age": user_data.get("age"),
             "lastLogin": datetime.now(timezone.utc),
             "metadata": {
                 "lastModified": datetime.now(timezone.utc)
             }
         }
+        
+        # Handle calendar fields carefully to preserve existing connections
+        if existing_user and existing_user.get("calendar", {}).get("connected"):
+            # Preserve existing calendar connection if it exists
+            user_doc["calendarSynced"] = existing_user.get("calendarSynced", False)
+            user_doc["calendar"] = existing_user.get("calendar", {})
+            print(f"DEBUG: Preserving existing calendar connection for user {user_data['googleId']}")
+        else:
+            # Set calendar fields from user_data for new users or when explicitly updating
+            user_doc["calendarSynced"] = user_data.get("calendarSynced", False)
+            user_doc["calendar"] = user_data.get("calendar", {})
+            print(f"DEBUG: Setting new calendar state for user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
 
         # Use upsert to create or update
         result = users_collection.update_one(

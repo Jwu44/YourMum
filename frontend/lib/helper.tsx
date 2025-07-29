@@ -1,38 +1,40 @@
-import { categorizeTask } from './api/users';
-import { v4 as uuidv4 } from 'uuid';
-import { Task, FormAction, DecompositionRequest, 
-  DecompositionResponse, MicrostepFeedback, FeedbackResponse, 
-  FormData, GetAISuggestionsResponse } from './types';
-import { auth } from '@/auth/firebase';
+import { categorizeTask } from './api/users'
+import { v4 as uuidv4 } from 'uuid'
+import {
+  type Task, type FormAction, type DecompositionRequest,
+  type DecompositionResponse, type MicrostepFeedback, type FeedbackResponse,
+  type FormData, type GetAISuggestionsResponse
+} from './types'
+import { auth } from '@/auth/firebase'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
-const today = new Date().toISOString().split('T')[0];
+const today = new Date().toISOString().split('T')[0]
 
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
-const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
-export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
+export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) =>
   (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setFormData(prevData => ({ ...prevData, [name]: value }));
-  };
+    const { name, value } = event.target
+    setFormData(prevData => ({ ...prevData, [name]: value }))
+  }
 
-export const handleNestedInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) => 
+export const handleNestedInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) =>
   (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    const [category, subCategory] = name.split('.');
+    const { name, value } = event.target
+    const [category, subCategory] = name.split('.')
     setFormData(prevData => ({
       ...prevData,
       [category]: {
         ...prevData[category],
         [subCategory]: value
       }
-    }));
-  };
+    }))
+  }
 
 export const handleAddTask = async (tasks: Task[], newTask: string, categories: string[]) => {
-  const result = await categorizeTask(newTask);
+  const result = await categorizeTask(newTask)
   const newTaskObject: Task = {
     id: uuidv4(),
     text: newTask.trim(),
@@ -44,48 +46,48 @@ export const handleAddTask = async (tasks: Task[], newTask: string, categories: 
     parent_id: null,
     level: 0,
     section_index: tasks.length,
-    type: "task",
+    type: 'task',
     is_recurring: null,
-    start_date: today,
-  };
-  return [...tasks, newTaskObject];
-};
+    start_date: today
+  }
+  return [...tasks, newTaskObject]
+}
 
 export const handleUpdateTask = (tasks: Task[], updatedTask: Task) => {
-  return tasks.map(task => task.id === updatedTask.id ? updatedTask : task);
-};
+  return tasks.map(task => task.id === updatedTask.id ? updatedTask : task)
+}
 
 export const handleDeleteTask = (tasks: Task[], taskId: string) => {
-  return tasks.filter(task => task.id !== taskId);
-};
+  return tasks.filter(task => task.id !== taskId)
+}
 
 export const cleanupTasks = async (parsedTasks: Task[], existingTasks: Task[]): Promise<Task[]> => {
   const cleanedTasks = parsedTasks.map(task => {
-    const matchingTask = existingTasks.find(t => t && t.id === task.id);
+    const matchingTask = existingTasks.find(t => t && t.id === task.id)
     return {
       ...task,
       categories: task.categories || (matchingTask ? matchingTask.categories : [])
-    };
-  });
+    }
+  })
 
-  return cleanedTasks;
-};
+  return cleanedTasks
+}
 
 export const updatePriorities = (
   setFormData: React.Dispatch<React.SetStateAction<FormData>>,
-  priorities: { id: string }[]
+  priorities: Array<{ id: string }>
 ): void => {
   const updatedPriorities = {
     health: '',
     relationships: '',
     fun_activities: '',
     ambitions: ''
-  };
+  }
   priorities.forEach((priority, index) => {
-    updatedPriorities[priority.id as keyof typeof updatedPriorities] = (index + 1).toString();
-  });
-  setFormData((prevData: FormData) => ({ ...prevData, priorities: updatedPriorities }));
-};
+    updatedPriorities[priority.id as keyof typeof updatedPriorities] = (index + 1).toString()
+  })
+  setFormData((prevData: FormData) => ({ ...prevData, priorities: updatedPriorities }))
+}
 
 export const handleEnergyChange = (
   dispatch: React.Dispatch<FormAction>,
@@ -93,14 +95,14 @@ export const handleEnergyChange = (
 ) => (value: string): void => {
   const updatedPatterns = currentPatterns.includes(value)
     ? currentPatterns.filter(pattern => pattern !== value)
-    : [...currentPatterns, value];
-  
+    : [...currentPatterns, value]
+
   dispatch({
     type: 'UPDATE_FIELD',
     field: 'energy_patterns',
     value: updatedPatterns
-  });
-};
+  })
+}
 
 // Add new functions for microstep operations
 export const handleMicrostepDecomposition = async (
@@ -114,7 +116,7 @@ export const handleMicrostepDecomposition = async (
       priorities: formData.priorities,
       work_start_time: formData.work_start_time,
       work_end_time: formData.work_end_time
-    };
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/tasks/decompose`, {
       method: 'POST',
@@ -122,22 +124,22 @@ export const handleMicrostepDecomposition = async (
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(request)
-    });
+    })
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to decompose task');
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to decompose task')
     }
 
-    const data = await response.json();
+    const data = await response.json()
     console.log(data)
-    return data;
+    return data
   } catch (error) {
-    console.error('Error decomposing task:', error);
+    console.error('Error decomposing task:', error)
     // Return empty array on error since DecompositionResponse is now string[]
-    return [];
+    return []
+  }
 }
-};
 
 export const submitMicrostepFeedback = async (
   taskId: string,
@@ -152,7 +154,7 @@ export const submitMicrostepFeedback = async (
       accepted,
       completion_order: completionOrder,
       timestamp: new Date().toISOString()
-    };
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/tasks/microstep-feedback`, {
       method: 'POST',
@@ -160,23 +162,23 @@ export const submitMicrostepFeedback = async (
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(feedback)
-    });
+    })
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to submit feedback');
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to submit feedback')
     }
 
-    return await response.json();
+    return await response.json()
   } catch (error) {
-    console.error('Error submitting microstep feedback:', error);
+    console.error('Error submitting microstep feedback:', error)
     return {
       database_status: 'error',
       colab_status: 'error',
       error: error instanceof Error ? error.message : 'Failed to submit feedback'
-    };
+    }
   }
-};
+}
 
 // Add helper function to handle microstep selection/rejection
 export const handleMicrostepSelection = async (
@@ -186,28 +188,28 @@ export const handleMicrostepSelection = async (
   onUpdateTask: (task: Task) => void
 ): Promise<void> => {
   try {
-    if (!microstep.parent_id) return;
+    if (!microstep.parent_id) return
 
     // Submit feedback
     const feedbackResult = await submitMicrostepFeedback(
       microstep.parent_id,
       microstep.id,
       accepted
-    );
+    )
 
     if (feedbackResult.database_status === 'error' || feedbackResult.colab_status === 'error') {
-      console.warn('Feedback submission had errors:', feedbackResult);
+      console.warn('Feedback submission had errors:', feedbackResult)
     }
 
     if (accepted) {
       // Find parent task
-      const parentTask = tasks.find(t => t.id === microstep.parent_id);
-      if (!parentTask) return;
+      const parentTask = tasks.find(t => t.id === microstep.parent_id)
+      if (!parentTask) return
 
       // Get existing microsteps for this parent to determine position
       const existingMicrosteps = tasks.filter(
         t => t.parent_id === microstep.parent_id && t.is_microstep
-      );
+      )
 
       // Create new task object from microstep
       const newSubtask: Task = {
@@ -227,28 +229,28 @@ export const handleMicrostepSelection = async (
         end_time: parentTask.end_time,
         is_recurring: parentTask.is_recurring,
         start_date: parentTask.start_date
-      };
+      }
 
       // Add the new subtask to tasks array
-      onUpdateTask(newSubtask);
+      onUpdateTask(newSubtask)
     }
   } catch (error) {
-    console.error('Error handling microstep selection:', error);
+    console.error('Error handling microstep selection:', error)
   }
-};
+}
 
 // Update existing functions to use new types
 export const checkTaskCompletion = (task: Task, tasks: Task[]): boolean => {
   // If task has no microsteps, use its own completion state
   const microsteps = tasks.filter(
     t => t.parent_id === task.id && t.is_microstep
-  );
-  
-  if (microsteps.length === 0) return task.completed;
+  )
+
+  if (microsteps.length === 0) return task.completed
 
   // Task is complete if all its microsteps are complete
-  return microsteps.every(step => step.completed);
-};
+  return microsteps.every(step => step.completed)
+}
 
 export const fetchAISuggestions = async (
   userId: string,
@@ -272,25 +274,25 @@ export const fetchAISuggestions = async (
         priorities,
         energyPatterns
       })
-    });
+    })
 
     if (!response.ok) {
-      throw new Error('Failed to fetch AI suggestions');
+      throw new Error('Failed to fetch AI suggestions')
     }
 
-    return await response.json();
+    return await response.json()
   } catch (error) {
-    console.error('Error fetching AI suggestions:', error);
-    throw error;
+    console.error('Error fetching AI suggestions:', error)
+    throw error
   }
-};
+}
 
 export const formatDateToString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 /**
  * Get the current user's Firebase ID token for API authentication
@@ -300,15 +302,16 @@ export const formatDateToString = (date: Date): string => {
 const getAuthToken = async (): Promise<string> => {
   // In development mode with bypass enabled, return a mock token
   if (IS_DEVELOPMENT && BYPASS_AUTH) {
-    return 'mock-token-for-development';
+    return 'mock-token-for-development'
   }
-  
-  const currentUser = auth.currentUser;
+
+  const currentUser = auth.currentUser
   if (!currentUser) {
-    throw new Error('User not authenticated');
+    throw new Error('User not authenticated')
   }
-  return await currentUser.getIdToken();
-};
+  // Force refresh token to ensure it's valid and not expired
+  return await currentUser.getIdToken(true)
+}
 
 /**
  * Check if a schedule exists for a specific date
@@ -318,8 +321,8 @@ const getAuthToken = async (): Promise<string> => {
 export const checkScheduleExists = async (date: Date): Promise<boolean> => {
   try {
     // Format date for API
-    const dateStr = formatDateToString(date);
-    
+    const dateStr = formatDateToString(date)
+
     // Use the existing GET schedule endpoint to check if a schedule exists
     const response = await fetch(
       `${API_BASE_URL}/api/schedules/${dateStr}`,
@@ -327,17 +330,17 @@ export const checkScheduleExists = async (date: Date): Promise<boolean> => {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`,
-        },
+          Authorization: `Bearer ${await getAuthToken()}`
+        }
       }
-    );
+    )
 
     // If we get a 200, schedule exists
     // If we get a 404, schedule doesn't exist
     // Any other error should be treated as "doesn't exist" for safety
-    return response.ok;
+    return response.ok
   } catch (error) {
-    console.error('Error checking schedule:', error);
-    return false;
+    console.error('Error checking schedule:', error)
+    return false
   }
-};
+}

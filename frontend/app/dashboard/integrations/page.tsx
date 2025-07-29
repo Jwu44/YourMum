@@ -3,8 +3,8 @@
  * @description Route file for the Integrations page
  */
 
-import IntegrationsPage from '@/components/parts/IntegrationsLayout';
+import IntegrationsPage from '@/components/parts/IntegrationsLayout'
 
-export default function DashboardIntegrationsPage() {
-  return <IntegrationsPage />;
-} 
+export default function DashboardIntegrationsPage () {
+  return <IntegrationsPage />
+}

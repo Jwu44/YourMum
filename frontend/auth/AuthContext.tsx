@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOAuthInProgress, setIsOAuthInProgress] = useState(false);
 
   /**
    * Process calendar access and connect to Google Calendar
@@ -39,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
+      // NOTE: isOAuthInProgress should already be true when this function is called
+      
       // Get scopes and check for calendar access
       const scopes = await getScopes(credential.accessToken);
       const hasCalendarAccess = scopes.some(scope => 
@@ -47,42 +50,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Has calendar access:", hasCalendarAccess);
       
-      if (hasCalendarAccess) {
-        try {
-          // Small delay to ensure Firebase auth state is fully established
-          console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Create credentials object
-          console.log("Connecting to Google Calendar...");
-          const credentials: CalendarCredentials = {
-            accessToken: credential.accessToken,
-            expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
-            scopes: scopes
-          };
-          
-          // Connect to calendar (credentials stored for later use)
-          await calendarApi.connectCalendar(credentials);
-          console.log("Connected to Google Calendar");
-          console.log("TASK-07 FIX: Calendar credentials stored, dashboard will handle event fetching");
-          
-          // Dashboard will handle fetching calendar events to prevent double-load
-        } catch (calendarError) {
-          console.error("Error connecting to calendar:", calendarError);
-          // Continue to dashboard even if calendar connection fails
-        }
+      // Store user with correct calendar access flag
+      if (auth.currentUser) {
+        console.log("Storing user with calendar access flag:", hasCalendarAccess);
+        await storeUserInBackend(auth.currentUser, hasCalendarAccess);
       }
       
-      // Get intended redirect destination
-      const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-      localStorage.removeItem('authRedirectDestination');
+      if (hasCalendarAccess) {
+        console.log("Starting calendar connection process...");
+        
+        // Small delay to ensure Firebase auth state is fully established
+        console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Create credentials object and connect to calendar
+        console.log("Connecting to Google Calendar...");
+        const credentials: CalendarCredentials = {
+          accessToken: credential.accessToken,
+          expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+          scopes: scopes
+        };
+        
+        // Connect to calendar - this should be atomic (either succeeds or fails)
+        await calendarApi.connectCalendar(credentials);
+        console.log("Connected to Google Calendar successfully");
+        
+        // Small delay to ensure all async operations complete before resetting OAuth state
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Success - reset OAuth state and redirect to dashboard
+        setIsOAuthInProgress(false);
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        window.location.href = redirectTo;
+        
+      } else {
+        // No calendar access, reset OAuth state and redirect directly to dashboard
+        setIsOAuthInProgress(false);
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        
+        console.log("No calendar access, navigating to:", redirectTo);
+        window.location.href = redirectTo;
+      }
       
-      // Navigate to intended destination
-      console.log("Navigating to:", redirectTo);
-      window.location.href = redirectTo;
     } catch (error) {
       console.error("Error processing calendar access:", error);
-      // Fallback to dashboard
+      setIsOAuthInProgress(false);
+      setError(error instanceof Error ? error.message : 'Failed to connect calendar');
+      
+      // Redirect to dashboard and let user retry from integrations page
       const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
       localStorage.removeItem('authRedirectDestination');
       window.location.href = redirectTo;
@@ -92,12 +109,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Store user information in the backend
    * @param user Firebase user object
+   * @param hasCalendarAccess Optional flag indicating if user has granted calendar access
    */
-  const storeUserInBackend = async (user: User): Promise<void> => {
+  const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false): Promise<void> => {
     try {
-      // Get the token
-      const idToken = await user.getIdToken();
-      console.log("Got ID token for backend storage");
+      // Force token refresh to ensure it's valid
+      const idToken = await user.getIdToken(true); // Force refresh
+      console.log("Got fresh ID token for backend storage");
+      console.log("Calendar access status:", hasCalendarAccess);
       
       // Check if NEXT_PUBLIC_API_URL is set correctly
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
@@ -114,14 +133,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
-          hasCalendarAccess: false // Will be updated when calendar is connected
+          hasCalendarAccess: hasCalendarAccess // Pass the actual calendar access state
         }),
       });
 
       if (response.ok) {
-        console.log("User stored in backend successfully");
+        console.log("User stored in backend successfully with calendar access:", hasCalendarAccess);
       } else {
-        console.error("Failed to store user in backend:", response.status);
+        const errorText = await response.text();
+        console.error("Failed to store user in backend:", response.status, errorText);
       }
     } catch (error) {
       console.error("Error storing user in backend:", error);
@@ -150,20 +170,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Auth state changed. User:", user ? `${user.displayName} (${user.email})` : "null");
+      console.log("OAuth in progress:", isOAuthInProgress);
       
       // Set user state immediately to prevent UI blocking
       setUser(user);
       setLoading(false);
       
-      if (user) {
-        await storeUserInBackend(user);
+      // IMPORTANT: Do not store user during OAuth flow to prevent race condition
+      // The OAuth flow (processCalendarAccess) will handle user storage with correct calendar access
+      if (user && !isOAuthInProgress) {
+        console.log("Storing user from auth state change (non-OAuth)");
+        await storeUserInBackend(user, false); // Explicitly set no calendar access for non-OAuth
         console.log("Authentication completed successfully");
+      } else if (user && isOAuthInProgress) {
+        console.log("Skipping user storage during OAuth flow to prevent race condition");
       }
     });
   
     // Cleanup subscription
     return () => unsubscribe();
-  }, []);
+  }, []); // Empty dependency array - setup once on mount
   
   // Handle redirect result and check for calendar access
   useEffect(() => {
@@ -176,11 +202,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result) {
           // User successfully signed in after redirect
           console.log("Redirect sign-in successful");
+          
+          // Set OAuth in progress to prevent race condition with auth state change
+          setIsOAuthInProgress(true);
         
           // Get credentials from result
           const credential = GoogleAuthProvider.credentialFromResult(result);
           if (!credential || !credential.accessToken) {
             console.error("Missing credential or access token");
+            setIsOAuthInProgress(false); // Reset OAuth state
             // Get intended redirect destination
             const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
             localStorage.removeItem('authRedirectDestination');
@@ -194,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Redirect sign-in error:", error);
+        setIsOAuthInProgress(false); // Reset OAuth state on error
         setError('Failed to sign in with Google');
         // Get intended redirect destination
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
@@ -234,6 +265,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Initiating signInWithPopup");
       
+      // Set OAuth in progress BEFORE popup to prevent race condition
+      setIsOAuthInProgress(true);
+      
       try {
         // Try popup first
         const result = await signInWithPopup(auth, provider);
@@ -268,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Sign in error:', error);
+      setIsOAuthInProgress(false); // Reset OAuth state on error
       setError('Failed to sign in with Google');
       // Clean up localStorage on error
       localStorage.removeItem('authRedirectDestination');
@@ -291,6 +326,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Reconnect Google Calendar for existing authenticated users
+   * This triggers the OAuth flow specifically for calendar access
+   */
+  const reconnectCalendar = async () => {
+    try {
+      setError(null);
+      console.log("Starting calendar reconnection process");
+      
+      if (!user) {
+        throw new Error('User must be authenticated to reconnect calendar');
+      }
+      
+      // Configure provider to request calendar access and force consent screen
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+      provider.setCustomParameters({
+        prompt: 'consent'  // Force the consent screen to appear
+      });
+      
+      console.log("Initiating calendar reconnection with popup");
+      
+      // Use popup for calendar reconnection (no redirect needed)
+      const result = await signInWithPopup(auth, provider);
+      console.log("Calendar reconnection successful");
+      
+      // Get credentials from result
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error('No calendar access token received');
+      }
+      
+      // Get scopes and connect to calendar
+      const scopes = await getScopes(credential.accessToken);
+      const hasCalendarAccess = scopes.some(scope => 
+        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+      );
+      
+      if (!hasCalendarAccess) {
+        throw new Error('Calendar access not granted');
+      }
+      
+      // Create credentials and connect
+      const credentials: CalendarCredentials = {
+        accessToken: credential.accessToken,
+        expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
+        scopes: scopes
+      };
+      
+      await calendarApi.connectCalendar(credentials);
+      console.log("Calendar reconnected successfully");
+      
+    } catch (error) {
+      console.error('Calendar reconnection error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reconnect calendar';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
   const value: AuthContextType = {
     user,                // Add this to satisfy AuthState
     currentUser: user,   // This is your renamed property
@@ -298,6 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error,
     signIn,
     signOut,
+    reconnectCalendar,
   };
 
   return (
