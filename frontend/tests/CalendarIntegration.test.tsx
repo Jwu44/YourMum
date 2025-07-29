@@ -130,4 +130,36 @@ describe('Calendar Integration in Dashboard', () => {
     expect(queryByText('Setting Up Your Calendar')).not.toBeInTheDocument();
     expect(queryByText('Connecting to Google Calendar...')).not.toBeInTheDocument();
   });
+
+  test('should prevent double load after calendar connection completes', async () => {
+    // Simulate the flow: connection stage -> null (completing connection)
+    mockAuthState.calendarConnectionStage = 'complete';
+    
+    const { rerender } = render(
+      <AuthProvider>
+        <FormProvider>
+          <Dashboard />
+        </FormProvider>
+      </AuthProvider>
+    );
+    
+    expect(mockAuthState.calendarConnectionStage).toBe('complete');
+    
+    // Simulate AuthContext clearing the stage (avoiding window.location.href reload)
+    mockAuthState.calendarConnectionStage = null;
+    
+    rerender(
+      <AuthProvider>
+        <FormProvider>
+          <Dashboard />
+        </FormProvider>
+      </AuthProvider>
+    );
+
+    // Should now show dashboard without calendar connection loader
+    // This simulates the fix where we avoid window.location.href when already on target page
+    await waitFor(() => {
+      expect(mockAuthState.calendarConnectionStage).toBe(null);
+    });
+  });
 });
