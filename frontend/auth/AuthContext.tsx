@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
-      setIsOAuthInProgress(true);
+      // NOTE: isOAuthInProgress should already be true when this function is called
       
       // Get scopes and check for calendar access
       const scopes = await getScopes(credential.accessToken);
@@ -75,19 +75,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await calendarApi.connectCalendar(credentials);
         console.log("Connected to Google Calendar successfully");
         
-        // Success - redirect to dashboard
+        // Success - reset OAuth state and redirect to dashboard
+        setIsOAuthInProgress(false);
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
         localStorage.removeItem('authRedirectDestination');
-        setIsOAuthInProgress(false);
         window.location.href = redirectTo;
         
       } else {
-        // No calendar access, redirect directly to dashboard
+        // No calendar access, reset OAuth state and redirect directly to dashboard
+        setIsOAuthInProgress(false);
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
         localStorage.removeItem('authRedirectDestination');
         
         console.log("No calendar access, navigating to:", redirectTo);
-        setIsOAuthInProgress(false);
         window.location.href = redirectTo;
       }
       
@@ -173,12 +173,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       setLoading(false);
       
-      // Only store user in backend if not during OAuth flow
-      // OAuth flow handles user creation with correct calendar access
+      // IMPORTANT: Do not store user during OAuth flow to prevent race condition
+      // The OAuth flow (processCalendarAccess) will handle user storage with correct calendar access
       if (user && !isOAuthInProgress) {
         console.log("Storing user from auth state change (non-OAuth)");
         await storeUserInBackend(user, false); // Explicitly set no calendar access for non-OAuth
         console.log("Authentication completed successfully");
+      } else if (user && isOAuthInProgress) {
+        console.log("Skipping user storage during OAuth flow to prevent race condition");
       }
     });
   
@@ -197,11 +199,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result) {
           // User successfully signed in after redirect
           console.log("Redirect sign-in successful");
+          
+          // Set OAuth in progress to prevent race condition with auth state change
+          setIsOAuthInProgress(true);
         
           // Get credentials from result
           const credential = GoogleAuthProvider.credentialFromResult(result);
           if (!credential || !credential.accessToken) {
             console.error("Missing credential or access token");
+            setIsOAuthInProgress(false); // Reset OAuth state
             // Get intended redirect destination
             const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
             localStorage.removeItem('authRedirectDestination');
@@ -215,6 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Redirect sign-in error:", error);
+        setIsOAuthInProgress(false); // Reset OAuth state on error
         setError('Failed to sign in with Google');
         // Get intended redirect destination
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
@@ -255,6 +262,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Initiating signInWithPopup");
       
+      // Set OAuth in progress BEFORE popup to prevent race condition
+      setIsOAuthInProgress(true);
+      
       try {
         // Try popup first
         const result = await signInWithPopup(auth, provider);
@@ -289,6 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Sign in error:', error);
+      setIsOAuthInProgress(false); // Reset OAuth state on error
       setError('Failed to sign in with Google');
       // Clean up localStorage on error
       localStorage.removeItem('authRedirectDestination');
