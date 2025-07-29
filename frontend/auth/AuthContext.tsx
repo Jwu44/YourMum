@@ -48,14 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Has calendar access:", hasCalendarAccess);
       
       if (hasCalendarAccess) {
-        // Show loading screen and set up progress tracking
-        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-        localStorage.setItem('calendarConnectionStage', 'connecting');
-        localStorage.setItem('calendarConnectionMessage', 'Storing your calendar credentials securely');
-        
-        // Navigate to loading page first
-        window.location.href = '/connecting';
-        
         try {
           // Small delay to ensure Firebase auth state is fully established
           console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
@@ -69,83 +61,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             scopes: scopes
           };
           
-          // TASK-21 FIX: Wait for calendar connection to complete with timeout
-          const connectionTimeout = 10000; // 10 seconds timeout
-          let connectionSuccess = false;
+          // Connect to calendar (credentials stored for later use)
+          await calendarApi.connectCalendar(credentials);
+          console.log("Connected to Google Calendar");
+          console.log("TASK-07 FIX: Calendar credentials stored, dashboard will handle event fetching");
           
-          try {
-            // Connect to calendar and wait for confirmation
-            await Promise.race([
-              (async () => {
-                await calendarApi.connectCalendar(credentials);
-                console.log("Connected to Google Calendar");
-                
-                // Update progress to verifying stage
-                localStorage.setItem('calendarConnectionStage', 'verifying');
-                localStorage.setItem('calendarConnectionMessage', 'Confirming calendar access is ready');
-                
-                // Verify credentials are stored by checking status
-                const currentUser = auth.currentUser;
-                if (currentUser) {
-                  const maxRetries = 5;
-                  let retries = 0;
-                  
-                  while (retries < maxRetries) {
-                    try {
-                      const status = await calendarApi.getCalendarStatus(currentUser.uid);
-                      if (status.connected && status.credentials) {
-                        console.log("Calendar credentials confirmed in backend");
-                        connectionSuccess = true;
-                        break;
-                      }
-                      retries++;
-                      if (retries < maxRetries) {
-                        console.log(`Verification attempt ${retries}/${maxRetries}, retrying...`);
-                        localStorage.setItem('calendarConnectionMessage', `Verification attempt ${retries}/${maxRetries}...`);
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                      }
-                    } catch (statusError) {
-                      console.error("Error checking calendar status:", statusError);
-                      retries++;
-                      if (retries < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                      }
-                    }
-                  }
-                  
-                  if (!connectionSuccess) {
-                    console.warn("Could not verify calendar credentials storage, proceeding anyway");
-                    localStorage.setItem('calendarConnectionMessage', 'Connection established, finalizing setup...');
-                  }
-                }
-                
-                // Mark as complete
-                localStorage.setItem('calendarConnectionStage', 'complete');
-                localStorage.setItem('calendarConnectionComplete', 'true');
-              })(),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Calendar connection timeout')), connectionTimeout)
-              )
-            ]);
-            
-          } catch (timeoutError) {
-            console.error("Calendar connection timed out or failed:", timeoutError);
-            // Set flag to show error toast on dashboard
-            localStorage.setItem('calendarConnectionError', 'Calendar connection timed out. Please try reconnecting from settings.');
-            // Still complete the process
-            localStorage.setItem('calendarConnectionComplete', 'true');
-          }
-          
+          // Dashboard will handle fetching calendar events to prevent double-load
         } catch (calendarError) {
           console.error("Error connecting to calendar:", calendarError);
-          // Set flag to show error toast on dashboard
-          localStorage.setItem('calendarConnectionError', 'Failed to connect calendar. Please try reconnecting from settings.');
-          // Still complete the process
-          localStorage.setItem('calendarConnectionComplete', 'true');
+          // Continue to dashboard even if calendar connection fails
         }
-        
-        // Return early since we're handling redirect through the loading page
-        return;
       }
       
       // Get intended redirect destination
@@ -170,9 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const storeUserInBackend = async (user: User): Promise<void> => {
     try {
-      // Get the token
-      const idToken = await user.getIdToken();
-      console.log("Got ID token for backend storage");
+      // Force token refresh to ensure it's valid
+      const idToken = await user.getIdToken(true); // Force refresh
+      console.log("Got fresh ID token for backend storage");
       
       // Check if NEXT_PUBLIC_API_URL is set correctly
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
@@ -196,7 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         console.log("User stored in backend successfully");
       } else {
-        console.error("Failed to store user in backend:", response.status);
+        const errorText = await response.text();
+        console.error("Failed to store user in backend:", response.status, errorText);
       }
     } catch (error) {
       console.error("Error storing user in backend:", error);
