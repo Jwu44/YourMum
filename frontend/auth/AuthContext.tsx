@@ -84,10 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Success - reset OAuth state and redirect to dashboard
         setIsOAuthInProgress(false);
-        setCalendarConnectionStage(null);
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
         localStorage.removeItem('authRedirectDestination');
-        window.location.href = redirectTo;
+        
+        // Check if we're already on the target page to avoid unnecessary reload
+        if (window.location.pathname === redirectTo) {
+          // Just clear the calendar connection stage to show dashboard content
+          setCalendarConnectionStage(null);
+        } else {
+          // Navigate to different page
+          setCalendarConnectionStage(null);
+          window.location.href = redirectTo;
+        }
         
       } else {
         // No calendar access, reset OAuth state and redirect directly to dashboard
@@ -96,8 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
         localStorage.removeItem('authRedirectDestination');
         
-        console.log("No calendar access, navigating to:", redirectTo);
-        window.location.href = redirectTo;
+        // Check if we're already on the target page to avoid unnecessary reload
+        if (window.location.pathname === redirectTo) {
+          console.log("No calendar access, already on target page:", redirectTo);
+          // Already on target page, no navigation needed
+        } else {
+          console.log("No calendar access, navigating to:", redirectTo);
+          window.location.href = redirectTo;
+        }
       }
       
     } catch (error) {
@@ -109,7 +123,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Redirect to dashboard and let user retry from integrations page
       const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
       localStorage.removeItem('authRedirectDestination');
-      window.location.href = redirectTo;
+      
+      // Check if we're already on the target page to avoid unnecessary reload
+      if (window.location.pathname === redirectTo) {
+        // Already on target page, no navigation needed
+      } else {
+        window.location.href = redirectTo;
+      }
     }
   };
 
