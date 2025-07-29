@@ -1257,7 +1257,7 @@ const Dashboard: React.FC = () => {
           onAddTask={() => { setIsTaskDrawerOpen(true) }}
         />
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto mt-8">
           <div className="w-full max-w-4xl mx-auto px-6 pb-6">
 
             {isLoadingSchedule
