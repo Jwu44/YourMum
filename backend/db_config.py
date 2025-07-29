@@ -274,7 +274,10 @@ def update_user_login(users_collection: Collection, google_id: str) -> bool:
 def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Create or update user with proper validation and error handling."""
     try:
-        # Prepare user document with required fields
+        # Check if user already exists to preserve calendar connection state
+        existing_user = users_collection.find_one({"googleId": user_data["googleId"]})
+        
+        # Prepare base user document with required fields
         user_doc = {
             "googleId": user_data["googleId"],
             "email": user_data["email"],
@@ -284,13 +287,23 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             "timezone": user_data.get("timezone", "UTC"),
             "jobTitle": user_data.get("jobTitle"),
             "age": user_data.get("age"),
-            "calendarSynced": user_data.get("calendarSynced", False),
             "lastLogin": datetime.now(timezone.utc),
-            "calendar": user_data.get("calendar", {}),
             "metadata": {
                 "lastModified": datetime.now(timezone.utc)
             }
         }
+        
+        # Handle calendar fields carefully to preserve existing connections
+        if existing_user and existing_user.get("calendar", {}).get("connected"):
+            # Preserve existing calendar connection if it exists
+            user_doc["calendarSynced"] = existing_user.get("calendarSynced", False)
+            user_doc["calendar"] = existing_user.get("calendar", {})
+            print(f"DEBUG: Preserving existing calendar connection for user {user_data['googleId']}")
+        else:
+            # Set calendar fields from user_data for new users or when explicitly updating
+            user_doc["calendarSynced"] = user_data.get("calendarSynced", False)
+            user_doc["calendar"] = user_data.get("calendar", {})
+            print(f"DEBUG: Setting new calendar state for user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
 
         # Use upsert to create or update
         result = users_collection.update_one(
