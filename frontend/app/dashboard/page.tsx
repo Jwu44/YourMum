@@ -12,11 +12,13 @@ import TaskEditDrawer from '@/components/parts/TaskEditDrawer'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
+import CalendarConnectionLoader from '@/components/parts/CalendarConnectionLoader'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
 import { useForm } from '../../lib/FormContext'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useAuth } from '@/auth/AuthContext'
 
 // Types
 import {
@@ -44,6 +46,7 @@ const Dashboard: React.FC = () => {
   const { state } = useForm()
   const { toast } = useToast()
   const isMobile = useIsMobile()
+  const { calendarConnectionStage } = useAuth()
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
@@ -1235,6 +1238,11 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     document.documentElement.classList.remove('dark')
   }, [])
+
+  // Show calendar connection loader during OAuth flow
+  if (calendarConnectionStage) {
+    return <CalendarConnectionLoader stage={calendarConnectionStage} />
+  }
 
   return (
     <SidebarLayout>
