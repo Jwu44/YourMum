@@ -16,53 +16,41 @@ I am facing a bug where after google sso and I land on /dashboard, the dashboard
 
 ## Resources
 ### Console logs
-Sign in successful: Justin Wu (justin.wu4444@gmail.com)
-page-38c6dd705d95bb07.js:1 Authenticated user detected on home page, redirecting to dashboard
-layout-893795dc592b02d1.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/', isPublicPath: true, inAuthFlow: false, …}
-344-7ef646987293d369.js:1 Has calendar access: true
-344-7ef646987293d369.js:1 Storing user with calendar access flag: true
-344-7ef646987293d369.js:1 Got fresh ID token for backend storage
-344-7ef646987293d369.js:1 Calendar access status: false
-344-7ef646987293d369.js:1 API Base URL: https://yourdai-production.up.railway.app
-page-16315068ed461b65.js:1 Setting currentDate: Tue Jul 29 2025 15:22:16 GMT+1000 (Australian Eastern Standard Time)
-page-16315068ed461b65.js:1 Attempting to fetch calendar events for: 2025-07-29
+Attempting to fetch calendar events for: 2025-07-29
 layout-893795dc592b02d1.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
 site.webmanifest:1  GET https://yourdai.app/site.webmanifest 401 (Unauthorized)
 /dashboard:1 Manifest fetch from https://yourdai.app/site.webmanifest failed, code 401
-344-7ef646987293d369.js:1 Got fresh ID token for backend storage
-344-7ef646987293d369.js:1 Calendar access status: true
-344-7ef646987293d369.js:1 API Base URL: https://yourdai-production.up.railway.app
-344-7ef646987293d369.js:1 User stored in backend successfully with calendar access: false
-344-7ef646987293d369.js:1 Authentication completed successfully
-page-16315068ed461b65.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
-344-7ef646987293d369.js:1  GET https://yourdai-production.up.railway.app/api/calendar/events?date=2025-07-29&timezone=Australia%2FSydney 400 (Bad Request)
-fetchEvents @ 344-7ef646987293d369.js:1
-page-16315068ed461b65.js:1 Calendar not connected, loading regular schedule: Google Calendar not connected. Please connect your calendar in the Integrations page to sync events.
-344-7ef646987293d369.js:1 User stored in backend successfully with calendar access: true
-344-7ef646987293d369.js:1 Starting calendar connection process...
-344-7ef646987293d369.js:1 Waiting for auth state to stabilize before connecting to Google Calendar...
-344-7ef646987293d369.js:1 Connecting to Google Calendar...
-344-7ef646987293d369.js:1 Connected to Google Calendar successfully
+344-ee6ec9255f51f37a.js:1 User stored in backend successfully with calendar access: false
+344-ee6ec9255f51f37a.js:1 Authentication completed successfully
+page-855490b9106aa606.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
+344-ee6ec9255f51f37a.js:1 User stored in backend successfully with calendar access: true
+344-ee6ec9255f51f37a.js:1 Starting calendar connection process...
+344-ee6ec9255f51f37a.js:1 Waiting for auth state to stabilize before connecting to Google Calendar...
+344-ee6ec9255f51f37a.js:1 Connecting to Google Calendar...
+344-ee6ec9255f51f37a.js:1 Connected to Google Calendar successfully
+page-855490b9106aa606.js:1 Calendar events fetched successfully: 3 events
+page-855490b9106aa606.js:1 ⚠️ Rendering legacy structure
 Navigated to https://yourdai.app/dashboard
-344-7ef646987293d369.js:1 Setting up auth state listener
-344-7ef646987293d369.js:1 Checking redirect result...
+344-ee6ec9255f51f37a.js:1 Setting up auth state listener
+344-ee6ec9255f51f37a.js:1 Checking redirect result...
 dashboard:1  GET https://yourdai.app/site.webmanifest 401 (Unauthorized)
 dashboard:1 Manifest fetch from https://yourdai.app/site.webmanifest failed, code 401
-344-7ef646987293d369.js:1 Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
-344-7ef646987293d369.js:1 OAuth in progress: false
-344-7ef646987293d369.js:1 Storing user from auth state change (non-OAuth)
-344-7ef646987293d369.js:1 Redirect result: null
-344-7ef646987293d369.js:1 No redirect result found
-page-16315068ed461b65.js:1 Setting currentDate: Tue Jul 29 2025 15:22:21 GMT+1000 (Australian Eastern Standard Time)
-page-16315068ed461b65.js:1 Attempting to fetch calendar events for: 2025-07-29
+344-ee6ec9255f51f37a.js:1 Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
+344-ee6ec9255f51f37a.js:1 OAuth in progress: false
+344-ee6ec9255f51f37a.js:1 Storing user from auth state change (non-OAuth)
+344-ee6ec9255f51f37a.js:1 Redirect result: null
+344-ee6ec9255f51f37a.js:1 No redirect result found
+page-855490b9106aa606.js:1 Setting currentDate: Tue Jul 29 2025 15:52:53 GMT+1000 (Australian Eastern Standard Time)
+page-855490b9106aa606.js:1 Attempting to fetch calendar events for: 2025-07-29
 layout-893795dc592b02d1.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
-344-7ef646987293d369.js:1 Got fresh ID token for backend storage
-344-7ef646987293d369.js:1 Calendar access status: false
-344-7ef646987293d369.js:1 API Base URL: https://yourdai-production.up.railway.app
-page-16315068ed461b65.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
-344-7ef646987293d369.js:1 User stored in backend successfully with calendar access: false
-344-7ef646987293d369.js:1 Authentication completed successfully
-page-16315068ed461b65.js:1 Calendar events fetched successfully: 3 events
+344-ee6ec9255f51f37a.js:1 Got fresh ID token for backend storage
+344-ee6ec9255f51f37a.js:1 Calendar access status: false
+344-ee6ec9255f51f37a.js:1 API Base URL: https://yourdai-production.up.railway.app
+page-855490b9106aa606.js:1 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
+344-ee6ec9255f51f37a.js:1 User stored in backend successfully with calendar access: false
+344-ee6ec9255f51f37a.js:1 Authentication completed successfully
+page-855490b9106aa606.js:1 Calendar events fetched successfully: 3 events
+page-855490b9106aa606.js:1 ⚠️ Rendering legacy structure
 
 ### Server logs
 WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
