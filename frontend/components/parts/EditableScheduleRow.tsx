@@ -343,20 +343,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     
     return (
       <>
-        {/* Left 30% zone (outdent/reorder) - RED background */}
+        {/* Left 10% zone (outdent/reorder) - RED background */}
         <div 
           className="absolute top-0 bottom-0 bg-red-200 opacity-30 pointer-events-none"
-          style={{ left: 0, width: '30%' }}
+          style={{ left: 0, width: '10%' }}
         />
-        {/* Right 70% zone (indent) - GREEN background */}
+        {/* Right 90% zone (indent) - GREEN background */}
         <div 
           className="absolute top-0 bottom-0 bg-green-200 opacity-30 pointer-events-none"
-          style={{ left: '30%', width: '70%' }}
+          style={{ left: '10%', width: '90%' }}
         />
         {/* Zone boundary line */}
         <div 
           className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 opacity-70 pointer-events-none"
-          style={{ left: '30%' }}
+          style={{ left: '10%' }}
         />
         {/* Current drag type indicator */}
         {cursorPosition && (

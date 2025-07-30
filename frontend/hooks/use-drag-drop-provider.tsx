@@ -11,7 +11,8 @@ import {
   closestCenter,
   CollisionDetection,
   SensorDescriptor,
-  DragMoveEvent
+  DragMoveEvent,
+  CollisionDescriptor
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -58,6 +59,110 @@ interface DragDropProviderReturn {
  * Hook that provides drag and drop context configuration
  * Handles drag events and task reordering with proper collision detection
  */
+/**
+ * Custom collision detection that respects parent-child block hierarchy
+ * Prevents child tasks from being selected when cursor is within parent bounds
+ */
+const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection => {
+  return (args) => {
+    // Get default collision results from @dnd-kit
+    const defaultCollisions = closestCenter(args);
+    
+    if (!defaultCollisions || defaultCollisions.length === 0) {
+      return defaultCollisions;
+    }
+
+    // Get the primary collision (closest target)
+    const primaryCollision = defaultCollisions[0];
+    const targetTaskId = primaryCollision.id as string;
+    
+    // Find the target task
+    const targetTask = tasks.find(task => task.id === targetTaskId);
+    if (!targetTask) {
+      return defaultCollisions;
+    }
+
+    // Check if this target task is a child task (has a parent)
+    const isChildTask = targetTask.parent_id != null;
+    if (!isChildTask) {
+      // Target is not a child, use default collision detection
+      return defaultCollisions;
+    }
+
+    // Target is a child task - check if cursor is actually within parent bounds
+    const parentTask = tasks.find(task => task.id === targetTask.parent_id);
+    if (!parentTask) {
+      return defaultCollisions;
+    }
+
+    // Get DOM elements for both parent and child
+    const parentElement = document.querySelector(`[data-sortable-id="${parentTask.id}"]`);
+    const childElement = document.querySelector(`[data-sortable-id="${targetTask.id}"]`);
+    
+    if (!parentElement || !childElement) {
+      return defaultCollisions;
+    }
+
+    // Get bounding rectangles
+    const parentRect = parentElement.getBoundingClientRect();
+    const childRect = childElement.getBoundingClientRect();
+    
+    // Get cursor position from collision rect
+    const cursorX = args.collisionRect.left + args.collisionRect.width / 2;
+    const cursorY = args.collisionRect.top + args.collisionRect.height / 2;
+
+    // Check if cursor is within parent bounds
+    const isWithinParentBounds = (
+      cursorX >= parentRect.left && 
+      cursorX <= parentRect.right &&
+      cursorY >= parentRect.top && 
+      cursorY <= parentRect.bottom
+    );
+
+    // Check if cursor is within child bounds  
+    const isWithinChildBounds = (
+      cursorX >= childRect.left && 
+      cursorX <= childRect.right &&
+      cursorY >= childRect.top && 
+      cursorY <= childRect.bottom
+    );
+
+    // 🔧 FIX: Refined parent zone priority logic
+    // The task requirement is: "parent Task A: purple line should trigger indent across the whole zone"
+    // But we still need to allow legitimate child interactions when directly over child
+    
+    if (isWithinParentBounds && !isWithinChildBounds) {
+      // Cursor is in parent zone but NOT directly over child - always select parent
+      console.log('🔧 Collision Override: Cursor in parent zone (not over child), selecting parent', {
+        originalTarget: targetTask.id,
+        newTarget: parentTask.id,
+        cursorX,
+        cursorY,
+        withinParent: isWithinParentBounds,
+        withinChild: isWithinChildBounds
+      });
+      
+      return [{
+        id: parentTask.id,
+        data: primaryCollision.data
+      }];
+    } else if (isWithinParentBounds && isWithinChildBounds) {
+      // Cursor is over both parent and child (overlapping area) - use default collision detection
+      // This allows legitimate child task interactions when directly hovering over child element
+      console.log('🔧 Collision Detection: Cursor over both parent and child, using default detection', {
+        target: targetTask.id,
+        cursorX,
+        cursorY,
+        withinParent: isWithinParentBounds,
+        withinChild: isWithinChildBounds
+      });
+    }
+
+    // Use default collision detection
+    return defaultCollisions;
+  };
+};
+
 export const useDragDropProvider = ({
   tasks,
   onReorderTasks,
@@ -232,7 +337,7 @@ export const useDragDropProvider = ({
   return {
     // DndContext configuration
     sensors,
-    collisionDetection: closestCenter, // 🔧 FIX: Use closestCenter for better cursor tracking
+    collisionDetection: createParentAwareCollisionDetection(tasks), // 🔧 FIX: Use parent-aware collision detection
     onDragStart: handleDragStart,
     onDragOver: handleDragOver,
     onDragMove: handleDragMove,
