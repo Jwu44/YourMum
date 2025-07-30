@@ -411,10 +411,15 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           );
 
         case 'indent_to_child_level':
-          // 3-zone system: Highest opacity (90%) for 60-100% zone  
+          // 3-zone system: Dark + regular purple for 90% zone (child task level indentation)
           // Task will be indented to target's level + 1, positioned after target
           return (
-            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-90 bottom-[-1px]" />
+            <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
+              {/* Darker purple section (10% of width) */}
+              <div className="bg-purple-700 opacity-90" style={{ width: '10%' }} />
+              {/* Regular purple section (90% of width) */}
+              <div className="bg-purple-500 opacity-90" style={{ width: '90%' }} />
+            </div>
           );
 
         case 'outdent':
