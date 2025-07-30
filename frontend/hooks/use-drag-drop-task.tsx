@@ -115,17 +115,18 @@ export const useDragDropTask = ({
       const containerRight = containerLeft + containerWidth;
       
       // Calculate zone thresholds for 2-zone/3-zone/1-zone system
-      const thirtyPercentWidth = containerWidth * 0.3;
+      const tenPercentWidth = containerWidth * 0.1;
       const sixtyPercentWidth = containerWidth * 0.6;
-      const firstZoneEnd = containerLeft + thirtyPercentWidth;  // 0-30%
-      const secondZoneEnd = containerLeft + sixtyPercentWidth;  // 30-60%
+      const firstZoneEnd = containerLeft + tenPercentWidth;  // 0-10%
+      const secondZoneEnd = containerLeft + sixtyPercentWidth;  // 10-60%
       // Third zone: 60-100%
       
       const currentTaskLevel = task.level || 0;
       const draggedTaskIsIndented = currentTaskLevel > 0;
       
-      // 🔧 FIX: Determine if target task has children (is a parent in parent-child block)
-      const targetTaskHasChildren = allTasks.some(t => t.parent_id === task.id);
+      // 🔧 FIX: Extract target task ID from DOM to determine if target has children
+      const targetTaskId = targetElement.getAttribute('data-sortable-id');
+      const targetTaskHasChildren = targetTaskId ? allTasks.some(t => t.parent_id === targetTaskId) : false;
       
       // Debug logging for threshold detection
       console.log('🎯 Zone Detection Debug:', {
@@ -135,11 +136,12 @@ export const useDragDropTask = ({
         targetLevel,
         currentTaskLevel,
         draggedTaskIsIndented,
+        targetTaskId,
         targetTaskHasChildren,
         firstZoneEnd,
         secondZoneEnd,
-        'zone1(0-30%)': x < firstZoneEnd,
-        'zone2(30-60%)': x >= firstZoneEnd && x < secondZoneEnd,
+        'zone1(0-10%)': x < firstZoneEnd,
+        'zone2(10-60%)': x >= firstZoneEnd && x < secondZoneEnd,
         'zone3(60-100%)': x >= secondZoneEnd
       });
       
@@ -154,25 +156,25 @@ export const useDragDropTask = ({
       } else if (targetLevel === 0) {
         // 2-zone system for non-indented targets without children
         if (x < firstZoneEnd) {
-          // 0-30% zone
+          // 0-10% zone
           dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';
-          console.log(`✅ Zone 1 (2-zone): ${dragType} - mouse in left 30%`);
+          console.log(`✅ Zone 1 (2-zone): ${dragType} - mouse in left 10%`);
         } else {
-          // 30-100% zone
+          // 10-100% zone
           dragType = 'indent';
-          console.log('✅ Zone 2 (2-zone): indent - mouse in right 70%');
+          console.log('✅ Zone 2 (2-zone): indent - mouse in right 90%');
         }
       } else if (targetLevel >= 1 && targetLevel <= 2) {
         // 🎯 PARENT-CHILD BLOCK CONTEXT: Child task in existing parent-child block
         // Enhanced logic to handle child tasks in parent-child blocks
         if (x < firstZoneEnd) {
-          // 0-30% zone: "left 30% zone should trigger indent under Task A" (the parent)
+          // 0-10% zone: "left 10% zone should trigger indent under Task A" (the parent)
           dragType = 'indent_to_parent_level';
-          console.log('✅ Child in parent-child block (30%): indent_to_parent_level - indent under parent');
+          console.log('✅ Child in parent-child block (10%): indent_to_parent_level - indent under parent');
         } else {
-          // 30-100% zone: "right 70% zone should trigger indent under Task B" (the child)
+          // 10-100% zone: "right 90% zone should trigger indent under Task B" (the child)
           dragType = targetLevel < 3 ? 'indent_to_child_level' : 'reorder';
-          console.log(`✅ Child in parent-child block (70%): ${dragType} - indent under child or reorder if max level`);
+          console.log(`✅ Child in parent-child block (90%): ${dragType} - indent under child or reorder if max level`);
         }
       } else if (targetLevel === 3) {
         // 1-zone system for max level targets
