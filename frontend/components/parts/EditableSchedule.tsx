@@ -90,7 +90,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   const moveTask = useCallback((
     dragIndex: number,
     hoverIndex: number,
-    dragType: 'indent' | 'outdent' | 'reorder',
+    dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level',
     targetSection: string | null
   ) => {
     try {
@@ -183,6 +183,79 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
           }
         } else {
           // Already at level 0, just reorder
+          newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+        }
+      } else if (dragType === 'indent_to_parent_level' && !targetTask.is_section) {
+        // 🔧 NEW: Indent to parent level - Task goes at target's parent level, positioned after target
+        // This handles the 30-60% zone for 3-zone system
+        try {
+          const targetLevel = targetTask.level || 0
+          const targetParentTask = processedTasks.find(t => t.id === targetTask.parent_id)
+          
+          if (targetLevel > 0 && targetParentTask) {
+            // Set task to same level as target's parent
+            const newLevel = targetParentTask.level || 0
+            
+            updatedDraggedTask.is_subtask = newLevel > 0
+            updatedDraggedTask.level = newLevel
+            updatedDraggedTask.parent_id = targetParentTask.parent_id
+            updatedDraggedTask.section = targetTask.section
+            
+            // Insert immediately after target task (as per requirement clarification)
+            const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+            newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
+            
+            console.log('✅ indent_to_parent_level: Task moved to parent level', {
+              taskId: draggedTask.id,
+              newLevel,
+              targetParentId: targetParentTask.id
+            })
+          } else {
+            // Target has no parent, fallback to child level behavior (as per dev-guide error handling)
+            const newLevel = Math.min(targetLevel + 1, 3)
+            
+            updatedDraggedTask.is_subtask = newLevel > 0
+            updatedDraggedTask.level = newLevel
+            updatedDraggedTask.parent_id = targetTask.id
+            updatedDraggedTask.section = targetTask.section
+            
+            const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+            newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
+            
+            console.log('✅ indent_to_parent_level fallback: Used child level behavior', {
+              taskId: draggedTask.id,
+              newLevel
+            })
+          }
+        } catch (error) {
+          console.error('Error in indent_to_parent_level operation:', error)
+          // Fallback to simple reorder on error
+          newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+        }
+      } else if (dragType === 'indent_to_child_level' && !targetTask.is_section) {
+        // 🔧 NEW: Indent to child level - Task goes at target's level + 1, positioned after target
+        // This handles the 60-100% zone for 3-zone system
+        try {
+          const targetLevel = targetTask.level || 0
+          const newLevel = Math.min(targetLevel + 1, 3)
+          
+          updatedDraggedTask.is_subtask = newLevel > 0
+          updatedDraggedTask.level = newLevel
+          updatedDraggedTask.parent_id = targetTask.id
+          updatedDraggedTask.section = targetTask.section
+          
+          // Insert directly after target task (as per requirement clarification)
+          const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+          newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
+          
+          console.log('✅ indent_to_child_level: Task indented under target', {
+            taskId: draggedTask.id,
+            newLevel,
+            parentId: targetTask.id
+          })
+        } catch (error) {
+          console.error('Error in indent_to_child_level operation:', error)
+          // Fallback to simple reorder on error
           newTasks.splice(hoverIndex, 0, updatedDraggedTask)
         }
       } else {
