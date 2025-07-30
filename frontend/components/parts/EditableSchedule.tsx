@@ -262,6 +262,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
       collisionDetection={dragDropProvider.collisionDetection}
       onDragStart={dragDropProvider.onDragStart}
       onDragOver={dragDropProvider.onDragOver}
+      onDragMove={dragDropProvider.onDragMove}
       onDragEnd={dragDropProvider.onDragEnd}
     >
       <SortableContext
