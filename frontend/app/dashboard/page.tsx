@@ -848,18 +848,6 @@ const Dashboard: React.FC = () => {
 
         setCurrentDayIndex(prevIndex => prevIndex - 1)
 
-        // Show appropriate message based on whether schedule has tasks
-        if (previousDaySchedule.length > 0) {
-          toast({
-            title: 'Success',
-            description: "Previous day's schedule loaded successfully."
-          })
-        } else {
-          toast({
-            title: 'Previous Day',
-            description: 'No schedule found for this date.'
-          })
-        }
       } else {
         // Failed to load - show empty schedule anyway to allow navigation
         const emptySchedule: Task[] = []

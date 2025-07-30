@@ -26,6 +26,7 @@ interface IndentationState {
   dragType: 'indent' | 'outdent' | 'reorder'
   cursorPosition: { x: number; y: number } | null
   targetTaskLeftEdge: number | null
+  containerWidth?: number // Track container width for percentage calculations
 }
 
 interface DragDropTaskReturn {
@@ -70,6 +71,99 @@ export const useDragDropTask = ({
     targetTaskLeftEdge: null
   })
 
+  // Cursor tracking for indentation detection - defined before useSortable
+  const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement) => {
+    try {
+      console.log('🔧 updateCursorPosition called:', { x, y, hasTarget: !!targetElement, taskText: task.text });
+      
+      if (!targetElement || isSection) {
+        // Reset state if no target or target is section
+        // 🔧 FIX: Use 'reorder' instead of null to ensure purple bar shows
+        console.log('🔧 Resetting to reorder - no target or is section');
+        setIndentationState({
+          dragType: 'reorder',
+          cursorPosition: null,
+          targetTaskLeftEdge: null,
+          containerWidth: undefined
+        });
+        return;
+      }
+
+      const targetRect = targetElement.getBoundingClientRect();
+      const targetTask = targetElement.getAttribute('data-task-level');
+      const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
+      
+      console.log('🔧 Target element details:', {
+        targetRect,
+        width: targetRect.width,
+        height: targetRect.height,
+        left: targetRect.left,
+        right: targetRect.right,
+        targetLevel,
+        elementTagName: targetElement.tagName,
+        elementClasses: targetElement.className
+      });
+      
+      // 🔧 FIX: Percentage-based threshold calculation for reliable positioning
+      // Following dev-guide principle: keep implementation SIMPLE
+      
+      // Use the entire visible task container for percentage calculation
+      const containerLeft = targetRect.left;
+      const containerWidth = targetRect.width;
+      const containerRight = containerLeft + containerWidth;
+      
+      // Calculate 30% threshold from left edge of container
+      const thirtyPercentWidth = containerWidth * 0.3;
+      const indentThreshold = containerLeft + thirtyPercentWidth;
+      const outdentThreshold = containerLeft + thirtyPercentWidth; // Same threshold for both
+      
+      // Debug logging for threshold detection
+      console.log('🎯 Percentage Threshold Debug:', {
+        mouseX: x,
+        containerLeft,
+        containerWidth,
+        containerRight,
+        thirtyPercentWidth,
+        indentThreshold,
+        'mouseInFirstThirty%': x < indentThreshold,
+        'mouseInLastSeventy%': x >= indentThreshold,
+        targetLevel,
+        taskLevel: task.level || 0
+      });
+      
+      let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
+      
+      // Check indent conditions: cursor in right 70% of container AND target can accept more levels
+      if (x >= indentThreshold && targetLevel < 3) { // Max level 3, so can indent up to level 2 (will become level 3)
+        dragType = 'indent';
+        console.log('✅ INDENT triggered - mouse in right 70% of container');
+      } 
+      // Check outdent conditions: cursor in left 30% of container AND current task can be outdented
+      else if (x < indentThreshold && (task.level || 0) > 0) {
+        dragType = 'outdent';
+        console.log('✅ OUTDENT triggered - mouse in left 30% of container');
+      } else {
+        console.log('✅ REORDER mode - standard positioning');
+      }
+      
+      setIndentationState({
+        dragType,
+        cursorPosition: { x, y },
+        targetTaskLeftEdge: containerLeft,
+        containerWidth
+      });
+      
+    } catch (error) {
+      console.error('Error updating cursor position:', error);
+      // Fallback to reorder mode
+      setIndentationState({
+        dragType: 'reorder',
+        cursorPosition: { x, y },
+        targetTaskLeftEdge: null
+      });
+    }
+  }, [isSection, task.level, task.text]);
+
   const {
     attributes,
     listeners,
@@ -84,7 +178,8 @@ export const useDragDropTask = ({
       type: isSection ? 'section' : 'task',
       task,
       index,
-      indentationState // Include indentation state in drag data
+      indentationState, // Include indentation state in drag data
+      updateCursorPosition // Include cursor position function in drag data
     },
     disabled: isSection // Sections cannot be dragged for now
   })
@@ -141,89 +236,6 @@ export const useDragDropTask = ({
     }
   }, [isDragging])
 
-  // Cursor tracking for indentation detection
-  const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement) => {
-    try {
-      if (!targetElement || isSection) {
-        // Reset state if no target or target is section
-        // 🔧 FIX: Use 'reorder' instead of null to ensure purple bar shows
-        setIndentationState({
-          dragType: 'reorder',
-          cursorPosition: null,
-          targetTaskLeftEdge: null
-        });
-        return;
-      }
-
-
-      const targetRect = targetElement.getBoundingClientRect();
-      const targetTask = targetElement.getAttribute('data-task-level');
-      const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
-      
-      // 🔧 FIX: Calculate actual content left edge accounting for task structure
-      // Try to find the actual text content element for more precise positioning
-      
-      // Look for the task text content span element
-      const textElement = targetElement.querySelector('span[data-task-content="true"]') || 
-                          targetElement.querySelector('span[class*="flex-1"]');
-      
-      let contentLeftEdge: number;
-      
-      if (textElement) {
-        // Use actual text element position for precise calculation
-        const textRect = textElement.getBoundingClientRect();
-        contentLeftEdge = textRect.left;
-      } else {
-        // Fallback: calculate based on task structure
-        // Task structure: [marginLeft for indentation] + [grip handle] + [checkbox] + [text content]
-        
-        const rowLeftEdge = targetRect.left;
-        
-        // Account for CSS marginLeft indentation (20px per level for subtasks)
-        const indentationOffset = targetLevel * 20;
-        
-        // Account for internal task elements:
-        // - Padding (p-4 = 16px left padding)
-        // - Grip handle (width ~16px + mr-2 = 8px margin = ~24px total when visible)
-        // - Checkbox area (~24px width + margins)
-        // Approximate total offset for content start: ~64px from row edge
-        const internalElementsOffset = 64;
-        
-        contentLeftEdge = rowLeftEdge + indentationOffset + internalElementsOffset;
-      }
-      
-      // 20px threshold for indent/outdent detection from content edge
-      const indentThreshold = contentLeftEdge + 20;
-      const outdentThreshold = contentLeftEdge - 20;
-      
-      let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
-      
-      // Check indent conditions: cursor right of content + 20px AND target can accept more levels
-      if (x > indentThreshold && targetLevel < 3) { // Max level 3, so can indent up to level 2 (will become level 3)
-        dragType = 'indent';
-      } 
-      // Check outdent conditions: cursor left of content - 20px AND current task can be outdented
-      else if (x < outdentThreshold && (task.level || 0) > 0) {
-        dragType = 'outdent';
-      }
-      
-      
-      setIndentationState({
-        dragType,
-        cursorPosition: { x, y },
-        targetTaskLeftEdge: contentLeftEdge
-      });
-      
-    } catch (error) {
-      console.error('Error updating cursor position:', error);
-      // Fallback to reorder mode
-      setIndentationState({
-        dragType: 'reorder',
-        cursorPosition: { x, y },
-        targetTaskLeftEdge: null
-      });
-    }
-     }, [isSection, task.level]);
 
   // Reset indentation state when drag ends
   useEffect(() => {

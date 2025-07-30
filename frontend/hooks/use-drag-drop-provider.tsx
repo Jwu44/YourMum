@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -10,7 +10,8 @@ import {
   useSensors,
   closestCenter,
   CollisionDetection,
-  SensorDescriptor
+  SensorDescriptor,
+  DragMoveEvent
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -45,6 +46,7 @@ interface DragDropProviderReturn {
   collisionDetection: CollisionDetection
   onDragStart: (event: DragStartEvent) => void
   onDragOver: (event: DragOverEvent) => void
+  onDragMove: (event: DragMoveEvent) => void
   onDragEnd: (event: DragEndEvent) => void
   
   // SortableContext props
@@ -98,7 +100,7 @@ export const useDragDropProvider = ({
 
   /**
    * Handle drag over - collision detection
-   * Replaces complex manual collision calculations
+   * Enhanced to update cursor position for indentation detection
    */
   const handleDragOver = useCallback((event: DragOverEvent) => {
     try {
@@ -108,10 +110,69 @@ export const useDragDropProvider = ({
         return
       }
 
+      console.log('🎯 DragOver event:', {
+        activeId: active.id,
+        overId: over.id,
+        activeData: active.data.current,
+        overData: over.data.current
+      });
+
       // @dnd-kit handles collision detection automatically
-      // We can add custom logic here if needed for indentation
     } catch (error) {
       console.error('Error handling drag over:', error)
+    }
+  }, [])
+
+  /**
+   * Handle drag move - track mouse position for indentation detection
+   * This is called during active drag operations with mouse coordinates
+   */
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    try {
+      const { active, over, delta } = event
+      
+      if (!over || active.id === over.id) {
+        return
+      }
+
+      // Get current mouse position from the drag event
+      const activatorEvent = event.activatorEvent as MouseEvent
+      if (!activatorEvent) return
+
+      // Calculate current mouse position by adding delta to initial position
+      const currentMouseX = activatorEvent.clientX + delta.x
+      const currentMouseY = activatorEvent.clientY + delta.y
+      
+      console.log('🎯 DragMove event:', {
+        activeId: active.id,
+        overId: over.id,
+        currentMouseX,
+        currentMouseY,
+        delta
+      });
+
+      // Find the target element using the over ID
+      const targetElement = document.querySelector(`[data-sortable-id="${over.id}"]`)
+      if (targetElement) {
+        console.log('🎯 Found target element in DragMove:', targetElement);
+        
+        // Get the over task's data and call updateCursorPosition
+        const overData = over.data.current;
+        if (overData?.updateCursorPosition && typeof overData.updateCursorPosition === 'function') {
+          console.log('🎯 Calling updateCursorPosition from DragMove:', over.id);
+          try {
+            overData.updateCursorPosition(currentMouseX, currentMouseY, targetElement as HTMLElement);
+          } catch (error) {
+            console.error('Error calling updateCursorPosition from DragMove:', error);
+          }
+        } else {
+          console.log('🚫 updateCursorPosition not found in DragMove');
+        }
+      } else {
+        console.log('🚫 Target element not found in DragMove for:', over.id);
+      }
+    } catch (error) {
+      console.error('Error handling drag move:', error)
     }
   }, [])
 
@@ -161,6 +222,7 @@ export const useDragDropProvider = ({
     collisionDetection: closestCenter, // 🔧 FIX: Use closestCenter for better cursor tracking
     onDragStart: handleDragStart,
     onDragOver: handleDragOver,
+    onDragMove: handleDragMove,
     onDragEnd: handleDragEnd,
     
     // SortableContext configuration  
