@@ -332,6 +332,42 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
 
+  // 🐛 DEBUG: Visual debugging zones for threshold detection
+  const getDebugZones = useCallback(() => {
+    // Only show debug zones for non-section tasks
+    if (isSection) return null;
+    
+    const { cursorPosition, dragType, containerWidth } = dragDropHook.indentationState;
+    
+    return (
+      <>
+        {/* Left 30% zone (outdent/reorder) - RED background */}
+        <div 
+          className="absolute top-0 bottom-0 bg-red-200 opacity-30 pointer-events-none"
+          style={{ left: 0, width: '30%' }}
+        />
+        {/* Right 70% zone (indent) - GREEN background */}
+        <div 
+          className="absolute top-0 bottom-0 bg-green-200 opacity-30 pointer-events-none"
+          style={{ left: '30%', width: '70%' }}
+        />
+        {/* Zone boundary line */}
+        <div 
+          className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 opacity-70 pointer-events-none"
+          style={{ left: '30%' }}
+        />
+        {/* Current drag type indicator */}
+        {cursorPosition && (
+          <div 
+            className="absolute top-1 right-1 px-2 py-1 bg-black text-white text-xs rounded opacity-80 pointer-events-none"
+          >
+            {dragType || 'none'} | W:{containerWidth}
+          </div>
+        )}
+      </>
+    );
+  }, [isSection, dragDropHook.indentationState]);
+
   // Implements Notion-style purple line indicator behaviour
   // Only shows when this task is being hovered over as a drop target, not when dragging
   const getDragIndicators = useCallback(() => {
@@ -343,6 +379,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     // Get drag type, default to 'reorder' if not set
     const { dragType } = dragDropHook.indentationState;
     const currentDragType = dragType || 'reorder';
+    
+    // 🐛 DEBUG: Log current drag state
+    console.log('🎨 Rendering drag indicator:', {
+      dragType: currentDragType,
+      isOver: dragDropHook.isOver,
+      isDragging: dragDropHook.isDragging,
+      containerWidth: dragDropHook.indentationState.containerWidth
+    });
 
     try {
       switch (currentDragType) {
@@ -377,7 +421,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
       );
     }
-  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, isSection])
+  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.containerWidth, isSection])
 
   /**
    * Handles task decomposition into microsteps
@@ -618,6 +662,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         ref={dragDropHook.setNodeRef}
         {...dragDropHook.attributes}
         data-task-level={task.level || 0}
+        data-sortable-id={task.id}
         className={cn(
           dragDropHook.getRowClassName(),
           isSection ? 'cursor-default' : '',
@@ -638,14 +683,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           transition: dragDropHook.isDragging ? 'none' : undefined
         }}
         onMouseEnter={(e) => {
-          // 🔧 FIX: Always track cursor position when mouse enters, not just when isOver
-          // This ensures immediate purple bar appearance and proper drag type detection
-          dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget);
+          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
+          // This ensures we track position relative to the TARGET task, not dragged task
+          if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            console.log('🔵 MouseEnter on TARGET task:', task.text);
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement);
+          }
         }}
         onMouseMove={(e) => {
-          // 🔧 FIX: Always track cursor position during mouse movement in the task area
-          // This enables real-time drag type updates (indent/outdent/reorder)
-          dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget);
+          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)  
+          // This enables real-time drag type updates relative to the TARGET task
+          if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            console.log('🔵 MouseMove on TARGET task:', task.text, 'at', e.clientX);
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement);
+          }
         }}
       >
         {/* Task/Section Content */}
@@ -699,6 +750,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         {/* Task Actions - only show for non-section tasks */}
         {!isSection && renderTaskActions()}
 
+        {/* 🐛 DEBUG: Visual threshold zones */}
+        {getDebugZones()}
+        
         {/* Enhanced Drag Indicators */}
         {getDragIndicators()}
       </div>
