@@ -18,12 +18,13 @@ interface UseDragDropTaskProps {
   task: Task
   index: number
   isSection: boolean
-  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
+  allTasks: Task[]
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level', targetSection: string | null) => void
 }
 
 // Enhanced state for indentation detection
 interface IndentationState {
-  dragType: 'indent' | 'outdent' | 'reorder'
+  dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level'
   cursorPosition: { x: number; y: number } | null
   targetTaskLeftEdge: number | null
   containerWidth?: number // Track container width for percentage calculations
@@ -60,6 +61,7 @@ export const useDragDropTask = ({
   task,
   index,
   isSection,
+  allTasks,
   moveTask
 }: UseDragDropTaskProps): DragDropTaskReturn => {
   
@@ -112,38 +114,70 @@ export const useDragDropTask = ({
       const containerWidth = targetRect.width;
       const containerRight = containerLeft + containerWidth;
       
-      // Calculate 30% threshold from left edge of container
+      // Calculate zone thresholds for 2-zone/3-zone/1-zone system
       const thirtyPercentWidth = containerWidth * 0.3;
-      const indentThreshold = containerLeft + thirtyPercentWidth;
-      const outdentThreshold = containerLeft + thirtyPercentWidth; // Same threshold for both
+      const sixtyPercentWidth = containerWidth * 0.6;
+      const firstZoneEnd = containerLeft + thirtyPercentWidth;  // 0-30%
+      const secondZoneEnd = containerLeft + sixtyPercentWidth;  // 30-60%
+      // Third zone: 60-100%
+      
+      const currentTaskLevel = task.level || 0;
+      const draggedTaskIsIndented = currentTaskLevel > 0;
+      
+      // 🔧 FIX: Determine if target task has children (is a parent in parent-child block)
+      const targetTaskHasChildren = allTasks.some(t => t.parent_id === task.id);
       
       // Debug logging for threshold detection
-      console.log('🎯 Percentage Threshold Debug:', {
+      console.log('🎯 Zone Detection Debug:', {
         mouseX: x,
         containerLeft,
         containerWidth,
-        containerRight,
-        thirtyPercentWidth,
-        indentThreshold,
-        'mouseInFirstThirty%': x < indentThreshold,
-        'mouseInLastSeventy%': x >= indentThreshold,
         targetLevel,
-        taskLevel: task.level || 0
+        currentTaskLevel,
+        draggedTaskIsIndented,
+        targetTaskHasChildren,
+        firstZoneEnd,
+        secondZoneEnd,
+        'zone1(0-30%)': x < firstZoneEnd,
+        'zone2(30-60%)': x >= firstZoneEnd && x < secondZoneEnd,
+        'zone3(60-100%)': x >= secondZoneEnd
       });
       
-      let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
+      let dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level' = 'reorder';
       
-      // Check indent conditions: cursor in right 70% of container AND target can accept more levels
-      if (x >= indentThreshold && targetLevel < 3) { // Max level 3, so can indent up to level 2 (will become level 3)
+      // 🔧 FIX: Enhanced zone system that considers parent-child block context
+      if (targetTaskHasChildren) {
+        // 🎯 PARENT-CHILD BLOCK CONTEXT: Target task has children (is a parent)
+        // According to requirements: "dragging into parent Task A: purple line should trigger indent across the whole zone, no reorder"
         dragType = 'indent';
-        console.log('✅ INDENT triggered - mouse in right 70% of container');
-      } 
-      // Check outdent conditions: cursor in left 30% of container AND current task can be outdented
-      else if (x < indentThreshold && (task.level || 0) > 0) {
-        dragType = 'outdent';
-        console.log('✅ OUTDENT triggered - mouse in left 30% of container');
-      } else {
-        console.log('✅ REORDER mode - standard positioning');
+        console.log('✅ Parent-child block (parent): indent - entire zone triggers indentation under parent');
+      } else if (targetLevel === 0) {
+        // 2-zone system for non-indented targets without children
+        if (x < firstZoneEnd) {
+          // 0-30% zone
+          dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';
+          console.log(`✅ Zone 1 (2-zone): ${dragType} - mouse in left 30%`);
+        } else {
+          // 30-100% zone
+          dragType = 'indent';
+          console.log('✅ Zone 2 (2-zone): indent - mouse in right 70%');
+        }
+      } else if (targetLevel >= 1 && targetLevel <= 2) {
+        // 🎯 PARENT-CHILD BLOCK CONTEXT: Child task in existing parent-child block
+        // Enhanced logic to handle child tasks in parent-child blocks
+        if (x < firstZoneEnd) {
+          // 0-30% zone: "left 30% zone should trigger indent under Task A" (the parent)
+          dragType = 'indent_to_parent_level';
+          console.log('✅ Child in parent-child block (30%): indent_to_parent_level - indent under parent');
+        } else {
+          // 30-100% zone: "right 70% zone should trigger indent under Task B" (the child)
+          dragType = targetLevel < 3 ? 'indent_to_child_level' : 'reorder';
+          console.log(`✅ Child in parent-child block (70%): ${dragType} - indent under child or reorder if max level`);
+        }
+      } else if (targetLevel === 3) {
+        // 1-zone system for max level targets
+        dragType = 'reorder';
+        console.log('✅ Single zone (max level): reorder only');
       }
       
       setIndentationState({
@@ -162,7 +196,7 @@ export const useDragDropTask = ({
         targetTaskLeftEdge: null
       });
     }
-  }, [isSection, task.level, task.text]);
+  }, [isSection, task.level, task.text, allTasks]);
 
   const {
     attributes,

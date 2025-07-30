@@ -538,11 +538,6 @@ const Dashboard: React.FC = () => {
         // Navigate to next day
         setCurrentDayIndex(prevIndex => prevIndex + 1)
 
-        toast({
-          title: 'Success',
-          description: `Loaded existing schedule for ${nextDayDate}`
-        })
-
         return
       }
 

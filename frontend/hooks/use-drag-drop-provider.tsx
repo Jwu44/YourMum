@@ -192,13 +192,26 @@ export const useDragDropProvider = ({
       const newIndex = tasks.findIndex(task => task.id === over.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // Extract indentation state from active drag data
+        // 🔧 FIX: Extract indentation state from target (over) data instead of active data
+        // The real-time drag type is tracked on the target task during cursor movement
         const activeData = active.data.current
-        const indentationState = activeData?.indentationState
-        const dragType = indentationState?.dragType || 'reorder'
+        const overData = over.data.current
+        
+        // Try to get drag type from target task's indentation state first
+        const targetIndentationState = overData?.indentationState
+        const fallbackIndentationState = activeData?.indentationState
+        
+        const dragType = targetIndentationState?.dragType || fallbackIndentationState?.dragType || 'reorder'
+        
+        console.log('🔧 DragEnd Debug:', {
+          activeId: active.id,
+          overId: over.id,
+          targetDragType: targetIndentationState?.dragType,
+          fallbackDragType: fallbackIndentationState?.dragType,
+          finalDragType: dragType
+        })
 
         // Determine if moving to a section
-        const overData = over.data.current
         const targetSection = overData?.type === 'section' ? overData.task.text : null
 
                  // Use the enhanced moveTask if available, otherwise fall back to simple reordering
