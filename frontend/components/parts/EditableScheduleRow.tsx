@@ -36,7 +36,7 @@ interface EditableScheduleRowProps {
   task: Task
   index: number
   onUpdateTask: (task: Task) => void
-  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level', targetSection: string | null) => void
   isSection: boolean
   children?: React.ReactNode
   allTasks: Task[]
@@ -215,6 +215,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onUpdateTask,
   moveTask,
   isSection,
+  allTasks,
   onEditTask, // New prop for edit functionality
   onDeleteTask, // New prop for delete functionality
   onArchiveTask, // New prop for archive functionality
@@ -225,6 +226,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     task,
     index,
     isSection,
+    allTasks,
     moveTask
   })
 
@@ -368,30 +370,30 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     );
   }, [isSection, dragDropHook.indentationState]);
 
-  // Implements Notion-style purple line indicator behaviour
-  // Only shows when this task is being hovered over as a drop target, not when dragging
+  // Implements Notion-style purple line indicator behavior with progressive opacity
+  // Supports 2-zone, 3-zone, and 1-zone systems based on target task level
   const getDragIndicators = useCallback(() => {
     // Only show indicators when this task is being hovered over as a drop target
     // AND we're not currently dragging this task (prevents showing on dragged task)
-    // 🔧 FIX: Show purple bar immediately when hovering, regardless of drag type
     if (!dragDropHook.isOver || dragDropHook.isDragging || isSection) return null
 
     // Get drag type, default to 'reorder' if not set
     const { dragType } = dragDropHook.indentationState;
     const currentDragType = dragType || 'reorder';
     
-    // 🐛 DEBUG: Log current drag state
-    console.log('🎨 Rendering drag indicator:', {
+    // 🐛 DEBUG: Log current drag state for progressive opacity system
+    console.log('🎨 Rendering progressive opacity drag indicator:', {
       dragType: currentDragType,
       isOver: dragDropHook.isOver,
       isDragging: dragDropHook.isDragging,
-      containerWidth: dragDropHook.indentationState.containerWidth
+      containerWidth: dragDropHook.indentationState.containerWidth,
+      taskLevel: task.level || 0
     });
 
     try {
       switch (currentDragType) {
         case 'indent':
-          // Purple bar with 10% darker section on left (Notion-style)
+          // 2-zone system: Purple bar with 10% darker section on left (Notion-style)
           return (
             <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
               {/* Darker purple section (10% of width) */}
@@ -399,6 +401,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               {/* Normal purple section (90% of width) */}
               <div className="bg-purple-500 opacity-75" style={{ width: '90%' }} />
             </div>
+          );
+
+        case 'indent_to_parent_level':
+          // 3-zone system: Medium opacity (75%) for 30-60% zone
+          // Task will be indented to target's parent level, positioned after target
+          return (
+            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
+          );
+
+        case 'indent_to_child_level':
+          // 3-zone system: Highest opacity (90%) for 60-100% zone  
+          // Task will be indented to target's level + 1, positioned after target
+          return (
+            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-90 bottom-[-1px]" />
           );
 
         case 'outdent':
@@ -409,14 +425,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
         case 'reorder':
         default:
-          // Standard purple bar for reordering - always show when hovering
+          // Lightest opacity (60%) for 0-30% zone and 1-zone system (level 3 tasks)
+          // Task will be repositioned without changing indentation level
           return (
             <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
           );
       }
     } catch (error) {
-      console.error('Error rendering drag indicators:', error);
-      // Fallback to simple indicator
+      console.error('Error rendering progressive opacity drag indicators:', error, {
+        dragType: currentDragType,
+        taskLevel: task.level || 0,
+        isOver: dragDropHook.isOver
+      });
+      // Fallback to medium opacity indicator (follows dev-guide error handling)
       return (
         <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
       );
@@ -667,14 +688,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           dragDropHook.getRowClassName(),
           isSection ? 'cursor-default' : '',
           isDecomposing && 'animate-pulse',
-          task.level && task.level > 0 ? 'pl-8' : '',
           // Section styling
           isSection ? 'mt-6 mb-4'
           // Task card styling following TaskList.tsx reference
             : 'group gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft'
         )}
         style={{
-          marginLeft: task.is_subtask ? `${(task.level || 1) * 20}px` : 0,
+          marginLeft: (task.level && task.level > 0) ? `${task.level * 30}px` : 0,
           minHeight: isSection ? '48px' : 'auto',
           transform: dragDropHook.transform, // Only applies to actively dragged items
           // 🔧 FIX: Prevent shuffling - only dragged items get transform optimization
@@ -711,8 +731,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             </div>
             
             <div ref={checkboxRef} className="flex items-center">
-              {task.is_subtask && (
-                <div className="w-4 h-4 mr-2 border-l border-b border-muted" />
+              {task.level && task.level > 0 && (
+                <div className="relative mr-2 flex items-center">
+                  {/* Connecting line extending from parent */}
+                  <div 
+                    className="border-l border-b border-muted-foreground/30"
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      borderBottomLeftRadius: '4px'
+                    }}
+                  />
+                </div>
               )}
               <Checkbox
                 checked={task.completed}
