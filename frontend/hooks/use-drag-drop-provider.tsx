@@ -1,6 +1,5 @@
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import {
-  DndContext,
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
@@ -12,10 +11,8 @@ import {
   CollisionDetection,
   SensorDescriptor,
   DragMoveEvent,
-  CollisionDescriptor
 } from '@dnd-kit/core'
 import {
-  SortableContext,
   arrayMove,
   SortingStrategy
 } from '@dnd-kit/sortable'
@@ -57,11 +54,11 @@ interface DragDropProviderReturn {
 
 /**
  * Hook that provides drag and drop context configuration
- * Handles drag events and task reordering with proper collision detection
+ * Handles drag events and task reordering with simplified collision detection
  */
 /**
- * Custom collision detection that respects parent-child block hierarchy
- * Prevents child tasks from being selected when cursor is within parent bounds
+ * Simplified collision detection that respects parent-child hierarchy
+ * Uses 2-zone system with red zone (0-10%) for outdent priority
  */
 const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection => {
   return (args) => {
@@ -82,78 +79,34 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       return defaultCollisions;
     }
 
-    // 🔧 FIX: Check for child-over-parent drag scenarios
-    // Get the dragged task to check if it's a child being dragged over its parent
+    // Get the dragged task to check scenarios
     const draggedTaskId = args.active?.id as string;
     const draggedTask = tasks.find(task => task.id === draggedTaskId);
     
-    // Scenario 1: Child task being dragged over its parent (OUTDENT scenario)
+    // Check for child-over-parent drag scenario
     const isChildOverParent = draggedTask?.parent_id === targetTaskId;
-    
-    // Scenario 2: Target task is a child task (existing logic)
     const isChildTask = targetTask.parent_id != null;
     
     if (isChildOverParent) {
-      // Handle child dragged over parent - apply red zone collision detection
-      console.log('🔧 Child-over-parent detected:', {
+      // Child task being dragged over its parent - always keep parent as target
+      // Zone logic is handled in use-drag-drop-task.tsx
+      console.log('🔧 Child-over-parent: keeping parent as target', {
         draggedTask: draggedTask?.text,
-        draggedTaskId,
-        parentTask: targetTask.text,
-        parentTaskId: targetTaskId
+        parentTask: targetTask.text
       });
-      
-      // Get cursor position from collision rect
-      const cursorX = args.collisionRect.left + args.collisionRect.width / 2;
-      const cursorY = args.collisionRect.top + args.collisionRect.height / 2;
-      
-      // Get parent task element to calculate red zone
-      const parentElement = document.querySelector(`[data-sortable-id="${targetTaskId}"]`);
-      if (parentElement) {
-        const parentRect = parentElement.getBoundingClientRect();
-        
-        // Calculate red zone (0-10% of parent width) for outdent detection
-        const parentRedZoneWidth = parentRect.width * 0.1;
-        const parentRedZoneEnd = parentRect.left + parentRedZoneWidth;
-        const isInParentRedZone = cursorX < parentRedZoneEnd;
-        
-        if (isInParentRedZone) {
-          // RED ZONE: Keep parent as target for outdent operation
-          console.log('🟥 Child-over-parent RED ZONE (0-10%): Keeping parent as target for outdent', {
-            draggedTask: draggedTask?.text,
-            parentTask: targetTask.text,
-            cursorX,
-            parentLeft: parentRect.left,
-            parentRedZoneEnd,
-            isInRedZone: isInParentRedZone
-          });
-          
-          return defaultCollisions; // Keep parent as target
-        } else {
-          // GREEN ZONE: Parent as target for indent (maintain parent-child relationship)
-          console.log('🟩 Child-over-parent GREEN ZONE (10-100%): Keeping parent as target for indent', {
-            draggedTask: draggedTask?.text,
-            parentTask: targetTask.text,
-            cursorX,
-            parentLeft: parentRect.left,
-            parentRedZoneEnd,
-            isInRedZone: isInParentRedZone
-          });
-          
-          return defaultCollisions; // Keep parent as target
-        }
-      }
+      return defaultCollisions;
     } else if (!isChildTask) {
-      // Target is not a child and not a child-over-parent scenario, use default collision detection
+      // Target is not a child - use default collision detection
       return defaultCollisions;
     }
 
-    // Target is a child task - check if cursor is actually within parent bounds
+    // Target is a child task - simplified parent zone logic
     const parentTask = tasks.find(task => task.id === targetTask.parent_id);
     if (!parentTask) {
       return defaultCollisions;
     }
 
-    // Get DOM elements for both parent and child
+    // Get DOM elements
     const parentElement = document.querySelector(`[data-sortable-id="${parentTask.id}"]`);
     const childElement = document.querySelector(`[data-sortable-id="${targetTask.id}"]`);
     
@@ -161,82 +114,41 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       return defaultCollisions;
     }
 
-    // Get bounding rectangles
-    const parentRect = parentElement.getBoundingClientRect();
-    const childRect = childElement.getBoundingClientRect();
-    
     // Get cursor position from collision rect
     const cursorX = args.collisionRect.left + args.collisionRect.width / 2;
     const cursorY = args.collisionRect.top + args.collisionRect.height / 2;
 
-    // Check if cursor is within parent bounds
+    // Get bounding rectangles
+    const parentRect = parentElement.getBoundingClientRect();
+    const childRect = childElement.getBoundingClientRect();
+
+    // Check if cursor is within bounds
     const isWithinParentBounds = (
-      cursorX >= parentRect.left && 
-      cursorX <= parentRect.right &&
-      cursorY >= parentRect.top && 
-      cursorY <= parentRect.bottom
+      cursorX >= parentRect.left && cursorX <= parentRect.right &&
+      cursorY >= parentRect.top && cursorY <= parentRect.bottom
     );
-
-    // Check if cursor is within child bounds  
     const isWithinChildBounds = (
-      cursorX >= childRect.left && 
-      cursorX <= childRect.right &&
-      cursorY >= childRect.top && 
-      cursorY <= childRect.bottom
+      cursorX >= childRect.left && cursorX <= childRect.right &&
+      cursorY >= childRect.top && cursorY <= childRect.bottom
     );
 
-    // 🔧 FIX: Refined parent zone priority logic
-    // The task requirement is: "parent Task A: purple line should trigger indent across the whole zone"
-    // But we still need to allow legitimate child interactions when directly over child
-    
     if (isWithinParentBounds && !isWithinChildBounds) {
-      // Cursor is in parent zone but NOT directly over child - always select parent
-      console.log('🔧 Collision Override: Cursor in parent zone (not over child), selecting parent', {
-        originalTarget: targetTask.id,
-        newTarget: parentTask.id,
-        cursorX,
-        cursorY,
-        withinParent: isWithinParentBounds,
-        withinChild: isWithinChildBounds
-      });
-      
-      return [{
-        id: parentTask.id,
-        data: primaryCollision.data
-      }];
+      // Cursor in parent zone but not over child - select parent
+      console.log('🔧 Selecting parent: cursor in parent zone only');
+      return [{ id: parentTask.id, data: primaryCollision.data }];
     } else if (isWithinParentBounds && isWithinChildBounds) {
-      // Cursor is over both parent and child (overlapping area)
-      // 🔧 FIX: Check if cursor is in parent's red zone (0-10%) for outdent priority
-      
-      // Calculate red zone (0-10% of parent width) for outdent detection
+      // Cursor over both - check red zone for parent priority
       const parentRedZoneWidth = parentRect.width * 0.1;
       const parentRedZoneEnd = parentRect.left + parentRedZoneWidth;
       const isInParentRedZone = cursorX < parentRedZoneEnd;
       
       if (isInParentRedZone) {
-        // RED ZONE: Prioritize parent selection for outdent operation
-        console.log('🟥 Collision Override: Cursor in parent RED ZONE (0-10%), selecting parent for outdent', {
-          originalTarget: targetTask.id,
-          newTarget: parentTask.id,
-          cursorX,
-          parentLeft: parentRect.left,
-          parentRedZoneEnd,
-          isInRedZone: isInParentRedZone
-        });
-        
-        return [{
-          id: parentTask.id,
-          data: primaryCollision.data
-        }];
+        // RED ZONE: Select parent for outdent
+        console.log('🟥 Red zone: selecting parent for outdent');
+        return [{ id: parentTask.id, data: primaryCollision.data }];
       } else {
-        // GREEN ZONE: Use default collision detection (selects child for indent)
-        console.log('🟩 Collision Detection: Cursor in parent GREEN ZONE (10-100%), using default detection for indent', {
-          target: targetTask.id,
-          cursorX,
-          parentLeft: parentRect.left,
-          parentRedZoneEnd,
-          isInRedZone: isInParentRedZone
-        });
+        // GREEN ZONE: Use default (child) for indent
+        console.log('🟩 Green zone: using default child target');
       }
     }
 
@@ -327,24 +239,20 @@ export const useDragDropProvider = ({
       let currentMouseX: number
       let currentMouseY: number
 
-      // Method 1: Use the same reliable method as collision detection (lines 111-112)
-      if (event.collisionRect && event.collisionRect.left !== undefined && event.collisionRect.top !== undefined) {
-        currentMouseX = event.collisionRect.left + event.collisionRect.width / 2
-        currentMouseY = event.collisionRect.top + event.collisionRect.height / 2
-      } else {
-        // Method 2: Fallback to activatorEvent + delta calculation
-        const activatorEvent = event.activatorEvent as MouseEvent
-        if (!activatorEvent) {
-          console.warn('🚫 No mouse coordinates available in DragMove event')
-          return
-        }
+      // Method 1: Try to get coordinates from activatorEvent + delta
+      const activatorEvent = event.activatorEvent as MouseEvent
+      if (activatorEvent && activatorEvent.clientX !== undefined && activatorEvent.clientY !== undefined) {
         currentMouseX = activatorEvent.clientX + delta.x
         currentMouseY = activatorEvent.clientY + delta.y
+      } else {
+        // Method 2: Final fallback - no coordinates available
+        console.warn('🚫 No mouse coordinates available in DragMove event')
+        return
       }
 
       // Dev-Guide: Proper error handling - validate coordinates before use
       if (isNaN(currentMouseX) || isNaN(currentMouseY) || currentMouseX === undefined || currentMouseY === undefined) {
-        console.warn('🚫 Invalid mouse coordinates in DragMove:', { currentMouseX, currentMouseY, hasCollisionRect: !!event.collisionRect })
+        console.warn('🚫 Invalid mouse coordinates in DragMove:', { currentMouseX, currentMouseY })
         return
       }
       
@@ -420,14 +328,29 @@ export const useDragDropProvider = ({
         // Determine if moving to a section
         const targetSection = overData?.type === 'section' ? overData.task.text : null
 
-                 // Use the enhanced moveTask if available, otherwise fall back to simple reordering
-         if (moveTask && typeof moveTask === 'function') {
-           moveTask(oldIndex, newIndex, dragType, targetSection)
-         } else {
-           // Fallback to simple reordering
-           const newTasks = arrayMove(tasks, oldIndex, newIndex)
-           onReorderTasks(newTasks)
-         }
+        // 🔧 FIX: Adjust target index for reorder operations
+        // Visual feedback shows "insert after target", so we need to increment target index
+        let adjustedNewIndex = newIndex
+        if (dragType === 'reorder') {
+          // For reorder: insert after the target task (increment index)
+          // Only increment if we're not moving from a later position to an earlier one
+          adjustedNewIndex = oldIndex < newIndex ? newIndex : newIndex + 1
+          console.log('🔧 Reorder adjustment:', {
+            originalNewIndex: newIndex,
+            adjustedNewIndex,
+            reason: oldIndex < newIndex ? 'moving forward' : 'moving backward'
+          })
+        }
+
+        // Use the enhanced moveTask if available, otherwise fall back to simple reordering
+        if (moveTask && typeof moveTask === 'function') {
+          moveTask(oldIndex, adjustedNewIndex, dragType, targetSection)
+        } else {
+          // Fallback to simple reordering with adjusted index
+          const finalIndex = dragType === 'reorder' && oldIndex < newIndex ? newIndex : adjustedNewIndex
+          const newTasks = arrayMove(tasks, oldIndex, finalIndex)
+          onReorderTasks(newTasks)
+        }
       }
     } catch (error) {
       console.error('Error handling drag end:', error)

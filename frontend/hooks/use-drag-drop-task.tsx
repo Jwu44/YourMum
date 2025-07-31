@@ -1,6 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { type Task } from '../lib/types'
 
 /**
@@ -19,15 +18,16 @@ interface UseDragDropTaskProps {
   index: number
   isSection: boolean
   allTasks: Task[]
-  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level', targetSection: string | null) => void
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
 }
 
-// Enhanced state for indentation detection
+// Simplified state for indentation detection
 interface IndentationState {
-  dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level'
+  dragType: 'indent' | 'outdent' | 'reorder'
   cursorPosition: { x: number; y: number } | null
   targetTaskLeftEdge: number | null
-  containerWidth?: number // Track container width for percentage calculations
+  containerWidth?: number
+  targetIndentLevel?: number // Track target indent level for progressive visual feedback
 }
 
 interface DragDropTaskReturn {
@@ -92,7 +92,8 @@ export const useDragDropTask = ({
           dragType: 'reorder',
           cursorPosition: null,
           targetTaskLeftEdge: null,
-          containerWidth: undefined
+          containerWidth: undefined,
+          targetIndentLevel: undefined
         });
         return;
       }
@@ -151,67 +152,52 @@ export const useDragDropTask = ({
         'zone3(60-100%)': x >= secondZoneEnd
       });
       
-      let dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level' = 'reorder';
+      let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
       
-      // 🔧 FIX: Check if dragged task is being dragged over its parent (outdent scenario)
-      // Due to collision detection, targetTaskId will be the parent when dragging child over parent
+      // Calculate target indent level for progressive visual feedback
+      let targetIndentLevel = targetLevel + 1; // Where we would indent to
+      
+      // Check if dragged task is being dragged over its parent (outdent scenario)
       const draggedTaskIsOverItsParent = targetTaskId === task.parent_id;
       
-      // Dev-Guide: Reduced logging for performance - only log key decisions
-      console.log('🔧 Parent-child detection:', {
+      console.log('🔧 Simplified zone detection:', {
         draggedTask: task.text,
         targetTaskId,
         isOverParent: draggedTaskIsOverItsParent,
-        zone: x < firstZoneEnd ? 'RED (0-10%)' : 'GREEN (10-100%)'
+        zone: x < firstZoneEnd ? 'RED (0-10%)' : 'GREEN (10-100%)',
+        targetIndentLevel
       });
       
       if (draggedTaskIsOverItsParent) {
-        // 🎯 CHILD-TO-PARENT DRAG: Child task being dragged over its parent's zones
+        // Child task being dragged over its parent
         if (x < firstZoneEnd) {
           // 0-10% zone: outdent to sibling level
           dragType = 'outdent';
-          console.log('🟥 Child-to-parent RED ZONE (0-10%): SET dragType = outdent - child becomes sibling of parent');
+          console.log('🟥 Child-to-parent RED ZONE: outdent');
         } else {
-          // 10-100% zone: maintain current parent-child relationship
+          // 10-100% zone: maintain parent-child relationship
           dragType = 'indent';
-          console.log('🟩 Child-to-parent GREEN ZONE (10-100%): SET dragType = indent - maintain parent-child relationship');
+          console.log('🟩 Child-to-parent GREEN ZONE: indent');
         }
-      } else {
-        console.log('❌ NOT child-to-parent drag, continuing with normal logic');
-      }
-      
-      if (!draggedTaskIsOverItsParent && targetTaskHasChildren) {
-        // 🎯 PARENT-CHILD BLOCK CONTEXT: Target task has children (is a parent)
-        // According to requirements: "dragging into parent Task A: purple line should trigger indent across the whole zone, no reorder"
+      } else if (targetTaskHasChildren) {
+        // Target task has children - always indent across whole zone
         dragType = 'indent';
-        console.log('✅ Parent-child block (parent): indent - entire zone triggers indentation under parent');
-      } else if (targetLevel === 0) {
-        // 2-zone system for non-indented targets without children
+        console.log('✅ Parent with children: indent across whole zone');
+      } else if (targetLevel === 3) {
+        // Max level - only reorder allowed
+        dragType = 'reorder';
+        console.log('✅ Max level: reorder only');
+      } else {
+        // Standard 2-zone system
         if (x < firstZoneEnd) {
           // 0-10% zone
           dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';
-          console.log(`✅ Zone 1 (2-zone): ${dragType} - mouse in left 10%`);
+          console.log(`✅ Standard RED zone: ${dragType}`);
         } else {
           // 10-100% zone
           dragType = 'indent';
-          console.log('✅ Zone 2 (2-zone): indent - mouse in right 90%');
+          console.log('✅ Standard GREEN zone: indent');
         }
-      } else if (targetLevel >= 1 && targetLevel <= 2) {
-        // 🎯 PARENT-CHILD BLOCK CONTEXT: Child task in existing parent-child block
-        // Enhanced logic to handle child tasks in parent-child blocks
-        if (x < firstZoneEnd) {
-          // 0-10% zone: "left 10% zone should trigger indent under Task A" (the parent)
-          dragType = 'indent_to_parent_level';
-          console.log('✅ Child in parent-child block (10%): indent_to_parent_level - indent under parent');
-        } else {
-          // 10-100% zone: "right 90% zone should trigger indent under Task B" (the child)
-          dragType = targetLevel < 3 ? 'indent_to_child_level' : 'reorder';
-          console.log(`✅ Child in parent-child block (90%): ${dragType} - indent under child or reorder if max level`);
-        }
-      } else if (targetLevel === 3) {
-        // 1-zone system for max level targets
-        dragType = 'reorder';
-        console.log('✅ Single zone (max level): reorder only');
       }
       
       // Dev-Guide: Final result logging (essential for debugging)
@@ -221,7 +207,8 @@ export const useDragDropTask = ({
         dragType,
         cursorPosition: { x, y },
         targetTaskLeftEdge: containerLeft,
-        containerWidth
+        containerWidth,
+        targetIndentLevel: Math.min(targetIndentLevel, 4) // Cap at 4 levels for visual feedback
       });
       
     } catch (error) {
@@ -230,7 +217,8 @@ export const useDragDropTask = ({
       setIndentationState({
         dragType: 'reorder',
         cursorPosition: { x, y },
-        targetTaskLeftEdge: null
+        targetTaskLeftEdge: null,
+        targetIndentLevel: undefined
       });
     }
   }, [isSection, task.level, task.text, allTasks]);
@@ -314,7 +302,8 @@ export const useDragDropTask = ({
       setIndentationState({
         dragType: 'reorder',
         cursorPosition: null,
-        targetTaskLeftEdge: null
+        targetTaskLeftEdge: null,
+        targetIndentLevel: undefined
       });
     }
   }, [isDragging, isOver]);
