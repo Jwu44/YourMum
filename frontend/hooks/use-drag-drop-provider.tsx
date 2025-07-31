@@ -328,27 +328,21 @@ export const useDragDropProvider = ({
         // Determine if moving to a section
         const targetSection = overData?.type === 'section' ? overData.task.text : null
 
-        // 🔧 FIX: Adjust target index for reorder operations
-        // Visual feedback shows "insert after target", so we need to increment target index
-        let adjustedNewIndex = newIndex
-        if (dragType === 'reorder') {
-          // For reorder: insert after the target task (increment index)
-          // Only increment if we're not moving from a later position to an earlier one
-          adjustedNewIndex = oldIndex < newIndex ? newIndex : newIndex + 1
-          console.log('🔧 Reorder adjustment:', {
-            originalNewIndex: newIndex,
-            adjustedNewIndex,
-            reason: oldIndex < newIndex ? 'moving forward' : 'moving backward'
-          })
-        }
+        // 🔧 FIX: Simplified - Let EditableSchedule handle all positioning logic
+        // Provider only handles events, positioning logic centralized in one place
+        console.log('🔧 Drag end - passing raw indices to moveTask:', {
+          oldIndex,
+          newIndex,
+          dragType,
+          targetSection
+        })
 
         // Use the enhanced moveTask if available, otherwise fall back to simple reordering
         if (moveTask && typeof moveTask === 'function') {
-          moveTask(oldIndex, adjustedNewIndex, dragType, targetSection)
+          moveTask(oldIndex, newIndex, dragType, targetSection)
         } else {
-          // Fallback to simple reordering with adjusted index
-          const finalIndex = dragType === 'reorder' && oldIndex < newIndex ? newIndex : adjustedNewIndex
-          const newTasks = arrayMove(tasks, oldIndex, finalIndex)
+          // Fallback to simple reordering - use raw indices
+          const newTasks = arrayMove(tasks, oldIndex, newIndex)
           onReorderTasks(newTasks)
         }
       }
