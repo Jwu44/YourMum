@@ -378,22 +378,17 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     if (!dragDropHook.isOver || dragDropHook.isDragging || isSection) return null
 
     // Get drag type, default to 'reorder' if not set
-    const { dragType } = dragDropHook.indentationState;
+    const { dragType, cursorPosition } = dragDropHook.indentationState;
     const currentDragType = dragType || 'reorder';
     
-    // 🐛 DEBUG: Log current drag state for progressive opacity system
-    console.log('🎨 Rendering progressive opacity drag indicator:', {
-      dragType: currentDragType,
-      isOver: dragDropHook.isOver,
-      isDragging: dragDropHook.isDragging,
-      containerWidth: dragDropHook.indentationState.containerWidth,
-      taskLevel: task.level || 0
-    });
+    // Dev-Guide: Essential visual indicator logging only
+    console.log('🎨 Visual indicator:', currentDragType, 'for', task.text);
 
-    try {
+    // Dev-Guide: Visual indicator rendering (keep implementation simple)
+    const indicatorToRender = (() => {
       switch (currentDragType) {
         case 'indent':
-          // 2-zone system: Purple bar with 10% darker section on left (Notion-style)
+          // For child-to-parent GREEN ZONE: Dark + regular purple segmented line
           return (
             <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
               {/* Darker purple section (10% of width) */}
@@ -403,16 +398,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             </div>
           );
 
+        case 'outdent':
+          // For child-to-parent RED ZONE: Regular purple line
+          return (
+            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
+          );
+
         case 'indent_to_parent_level':
           // 3-zone system: Medium opacity (75%) for 30-60% zone
-          // Task will be indented to target's parent level, positioned after target
           return (
             <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
           );
 
         case 'indent_to_child_level':
-          // 3-zone system: Dark + regular purple for 90% zone (child task level indentation)
-          // Task will be indented to target's level + 1, positioned after target
+          // 3-zone system: Dark + regular purple for child level indentation
           return (
             <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
               {/* Darker purple section (10% of width) */}
@@ -422,31 +421,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             </div>
           );
 
-        case 'outdent':
-          // Single shade purple bar with higher opacity for outdent indication
-          return (
-            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
-          );
-
         case 'reorder':
         default:
-          // Lightest opacity (60%) for 0-30% zone and 1-zone system (level 3 tasks)
-          // Task will be repositioned without changing indentation level
+          // Default reorder: Light purple
           return (
             <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
           );
       }
-    } catch (error) {
-      console.error('Error rendering progressive opacity drag indicators:', error, {
-        dragType: currentDragType,
-        taskLevel: task.level || 0,
-        isOver: dragDropHook.isOver
-      });
-      // Fallback to medium opacity indicator (follows dev-guide error handling)
-      return (
-        <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
-      );
-    }
+    })();
+
+    // 🔧 FALLBACK: Always return an indicator, never null
+    return indicatorToRender || (
+      <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-50 bottom-[-1px]" />
+    );
   }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.containerWidth, isSection])
 
   /**

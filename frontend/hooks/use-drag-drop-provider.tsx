@@ -82,10 +82,68 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       return defaultCollisions;
     }
 
-    // Check if this target task is a child task (has a parent)
+    // 🔧 FIX: Check for child-over-parent drag scenarios
+    // Get the dragged task to check if it's a child being dragged over its parent
+    const draggedTaskId = args.active?.id as string;
+    const draggedTask = tasks.find(task => task.id === draggedTaskId);
+    
+    // Scenario 1: Child task being dragged over its parent (OUTDENT scenario)
+    const isChildOverParent = draggedTask?.parent_id === targetTaskId;
+    
+    // Scenario 2: Target task is a child task (existing logic)
     const isChildTask = targetTask.parent_id != null;
-    if (!isChildTask) {
-      // Target is not a child, use default collision detection
+    
+    if (isChildOverParent) {
+      // Handle child dragged over parent - apply red zone collision detection
+      console.log('🔧 Child-over-parent detected:', {
+        draggedTask: draggedTask?.text,
+        draggedTaskId,
+        parentTask: targetTask.text,
+        parentTaskId: targetTaskId
+      });
+      
+      // Get cursor position from collision rect
+      const cursorX = args.collisionRect.left + args.collisionRect.width / 2;
+      const cursorY = args.collisionRect.top + args.collisionRect.height / 2;
+      
+      // Get parent task element to calculate red zone
+      const parentElement = document.querySelector(`[data-sortable-id="${targetTaskId}"]`);
+      if (parentElement) {
+        const parentRect = parentElement.getBoundingClientRect();
+        
+        // Calculate red zone (0-10% of parent width) for outdent detection
+        const parentRedZoneWidth = parentRect.width * 0.1;
+        const parentRedZoneEnd = parentRect.left + parentRedZoneWidth;
+        const isInParentRedZone = cursorX < parentRedZoneEnd;
+        
+        if (isInParentRedZone) {
+          // RED ZONE: Keep parent as target for outdent operation
+          console.log('🟥 Child-over-parent RED ZONE (0-10%): Keeping parent as target for outdent', {
+            draggedTask: draggedTask?.text,
+            parentTask: targetTask.text,
+            cursorX,
+            parentLeft: parentRect.left,
+            parentRedZoneEnd,
+            isInRedZone: isInParentRedZone
+          });
+          
+          return defaultCollisions; // Keep parent as target
+        } else {
+          // GREEN ZONE: Parent as target for indent (maintain parent-child relationship)
+          console.log('🟩 Child-over-parent GREEN ZONE (10-100%): Keeping parent as target for indent', {
+            draggedTask: draggedTask?.text,
+            parentTask: targetTask.text,
+            cursorX,
+            parentLeft: parentRect.left,
+            parentRedZoneEnd,
+            isInRedZone: isInParentRedZone
+          });
+          
+          return defaultCollisions; // Keep parent as target
+        }
+      }
+    } else if (!isChildTask) {
+      // Target is not a child and not a child-over-parent scenario, use default collision detection
       return defaultCollisions;
     }
 
@@ -147,15 +205,39 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
         data: primaryCollision.data
       }];
     } else if (isWithinParentBounds && isWithinChildBounds) {
-      // Cursor is over both parent and child (overlapping area) - use default collision detection
-      // This allows legitimate child task interactions when directly hovering over child element
-      console.log('🔧 Collision Detection: Cursor over both parent and child, using default detection', {
-        target: targetTask.id,
-        cursorX,
-        cursorY,
-        withinParent: isWithinParentBounds,
-        withinChild: isWithinChildBounds
-      });
+      // Cursor is over both parent and child (overlapping area)
+      // 🔧 FIX: Check if cursor is in parent's red zone (0-10%) for outdent priority
+      
+      // Calculate red zone (0-10% of parent width) for outdent detection
+      const parentRedZoneWidth = parentRect.width * 0.1;
+      const parentRedZoneEnd = parentRect.left + parentRedZoneWidth;
+      const isInParentRedZone = cursorX < parentRedZoneEnd;
+      
+      if (isInParentRedZone) {
+        // RED ZONE: Prioritize parent selection for outdent operation
+        console.log('🟥 Collision Override: Cursor in parent RED ZONE (0-10%), selecting parent for outdent', {
+          originalTarget: targetTask.id,
+          newTarget: parentTask.id,
+          cursorX,
+          parentLeft: parentRect.left,
+          parentRedZoneEnd,
+          isInRedZone: isInParentRedZone
+        });
+        
+        return [{
+          id: parentTask.id,
+          data: primaryCollision.data
+        }];
+      } else {
+        // GREEN ZONE: Use default collision detection (selects child for indent)
+        console.log('🟩 Collision Detection: Cursor in parent GREEN ZONE (10-100%), using default detection for indent', {
+          target: targetTask.id,
+          cursorX,
+          parentLeft: parentRect.left,
+          parentRedZoneEnd,
+          isInRedZone: isInParentRedZone
+        });
+      }
     }
 
     // Use default collision detection
@@ -240,20 +322,39 @@ export const useDragDropProvider = ({
         return
       }
 
-      // Get current mouse position from the drag event
-      const activatorEvent = event.activatorEvent as MouseEvent
-      if (!activatorEvent) return
+      // 🔧 FIX: Use proven coordinate extraction method from collision detection
+      // This method is already working successfully in createParentAwareCollisionDetection
+      let currentMouseX: number
+      let currentMouseY: number
 
-      // Calculate current mouse position by adding delta to initial position
-      const currentMouseX = activatorEvent.clientX + delta.x
-      const currentMouseY = activatorEvent.clientY + delta.y
+      // Method 1: Use the same reliable method as collision detection (lines 111-112)
+      if (event.collisionRect && event.collisionRect.left !== undefined && event.collisionRect.top !== undefined) {
+        currentMouseX = event.collisionRect.left + event.collisionRect.width / 2
+        currentMouseY = event.collisionRect.top + event.collisionRect.height / 2
+      } else {
+        // Method 2: Fallback to activatorEvent + delta calculation
+        const activatorEvent = event.activatorEvent as MouseEvent
+        if (!activatorEvent) {
+          console.warn('🚫 No mouse coordinates available in DragMove event')
+          return
+        }
+        currentMouseX = activatorEvent.clientX + delta.x
+        currentMouseY = activatorEvent.clientY + delta.y
+      }
+
+      // Dev-Guide: Proper error handling - validate coordinates before use
+      if (isNaN(currentMouseX) || isNaN(currentMouseY) || currentMouseX === undefined || currentMouseY === undefined) {
+        console.warn('🚫 Invalid mouse coordinates in DragMove:', { currentMouseX, currentMouseY, hasCollisionRect: !!event.collisionRect })
+        return
+      }
       
-      console.log('🎯 DragMove event:', {
+      console.log('🎯 DragMove event (FIXED COORDINATES):', {
         activeId: active.id,
         overId: over.id,
         currentMouseX,
         currentMouseY,
-        delta
+        delta,
+        hasValidCoordinates: !isNaN(currentMouseX) && !isNaN(currentMouseY)
       });
 
       // Find the target element using the over ID
