@@ -63,7 +63,7 @@ const TestDragRowComponent = ({
   horizontalOffset?: number
   isDropTarget?: boolean
   onUpdateTask?: (task: Task) => void
-  moveTask?: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level', targetSection: string | null) => void
+  moveTask?: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
 }) => {
   const dragDropProvider = useDragDropProvider({
     tasks: mockTasks,
@@ -98,9 +98,6 @@ const TestDragRowComponent = ({
             moveTask={moveTask}
             isSection={task.is_section || false}
             allTasks={mockTasks}
-            shouldIndent={shouldIndent}
-            horizontalOffset={horizontalOffset}
-            isDropTarget={isDropTarget}
           />
         </SortableContext>
       </DndContext>

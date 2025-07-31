@@ -842,7 +842,6 @@ const Dashboard: React.FC = () => {
         )
 
         setCurrentDayIndex(prevIndex => prevIndex - 1)
-
       } else {
         // Failed to load - show empty schedule anyway to allow navigation
         const emptySchedule: Task[] = []
