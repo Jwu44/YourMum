@@ -36,7 +36,7 @@ interface EditableScheduleRowProps {
   task: Task
   index: number
   onUpdateTask: (task: Task) => void
-  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level', targetSection: string | null) => void
+  moveTask: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
   isSection: boolean
   children?: React.ReactNode
   allTasks: Task[]
@@ -194,14 +194,14 @@ const getSectionIcon = (sectionName: string, onEmojiChange?: (emoji: string) => 
 
 /**
  * EditableScheduleRow Component
- * 
+ *
  * Renders a single task or section row with drag and drop functionality.
- * 
+ *
  * Follows dev-guide principles:
  * - Simple implementation using @dnd-kit for drag and drop
  * - Modular architecture with clear separation of concerns
  * - Focus on rendering with drag logic handled by custom hooks
- * 
+ *
  * Features:
  * - Drag and drop reordering with purple visual feedback
  * - Microstep decomposition for complex tasks
@@ -334,107 +334,117 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
 
-  // 🐛 DEBUG: Visual debugging zones for threshold detection
+  // Debug zones for simplified 2-zone system
   const getDebugZones = useCallback(() => {
-    // Only show debug zones for non-section tasks
-    if (isSection) return null;
-    
-    const { cursorPosition, dragType, containerWidth } = dragDropHook.indentationState;
-    
+    // Only show debug zones for non-section tasks during development
+    if (isSection) return null
+
+    const { cursorPosition, dragType, targetIndentLevel } = dragDropHook.indentationState
+
     return (
       <>
         {/* Left 10% zone (outdent/reorder) - RED background */}
-        <div 
+        <div
           className="absolute top-0 bottom-0 bg-red-200 opacity-30 pointer-events-none"
           style={{ left: 0, width: '10%' }}
         />
         {/* Right 90% zone (indent) - GREEN background */}
-        <div 
+        <div
           className="absolute top-0 bottom-0 bg-green-200 opacity-30 pointer-events-none"
           style={{ left: '10%', width: '90%' }}
         />
         {/* Zone boundary line */}
-        <div 
+        <div
           className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 opacity-70 pointer-events-none"
           style={{ left: '10%' }}
         />
-        {/* Current drag type indicator */}
+        {/* Simplified drag type indicator */}
         {cursorPosition && (
-          <div 
+          <div
             className="absolute top-1 right-1 px-2 py-1 bg-black text-white text-xs rounded opacity-80 pointer-events-none"
           >
-            {dragType || 'none'} | W:{containerWidth}
+            {dragType || 'none'} | L:{targetIndentLevel || 'none'}
           </div>
         )}
       </>
-    );
-  }, [isSection, dragDropHook.indentationState]);
+    )
+  }, [isSection, dragDropHook.indentationState])
 
-  // Implements Notion-style purple line indicator behavior with progressive opacity
-  // Supports 2-zone, 3-zone, and 1-zone systems based on target task level
+  // Progressive visual feedback system for indentation levels
+  // Shows increasingly complex purple lines based on target indentation depth
   const getDragIndicators = useCallback(() => {
     // Only show indicators when this task is being hovered over as a drop target
-    // AND we're not currently dragging this task (prevents showing on dragged task)
     if (!dragDropHook.isOver || dragDropHook.isDragging || isSection) return null
 
-    // Get drag type, default to 'reorder' if not set
-    const { dragType, cursorPosition } = dragDropHook.indentationState;
-    const currentDragType = dragType || 'reorder';
-    
-    // Dev-Guide: Essential visual indicator logging only
-    console.log('🎨 Visual indicator:', currentDragType, 'for', task.text);
+    const { dragType, targetIndentLevel } = dragDropHook.indentationState
+    const currentDragType = dragType || 'reorder'
 
-    // Dev-Guide: Visual indicator rendering (keep implementation simple)
-    const indicatorToRender = (() => {
-      switch (currentDragType) {
-        case 'indent':
-          // For child-to-parent GREEN ZONE: Dark + regular purple segmented line
-          return (
-            <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
-              {/* Darker purple section (10% of width) */}
-              <div className="bg-purple-700 opacity-90" style={{ width: '10%' }} />
-              {/* Normal purple section (90% of width) */}
-              <div className="bg-purple-500 opacity-75" style={{ width: '90%' }} />
-            </div>
-          );
+    console.log('🎨 Visual indicator:', currentDragType, 'level:', targetIndentLevel, 'for', task.text)
 
-        case 'outdent':
-          // For child-to-parent RED ZONE: Regular purple line
-          return (
-            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
-          );
+    // Progressive opacity system based on requirements
+    const renderProgressiveIndentLine = (levels: number) => {
+      // Cap at 4 segments maximum as per requirements
+      const segmentCount = Math.min(levels, 4)
+      const segments = []
 
-        case 'indent_to_parent_level':
-          // 3-zone system: Medium opacity (75%) for 30-60% zone
-          return (
-            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-75 bottom-[-1px]" />
-          );
+      // Always show dark purple (10%) + regular purple (90%) for any indent
+      // For level 1: dark purple (10%) + regular purple (90%)
+      // For level 2+: dark purple (10%) + progressive segments (90% split)
+      const firstSegmentWidth = 10 // 10% for darkest
+      const remainingWidth = 90 // 90% for remaining segments
+      
+      // Always have at least 2 segments total (dark + regular)
+      const totalSegments = Math.max(segmentCount, 2)
+      const otherSegmentWidth = remainingWidth / (totalSegments - 1)
 
-        case 'indent_to_child_level':
-          // 3-zone system: Dark + regular purple for child level indentation
-          return (
-            <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
-              {/* Darker purple section (10% of width) */}
-              <div className="bg-purple-700 opacity-90" style={{ width: '10%' }} />
-              {/* Regular purple section (90% of width) */}
-              <div className="bg-purple-500 opacity-90" style={{ width: '90%' }} />
-            </div>
-          );
+      for (let i = 0; i < totalSegments; i++) {
+        const isFirst = i === 0
+        const width = isFirst ? firstSegmentWidth : otherSegmentWidth
 
-        case 'reorder':
-        default:
-          // Default reorder: Light purple
-          return (
-            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
-          );
+        // Progressive opacity: darkest to lightest (using inline styles for dynamic values)
+        const opacity = isFirst ? 0.9 : Math.max(0.6 - (i - 1) * 0.15, 0.6)
+        const backgroundColor = isFirst ? '#7c3aed' : '#a855f7' // purple-600 : purple-500
+
+        segments.push(
+          <div
+            key={i}
+            style={{
+              width: `${width}%`,
+              backgroundColor,
+              opacity
+            }}
+          />
+        )
       }
-    })();
 
-    // 🔧 FALLBACK: Always return an indicator, never null
-    return indicatorToRender || (
-      <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-50 bottom-[-1px]" />
-    );
-  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.containerWidth, isSection])
+      return (
+        <div className="absolute right-0 left-0 h-1 bottom-[-1px] flex">
+          {segments}
+        </div>
+      )
+    }
+
+    // Simplified visual feedback system
+    switch (currentDragType) {
+      case 'indent':
+        // Progressive opacity based on target indent level
+        const indentLevel = targetIndentLevel || 1
+        return renderProgressiveIndentLine(indentLevel)
+
+      case 'outdent':
+        // Simple purple line for outdent
+        return (
+          <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
+        )
+
+      case 'reorder':
+      default:
+        // Simple purple line for reorder
+        return (
+          <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
+        )
+    }
+  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text])
 
   /**
    * Handles task decomposition into microsteps
@@ -698,16 +708,16 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
           // This ensures we track position relative to the TARGET task, not dragged task
           if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            console.log('🔵 MouseEnter on TARGET task:', task.text);
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement);
+            console.log('🔵 MouseEnter on TARGET task:', task.text)
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
           }
         }}
         onMouseMove={(e) => {
-          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)  
+          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
           // This enables real-time drag type updates relative to the TARGET task
           if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            console.log('🔵 MouseMove on TARGET task:', task.text, 'at', e.clientX);
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement);
+            console.log('🔵 MouseMove on TARGET task:', task.text, 'at', e.clientX)
+            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
           }
         }}
       >
@@ -715,18 +725,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         {!isSection && (
           <>
             {/* Drag Handle - only visible on hover */}
-            <div 
+            <div
               className={dragDropHook.getGripClassName()}
               {...dragDropHook.listeners}
             >
               <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
             </div>
-            
+
             <div ref={checkboxRef} className="flex items-center">
               {task.level && task.level > 0 && (
                 <div className="relative mr-2 flex items-center">
                   {/* Connecting line extending from parent */}
-                  <div 
+                  <div
                     className="border-l border-b border-muted-foreground/30"
                     style={{
                       width: '20px',
@@ -755,7 +765,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           </div>
             )
           : (
-          <span 
+          <span
             className={cn(
               'flex-1 text-foreground transition-all duration-200',
               task.completed && 'line-through text-muted-foreground'
@@ -774,7 +784,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
         {/* 🐛 DEBUG: Visual threshold zones */}
         {getDebugZones()}
-        
+
         {/* Enhanced Drag Indicators */}
         {getDragIndicators()}
       </div>
