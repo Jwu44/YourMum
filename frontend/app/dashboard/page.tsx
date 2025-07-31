@@ -412,13 +412,50 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, scheduleCache, toast])
 
-  const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
-    setScheduleDays(prevDays => {
-      const newDays = [...prevDays]
-      newDays[currentDayIndex] = reorderedTasks
-      return newDays
-    })
-  }, [currentDayIndex])
+  const handleReorderTasks = useCallback(async (reorderedTasks: Task[]) => {
+    try {
+      const currentDate = getDateString(currentDayIndex)
+
+      // Update frontend state
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        newDays[currentDayIndex] = reorderedTasks
+        return newDays
+      })
+
+      // Update cache
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache)
+        newCache.set(currentDate, reorderedTasks)
+        return newCache
+      })
+
+      // Save to backend
+      const updateResult = await updateSchedule(currentDate, reorderedTasks)
+
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to save task positions')
+      }
+    } catch (error) {
+      console.error('Error saving reordered tasks:', error)
+
+      // Revert frontend state on error
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
+        if (cachedSchedule && newDays[currentDayIndex]) {
+          newDays[currentDayIndex] = cachedSchedule
+        }
+        return newDays
+      })
+
+      toast({
+        title: 'Error',
+        description: 'Failed to save task positions. Please try again.',
+        variant: 'destructive'
+      })
+    }
+  }, [currentDayIndex, scheduleCache, toast])
 
   /**
    * Filter tasks for next day based on task5.md requirements

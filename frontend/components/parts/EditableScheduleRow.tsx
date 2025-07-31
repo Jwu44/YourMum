@@ -392,7 +392,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       // For level 2+: dark purple (10%) + progressive segments (90% split)
       const firstSegmentWidth = 10 // 10% for darkest
       const remainingWidth = 90 // 90% for remaining segments
-      
+
       // Always have at least 2 segments total (dark + regular)
       const totalSegments = Math.max(segmentCount, 2)
       const otherSegmentWidth = remainingWidth / (totalSegments - 1)
