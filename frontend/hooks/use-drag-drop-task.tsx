@@ -76,6 +76,12 @@ export const useDragDropTask = ({
   // Cursor tracking for indentation detection - defined before useSortable
   const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement) => {
     try {
+      // Dev-Guide: Proper error handling - validate coordinates first
+      if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) {
+        console.warn('🚫 Invalid coordinates received in updateCursorPosition:', { x, y, taskText: task.text });
+        return;
+      }
+
       console.log('🔧 updateCursorPosition called:', { x, y, hasTarget: !!targetElement, taskText: task.text });
       
       if (!targetElement || isSection) {
@@ -147,8 +153,34 @@ export const useDragDropTask = ({
       
       let dragType: 'indent' | 'outdent' | 'reorder' | 'indent_to_parent_level' | 'indent_to_child_level' = 'reorder';
       
-      // 🔧 FIX: Enhanced zone system that considers parent-child block context
-      if (targetTaskHasChildren) {
+      // 🔧 FIX: Check if dragged task is being dragged over its parent (outdent scenario)
+      // Due to collision detection, targetTaskId will be the parent when dragging child over parent
+      const draggedTaskIsOverItsParent = targetTaskId === task.parent_id;
+      
+      // Dev-Guide: Reduced logging for performance - only log key decisions
+      console.log('🔧 Parent-child detection:', {
+        draggedTask: task.text,
+        targetTaskId,
+        isOverParent: draggedTaskIsOverItsParent,
+        zone: x < firstZoneEnd ? 'RED (0-10%)' : 'GREEN (10-100%)'
+      });
+      
+      if (draggedTaskIsOverItsParent) {
+        // 🎯 CHILD-TO-PARENT DRAG: Child task being dragged over its parent's zones
+        if (x < firstZoneEnd) {
+          // 0-10% zone: outdent to sibling level
+          dragType = 'outdent';
+          console.log('🟥 Child-to-parent RED ZONE (0-10%): SET dragType = outdent - child becomes sibling of parent');
+        } else {
+          // 10-100% zone: maintain current parent-child relationship
+          dragType = 'indent';
+          console.log('🟩 Child-to-parent GREEN ZONE (10-100%): SET dragType = indent - maintain parent-child relationship');
+        }
+      } else {
+        console.log('❌ NOT child-to-parent drag, continuing with normal logic');
+      }
+      
+      if (!draggedTaskIsOverItsParent && targetTaskHasChildren) {
         // 🎯 PARENT-CHILD BLOCK CONTEXT: Target task has children (is a parent)
         // According to requirements: "dragging into parent Task A: purple line should trigger indent across the whole zone, no reorder"
         dragType = 'indent';
@@ -181,6 +213,9 @@ export const useDragDropTask = ({
         dragType = 'reorder';
         console.log('✅ Single zone (max level): reorder only');
       }
+      
+      // Dev-Guide: Final result logging (essential for debugging)
+      console.log('🎯 Final dragType:', dragType, 'for', task.text);
       
       setIndentationState({
         dragType,
