@@ -269,15 +269,20 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
               categories: [targetTask.text]
             })
           } else {
-            const keepIndentation =
-            targetTask.parent_id === draggedTask.parent_id ||
-            targetTask.level === draggedTask.level
-
-            newTasks.splice(hoverIndex, 0, {
+            // 🔧 FIX: Reorder - Always inherit target's section and reset to target's level
+            // This fixes cross-section reordering where tasks weren't moving to the target section
+            const targetLevel = targetTask.level || 0
+            
+            // 🔧 FIX: Use consistent pattern from working indent operations
+            // Insert after target task (adjustedHoverIndex + 1)
+            const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+            
+            newTasks.splice(adjustedHoverIndex + 1, 0, {
               ...updatedDraggedTask,
-              is_subtask: keepIndentation ? draggedTask.is_subtask : false,
-              level: keepIndentation ? draggedTask.level : 0,
-              parent_id: keepIndentation ? draggedTask.parent_id : null
+              section: targetTask.section,
+              is_subtask: targetLevel > 0,
+              level: targetLevel,
+              parent_id: targetTask.parent_id
             })
           }
         }
