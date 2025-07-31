@@ -87,16 +87,33 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
     const isChildOverParent = draggedTask?.parent_id === targetTaskId;
     const isChildTask = targetTask.parent_id != null;
     
+    // 🔧 FIX: Check for parent-over-child scenario (should be blocked/restricted)
+    const isParentOverChild = targetTask.parent_id === draggedTaskId;
+    
+    // Collision detection logging
+    console.log('🔧 Collision detection:', {
+      draggedTask: draggedTask?.text,
+      targetTask: targetTask.text,
+      scenario: isChildOverParent ? 'child-over-parent' : 
+                isParentOverChild ? 'parent-over-child (BLOCKED)' : 'default'
+    });
+    
     if (isChildOverParent) {
-      // Child task being dragged over its parent - always keep parent as target
+      // Child task being dragged over its parent - allow normal zone logic
       // Zone logic is handled in use-drag-drop-task.tsx
-      console.log('🔧 Child-over-parent: keeping parent as target', {
-        draggedTask: draggedTask?.text,
-        parentTask: targetTask.text
-      });
+      console.log('🔧 Child-over-parent: allowing zone detection');
       return defaultCollisions;
+    } else if (isParentOverChild) {
+      // 🔧 FIX: Parent being dragged over its child - block this operation for now
+      // Future enhancement: implement block dragging
+      console.log('🚫 Parent-over-child: blocking operation (future: block drag)', {
+        draggedParent: draggedTask?.text,
+        targetChild: targetTask.text
+      });
+      return []; // Return empty array to block the collision
     } else if (!isChildTask) {
       // Target is not a child - use default collision detection
+      console.log('🔧 Target is not a child: using default collision detection');
       return defaultCollisions;
     }
 
@@ -132,25 +149,12 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       cursorY >= childRect.top && cursorY <= childRect.bottom
     );
 
-    if (isWithinParentBounds && !isWithinChildBounds) {
-      // Cursor in parent zone but not over child - select parent
-      console.log('🔧 Selecting parent: cursor in parent zone only');
-      return [{ id: parentTask.id, data: primaryCollision.data }];
-    } else if (isWithinParentBounds && isWithinChildBounds) {
-      // Cursor over both - check red zone for parent priority
-      const parentRedZoneWidth = parentRect.width * 0.1;
-      const parentRedZoneEnd = parentRect.left + parentRedZoneWidth;
-      const isInParentRedZone = cursorX < parentRedZoneEnd;
-      
-      if (isInParentRedZone) {
-        // RED ZONE: Select parent for outdent
-        console.log('🟥 Red zone: selecting parent for outdent');
-        return [{ id: parentTask.id, data: primaryCollision.data }];
-      } else {
-        // GREEN ZONE: Use default (child) for indent
-        console.log('🟩 Green zone: using default child target');
-      }
-    }
+    // 🔧 FIX: Simplified collision detection - let zone detection handle red/green zones
+    // The collision detection should only determine WHICH task to target,
+    // not WHAT operation to perform (that's handled by zone detection)
+    
+    console.log('🔧 SIMPLIFIED: Always use default collision for child tasks');
+    console.log('🔧 Zone detection in use-drag-drop-task.tsx will handle red/green logic');
 
     // Use default collision detection
     return defaultCollisions;
@@ -272,12 +276,21 @@ export const useDragDropProvider = ({
         
         // Get the over task's data and call updateCursorPosition
         const overData = over.data.current;
+        const activeData = active.data.current;
+        const draggedTask = activeData?.task; // Extract the dragged task
+        
+        // Dev-Guide: Comprehensive error handling and validation
+        if (!draggedTask) {
+          console.warn('🚫 No dragged task found in active data');
+        }
+        
         if (overData?.updateCursorPosition && typeof overData.updateCursorPosition === 'function') {
-          console.log('🎯 Calling updateCursorPosition from DragMove:', over.id);
+          console.log('🎯 Calling updateCursorPosition from DragMove:', over.id, 'with dragged task:', draggedTask?.text);
           try {
-            overData.updateCursorPosition(currentMouseX, currentMouseY, targetElement as HTMLElement);
+            overData.updateCursorPosition(currentMouseX, currentMouseY, targetElement as HTMLElement, draggedTask);
           } catch (error) {
             console.error('Error calling updateCursorPosition from DragMove:', error);
+            // Graceful fallback - continue operation without crashing
           }
         } else {
           console.log('🚫 updateCursorPosition not found in DragMove');
