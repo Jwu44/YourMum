@@ -272,11 +272,11 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             // 🔧 FIX: Reorder - Always inherit target's section and reset to target's level
             // This fixes cross-section reordering where tasks weren't moving to the target section
             const targetLevel = targetTask.level || 0
-            
+
             // 🔧 FIX: Use consistent pattern from working indent operations
             // Insert after target task (adjustedHoverIndex + 1)
             const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
-            
+
             newTasks.splice(adjustedHoverIndex + 1, 0, {
               ...updatedDraggedTask,
               section: targetTask.section,
