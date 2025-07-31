@@ -49,7 +49,7 @@ interface DragDropTaskReturn {
   getGripClassName: () => string
   
   // Cursor tracking for indentation
-  updateCursorPosition: (x: number, y: number, targetElement?: HTMLElement) => void
+  updateCursorPosition: (x: number, y: number, targetElement?: HTMLElement, draggedTask?: Task) => void
 }
 
 /**
@@ -74,7 +74,7 @@ export const useDragDropTask = ({
   })
 
   // Cursor tracking for indentation detection - defined before useSortable
-  const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement) => {
+  const updateCursorPosition = useCallback((x: number, y: number, targetElement?: HTMLElement, draggedTask?: Task) => {
     try {
       // Dev-Guide: Proper error handling - validate coordinates first
       if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) {
@@ -82,7 +82,7 @@ export const useDragDropTask = ({
         return;
       }
 
-      console.log('🔧 updateCursorPosition called:', { x, y, hasTarget: !!targetElement, taskText: task.text });
+      console.log('🔧 updateCursorPosition called:', { x, y, hasTarget: !!targetElement, taskText: task.text, draggedTask: draggedTask?.text });
       
       if (!targetElement || isSection) {
         // Reset state if no target or target is section
@@ -157,23 +157,71 @@ export const useDragDropTask = ({
       // Calculate target indent level for progressive visual feedback
       let targetIndentLevel = targetLevel + 1; // Where we would indent to
       
-      // Check if dragged task is being dragged over its parent (outdent scenario)
-      const draggedTaskIsOverItsParent = targetTaskId === task.parent_id;
+      // 🔧 FIX: Check if dragged task is being dragged over its parent (outdent scenario)
+      // Use draggedTask parameter when available, fallback to current task context for compatibility
+      const actualDraggedTask = draggedTask || task;
       
-      console.log('🔧 Simplified zone detection:', {
-        draggedTask: task.text,
+      // Dev-Guide: Comprehensive error handling and null checks
+      if (!targetTaskId || !actualDraggedTask) {
+        console.warn('🚫 Missing required data for drag comparison:', { targetTaskId, actualDraggedTask: actualDraggedTask?.text });
+        setIndentationState({
+          dragType: 'reorder',
+          cursorPosition: { x, y },
+          targetTaskLeftEdge: containerLeft,
+          targetIndentLevel: undefined
+        });
+        return;
+      }
+      
+      const draggedTaskIsOverItsParent = draggedTask ? 
+        (targetTaskId === draggedTask.parent_id && draggedTask.parent_id !== null) : 
+        (targetTaskId === task.parent_id && task.parent_id !== null);
+      
+      // 🐛 CRITICAL DEBUG: Log exact values and types to find the comparison issue
+      console.log('🚨 FIXED DEBUG - Variable Analysis:', {
+        draggedTask: actualDraggedTask.text,
+        draggedTaskId: actualDraggedTask.id,
+        draggedTaskParentId: actualDraggedTask.parent_id,
+        draggedTaskParentIdType: typeof actualDraggedTask.parent_id,
+        targetTaskId: targetTaskId,
+        targetTaskIdType: typeof targetTaskId,
+        targetTaskIdIsNull: targetTaskId === null,
+        targetTaskIdIsUndefined: targetTaskId === undefined,
+        parentIdIsNull: actualDraggedTask.parent_id === null,
+        parentIdIsUndefined: actualDraggedTask.parent_id === undefined,
+        exactComparison: `"${targetTaskId}" === "${actualDraggedTask.parent_id}"`,
+        comparisonResult: draggedTaskIsOverItsParent,
+        targetTaskHasChildren: targetTaskHasChildren,
+        usingDraggedTaskContext: !!draggedTask
+      });
+      
+      // Zone detection logging for verification
+      console.log('🔧 Zone detection:', {
+        draggedTask: actualDraggedTask.text,
         targetTaskId,
         isOverParent: draggedTaskIsOverItsParent,
         zone: x < firstZoneEnd ? 'RED (0-10%)' : 'GREEN (10-100%)',
-        targetIndentLevel
+        mouseX: x,
+        firstZoneEnd
       });
       
+      // 🐛 DEBUG: Log which conditions are true before branching
+      console.log('🔍 CONDITION ANALYSIS:', {
+        'draggedTaskIsOverItsParent': draggedTaskIsOverItsParent,
+        'targetTaskHasChildren': targetTaskHasChildren,
+        'targetLevel === 3': targetLevel === 3,
+        'willExecute': draggedTaskIsOverItsParent ? 'draggedTaskIsOverItsParent (SHOULD BE THIS FOR OUTDENT!)' : 
+                      targetTaskHasChildren ? 'targetTaskHasChildren (THIS IS THE PROBLEM!)' :
+                      targetLevel === 3 ? 'targetLevel === 3' : 'standard 2-zone'
+      });
+
       if (draggedTaskIsOverItsParent) {
         // Child task being dragged over its parent
+        console.log('✅ EXECUTING: draggedTaskIsOverItsParent - THIS IS CORRECT!');
         if (x < firstZoneEnd) {
           // 0-10% zone: outdent to sibling level
           dragType = 'outdent';
-          console.log('🟥 Child-to-parent RED ZONE: outdent');
+          console.log('🟥 Child-to-parent RED ZONE: outdent - SUCCESS!');
         } else {
           // 10-100% zone: maintain parent-child relationship
           dragType = 'indent';
@@ -182,13 +230,16 @@ export const useDragDropTask = ({
       } else if (targetTaskHasChildren) {
         // Target task has children - always indent across whole zone
         dragType = 'indent';
+        console.log('❌ EXECUTING: targetTaskHasChildren - THIS IS THE BUG! Should not reach here when child over parent!');
         console.log('✅ Parent with children: indent across whole zone');
       } else if (targetLevel === 3) {
         // Max level - only reorder allowed
         dragType = 'reorder';
+        console.log('✅ EXECUTING: targetLevel === 3');
         console.log('✅ Max level: reorder only');
       } else {
         // Standard 2-zone system
+        console.log('✅ EXECUTING: Standard 2-zone system');
         if (x < firstZoneEnd) {
           // 0-10% zone
           dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';
@@ -221,7 +272,7 @@ export const useDragDropTask = ({
         targetIndentLevel: undefined
       });
     }
-  }, [isSection, task.level, task.text, allTasks]);
+  }, [isSection, task.level, task.text, task.parent_id, allTasks]);
 
   const {
     attributes,

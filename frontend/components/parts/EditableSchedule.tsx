@@ -147,42 +147,32 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
           const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
           newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
         } else if (dragType === 'outdent' && !targetTask.is_section) {
-        // 🔧 FIX: Outdent - Move to same level as parent task and sit below parent
-        // Find the parent task if current task is indented
+        // 🔧 FIX: Outdent - Reduce level by 1 and move to same level as target task
+        // As per task26.md: "dragged task's level is reduced by 1" and "Task D + Task F on the same level"
           const currentTaskLevel = draggedTask.level || 0
 
           if (currentTaskLevel > 0) {
-          // Find the parent task
-            const parentTask = processedTasks.find(t => t.id === draggedTask.parent_id)
-
-            if (parentTask) {
-            // Move to same level as parent (requirement clarification #2)
-              const newLevel = parentTask.level || 0
-
-              updatedDraggedTask.is_subtask = newLevel > 0
-              updatedDraggedTask.level = newLevel
-              updatedDraggedTask.parent_id = parentTask.parent_id
-              updatedDraggedTask.section = parentTask.section
-
-              // Find position to insert after parent (below parent task)
-              const parentIndex = newTasks.findIndex(t => t.id === parentTask.id)
-              if (parentIndex !== -1) {
-                newTasks.splice(parentIndex + 1, 0, updatedDraggedTask)
-              } else {
-              // Fallback: insert at hover position
-                newTasks.splice(hoverIndex, 0, updatedDraggedTask)
-              }
-            } else {
-            // No parent found, move to level 0
-              updatedDraggedTask.is_subtask = false
-              updatedDraggedTask.level = 0
+            // Reduce level by 1 (as per task requirement)
+            const newLevel = Math.max(currentTaskLevel - 1, 0)
+            
+            // Move to same level as target task (the parent)
+            updatedDraggedTask.is_subtask = newLevel > 0
+            updatedDraggedTask.level = newLevel
+            updatedDraggedTask.section = targetTask.section
+            
+            if (newLevel === 0) {
+              // Moving to top level
               updatedDraggedTask.parent_id = null
-              updatedDraggedTask.section = targetTask.section
-
-              newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+            } else {
+              // Moving to same parent as target task
+              updatedDraggedTask.parent_id = targetTask.parent_id
             }
+
+            // Position after the target task (the parent that was dragged over)
+            const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+            newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
           } else {
-          // Already at level 0, just reorder
+            // Already at level 0, just reorder
             newTasks.splice(hoverIndex, 0, updatedDraggedTask)
           }
         } else if (dragType === 'indent_to_parent_level' && !targetTask.is_section) {
