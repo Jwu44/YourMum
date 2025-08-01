@@ -259,21 +259,48 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
               categories: [targetTask.text]
             })
           } else {
-            // 🔧 FIX: Reorder - Always inherit target's section and reset to target's level
-            // This fixes cross-section reordering where tasks weren't moving to the target section
+            // 🔧 FIX: Reorder logic with parent block detection
+            // Dev-Guide: Keep implementation SIMPLE and handle edge cases
             const targetLevel = targetTask.level || 0
-
-            // 🔧 FIX: Use consistent pattern from working indent operations
-            // Insert after target task (adjustedHoverIndex + 1)
             const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
 
-            newTasks.splice(adjustedHoverIndex + 1, 0, {
-              ...updatedDraggedTask,
-              section: targetTask.section,
-              is_subtask: targetLevel > 0,
-              level: targetLevel,
-              parent_id: targetTask.parent_id
-            })
+            // Check if target task has children (parent block scenario)
+            const targetHasChildren = processedTasks.some(t => String(t.parent_id) === String(targetTask.id))
+            
+            if (targetHasChildren) {
+              // Target is a parent with children - position after entire parent block
+              console.log('🔧 Reorder: Parent block detected, positioning after entire block');
+              
+              // Find the last child of the target task
+              let lastChildIndex = adjustedHoverIndex
+              for (let i = adjustedHoverIndex + 1; i < newTasks.length; i++) {
+                const task = newTasks[i]
+                if (String(task.parent_id) === String(targetTask.id)) {
+                  lastChildIndex = i
+                } else if (task.level <= targetLevel) {
+                  // Found a task at same or higher level - stop looking
+                  break
+                }
+              }
+              
+              // Insert after the last child of the parent block
+              newTasks.splice(lastChildIndex + 1, 0, {
+                ...updatedDraggedTask,
+                section: targetTask.section,
+                is_subtask: false,          // Sibling, not child
+                level: targetLevel,         // Same level as parent
+                parent_id: targetTask.parent_id  // Same parent as target
+              })
+            } else {
+              // Standard reorder - position directly after target
+              newTasks.splice(adjustedHoverIndex + 1, 0, {
+                ...updatedDraggedTask,
+                section: targetTask.section,
+                is_subtask: targetLevel > 0,
+                level: targetLevel,
+                parent_id: targetTask.parent_id
+              })
+            }
           }
         }
       }

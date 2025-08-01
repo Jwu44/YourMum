@@ -230,10 +230,17 @@ export const useDragDropTask = ({
           console.log('🟩 Child-to-parent GREEN ZONE: indent');
         }
       } else if (targetTaskHasChildren) {
-        // Target task has children - always indent across whole zone
-        dragType = 'indent';
-        console.log('❌ EXECUTING: targetTaskHasChildren - THIS IS THE BUG! Should not reach here when child over parent!');
-        console.log('✅ Parent with children: indent across whole zone');
+        // Target task has children - use 2-zone system like draggedTaskIsOverItsParent
+        if (x < firstZoneEnd) {
+          // 0-10% zone: reorder as siblings after parent block
+          dragType = 'reorder';
+          console.log('🟥 Parent with children RED ZONE: reorder as siblings');
+        } else {
+          // 10-100% zone: indent under parent
+          dragType = 'indent';
+          console.log('🟩 Parent with children GREEN ZONE: indent under parent');
+        }
+        console.log('✅ EXECUTING: targetTaskHasChildren - FIXED for both zones!');
       } else if (targetLevel === 3) {
         // Max level - only reorder allowed
         dragType = 'reorder';
