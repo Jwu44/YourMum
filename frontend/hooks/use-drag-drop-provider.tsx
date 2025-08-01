@@ -149,30 +149,16 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       cursorY >= childRect.top && cursorY <= childRect.bottom
     );
 
-    // 🔧 FIX: Check if cursor is in parent's green zone (beyond 30% width)
-    // If so, redirect collision target from child to parent
-    const parentWidth = parentRect.width;
-    const thirtyPercentWidth = parentWidth * 0.3;
-    const parentGreenZoneStart = parentRect.left + thirtyPercentWidth;
+    // 🔧 FIX: Always redirect collision to parent when dragging over child
+    // This allows the zone detection logic in use-drag-drop-task.tsx to handle red/green zones properly
+    // Both red zone (reorder) and green zone (indent) need to target the parent for proper logic execution
     
-    // Dev-Guide: Check for potential null/undefined values
-    const isInParentGreenZone = isWithinParentBounds && cursorX >= parentGreenZoneStart;
-    
-    console.log('🔧 Parent zone analysis:', {
-      parentWidth,
-      thirtyPercentWidth,  
-      parentGreenZoneStart,
-      cursorX,
-      isWithinParentBounds,
-      isInParentGreenZone,
-      willRedirectToParent: isInParentGreenZone
-    });
-
-    if (isInParentGreenZone) {
-      // Redirect collision to parent task instead of child
+    if (isWithinParentBounds) {
+      // Redirect collision to parent task for both red and green zones
       console.log('🔄 Redirecting collision from child to parent:', {
         from: targetTask.text,
-        to: parentTask.text
+        to: parentTask.text,
+        reason: 'Parent-child drag operation detected'
       });
       
       return [{
@@ -184,7 +170,7 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       }];
     }
 
-    // Default: target the child task
+    // Default: target the child task (when not within parent bounds)
     console.log('🔧 Using default collision - targeting child task');
     return defaultCollisions;
   };
