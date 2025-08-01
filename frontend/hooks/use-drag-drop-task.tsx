@@ -132,8 +132,9 @@ export const useDragDropTask = ({
       const draggedTaskIsIndented = currentTaskLevel > 0;
       
       // 🔧 FIX: Extract target task ID from DOM to determine if target has children
+      // Dev-Guide: Check for potential null/undefined values and verify type consistency
       const targetTaskId = targetElement.getAttribute('data-sortable-id');
-      const targetTaskHasChildren = targetTaskId ? allTasks.some(t => t.parent_id === targetTaskId) : false;
+      const targetTaskHasChildren = targetTaskId ? allTasks.some(t => String(t.parent_id) === String(targetTaskId)) : false;
       
       // Debug logging for threshold detection
       console.log('🎯 Zone Detection Debug:', {
@@ -173,9 +174,10 @@ export const useDragDropTask = ({
         return;
       }
       
+      // Dev-Guide: Verify type consistency for parent-child relationship detection
       const draggedTaskIsOverItsParent = draggedTask ? 
-        (targetTaskId === draggedTask.parent_id && draggedTask.parent_id !== null) : 
-        (targetTaskId === task.parent_id && task.parent_id !== null);
+        (String(targetTaskId) === String(draggedTask.parent_id) && draggedTask.parent_id !== null) : 
+        (String(targetTaskId) === String(task.parent_id) && task.parent_id !== null);
       
       // 🐛 CRITICAL DEBUG: Log exact values and types to find the comparison issue
       console.log('🚨 FIXED DEBUG - Variable Analysis:', {
