@@ -149,14 +149,43 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       cursorY >= childRect.top && cursorY <= childRect.bottom
     );
 
-    // 🔧 FIX: Simplified collision detection - let zone detection handle red/green zones
-    // The collision detection should only determine WHICH task to target,
-    // not WHAT operation to perform (that's handled by zone detection)
+    // 🔧 FIX: Check if cursor is in parent's green zone (beyond 30% width)
+    // If so, redirect collision target from child to parent
+    const parentWidth = parentRect.width;
+    const thirtyPercentWidth = parentWidth * 0.3;
+    const parentGreenZoneStart = parentRect.left + thirtyPercentWidth;
     
-    console.log('🔧 SIMPLIFIED: Always use default collision for child tasks');
-    console.log('🔧 Zone detection in use-drag-drop-task.tsx will handle red/green logic');
+    // Dev-Guide: Check for potential null/undefined values
+    const isInParentGreenZone = isWithinParentBounds && cursorX >= parentGreenZoneStart;
+    
+    console.log('🔧 Parent zone analysis:', {
+      parentWidth,
+      thirtyPercentWidth,  
+      parentGreenZoneStart,
+      cursorX,
+      isWithinParentBounds,
+      isInParentGreenZone,
+      willRedirectToParent: isInParentGreenZone
+    });
 
-    // Use default collision detection
+    if (isInParentGreenZone) {
+      // Redirect collision to parent task instead of child
+      console.log('🔄 Redirecting collision from child to parent:', {
+        from: targetTask.text,
+        to: parentTask.text
+      });
+      
+      return [{
+        id: parentTask.id,
+        data: {
+          droppableContainer: defaultCollisions[0]?.data?.droppableContainer,
+          value: parentTask.id
+        }
+      }];
+    }
+
+    // Default: target the child task
+    console.log('🔧 Using default collision - targeting child task');
     return defaultCollisions;
   };
 };
