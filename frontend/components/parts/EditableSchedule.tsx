@@ -277,7 +277,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
                 const task = newTasks[i]
                 if (String(task.parent_id) === String(targetTask.id)) {
                   lastChildIndex = i
-                } else if (task.level <= targetLevel) {
+                } else if ((task.level || 0) <= targetLevel) {
                   // Found a task at same or higher level - stop looking
                   break
                 }
