@@ -214,38 +214,39 @@ export const useDragDropTask = ({
                       targetLevel === 3 ? 'targetLevel === 3' : 'standard 2-zone'
       });
 
+      // 🔧 FIX: Simplified zone detection logic for child-to-child vs child-to-parent scenarios
       if (draggedTaskIsOverItsParent) {
-        // Child task being dragged over its parent
-        console.log('✅ EXECUTING: draggedTaskIsOverItsParent - THIS IS CORRECT!');
+        // Child task being dragged over its parent - preserve existing outdent behavior
+        console.log('✅ Child-to-parent scenario detected');
         if (x < firstZoneEnd) {
           // 0-10% zone: outdent to sibling level
           dragType = 'outdent';
-          console.log('🟥 Child-to-parent RED ZONE: outdent - SUCCESS!');
+          console.log('🟥 Child-to-parent RED ZONE: outdent');
         } else {
           // 10-100% zone: maintain parent-child relationship
           dragType = 'indent';
           console.log('🟩 Child-to-parent GREEN ZONE: indent');
         }
-      } else if (targetTaskHasChildren) {
-        // Target task has children - use 2-zone system like draggedTaskIsOverItsParent
+      } else if (targetLevel > 0) {
+        // 🔧 FIX: Target is a child task (level > 0) - this is the key scenario for the bug
+        // This covers child-to-child scenarios where we want to reorder as siblings
+        console.log('✅ Child-to-child scenario detected - target is child task');
         if (x < firstZoneEnd) {
-          // 0-10% zone: reorder as siblings after parent block
+          // 0-10% zone: reorder as sibling after the target child
           dragType = 'reorder';
-          console.log('🟥 Parent with children RED ZONE: reorder as siblings');
+          console.log('🟥 Child RED ZONE: reorder as sibling after target child');
         } else {
-          // 10-100% zone: indent under parent
+          // 10-100% zone: indent under target child
           dragType = 'indent';
-          console.log('🟩 Parent with children GREEN ZONE: indent under parent');
+          console.log('🟩 Child GREEN ZONE: indent under target child');
         }
-        console.log('✅ EXECUTING: targetTaskHasChildren - FIXED for both zones!');
       } else if (targetLevel === 3) {
         // Max level - only reorder allowed
         dragType = 'reorder';
-        console.log('✅ EXECUTING: targetLevel === 3');
-        console.log('✅ Max level: reorder only');
+        console.log('✅ Max level (3): reorder only');
       } else {
-        // Standard 2-zone system
-        console.log('✅ EXECUTING: Standard 2-zone system');
+        // Standard 2-zone system for level 0 tasks (parents/top-level)
+        console.log('✅ Standard 2-zone system for level 0 task');
         if (x < firstZoneEnd) {
           // 0-10% zone
           dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';

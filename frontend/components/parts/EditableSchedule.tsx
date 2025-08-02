@@ -190,7 +190,7 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
               categories: [targetTask.text]
             })
           } else {
-            // 🔧 FIX: Reorder logic with parent block detection
+            // 🔧 FIX: Simplified reorder logic - handle child targets directly
             // Dev-Guide: Keep implementation SIMPLE and handle edge cases
             const targetLevel = targetTask.level || 0
             const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
@@ -198,7 +198,19 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
             // Check if target task has children (parent block scenario)
             const targetHasChildren = processedTasks.some(t => String(t.parent_id) === String(targetTask.id))
             
-            if (targetHasChildren) {
+            if (targetLevel > 0) {
+              // 🔧 FIX: Target is a child task - position directly after it as sibling
+              // This fixes the bug where dragging to child red zone incorrectly positioned after parent block
+              console.log('🔧 Reorder: Child target detected, positioning as sibling after target child');
+              
+              newTasks.splice(adjustedHoverIndex + 1, 0, {
+                ...updatedDraggedTask,
+                section: targetTask.section,
+                is_subtask: true,           // Child task (level > 0)
+                level: targetLevel,         // Same level as target child
+                parent_id: targetTask.parent_id  // Same parent as target child
+              })
+            } else if (targetHasChildren) {
               // Target is a parent with children - position after entire parent block
               console.log('🔧 Reorder: Parent block detected, positioning after entire block');
               

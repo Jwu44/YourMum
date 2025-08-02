@@ -15,4 +15,4 @@ I am facing a bug where dragging a task into a child's redzone causes indent whe
 - Dragging Task D into Task B's red zone should trigger an indent under Task A but a reorder after Task B
     e.g. Upon release, list should be: Task A > Task B + Task D + Task C, where all B, C and D are subtasks of Task 
 - Ensure all other drag functions/logic are preserved
-    e.g. - Current dragging of Task D into subtask green zoen are correct where indent is triggered
+    e.g. - Current dragging of Task D into subtask green zone are correct where indent is triggered
