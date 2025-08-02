@@ -57,10 +57,10 @@ interface DragDropProviderReturn {
  * Handles drag events and task reordering with simplified collision detection
  */
 /**
- * Simplified collision detection that respects parent-child hierarchy
- * Uses 2-zone system: red zone (0-10%) for outdent/reorder, green zone (10-100%) for indent
+ * Simplified collision detection - handles child targets directly
+ * Removes complex parent redirection logic for cleaner implementation
  */
-const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection => {
+const createSimplifiedCollisionDetection = (tasks: Task[]): CollisionDetection => {
   return (args) => {
     // Get default collision results from @dnd-kit
     const defaultCollisions = closestCenter(args);
@@ -69,109 +69,37 @@ const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection 
       return defaultCollisions;
     }
 
-    // Get the primary collision (closest target)
-    const primaryCollision = defaultCollisions[0];
-    const targetTaskId = primaryCollision.id as string;
-    
-    // Find the target task
-    const targetTask = tasks.find(task => task.id === targetTaskId);
-    if (!targetTask) {
-      return defaultCollisions;
-    }
-
-    // Get the dragged task to check scenarios
+    // Get the dragged task to check for invalid scenarios
     const draggedTaskId = args.active?.id as string;
     const draggedTask = tasks.find(task => task.id === draggedTaskId);
     
-    // Check for child-over-parent drag scenario
-    const isChildOverParent = draggedTask?.parent_id === targetTaskId;
-    const isChildTask = targetTask.parent_id != null;
+    // Get the primary collision (closest target)
+    const primaryCollision = defaultCollisions[0];
+    const targetTaskId = primaryCollision.id as string;
+    const targetTask = tasks.find(task => task.id === targetTaskId);
     
-    // 🔧 FIX: Check for parent-over-child scenario (should be blocked/restricted)
+    if (!targetTask || !draggedTask) {
+      return defaultCollisions;
+    }
+    
+    // 🔧 FIX: Block parent-over-child operations (prevent dragging parent onto its own child)
     const isParentOverChild = targetTask.parent_id === draggedTaskId;
     
-    // Collision detection logging
-    console.log('🔧 Collision detection:', {
-      draggedTask: draggedTask?.text,
-      targetTask: targetTask.text,
-      scenario: isChildOverParent ? 'child-over-parent' : 
-                isParentOverChild ? 'parent-over-child (BLOCKED)' : 'default'
-    });
-    
-    if (isChildOverParent) {
-      // Child task being dragged over its parent - allow normal zone logic
-      // Zone logic is handled in use-drag-drop-task.tsx
-      console.log('🔧 Child-over-parent: allowing zone detection');
-      return defaultCollisions;
-    } else if (isParentOverChild) {
-      // 🔧 FIX: Parent being dragged over its child - block this operation for now
-      // Future enhancement: implement block dragging
-      console.log('🚫 Parent-over-child: blocking operation (future: block drag)', {
-        draggedParent: draggedTask?.text,
+    if (isParentOverChild) {
+      console.log('🚫 Blocking parent-over-child operation:', {
+        draggedParent: draggedTask.text,
         targetChild: targetTask.text
       });
-      return []; // Return empty array to block the collision
-    } else if (!isChildTask) {
-      // Target is not a child - use default collision detection
-      console.log('🔧 Target is not a child: using default collision detection');
-      return defaultCollisions;
+      return []; // Block this collision
     }
-
-    // Target is a child task - simplified parent zone logic
-    const parentTask = tasks.find(task => task.id === targetTask.parent_id);
-    if (!parentTask) {
-      return defaultCollisions;
-    }
-
-    // Get DOM elements
-    const parentElement = document.querySelector(`[data-sortable-id="${parentTask.id}"]`);
-    const childElement = document.querySelector(`[data-sortable-id="${targetTask.id}"]`);
     
-    if (!parentElement || !childElement) {
-      return defaultCollisions;
-    }
-
-    // Get cursor position from collision rect
-    const cursorX = args.collisionRect.left + args.collisionRect.width / 2;
-    const cursorY = args.collisionRect.top + args.collisionRect.height / 2;
-
-    // Get bounding rectangles
-    const parentRect = parentElement.getBoundingClientRect();
-    const childRect = childElement.getBoundingClientRect();
-
-    // Check if cursor is within bounds
-    const isWithinParentBounds = (
-      cursorX >= parentRect.left && cursorX <= parentRect.right &&
-      cursorY >= parentRect.top && cursorY <= parentRect.bottom
-    );
-    const isWithinChildBounds = (
-      cursorX >= childRect.left && cursorX <= childRect.right &&
-      cursorY >= childRect.top && cursorY <= childRect.bottom
-    );
-
-    // 🔧 FIX: Always redirect collision to parent when dragging over child
-    // This allows the zone detection logic in use-drag-drop-task.tsx to handle red/green zones properly
-    // Both red zone (reorder) and green zone (indent) need to target the parent for proper logic execution
+    // Default collision detection - allow direct child targeting
+    console.log('🔧 Direct collision detection:', {
+      draggedTask: draggedTask.text,
+      targetTask: targetTask.text,
+      targetIsChild: targetTask.parent_id != null
+    });
     
-    if (isWithinParentBounds) {
-      // Redirect collision to parent task for both red and green zones
-      console.log('🔄 Redirecting collision from child to parent:', {
-        from: targetTask.text,
-        to: parentTask.text,
-        reason: 'Parent-child drag operation detected'
-      });
-      
-      return [{
-        id: parentTask.id,
-        data: {
-          droppableContainer: defaultCollisions[0]?.data?.droppableContainer,
-          value: parentTask.id
-        }
-      }];
-    }
-
-    // Default: target the child task (when not within parent bounds)
-    console.log('🔧 Using default collision - targeting child task');
     return defaultCollisions;
   };
 };
@@ -383,7 +311,7 @@ export const useDragDropProvider = ({
   return {
     // DndContext configuration
     sensors,
-    collisionDetection: createParentAwareCollisionDetection(tasks), // 🔧 FIX: Use parent-aware collision detection
+    collisionDetection: createSimplifiedCollisionDetection(tasks), // 🔧 FIX: Use simplified collision detection
     onDragStart: handleDragStart,
     onDragOver: handleDragOver,
     onDragMove: handleDragMove,
