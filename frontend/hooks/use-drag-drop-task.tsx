@@ -55,7 +55,7 @@ interface DragDropTaskReturn {
 /**
  * Hook that provides drag and drop functionality for task rows
  * 🔧 FIX: Optimized for smooth horizontal and vertical dragging performance
- * ✨ NEW: Enhanced with Notion-style indentation detection based on cursor position
+ * ✨ Uses simplified 2-zone system for reliable indentation detection
  */
 export const useDragDropTask = ({
   task,
@@ -115,18 +115,17 @@ export const useDragDropTask = ({
       
       // 🔧 FIX: Percentage-based threshold calculation for reliable positioning
       // Following dev-guide principle: keep implementation SIMPLE
+      // Uses 2-zone system: 0-10% (red) for outdent/reorder, 10-100% (green) for indent
       
       // Use the entire visible task container for percentage calculation
       const containerLeft = targetRect.left;
       const containerWidth = targetRect.width;
       const containerRight = containerLeft + containerWidth;
       
-      // Calculate zone thresholds for 2-zone/3-zone/1-zone system
+      // Calculate zone thresholds for 2-zone system
       const tenPercentWidth = containerWidth * 0.1;
-      const sixtyPercentWidth = containerWidth * 0.6;
       const firstZoneEnd = containerLeft + tenPercentWidth;  // 0-10%
-      const secondZoneEnd = containerLeft + sixtyPercentWidth;  // 10-60%
-      // Third zone: 60-100%
+      // Second zone: 10-100%
       
       const currentTaskLevel = task.level || 0;
       const draggedTaskIsIndented = currentTaskLevel > 0;
@@ -147,10 +146,8 @@ export const useDragDropTask = ({
         targetTaskId,
         targetTaskHasChildren,
         firstZoneEnd,
-        secondZoneEnd,
         'zone1(0-10%)': x < firstZoneEnd,
-        'zone2(10-60%)': x >= firstZoneEnd && x < secondZoneEnd,
-        'zone3(60-100%)': x >= secondZoneEnd
+        'zone2(10-100%)': x >= firstZoneEnd
       });
       
       let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';

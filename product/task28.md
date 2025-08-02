@@ -1,19 +1,18 @@
 Status: To do
 
 ## Bug
-I am facing a bug where dragging a task into a parent's red zone causes indentation while dragging into a parent's green zone causes indentation in it's child task.
+I am facing a bug where dragging a task into a child's redzone causes indent when it should be an indent + reorder.
 
 ## Current behaviour
 - Let's look at an example with the default state in @image.png
-- When I try to drag Task E into Task F's red zone, it triggers indentation
-- When I try to drag Task E into Task F's green zone, it triggers indentation under Task F which is correct as seen in @image2.png
-    - But as I move further along the green zone of Task F, the indentation moves to child Task D which is incorrect as seen in image3.png
-    - Maybe this is because of old logic where I wanted indentation at 30% width?
+- When I try to drag Task D into Task C's red zone, it triggers outdent as seen in @image1.png
+- Upon release, Task D becomes a parent of Task C and is outdented as seen in @image2.png 
+
 
 ## Expected behaviour
-- Dragging Task E into Task F's red zone should trigger reorder
-    - Upon release, Task E is positioned after Task F's block 
-    - E.g. (Task F > Task D) + Task E as siblings
-- Dragging Task E into Task F's green zone should always trigger indentation
-    - Upon release, Task E is indented under Task F as the first child
-    - E.g. Task F > (Task E + Task D)
+- Dragging Task D into Task C's red zone should trigger an indent under Task A but a reorder after Task C
+    e.g. Upon release, list should be: Task A > Task B + Task C + Task D, where all B, C and D are subtasks of Task A
+- Dragging Task D into Task B's red zone should trigger an indent under Task A but a reorder after Task B
+    e.g. Upon release, list should be: Task A > Task B + Task D + Task C, where all B, C and D are subtasks of Task 
+- Ensure all other drag functions/logic are preserved
+    e.g. - Current dragging of Task D into subtask green zoen are correct where indent is triggered

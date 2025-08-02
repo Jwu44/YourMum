@@ -58,7 +58,7 @@ interface DragDropProviderReturn {
  */
 /**
  * Simplified collision detection that respects parent-child hierarchy
- * Uses 2-zone system with red zone (0-10%) for outdent priority
+ * Uses 2-zone system: red zone (0-10%) for outdent/reorder, green zone (10-100%) for indent
  */
 const createParentAwareCollisionDetection = (tasks: Task[]): CollisionDetection => {
   return (args) => {
