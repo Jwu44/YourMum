@@ -700,19 +700,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
             </div>
             <div ref={checkboxRef} className="flex items-center">
-              {(task.level || 0) > 0 && (
-                <div className="relative mr-2 flex items-center">
-                  {/* Connecting line extending from parent */}
-                  <div
-                    className="border-l border-b border-muted-foreground/30"
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderBottomLeftRadius: '4px'
-                    }}
-                  />
-                </div>
-              )}
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
