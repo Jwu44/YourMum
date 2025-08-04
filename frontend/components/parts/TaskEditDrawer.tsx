@@ -281,7 +281,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       modal={true}
     >
       <DrawerContent
-        className="fixed bottom-0 left-0 right-0 h-[75vh] w-full bg-background shadow-lg outline-none"
+        className="fixed bottom-0 left-0 right-0 h-[80vh] sm:h-[75vh] w-full bg-background shadow-lg outline-none mobile-padding-safe"
         onPointerDownOutside={(e) => {
           // Allow time picker interactions - check if click is on time input or its picker
           const target = e.target as HTMLElement
@@ -303,16 +303,16 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           handleClose()
         }}
       >
-        <div className="mx-auto w-full max-w-sm">
+        <div className="mx-auto w-full max-w-sm px-2 sm:px-0">
           <DrawerHeader>
             <DrawerTitle>
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="p-4 space-y-4">
+          <div className="p-3 sm:p-4 space-y-4 sm:space-y-5">
             {/* Task Name */}
             <div>
-              <label htmlFor="text" className="block text-sm font-medium text-foreground">
+              <label htmlFor="text" className="block text-sm font-medium text-foreground mb-2">
                 Task Name
               </label>
               <Input
@@ -321,7 +321,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 value={editedTask.text}
                 onChange={handleInputChange}
                 onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                className="mt-1"
+                className="mobile-form-input"
               />
             </div>
 
@@ -338,7 +338,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                       key={category}
                       variant={isSelected ? 'default' : 'outline'}
                       className={cn(
-                        'cursor-pointer',
+                        'cursor-pointer mobile-touch-target px-3 py-2 text-base sm:text-sm sm:px-2 sm:py-1',
                         isSelected && getCategoryVariant(category) === 'work' && 'bg-info btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'fun' && 'bg-warning btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'relationships' && 'bg-primary btn-hover-primary',
@@ -350,7 +350,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                     >
                       {category}
                       {isSelected && (
-                        <X className="ml-1 h-3 w-3" />
+                        <X className="ml-1 h-4 w-4 sm:h-3 sm:w-3" />
                       )}
                     </Badge>
                   )
@@ -359,58 +359,60 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
             </div>
 
             {/* Time Fields */}
-            <div>
-              <label htmlFor="start_time" className="block text-sm font-medium text-foreground">
-                Start Time
-              </label>
-              <div
-                className="relative"
-                onPointerDown={(e) => {
-                  // Prevent drawer from closing when interacting with time input
-                  e.stopPropagation()
-                }}
-              >
-                <Input
-                  id="start_time"
-                  name="start_time"
-                  type="time"
-                  value={editedTask.start_time || ''}
-                  onChange={handleInputChange}
-                  onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                  onClick={(e) => {
-                    // Try to trigger time picker on click
-                    e.currentTarget.showPicker?.()
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="start_time" className="block text-sm font-medium text-foreground mb-2">
+                  Start Time
+                </label>
+                <div
+                  className="relative"
+                  onPointerDown={(e) => {
+                    // Prevent drawer from closing when interacting with time input
+                    e.stopPropagation()
                   }}
-                  className="mt-1 w-full font-mono text-center time-input-custom"
-                  autoComplete="off"
-                />
+                >
+                  <Input
+                    id="start_time"
+                    name="start_time"
+                    type="time"
+                    value={editedTask.start_time || ''}
+                    onChange={handleInputChange}
+                    onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
+                    onClick={(e) => {
+                      // Try to trigger time picker on click
+                      e.currentTarget.showPicker?.()
+                    }}
+                    className="mobile-form-input font-mono text-center time-input-custom"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label htmlFor="end_time" className="block text-sm font-medium text-foreground">
-                End Time
-              </label>
-              <div
-                className="relative"
-                onPointerDown={(e) => {
-                  // Prevent drawer from closing when interacting with time input
-                  e.stopPropagation()
-                }}
-              >
-                <Input
-                  id="end_time"
-                  name="end_time"
-                  type="time"
-                  value={editedTask.end_time || ''}
-                  onChange={handleInputChange}
-                  onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                  onClick={(e) => {
-                    // Try to trigger time picker on click
-                    e.currentTarget.showPicker?.()
+              <div>
+                <label htmlFor="end_time" className="block text-sm font-medium text-foreground mb-2">
+                  End Time
+                </label>
+                <div
+                  className="relative"
+                  onPointerDown={(e) => {
+                    // Prevent drawer from closing when interacting with time input
+                    e.stopPropagation()
                   }}
-                  className="mt-1 w-full font-mono text-center time-input-custom"
-                  autoComplete="off"
-                />
+                >
+                  <Input
+                    id="end_time"
+                    name="end_time"
+                    type="time"
+                    value={editedTask.end_time || ''}
+                    onChange={handleInputChange}
+                    onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
+                    onClick={(e) => {
+                      // Try to trigger time picker on click
+                      e.currentTarget.showPicker?.()
+                    }}
+                    className="mobile-form-input font-mono text-center time-input-custom"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             </div>
 
@@ -425,7 +427,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                 }
                 onValueChange={handleRecurrenceChange}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full mobile-form-input">
                   <SelectValue placeholder="Select recurrence" />
                 </SelectTrigger>
                 <SelectContent className="select-content bg-background">
@@ -443,8 +445,8 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           </div>
 
           {/* Footer with improved save button */}
-          <DrawerFooter>
-            <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground">
+          <DrawerFooter className="px-3 sm:px-6">
+            <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground mobile-form-button">
               {isEditMode ? 'Save Changes' : 'Create'}
             </Button>
           </DrawerFooter>

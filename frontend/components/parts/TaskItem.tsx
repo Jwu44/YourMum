@@ -57,7 +57,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
   }
 
   return (
-    <div className="flex items-center my-2">
+    <div className="flex items-center my-2 gap-2 sm:gap-3">
       {isEditing
         ? (
         <Input
@@ -65,47 +65,49 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
           onChange={(e) => { setEditedTask(e.target.value) }}
           onBlur={handleUpdate}
           onKeyPress={(e) => e.key === 'Enter' && handleUpdate()}
-          className="flex-grow"
+          className="flex-grow min-h-[44px] text-base"
         />
           )
         : (
-        <div className="flex-grow cursor-pointer text-white" onClick={() => { setIsEditing(true) }}>
+        <div className="flex-grow cursor-pointer text-white py-3 px-2 rounded-md hover:bg-accent/10 transition-colors min-h-[44px] flex items-center" onClick={() => { setIsEditing(true) }}>
           {task.text}
         </div>
           )}
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
-          <div className="flex items-center cursor-pointer ml-2">
-            {selectedCategories.map((category, index) => (
-              <Badge key={index} className={`mr-1 mb-1 ${getCategoryColor(category)}`}>
-                {category}
-              </Badge>
-            ))}
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-secondary-foreground font-bold text-lg hover-selection">
-              +
-            </span>
+          <div className="flex items-center cursor-pointer">
+            <div className="flex flex-wrap items-center gap-1">
+              {selectedCategories.map((category, index) => (
+                <Badge key={index} className={`text-xs ${getCategoryColor(category)}`}>
+                  {category}
+                </Badge>
+              ))}
+              <span className="inline-flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-secondary text-secondary-foreground font-bold text-lg hover:bg-secondary/80 transition-colors">
+                +
+              </span>
+            </div>
           </div>
         </PopoverTrigger>
         <PopoverContent className="w-64">
-          <div className="space-y-2">
+          <div className="space-y-3">
             {categories.map((cat) => (
               <div key={cat} className="flex items-center">
                 <Checkbox
                   id={`category-${cat}`}
                   checked={selectedCategories.includes(cat)}
                   onCheckedChange={() => { handleCategorySelect(cat) }}
-                  className="mr-2"
+                  className="mr-3 h-5 w-5"
                 />
                 <label
                   htmlFor={`category-${cat}`}
-                  className="flex-grow cursor-pointer"
+                  className="flex-grow cursor-pointer py-2 text-base"
                 >
                   {cat}
                 </label>
               </div>
             ))}
           </div>
-          <Button onClick={handleCategoriesConfirm} className="w-full mt-4">
+          <Button onClick={handleCategoriesConfirm} className="w-full mt-4 h-11">
             Confirm
           </Button>
         </PopoverContent>
@@ -114,9 +116,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onUpdate, onDelete }) => {
         variant="ghost"
         size="sm"
         onClick={() => { onDelete(task.id) }}
-        className="ml-2"
+        className="h-11 w-11 p-0 sm:h-8 sm:w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
+        aria-label="Delete task"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5 sm:h-4 sm:w-4" />
       </Button>
     </div>
   )

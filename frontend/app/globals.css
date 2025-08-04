@@ -528,4 +528,65 @@ All colors MUST be HSL.
   input[type="time"]::-webkit-calendar-picker-indicator + * {
     z-index: 10001 !important;
   }
+
+  /* Mobile-specific utilities */
+  .mobile-touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .mobile-text-base {
+    @apply text-base sm:text-sm;
+  }
+
+  .mobile-spacing {
+    @apply p-3 sm:p-4 md:p-5;
+  }
+
+  .mobile-gap {
+    @apply gap-2 sm:gap-3 md:gap-4;
+  }
+
+  .mobile-padding-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-header-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Mobile-optimized forms */
+  .mobile-form-input {
+    @apply min-h-[44px] text-base;
+  }
+
+  .mobile-form-button {
+    @apply min-h-[44px] text-base px-6;
+  }
+
+  /* Mobile keyboard compensation */
+  .mobile-viewport-height {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Better mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Touch-friendly hover states */
+  @media (hover: hover) and (pointer: fine) {
+    .hover-desktop:hover {
+      @apply bg-hover text-hover-foreground;
+    }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .hover-desktop {
+      @apply active:bg-hover active:text-hover-foreground;
+    }
+  }
 }

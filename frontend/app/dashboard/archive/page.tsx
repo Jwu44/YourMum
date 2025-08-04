@@ -246,46 +246,48 @@ const ArchivePage: React.FC = () => {
 
   return (
     <SidebarLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="w-full max-w-4xl mx-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto mobile-scroll">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
           {/* Page Header */}
-          <div className="mb-8 pt-8">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="icon-container">
-                <Archive className="h-6 w-6 text-primary" />
+          <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="icon-container">
+                  <Archive className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Archive</h1>
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">Archive</h1>
               {!isLoading && (
-                <Badge variant="secondary" className="ml-2">
+                <Badge variant="secondary" className="self-start sm:ml-2">
                   {archivedTasks.length} {archivedTasks.length === 1 ? 'task' : 'tasks'}
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               Manage your archived tasks. Move them back to today's schedule or delete them permanently.
             </p>
           </div>
 
           {/* Loading State */}
           {isLoading && (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-8 sm:py-12">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading archived tasks...</p>
+                <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary mx-auto mb-3 sm:mb-4"></div>
+                <p className="text-muted-foreground text-sm sm:text-base">Loading archived tasks...</p>
               </div>
             </div>
           )}
 
           {/* Error State */}
           {error && !isLoading && (
-            <Card className="mb-6">
-              <CardContent className="flex items-center gap-3 p-6">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Failed to load archived tasks</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
+            <Card className="mb-4 sm:mb-6">
+              <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 sm:p-6">
+                <AlertCircle className="h-5 w-5 text-destructive self-start sm:self-center" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-left">Failed to load archived tasks</p>
+                  <p className="text-sm text-muted-foreground break-words">{error}</p>
                 </div>
-                <Button onClick={loadArchivedTasks} variant="outline" size="sm">
+                <Button onClick={loadArchivedTasks} variant="outline" size="sm" className="self-start sm:self-center mobile-form-button sm:w-auto">
                   Retry
                 </Button>
               </CardContent>
@@ -294,17 +296,17 @@ const ArchivePage: React.FC = () => {
 
           {/* Empty State */}
           {!isLoading && !error && archivedTasks.length === 0 && (
-            <div className="flex items-center justify-center min-h-[40vh]">
-              <div className="text-center max-w-md">
-                <Archive className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No archived tasks yet</h3>
-                <p className="text-muted-foreground mb-6">
+            <div className="flex items-center justify-center min-h-[30vh] sm:min-h-[40vh]">
+              <div className="text-center max-w-md px-4">
+                <Archive className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/50 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-base sm:text-lg font-medium mb-2">No archived tasks yet</h3>
+                <p className="text-muted-foreground mb-6 text-sm sm:text-base">
                   Archive any tasks for future use. Archived tasks can be moved back to your schedule or deleted permanently.
                 </p>
                 <Button
                   onClick={() => { router.push('/dashboard') }}
                   variant="outline"
-                  className="flex items-center gap-2 mx-auto"
+                  className="flex items-center gap-2 mx-auto mobile-form-button sm:w-auto"
                 >
                   <Calendar className="h-4 w-4" />
                   Go to Dashboard
@@ -315,18 +317,20 @@ const ArchivePage: React.FC = () => {
 
           {/* Archived Tasks List */}
           {!isLoading && !error && archivedTasks.length > 0 && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {archivedTasks.map((archivedTask, index) => (
                 <div key={archivedTask.taskId} className="space-y-2">
                   {/* Archive metadata */}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>Archived on {formatArchiveDate(archivedTask.archivedAt)}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground px-1">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <Calendar className="h-3 w-3 flex-shrink-0" />
+                      <span>Archived on {formatArchiveDate(archivedTask.archivedAt)}</span>
+                    </div>
                     {archivedTask.originalDate && (
-                      <>
-                        <span>•</span>
+                      <div className="flex items-center gap-1 sm:gap-2 ml-4 sm:ml-0">
+                        <span className="hidden sm:inline">•</span>
                         <span>Originally from {formatArchiveDate(archivedTask.originalDate)}</span>
-                      </>
+                      </div>
                     )}
                   </div>
 

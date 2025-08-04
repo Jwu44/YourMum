@@ -405,27 +405,27 @@ const InputConfigurationPage: React.FC = () => {
 
   return (
     <SidebarLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="w-full max-w-4xl mx-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto mobile-scroll">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
           {/* Page Header */}
-          <div className="mb-8 pt-8">
-            <h1 className="text-3xl font-bold tracking-tight">Input Configuration</h1>
-            <p className="text-muted-foreground mt-2">
+          <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Input Configuration</h1>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Add your preferences to personalise your schedule.
             </p>
             {/* Show loading indicator while loading tasks */}
             {isLoadingTasks && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Loading current schedule tasks...
               </p>
             )}
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {/* 1. Work Schedule Section */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div className="icon-container">
                     <Clock className="h-5 w-5 text-primary" />
                   </div>
@@ -655,7 +655,7 @@ const InputConfigurationPage: React.FC = () => {
                       value={state.layout_preference?.subcategory || 'day-sections'}
                       onValueChange={(value) => { handleLayoutChange('subcategory', value) }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full mobile-form-input">
                         <SelectValue placeholder="Select subcategory" />
                       </SelectTrigger>
                       <SelectContent>

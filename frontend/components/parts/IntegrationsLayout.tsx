@@ -86,20 +86,20 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
 const IntegrationsPage: React.FC = () => {
   return (
     <SidebarLayout>
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe mobile-scroll">
         {/* Page Header */}
-        <div className="mb-8 pt-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Plug className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
+        <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <Plug className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Integrations</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm sm:text-base">
             Connect third-party services to streamline your task management workflow
           </p>
         </div>
 
         {/* Integrations Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
           {integrationServices.map((service) => {
             if (service.status === 'available' && service.component) {
               const ServiceComponent = service.component
