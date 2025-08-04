@@ -334,41 +334,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
 
-  // Debug zones for simplified 2-zone system
-  const getDebugZones = useCallback(() => {
-    // Only show debug zones for non-section tasks during development
-    if (isSection) return null
-
-    const { cursorPosition, dragType, targetIndentLevel } = dragDropHook.indentationState
-
-    return (
-      <>
-        {/* Left 10% zone (outdent/reorder) - RED background */}
-        <div
-          className="absolute top-0 bottom-0 bg-red-200 opacity-30 pointer-events-none"
-          style={{ left: 0, width: '10%' }}
-        />
-        {/* Right 90% zone (indent) - GREEN background */}
-        <div
-          className="absolute top-0 bottom-0 bg-green-200 opacity-30 pointer-events-none"
-          style={{ left: '10%', width: '90%' }}
-        />
-        {/* Zone boundary line */}
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-yellow-500 opacity-70 pointer-events-none"
-          style={{ left: '10%' }}
-        />
-        {/* Simplified drag type indicator */}
-        {cursorPosition && (
-          <div
-            className="absolute top-1 right-1 px-2 py-1 bg-black text-white text-xs rounded opacity-80 pointer-events-none"
-          >
-            {dragType || 'none'} | L:{targetIndentLevel || 'none'}
-          </div>
-        )}
-      </>
-    )
-  }, [isSection, dragDropHook.indentationState])
 
   // Progressive visual feedback system for indentation levels
   // Shows increasingly complex purple lines based on target indentation depth
@@ -379,7 +344,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     const { dragType, targetIndentLevel } = dragDropHook.indentationState
     const currentDragType = dragType || 'reorder'
 
-    console.log('🎨 Visual indicator:', currentDragType, 'level:', targetIndentLevel, 'for', task.text)
 
     // Progressive opacity system based on requirements
     const renderProgressiveIndentLine = (levels: number) => {
@@ -684,7 +648,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       <div
         ref={dragDropHook.setNodeRef}
         {...dragDropHook.attributes}
-        data-task-level={task.level || 0}
         data-sortable-id={task.id}
         className={cn(
           dragDropHook.getRowClassName(),
@@ -708,7 +671,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
           // This ensures we track position relative to the TARGET task, not dragged task
           if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            console.log('🔵 MouseEnter on TARGET task:', task.text)
             dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
           }
         }}
@@ -716,7 +678,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
           // This enables real-time drag type updates relative to the TARGET task
           if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            console.log('🔵 MouseMove on TARGET task:', task.text, 'at', e.clientX)
             dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
           }
         }}
@@ -731,9 +692,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             >
               <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
             </div>
-
             <div ref={checkboxRef} className="flex items-center">
-              {task.level && task.level > 0 && (
+              {task.level > 0 && (
                 <div className="relative mr-2 flex items-center">
                   {/* Connecting line extending from parent */}
                   <div
@@ -781,9 +741,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
         {/* Task Actions - only show for non-section tasks */}
         {!isSection && renderTaskActions()}
-
-        {/* 🐛 DEBUG: Visual threshold zones */}
-        {getDebugZones()}
 
         {/* Enhanced Drag Indicators */}
         {getDragIndicators()}

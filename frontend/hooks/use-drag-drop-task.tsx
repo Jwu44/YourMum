@@ -78,16 +78,13 @@ export const useDragDropTask = ({
     try {
       // Dev-Guide: Proper error handling - validate coordinates first
       if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) {
-        console.warn('🚫 Invalid coordinates received in updateCursorPosition:', { x, y, taskText: task.text });
         return;
       }
 
-      console.log('🔧 updateCursorPosition called:', { x, y, hasTarget: !!targetElement, taskText: task.text, draggedTask: draggedTask?.text });
       
       if (!targetElement || isSection) {
         // Reset state if no target or target is section
         // 🔧 FIX: Use 'reorder' instead of null to ensure purple bar shows
-        console.log('🔧 Resetting to reorder - no target or is section');
         setIndentationState({
           dragType: 'reorder',
           cursorPosition: null,
@@ -102,16 +99,6 @@ export const useDragDropTask = ({
       const targetTask = targetElement.getAttribute('data-task-level');
       const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
       
-      console.log('🔧 Target element details:', {
-        targetRect,
-        width: targetRect.width,
-        height: targetRect.height,
-        left: targetRect.left,
-        right: targetRect.right,
-        targetLevel,
-        elementTagName: targetElement.tagName,
-        elementClasses: targetElement.className
-      });
       
       // 🔧 FIX: Percentage-based threshold calculation for reliable positioning
       // Following dev-guide principle: keep implementation SIMPLE
@@ -135,20 +122,6 @@ export const useDragDropTask = ({
       const targetTaskId = targetElement.getAttribute('data-sortable-id');
       const targetTaskHasChildren = targetTaskId ? allTasks.some(t => String(t.parent_id) === String(targetTaskId)) : false;
       
-      // Debug logging for threshold detection
-      console.log('🎯 Zone Detection Debug:', {
-        mouseX: x,
-        containerLeft,
-        containerWidth,
-        targetLevel,
-        currentTaskLevel,
-        draggedTaskIsIndented,
-        targetTaskId,
-        targetTaskHasChildren,
-        firstZoneEnd,
-        'zone1(0-10%)': x < firstZoneEnd,
-        'zone2(10-100%)': x >= firstZoneEnd
-      });
       
       let dragType: 'indent' | 'outdent' | 'reorder' = 'reorder';
       
@@ -161,7 +134,6 @@ export const useDragDropTask = ({
       
       // Dev-Guide: Comprehensive error handling and null checks
       if (!targetTaskId || !actualDraggedTask) {
-        console.warn('🚫 Missing required data for drag comparison:', { targetTaskId, actualDraggedTask: actualDraggedTask?.text });
         setIndentationState({
           dragType: 'reorder',
           cursorPosition: { x, y },
@@ -176,90 +148,43 @@ export const useDragDropTask = ({
         (String(targetTaskId) === String(draggedTask.parent_id) && draggedTask.parent_id !== null) : 
         (String(targetTaskId) === String(task.parent_id) && task.parent_id !== null);
       
-      // 🐛 CRITICAL DEBUG: Log exact values and types to find the comparison issue
-      console.log('🚨 FIXED DEBUG - Variable Analysis:', {
-        draggedTask: actualDraggedTask.text,
-        draggedTaskId: actualDraggedTask.id,
-        draggedTaskParentId: actualDraggedTask.parent_id,
-        draggedTaskParentIdType: typeof actualDraggedTask.parent_id,
-        targetTaskId: targetTaskId,
-        targetTaskIdType: typeof targetTaskId,
-        targetTaskIdIsNull: targetTaskId === null,
-        targetTaskIdIsUndefined: targetTaskId === undefined,
-        parentIdIsNull: actualDraggedTask.parent_id === null,
-        parentIdIsUndefined: actualDraggedTask.parent_id === undefined,
-        exactComparison: `"${targetTaskId}" === "${actualDraggedTask.parent_id}"`,
-        comparisonResult: draggedTaskIsOverItsParent,
-        targetTaskHasChildren: targetTaskHasChildren,
-        usingDraggedTaskContext: !!draggedTask
-      });
       
-      // Zone detection logging for verification
-      console.log('🔧 Zone detection:', {
-        draggedTask: actualDraggedTask.text,
-        targetTaskId,
-        isOverParent: draggedTaskIsOverItsParent,
-        zone: x < firstZoneEnd ? 'RED (0-10%)' : 'GREEN (10-100%)',
-        mouseX: x,
-        firstZoneEnd
-      });
       
-      // 🐛 DEBUG: Log which conditions are true before branching
-      console.log('🔍 CONDITION ANALYSIS:', {
-        'draggedTaskIsOverItsParent': draggedTaskIsOverItsParent,
-        'targetTaskHasChildren': targetTaskHasChildren,
-        'targetLevel === 3': targetLevel === 3,
-        'willExecute': draggedTaskIsOverItsParent ? 'draggedTaskIsOverItsParent (SHOULD BE THIS FOR OUTDENT!)' : 
-                      targetTaskHasChildren ? 'targetTaskHasChildren (THIS IS THE PROBLEM!)' :
-                      targetLevel === 3 ? 'targetLevel === 3' : 'standard 2-zone'
-      });
 
       // 🔧 FIX: Simplified zone detection logic for child-to-child vs child-to-parent scenarios
       if (draggedTaskIsOverItsParent) {
         // Child task being dragged over its parent - preserve existing outdent behavior
-        console.log('✅ Child-to-parent scenario detected');
         if (x < firstZoneEnd) {
           // 0-10% zone: outdent to sibling level
           dragType = 'outdent';
-          console.log('🟥 Child-to-parent RED ZONE: outdent');
         } else {
           // 10-100% zone: maintain parent-child relationship
           dragType = 'indent';
-          console.log('🟩 Child-to-parent GREEN ZONE: indent');
         }
       } else if (targetLevel > 0) {
         // 🔧 FIX: Target is a child task (level > 0) - this is the key scenario for the bug
         // This covers child-to-child scenarios where we want to reorder as siblings
-        console.log('✅ Child-to-child scenario detected - target is child task');
         if (x < firstZoneEnd) {
           // 0-10% zone: reorder as sibling after the target child
           dragType = 'reorder';
-          console.log('🟥 Child RED ZONE: reorder as sibling after target child');
         } else {
           // 10-100% zone: indent under target child
           dragType = 'indent';
-          console.log('🟩 Child GREEN ZONE: indent under target child');
         }
       } else if (targetLevel === 3) {
         // Max level - only reorder allowed
         dragType = 'reorder';
-        console.log('✅ Max level (3): reorder only');
       } else {
         // Standard 2-zone system for level 0 tasks (parents/top-level)
-        console.log('✅ Standard 2-zone system for level 0 task');
         if (x < firstZoneEnd) {
           // 0-10% zone
           dragType = draggedTaskIsIndented ? 'outdent' : 'reorder';
-          console.log(`✅ Standard RED zone: ${dragType}`);
         } else {
           // 10-100% zone
           dragType = 'indent';
-          console.log('✅ Standard GREEN zone: indent');
         }
       }
       
-      // Dev-Guide: Final result logging (essential for debugging)
-      console.log('🎯 Final dragType:', dragType, 'for', task.text);
       
       setIndentationState({
         dragType,

@@ -790,10 +790,6 @@ const Dashboard: React.FC = () => {
 
         setCurrentDayIndex(dayOffset)
 
-        toast({
-          title: 'Success',
-          description: `Navigated to ${formatDateToString(selectedDate)}`
-        })
       } else {
         throw new Error(loadResult.error || 'Failed to load schedule')
       }
@@ -906,11 +902,6 @@ const Dashboard: React.FC = () => {
         )
 
         setCurrentDayIndex(prevIndex => prevIndex - 1)
-
-        toast({
-          title: 'Previous Day',
-          description: 'No schedule found for this date.'
-        })
       }
     } catch (error) {
       console.error('Error loading previous day:', error)
