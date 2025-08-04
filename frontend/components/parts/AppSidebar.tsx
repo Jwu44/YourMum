@@ -9,7 +9,7 @@
 import * as React from 'react'
 import { Plus, Archive, Plug } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 
 import {
@@ -24,6 +24,7 @@ import {
 
 // Import helper to get current date string
 import { formatDateToString } from '@/lib/helper'
+import { useAuth } from '@/auth/AuthContext'
 
 /**
  * Type definition for navigation menu items
@@ -37,29 +38,31 @@ interface NavigationItem {
 }
 
 /**
- * Navigation menu items configuration
+ * Get navigation menu items with current active state
+ * @param pathname - Current pathname to determine active state
+ * @returns Array of navigation items with updated active states
  */
-const navigationItems: NavigationItem[] = [
+const getNavigationItems = (pathname: string): NavigationItem[] => [
   {
     id: 'inputs',
     title: 'Inputs',
     icon: Plus,
     href: '/dashboard/inputs',
-    isActive: false
+    isActive: pathname.startsWith('/dashboard/inputs')
   },
   {
     id: 'integrations',
     title: 'Integrations',
     icon: Plug,
     href: '/dashboard/integrations',
-    isActive: false
+    isActive: pathname.startsWith('/dashboard/integrations')
   },
   {
     id: 'archive',
     title: 'Archive',
     icon: Archive,
     href: '/dashboard/archive',
-    isActive: false
+    isActive: pathname.startsWith('/dashboard/archive')
   }
 ]
 
@@ -78,6 +81,28 @@ const navigationItems: NavigationItem[] = [
  */
 export function AppSidebar (): JSX.Element {
   const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
+  
+  // Get navigation items with current active state
+  const navigationItems = React.useMemo(() => getNavigationItems(pathname), [pathname])
+
+  /**
+   * Get the first letter of the user's email for the avatar
+   */
+  const getAvatarInitial = React.useMemo(() => {
+    if (user?.email) {
+      return user.email.charAt(0).toUpperCase()
+    }
+    return 'U'
+  }, [user?.email])
+
+  /**
+   * Get the display email for the user
+   */
+  const getUserEmail = React.useMemo(() => {
+    return user?.email || 'User'
+  }, [user?.email])
 
   /**
    * Get the current dashboard date from the context
@@ -170,7 +195,11 @@ export function AppSidebar (): JSX.Element {
               <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-12 hover-selection cursor-pointer"
+                  className={`h-12 hover-selection cursor-pointer transition-all duration-200 ${
+                    item.isActive 
+                      ? 'bg-sidebar-accent/100 text-sidebar-accent-foreground'
+                      : ''
+                  }`}
                   data-testid={`nav-item-${item.id}`}
                   onClick={() => { handleNavigation(item) }}
                 >
@@ -208,10 +237,10 @@ export function AppSidebar (): JSX.Element {
             data-testid="user-avatar"
           >
             <span className="text-sm font-medium text-primary-foreground">
-              U
+              {getAvatarInitial}
             </span>
           </div>
-          <span className="font-medium text-sidebar-foreground">User</span>
+          <span className="font-medium text-sidebar-foreground">{getUserEmail}</span>
         </div>
       </SidebarFooter>
     </Sidebar>

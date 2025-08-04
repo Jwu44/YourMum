@@ -32,110 +32,34 @@ frequent_tasks_cache = LRUCache(maxsize=100)
 # Add cache for storing successful decomposition patterns
 decomposition_patterns_cache = {}
 
-def create_prompt_schedule(user_data: Dict[str, Any]) -> Tuple[str, str]:
-    """
-    Creates a prompt for schedule generation based on user data.
+def create_prompt_schedule(work_schedule, energy_patterns, priority_description, 
+                          categorized_tasks, example_schedule):
+    """Create a concise prompt for schedule generation using Claude best practices."""
     
-    Args:
-        user_data: Dictionary containing user preferences and tasks
-        
-    Returns:
-        Tuple of (system_prompt, user_prompt)
-    """
-    # Extract user data
-    # Use default work times if not provided
-    work_start_time = user_data.get('work_start_time', '9:00 AM')
-    work_end_time = user_data.get('work_end_time', '05:00 PM')
-    work_schedule = f"{work_start_time} - {work_end_time}"
-    energy_patterns = ', '.join(user_data['energy_patterns'])
-    priorities = user_data['priorities']
-    layout_preference = user_data['layout_preference']
-
-    # Process tasks
-    tasks = user_data['tasks']
-    categorized_tasks = {
-        'Work': [], 'Exercise': [], 'Relationship': [],
-        'Fun': [], 'Ambition': []
-    }
-
-    # this could be more efficient instead of n^2
-    for task in tasks:
-        for category in task.categories:
-            if category in categorized_tasks:
-                categorized_tasks[category].append(task.text)
-
-    # Convert priorities to a sorted list of tuples (category, rank)
-    priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
-    priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
+    # Format tasks with categories inline for clarity
+    task_list = []
+    for category, tasks in categorized_tasks.items():
+        for task in tasks:
+            task_list.append(f"- {task} [{category}]")
     
-    # Get example schedule using the helper function
-    example_schedule = generate_composite_example(layout_preference)
-    print(example_schedule)
+    prompt = f"""Create an optimized daily schedule using these inputs:
+
+        Work hours: {work_schedule}
+        Energy: {energy_patterns}  
+        Priorities: {priority_description}
+
+        Tasks to schedule:
+        {chr(10).join(task_list)}
+
+        Create a schedule exactly like this example:
+        {example_schedule}
+
+        Rules: Only use work hours for [Work] tasks. Schedule other tasks by priority and energy. Keep tasks separate.
+
+        <schedule>
+        """
     
-    # Create a more comprehensive system prompt
-    system_prompt = """You are an expert psychologist and occupational therapist specializing in personalized daily planning and work-life balance optimization. Your role is to create a tailored schedule for your client's day that maximizes productivity, well-being, and personal growth. Based on client preferences, energy patterns, and priorities, you'll create an optimized schedule that follows their preferred structure and task ordering pattern."""
-
-    # Create detailed user prompt with ordering pattern instructions
-    user_prompt = f"""
-    Here is the client's information:
-
-    <client_info>
-    <work_schedule>{work_schedule}</work_schedule>
-    <energy_patterns>{energy_patterns}</energy_patterns>
-    <priority_description>{priority_description}</priority_description>
-    </client_info>
-
-    Here are the client's tasks categorized:
-
-    <tasks>
-    <work_tasks>{', '.join(categorized_tasks['Work'])}</work_tasks>
-    <exercise_tasks>{',_'.join(categorized_tasks['Exercise'])}</exercise_tasks>
-    <relationship_tasks>{',_'.join(categorized_tasks['Relationship'])}</relationship_tasks>
-    <fun_tasks>{',_'.join(categorized_tasks['Fun'])}</fun_tasks>
-    <ambition_tasks>{',_'.join(categorized_tasks['Ambition'])}</ambition_tasks>
-    </tasks>
-
-    Instructions for creating the personalized schedule:
-
-    1. Analyze the client's information carefully.
-    2. Create a balanced schedule that adheres to the following guidelines:
-       a. Schedule work tasks strictly within the specified work schedule, considering the client's energy patterns.
-       b. Outside work hours, focus on personal tasks (exercise, relationship, fun, or ambition) based on the client's priority rankings and energy patterns.
-       c. For tasks with multiple categories, prioritize according to the client's priority description.
-       d. Apply the specified task ordering pattern as outlined below.
-    3. Format the schedule as follows:
-       a. If the ordering pattern is 'timebox', include specific times for each task.
-       b. If the ordering pattern is not 'timebox', list tasks in the order they should be performed without specific times.
-       c. Apply the correct schedule layout by referring to this example of the desired output format: {example_schedule}
-    4. Ensure the language of the schedule is:
-       a. Clear, concise, and conversational.
-       b. Free of jargon and unnecessary complexity.
-       c. Without explanations or notes sections.
-       d. Without category labels for each task.
-    5. Important: Ensure each task is listed separately. Do not combine multiple tasks into a single entry.
-    6. Only include tasks that the client has provided. Do not add any new tasks.
-
-    Please structure your response as follows:
-
-    <schedule_planning>
-    1. List all tasks from each category
-    2. Analyze energy patterns and work schedule to determine optimal task placement
-    3. Consider priority rankings when scheduling personal tasks
-    4. Apply the specified task ordering pattern to optimize productivity and energy management
-    5. Ensure the schedule follows the requested layout structure and timeboxing preference
-    6. Create the final schedule based on the above analysis
-    </schedule_planning>
-
-    <schedule>
-    [The final personalized schedule]
-    </schedule>
-
-    If requested to provide JSON format, also include a structured representation of the schedule.
-
-    Remember to adhere to all guidelines and requirements outlined above when creating the schedule.
-    """
-
-    return system_prompt, user_prompt
+    return prompt
 
 def create_prompt_categorize(task: str) -> str:
     """
@@ -334,7 +258,37 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
         prepared_data = prepare_user_data_for_schedule(user_data)
         
         # Step 2: Generate LLM prompt
-        system_prompt, user_prompt = create_prompt_schedule(prepared_data)
+        # Extract required parameters from prepared_data
+        work_start_time = prepared_data.get('work_start_time', '9:00 AM')
+        work_end_time = prepared_data.get('work_end_time', '05:00 PM')
+        work_schedule = f"{work_start_time} - {work_end_time}"
+        
+        energy_patterns = ', '.join(prepared_data['energy_patterns'])
+        
+        priorities = prepared_data['priorities']
+        priority_list = sorted(priorities.items(), key=lambda x: x[1], reverse=True)
+        priority_description = ", ".join([f"{category} (rank {rank})" for category, rank in priority_list])
+        
+        # Process tasks into categorized format
+        tasks = prepared_data['tasks']
+        categorized_tasks = {
+            'Work': [], 'Exercise': [], 'Relationship': [],
+            'Fun': [], 'Ambition': []
+        }
+        
+        for task in tasks:
+            for category in task.categories:
+                if category in categorized_tasks:
+                    categorized_tasks[category].append(task.text)
+        
+        layout_preference = prepared_data['layout_preference']
+        example_schedule = generate_composite_example(layout_preference)
+        
+        user_prompt = create_prompt_schedule(work_schedule, energy_patterns, priority_description, 
+                                           categorized_tasks, example_schedule)
+        
+        # Create a simple system prompt for the LLM
+        system_prompt = "You are an expert schedule optimizer. Create a personalized daily schedule based on the user's requirements."
         
         # Step 3: Call LLM API
         llm_response = call_schedule_llm(system_prompt, user_prompt)
