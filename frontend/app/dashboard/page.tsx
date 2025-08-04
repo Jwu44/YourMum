@@ -1170,6 +1170,8 @@ const Dashboard: React.FC = () => {
     if (hasInitiallyLoaded.current) return
 
     const loadInitialSchedule = async () => {
+      // Set flag immediately to prevent race conditions in React Strict Mode
+      hasInitiallyLoaded.current = true
       setIsLoadingSchedule(true)
 
       try {
@@ -1214,9 +1216,11 @@ const Dashboard: React.FC = () => {
         try {
           const emptyScheduleResult = await updateSchedule(today, [])
           if (emptyScheduleResult.success) {
-            setScheduleDays([[]])
-            setScheduleCache(new Map([[today, []]]))
-            console.log('Empty schedule created successfully in backend')
+            const backendSchedule = emptyScheduleResult.schedule || []
+            setScheduleDays([backendSchedule])
+            setScheduleCache(new Map([[today, backendSchedule]]))
+            console.log('Empty schedule created successfully in backend with', backendSchedule.length, 'tasks')
+            console.log('Schedule contains sections:', backendSchedule.filter(t => t.is_section).map(t => t.text))
           } else {
             // Show error toast and continue with frontend-only empty state
             toast({
@@ -1246,7 +1250,6 @@ const Dashboard: React.FC = () => {
         })
       } finally {
         setIsLoadingSchedule(false)
-        hasInitiallyLoaded.current = true
       }
     }
 

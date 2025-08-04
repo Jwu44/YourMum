@@ -11,8 +11,11 @@ to eliminate code duplication across API routes.
 
 from typing import Dict, List, Any, Tuple, Optional
 import traceback
+import uuid
+from datetime import datetime, timedelta
 
 from backend.db_config import get_user_schedules_collection
+from backend.services.schedule_gen import generate_local_sections
 from backend.models.schedule_schema import (
     validate_schedule_document, 
     format_schedule_date, 
@@ -271,7 +274,13 @@ class ScheduleService:
         inputs: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Create a basic schedule manually with optional initial tasks.
+        Create an enhanced empty schedule with sections, recurring tasks, and inputs from last valid schedule.
+        
+        This method now implements the full logic for Task 22:
+        1. Gets inputs config from most recent schedule with valid inputs
+        2. Creates sections from layout preference if they exist
+        3. Adds recurring tasks that should occur on the target date
+        4. Maintains backwards compatibility with simple empty schedule creation
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -284,14 +293,48 @@ class ScheduleService:
             schedule data on success or error message on failure
         """
         try:
-            # Default to empty task list if none provided
-            initial_tasks = tasks if tasks is not None else []
+            print(f"Creating enhanced empty schedule for {date}")
             
-            # Create schedule document using centralized helper
+            # Step 1: Start with provided tasks or empty list
+            enhanced_tasks = list(tasks) if tasks else []
+            
+            # Step 2: Always get most recent schedule (needed for sections and inputs)
+            recent_schedule = self._get_most_recent_schedule_with_inputs(user_id, date)
+            
+            # Use inputs from recent schedule if not provided
+            if not inputs:
+                if recent_schedule:
+                    inputs = recent_schedule.get('inputs', {})
+                    print(f"Using inputs from recent schedule")
+                else:
+                    print("No recent schedule with inputs found, using default empty inputs")
+            
+            # Step 3: Copy existing sections from most recent schedule if available
+            section_tasks = []
+            if recent_schedule:
+                existing_sections = self._copy_sections_from_schedule(recent_schedule)
+                section_tasks = existing_sections
+                print(f"Copied {len(section_tasks)} section tasks from recent schedule")
+            elif inputs and inputs.get('layout_preference'):
+                # Fallback: create sections from layout preference if no recent sections found
+                layout_preference = inputs.get('layout_preference', {})
+                if layout_preference.get('layout') == 'todolist-structured':
+                    section_tasks = self._create_sections_from_config(layout_preference)
+                    print(f"Created {len(section_tasks)} section tasks from layout config")
+            
+            # Step 4: Find recurring tasks for this date
+            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
+            
+            # Step 5: Combine all tasks in order: sections first, then recurring tasks, then any provided tasks
+            final_tasks = section_tasks + recurring_tasks + enhanced_tasks
+            
+            print(f"Final schedule has: {len(section_tasks)} sections, {len(recurring_tasks)} recurring tasks, {len(enhanced_tasks)} initial tasks")
+            
+            # Step 6: Create schedule document using centralized helper
             schedule_document = self._create_schedule_document(
                 user_id=user_id,
                 date=date,
-                tasks=initial_tasks,
+                tasks=final_tasks,
                 source="manual",
                 inputs=inputs
             )
@@ -310,7 +353,7 @@ class ScheduleService:
             )
             
             # Calculate response metadata
-            metadata = self._calculate_schedule_metadata(initial_tasks)
+            metadata = self._calculate_schedule_metadata(final_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
@@ -318,7 +361,7 @@ class ScheduleService:
             })
             
             return True, {
-                "schedule": initial_tasks,
+                "schedule": final_tasks,
                 "date": date,
                 "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
                 "metadata": metadata
@@ -327,7 +370,7 @@ class ScheduleService:
         except Exception as e:
             print(f"Error in create_empty_schedule: {str(e)}")
             traceback.print_exc()
-            return False, {"error": f"Failed to create manual schedule: {str(e)}"}
+            return False, {"error": f"Failed to create enhanced empty schedule: {str(e)}"}
 
     def update_schedule_tasks(
         self, 
@@ -464,6 +507,266 @@ class ScheduleService:
                 "source": source
             }
         }
+
+    def _get_most_recent_schedule_with_inputs(
+        self, 
+        user_id: str, 
+        target_date: str, 
+        max_days_back: int = 30
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find the most recent schedule that has non-empty input config data.
+        Searches backwards from target date up to max_days_back days.
+        
+        Args:
+            user_id: User's Google ID or Firebase UID
+            target_date: Date string in YYYY-MM-DD format to search backwards from
+            max_days_back: Maximum number of days to search backwards (default 30)
+            
+        Returns:
+            Schedule document with inputs config, or None if not found
+        """
+        try:
+            target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+            
+            # Search backwards day by day
+            for days_back in range(1, max_days_back + 1):
+                search_date = target_dt - timedelta(days=days_back)
+                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
+                
+                schedule_doc = self.schedules_collection.find_one({
+                    "userId": user_id,
+                    "date": formatted_date
+                })
+                
+                if schedule_doc:
+                    inputs = schedule_doc.get('inputs', {})
+                    # Check if inputs has meaningful data (not empty or default)
+                    if inputs and any([
+                        inputs.get('name'),
+                        inputs.get('work_start_time'),
+                        inputs.get('working_days'),
+                        inputs.get('layout_preference', {}).get('layout')
+                    ]):
+                        print(f"Found recent schedule with inputs from {search_date.strftime('%Y-%m-%d')}")
+                        return schedule_doc
+                        
+            print(f"No recent schedule with inputs found within {max_days_back} days")
+            return None
+            
+        except Exception as e:
+            print(f"Error finding recent schedule with inputs: {str(e)}")
+            traceback.print_exc()
+            return None
+
+    def _create_sections_from_config(self, layout_preference: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Create empty section tasks from layout preference configuration.
+        
+        Args:
+            layout_preference: Layout configuration from inputs
+            
+        Returns:
+            List of section task objects
+        """
+        try:
+            # Generate section names using existing logic
+            section_names = generate_local_sections(layout_preference)
+            section_tasks = []
+            
+            for index, section_name in enumerate(section_names):
+                section_task = {
+                    "id": str(uuid.uuid4()),
+                    "text": section_name,
+                    "categories": [],
+                    "is_section": True,
+                    "completed": False,
+                    "is_subtask": False,
+                    "section": None,
+                    "parent_id": None,
+                    "level": 0,
+                    "section_index": index,
+                    "type": "section"
+                }
+                section_tasks.append(section_task)
+                
+            return section_tasks
+            
+        except Exception as e:
+            print(f"Error creating sections from config: {str(e)}")
+            return []
+
+    def _copy_sections_from_schedule(self, schedule_doc: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Copy section tasks from an existing schedule document.
+        Creates new section tasks with fresh IDs but preserves section structure.
+        
+        Args:
+            schedule_doc: Schedule document containing existing sections
+            
+        Returns:
+            List of section task objects copied from the schedule
+        """
+        try:
+            existing_tasks = schedule_doc.get('schedule', [])
+            section_tasks = []
+            
+            # Find all section tasks in the existing schedule
+            for task in existing_tasks:
+                if task.get('is_section', False) or task.get('type') == 'section':
+                    # Create a copy of the section with a new ID
+                    section_copy = {
+                        "id": str(uuid.uuid4()),  # New ID for new date
+                        "text": task.get('text', ''),
+                        "categories": task.get('categories', []),
+                        "is_section": True,
+                        "completed": False,
+                        "is_subtask": False,
+                        "section": None,
+                        "parent_id": None,
+                        "level": task.get('level', 0),
+                        "section_index": task.get('section_index', len(section_tasks)),
+                        "type": "section"
+                    }
+                    section_tasks.append(section_copy)
+                    
+            return section_tasks
+            
+        except Exception as e:
+            print(f"Error copying sections from schedule: {str(e)}")
+            return []
+
+    def _get_recurring_tasks_for_date(
+        self, 
+        user_id: str, 
+        target_date: str, 
+        max_days_back: int = 30
+    ) -> List[Dict[str, Any]]:
+        """
+        Find all recurring tasks that should occur on the target date.
+        Searches through recent schedules to find recurring tasks.
+        
+        Args:
+            user_id: User's Google ID or Firebase UID
+            target_date: Date string in YYYY-MM-DD format
+            max_days_back: Maximum number of days to search back for recurring tasks
+            
+        Returns:
+            List of recurring task objects that should occur on target date
+        """
+        try:
+            target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+            recurring_tasks = []
+            seen_task_texts = set()  # Prevent duplicates
+            
+            # Search backwards through recent schedules
+            for days_back in range(1, max_days_back + 1):
+                search_date = target_dt - timedelta(days=days_back)
+                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
+                
+                schedule_doc = self.schedules_collection.find_one({
+                    "userId": user_id,
+                    "date": formatted_date
+                })
+                
+                if schedule_doc:
+                    schedule_tasks = schedule_doc.get('schedule', [])
+                    
+                    # Check each task for recurrence
+                    for task in schedule_tasks:
+                        if (task.get('is_recurring') and 
+                            not task.get('is_section', False) and
+                            task.get('text') not in seen_task_texts):
+                            
+                            if self._should_task_recur_on_date(task, target_dt):
+                                # Create a copy of the task for the new date
+                                recurring_task = {
+                                    **task,
+                                    "id": str(uuid.uuid4()),  # New ID for new date
+                                    "start_date": target_date,
+                                    "completed": False  # Reset completion status
+                                }
+                                recurring_tasks.append(recurring_task)
+                                seen_task_texts.add(task.get('text'))
+                                
+            print(f"Found {len(recurring_tasks)} recurring tasks for {target_date}")
+            return recurring_tasks
+            
+        except Exception as e:
+            print(f"Error finding recurring tasks: {str(e)}")
+            traceback.print_exc()
+            return []
+
+    def _should_task_recur_on_date(self, task: Dict[str, Any], target_date: datetime) -> bool:
+        """
+        Check if a recurring task should occur on the target date.
+        Based on the frontend shouldTaskRecurOnDate logic.
+        
+        Args:
+            task: Task object with recurrence information
+            target_date: Target date as datetime object
+            
+        Returns:
+            Boolean indicating if task should recur on target date
+        """
+        try:
+            is_recurring = task.get('is_recurring')
+            if not is_recurring or not isinstance(is_recurring, dict):
+                return False
+                
+            frequency = is_recurring.get('frequency')
+            
+            if frequency == 'daily':
+                return True
+                
+            elif frequency == 'weekly':
+                day_of_week = is_recurring.get('dayOfWeek')
+                if not day_of_week:
+                    return False
+                target_day_name = target_date.strftime('%A')  # Monday, Tuesday, etc.
+                return target_day_name == day_of_week
+                
+            elif frequency == 'monthly':
+                day_of_week = is_recurring.get('dayOfWeek')
+                week_of_month = is_recurring.get('weekOfMonth')
+                if not day_of_week or not week_of_month:
+                    return False
+                    
+                target_day_name = target_date.strftime('%A')
+                target_week_of_month = self._get_week_of_month(target_date)
+                
+                return (target_day_name == day_of_week and 
+                        target_week_of_month == week_of_month)
+                        
+            return False
+            
+        except Exception as e:
+            print(f"Error checking task recurrence: {str(e)}")
+            return False
+
+    def _get_week_of_month(self, date: datetime) -> str:
+        """
+        Get which week of the month a date falls in.
+        
+        Args:
+            date: Date to check
+            
+        Returns:
+            Week identifier: 'first', 'second', 'third', 'fourth', or 'last'
+        """
+        day_of_month = date.day
+        
+        if 1 <= day_of_month <= 7:
+            return 'first'
+        elif 8 <= day_of_month <= 14:
+            return 'second'
+        elif 15 <= day_of_month <= 21:
+            return 'third'
+        elif 22 <= day_of_month <= 28:
+            return 'fourth'
+        else:
+            # Days 29-31 are considered 'last' week
+            return 'last'
 
     def _calculate_schedule_metadata(
         self, 
