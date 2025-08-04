@@ -693,7 +693,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
             </div>
             <div ref={checkboxRef} className="flex items-center">
-              {task.level > 0 && (
+              {(task.level || 0) > 0 && (
                 <div className="relative mr-2 flex items-center">
                   {/* Connecting line extending from parent */}
                   <div

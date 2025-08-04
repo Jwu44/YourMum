@@ -135,7 +135,8 @@ const Dashboard: React.FC = () => {
       // Update UI state with confirmed backend data
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
-        newDays[currentDayIndex] = updateResult.schedule || updatedSchedule
+        const dayIndex = Math.abs(currentDayIndex)
+        newDays[dayIndex] = updateResult.schedule || updatedSchedule
         return newDays
       })
 
@@ -182,8 +183,9 @@ const Dashboard: React.FC = () => {
       // Update frontend state and capture the new schedule
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
-        if (newDays[currentDayIndex]) {
-          const currentTasks = newDays[currentDayIndex]
+        const dayIndex = Math.abs(currentDayIndex)
+        if (newDays[dayIndex]) {
+          const currentTasks = newDays[dayIndex]
           const taskIndex = currentTasks.findIndex(t => t.id === updatedTask.id)
 
           if (taskIndex !== -1) {
@@ -191,7 +193,7 @@ const Dashboard: React.FC = () => {
             updatedSchedule = currentTasks.map(task =>
               task.id === updatedTask.id ? { ...task, ...updatedTask } : task
             )
-            newDays[currentDayIndex] = updatedSchedule
+            newDays[dayIndex] = updatedSchedule
           } else {
             // Add new task (for microsteps)
             const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id)
@@ -203,7 +205,7 @@ const Dashboard: React.FC = () => {
               const newTasks = [...currentTasks]
               newTasks.splice(insertIndex, 0, updatedTask)
               updatedSchedule = newTasks
-              newDays[currentDayIndex] = updatedSchedule
+              newDays[dayIndex] = updatedSchedule
             }
           }
         }
@@ -235,9 +237,10 @@ const Dashboard: React.FC = () => {
       // Revert frontend state on error
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
+        const dayIndex = Math.abs(currentDayIndex)
         const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
-        if (cachedSchedule && newDays[currentDayIndex]) {
-          newDays[currentDayIndex] = cachedSchedule
+        if (cachedSchedule && newDays[dayIndex]) {
+          newDays[dayIndex] = cachedSchedule
         }
         return newDays
       })
@@ -291,10 +294,11 @@ const Dashboard: React.FC = () => {
       // Optimistically update frontend state first
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
-        if (newDays[currentDayIndex]) {
-          const currentTasks = newDays[currentDayIndex]
+        const dayIndex = Math.abs(currentDayIndex)
+        if (newDays[dayIndex]) {
+          const currentTasks = newDays[dayIndex]
           const updatedTasks = currentTasks.filter(task => task.id !== taskToDelete.id)
-          newDays[currentDayIndex] = updatedTasks
+          newDays[dayIndex] = updatedTasks
         }
         return newDays
       })
@@ -327,9 +331,10 @@ const Dashboard: React.FC = () => {
       // Revert frontend state on error
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
+        const dayIndex = Math.abs(currentDayIndex)
         const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
-        if (cachedSchedule && newDays[currentDayIndex]) {
-          newDays[currentDayIndex] = cachedSchedule
+        if (cachedSchedule && newDays[dayIndex]) {
+          newDays[dayIndex] = cachedSchedule
         }
         return newDays
       })
@@ -353,10 +358,11 @@ const Dashboard: React.FC = () => {
       // Optimistically update frontend state first
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
-        if (newDays[currentDayIndex]) {
-          const currentTasks = newDays[currentDayIndex]
+        const dayIndex = Math.abs(currentDayIndex)
+        if (newDays[dayIndex]) {
+          const currentTasks = newDays[dayIndex]
           const updatedTasks = currentTasks.filter(task => task.id !== taskToArchive.id)
-          newDays[currentDayIndex] = updatedTasks
+          newDays[dayIndex] = updatedTasks
         }
         return newDays
       })
@@ -397,9 +403,10 @@ const Dashboard: React.FC = () => {
       // Revert frontend state on error
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
+        const dayIndex = Math.abs(currentDayIndex)
         const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
-        if (cachedSchedule && newDays[currentDayIndex]) {
-          newDays[currentDayIndex] = cachedSchedule
+        if (cachedSchedule && newDays[dayIndex]) {
+          newDays[dayIndex] = cachedSchedule
         }
         return newDays
       })
@@ -419,7 +426,8 @@ const Dashboard: React.FC = () => {
       // Update frontend state
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
-        newDays[currentDayIndex] = reorderedTasks
+        const dayIndex = Math.abs(currentDayIndex)
+        newDays[dayIndex] = reorderedTasks
         return newDays
       })
 
@@ -442,9 +450,10 @@ const Dashboard: React.FC = () => {
       // Revert frontend state on error
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
+        const dayIndex = Math.abs(currentDayIndex)
         const cachedSchedule = scheduleCache.get(getDateString(currentDayIndex))
-        if (cachedSchedule && newDays[currentDayIndex]) {
-          newDays[currentDayIndex] = cachedSchedule
+        if (cachedSchedule && newDays[dayIndex]) {
+          newDays[dayIndex] = cachedSchedule
         }
         return newDays
       })
@@ -1106,7 +1115,8 @@ const Dashboard: React.FC = () => {
 
       setScheduleDays(prev => {
         const newDays = [...prev]
-        newDays[currentDayIndex] = updatedSchedule
+        const dayIndex = Math.abs(currentDayIndex)
+        newDays[dayIndex] = updatedSchedule
         return newDays
       })
 
