@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 // API and Helpers
 import { userApi } from '@/lib/api/users'
@@ -22,7 +23,8 @@ interface DashboardHeaderProps {
   onNavigateToDate?: (date: Date) => void
   currentDate: Date | undefined
   isCurrentDay: boolean
-  onAddTask?: () => void // New prop for Add Task functionality
+  onAddTask?: () => void
+  showSidebarTrigger?: boolean
 }
 
 /**
@@ -35,7 +37,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onNavigateToDate,
   currentDate,
   isCurrentDay,
-  onAddTask
+  onAddTask,
+  showSidebarTrigger = false
 }) => {
   // Mobile detection hook
   const isMobile = useIsMobile()
@@ -190,17 +193,25 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   }, [isCalendarOpen, loadAvailableDates, availableDates.size])
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6">
       <div className="flex items-center justify-between">
-        {/* Left-aligned date navigation section */}
-        <div className="flex items-center gap-4">
+        {/* Left-aligned section with sidebar trigger (mobile) and date navigation */}
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+          {/* Sidebar trigger - mobile only */}
+          {isMobile && showSidebarTrigger && (
+            <>
+              <SidebarTrigger className="-ml-1 h-11 w-11 p-2" />
+              <div className="h-4 w-px bg-sidebar-border" />
+            </>
+          )}
+          
           {/* Calendar navigation dropdown */}
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
                 aria-label="Open calendar navigation"
                 data-testid="calendar-dropdown-trigger"
               >
@@ -209,7 +220,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </PopoverTrigger>
             <PopoverContent
               className="w-auto p-0"
-              align="start"
+              align={isMobile ? "center" : "start"}
               data-testid="calendar-dropdown"
             >
               {availableDates.size === 0
@@ -230,7 +241,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </PopoverContent>
           </Popover>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -239,10 +250,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     size="sm"
                     onClick={() => { onPreviousDay() }}
                     disabled={false}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
                     aria-label="Previous day"
                   >
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={20} className="sm:w-4 sm:h-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -251,7 +262,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               </Tooltip>
             </TooltipProvider>
 
-            <h1 className="text-xl font-semibold text-foreground">
+            <h1 className="text-lg font-semibold text-foreground truncate sm:text-xl">
               {formattedDate()}
             </h1>
 
@@ -263,10 +274,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     size="sm"
                     onClick={() => { onNextDay() }}
                     disabled={isCurrentDay}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
                     aria-label="Next day"
                   >
-                    <ChevronRight size={16} />
+                    <ChevronRight size={20} className="sm:w-4 sm:h-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -277,16 +288,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right-aligned Create Task button - only show on desktop */}
-        {!isMobile && onAddTask && (
-          <Button
-            size="sm"
-            onClick={onAddTask}
-            className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
-          >
-            <Plus size={16} />
-            Create Task
-          </Button>
+        {/* Create Task button - desktop only since mobile uses FAB */}
+        {onAddTask && !isMobile && (
+          <div className="flex-shrink-0 ml-2">
+            <Button
+              size="sm"
+              onClick={onAddTask}
+              className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
+            >
+              <Plus size={16} />
+              Create Task
+            </Button>
+          </div>
         )}
       </div>
     </div>

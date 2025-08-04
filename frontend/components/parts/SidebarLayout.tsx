@@ -31,14 +31,8 @@ export function SidebarLayout ({ children }: SidebarLayoutProps): JSX.Element {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {/* Mobile trigger button - hidden on desktop */}
-        <header className="flex h-16 shrink-0 items-center gap-2 px-4 md:hidden">
-          <SidebarTrigger className="-ml-1" />
-          <div className="h-4 w-px bg-sidebar-border" />
-        </header>
-
-        {/* Main content area */}
-        <div className="flex flex-1 flex-col gap-4 p-5 pt-5">
+        {/* Main content area with responsive padding */}
+        <div className="flex flex-1 flex-col gap-4 p-3 pt-3 md:p-5 md:pt-5">
           {children}
         </div>
       </SidebarInset>

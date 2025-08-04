@@ -288,24 +288,24 @@ export default function SettingsPage () {
 
   return (
     <SidebarLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="w-full max-w-4xl mx-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto mobile-scroll">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
           {/* Main Settings Heading */}
-          <div className="mb-8 pt-8">
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground mt-2">
+          <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Manage your profile, billing, and account settings.
             </p>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
           {/* Profile Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Profile</CardTitle>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg sm:text-xl">Profile</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent className="space-y-4 sm:space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:gap-5">
                 {/* Name Field */}
                 <div className="space-y-2">
                   <Label htmlFor="displayName">Name</Label>
@@ -313,6 +313,7 @@ export default function SettingsPage () {
                     id="displayName"
                     value={profileData.displayName}
                     onChange={(e) => { handleInputChange('displayName', e.target.value) }}
+                    className="mobile-form-input"
                   />
                 </div>
 
@@ -323,7 +324,7 @@ export default function SettingsPage () {
                     id="email"
                     value={profileData.email}
                     disabled={true}
-                    className="bg-muted"
+                    className="bg-muted mobile-form-input"
                   />
                 </div>
 
@@ -336,6 +337,7 @@ export default function SettingsPage () {
                     onChange={(e) => { handleInputChange('jobTitle', e.target.value) }}
                     maxLength={50}
                     placeholder="Enter your job title"
+                    className="mobile-form-input"
                   />
                 </div>
 
@@ -350,22 +352,25 @@ export default function SettingsPage () {
                     min="1"
                     max="150"
                     placeholder="Enter your age"
+                    className="mobile-form-input"
                   />
                 </div>
               </div>
 
-              {/* Profile Action Buttons - Right Aligned */}
-              <div className="flex justify-end gap-2 pt-4">
+              {/* Profile Action Buttons - Mobile Full Width, Desktop Right Aligned */}
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
                 <Button
                   variant="outline"
                   onClick={handleCancelEdit}
                   disabled={isSaving}
+                  className="mobile-form-button order-2 sm:order-1"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSaveProfile}
                   disabled={isSaveDisabled}
+                  className="mobile-form-button order-1 sm:order-2"
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </Button>
@@ -375,18 +380,18 @@ export default function SettingsPage () {
 
           {/* Billing Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Billing</CardTitle>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg sm:text-xl">Billing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <Label className="text-sm font-medium">Subscription</Label>
                   <p className="text-sm text-muted-foreground">
                     {userProfile?.role === 'premium' ? 'Premium' : 'Free'}
                   </p>
                 </div>
-                <Button variant="outline">
+                <Button variant="outline" className="mobile-form-button sm:w-auto">
                   Manage
                 </Button>
               </div>
@@ -395,12 +400,12 @@ export default function SettingsPage () {
 
           {/* Account Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Account</CardTitle>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg sm:text-xl">Account</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 sm:space-y-5">
               {/* Log out */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Log out of this device</p>
                 </div>
@@ -408,13 +413,14 @@ export default function SettingsPage () {
                   variant="outline"
                   onClick={handleLogout}
                   disabled={isLoggingOut}
+                  className="mobile-form-button sm:w-auto"
                 >
                   {isLoggingOut ? 'Logging out...' : 'Log out'}
                 </Button>
               </div>
 
               {/* Delete account */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Delete your account</p>
                 </div>
@@ -422,6 +428,7 @@ export default function SettingsPage () {
                   variant="destructive"
                   onClick={handleOpenDeleteDialog}
                   disabled={isDeleting}
+                  className="mobile-form-button sm:w-auto"
                 >
                   Delete
                 </Button>

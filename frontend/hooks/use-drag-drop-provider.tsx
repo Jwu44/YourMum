@@ -104,11 +104,11 @@ export const useDragDropProvider = ({
     useSensor(MouseSensor, {
       // No activationConstraint for maximum responsiveness and instant drag start
     }),
-    // TouchSensor for mobile devices with minimal delay
+    // TouchSensor for mobile devices with improved mobile support
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 0,
-        tolerance: 5, // Small tolerance for touch precision
+        delay: 100, // Small delay to prevent accidental drags while scrolling
+        tolerance: 8, // Slightly higher tolerance for better touch handling
       },
     })
   )
