@@ -82,23 +82,9 @@ const createSimplifiedCollisionDetection = (tasks: Task[]): CollisionDetection =
       return defaultCollisions;
     }
     
-    // 🔧 FIX: Block parent-over-child operations (prevent dragging parent onto its own child)
-    const isParentOverChild = targetTask.parent_id === draggedTaskId;
-    
-    if (isParentOverChild) {
-      console.log('🚫 Blocking parent-over-child operation:', {
-        draggedParent: draggedTask.text,
-        targetChild: targetTask.text
-      });
-      return []; // Block this collision
-    }
+    // Dev-Guide: Keep implementation SIMPLE - removed blocking logic that caused stiff parent dragging
     
     // Default collision detection - allow direct child targeting
-    console.log('🔧 Direct collision detection:', {
-      draggedTask: draggedTask.text,
-      targetTask: targetTask.text,
-      targetIsChild: targetTask.parent_id != null
-    });
     
     return defaultCollisions;
   };
@@ -137,7 +123,6 @@ export const useDragDropProvider = ({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     try {
       const { active } = event
-      console.log('Drag started:', active.id)
       // Could add additional drag start logic here if needed
     } catch (error) {
       console.error('Error handling drag start:', error)
@@ -156,12 +141,6 @@ export const useDragDropProvider = ({
         return
       }
 
-      console.log('🎯 DragOver event:', {
-        activeId: active.id,
-        overId: over.id,
-        activeData: active.data.current,
-        overData: over.data.current
-      });
 
       // @dnd-kit handles collision detection automatically
     } catch (error) {
@@ -193,29 +172,18 @@ export const useDragDropProvider = ({
         currentMouseY = activatorEvent.clientY + delta.y
       } else {
         // Method 2: Final fallback - no coordinates available
-        console.warn('🚫 No mouse coordinates available in DragMove event')
         return
       }
 
       // Dev-Guide: Proper error handling - validate coordinates before use
       if (isNaN(currentMouseX) || isNaN(currentMouseY) || currentMouseX === undefined || currentMouseY === undefined) {
-        console.warn('🚫 Invalid mouse coordinates in DragMove:', { currentMouseX, currentMouseY })
         return
       }
       
-      console.log('🎯 DragMove event (FIXED COORDINATES):', {
-        activeId: active.id,
-        overId: over.id,
-        currentMouseX,
-        currentMouseY,
-        delta,
-        hasValidCoordinates: !isNaN(currentMouseX) && !isNaN(currentMouseY)
-      });
 
       // Find the target element using the over ID
       const targetElement = document.querySelector(`[data-sortable-id="${over.id}"]`)
       if (targetElement) {
-        console.log('🎯 Found target element in DragMove:', targetElement);
         
         // Get the over task's data and call updateCursorPosition
         const overData = over.data.current;
@@ -223,23 +191,15 @@ export const useDragDropProvider = ({
         const draggedTask = activeData?.task; // Extract the dragged task
         
         // Dev-Guide: Comprehensive error handling and validation
-        if (!draggedTask) {
-          console.warn('🚫 No dragged task found in active data');
-        }
         
         if (overData?.updateCursorPosition && typeof overData.updateCursorPosition === 'function') {
-          console.log('🎯 Calling updateCursorPosition from DragMove:', over.id, 'with dragged task:', draggedTask?.text);
           try {
             overData.updateCursorPosition(currentMouseX, currentMouseY, targetElement as HTMLElement, draggedTask);
           } catch (error) {
             console.error('Error calling updateCursorPosition from DragMove:', error);
             // Graceful fallback - continue operation without crashing
           }
-        } else {
-          console.log('🚫 updateCursorPosition not found in DragMove');
         }
-      } else {
-        console.log('🚫 Target element not found in DragMove for:', over.id);
       }
     } catch (error) {
       console.error('Error handling drag move:', error)
@@ -273,25 +233,12 @@ export const useDragDropProvider = ({
         
         const dragType = targetIndentationState?.dragType || fallbackIndentationState?.dragType || 'reorder'
         
-        console.log('🔧 DragEnd Debug:', {
-          activeId: active.id,
-          overId: over.id,
-          targetDragType: targetIndentationState?.dragType,
-          fallbackDragType: fallbackIndentationState?.dragType,
-          finalDragType: dragType
-        })
 
         // Determine if moving to a section
         const targetSection = overData?.type === 'section' ? overData.task.text : null
 
         // 🔧 FIX: Simplified - Let EditableSchedule handle all positioning logic
         // Provider only handles events, positioning logic centralized in one place
-        console.log('🔧 Drag end - passing raw indices to moveTask:', {
-          oldIndex,
-          newIndex,
-          dragType,
-          targetSection
-        })
 
         // Use the enhanced moveTask if available, otherwise fall back to simple reordering
         if (moveTask && typeof moveTask === 'function') {
