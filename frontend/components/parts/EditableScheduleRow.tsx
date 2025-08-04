@@ -339,7 +339,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Shows increasingly complex purple lines based on target indentation depth
   const getDragIndicators = useCallback(() => {
     // Only show indicators when this task is being hovered over as a drop target
-    if (!dragDropHook.isOver || dragDropHook.isDragging || isSection) return null
+    if (!dragDropHook.isOver || dragDropHook.isDragging) return null
+
+    // For sections, always show the regular purple reorder line
+    if (isSection) {
+      return (
+        <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
+      )
+    }
 
     const { dragType, targetIndentLevel } = dragDropHook.indentationState
     const currentDragType = dragType || 'reorder'
