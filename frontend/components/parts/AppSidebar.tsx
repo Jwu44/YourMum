@@ -233,14 +233,14 @@ export function AppSidebar (): JSX.Element {
           }}
         >
           <div
-            className="flex items-center justify-center w-8 h-8 gradient-accent rounded-full"
+            className="flex items-center justify-center w-8 h-8 min-w-8 min-h-8 gradient-accent rounded-full flex-shrink-0"
             data-testid="user-avatar"
           >
             <span className="text-sm font-medium text-primary-foreground">
               {getAvatarInitial}
             </span>
           </div>
-          <span className="font-medium text-sidebar-foreground">{getUserEmail}</span>
+          <span className="font-medium text-sidebar-foreground truncate">{getUserEmail}</span>
         </div>
       </SidebarFooter>
     </Sidebar>
