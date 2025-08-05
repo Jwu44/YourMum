@@ -63,7 +63,7 @@ class TestTaskRegistry:
 class TestCategorization:
     """Test task categorization pipeline"""
     
-    @patch('backend.services.optimized_ai_service.client')
+    @patch('backend.services.schedule_gen.client')
     def test_categorize_uncategorized_tasks_success(self, mock_client):
         """Test successful batch categorization"""
         # Mock API response
@@ -91,7 +91,7 @@ class TestCategorization:
         assert registry["1"].categories == ["Exercise"]
         assert registry["2"].categories == ["Work", "Relationships"]
     
-    @patch('backend.services.optimized_ai_service.client')
+    @patch('backend.services.schedule_gen.client')
     def test_categorize_uncategorized_tasks_failure(self, mock_client):
         """Test categorization failure fallback to 'Work'"""
         # Mock API failure
@@ -264,7 +264,7 @@ class TestScheduleAssembly:
 class TestIntegration:
     """Integration tests for the complete optimized pipeline"""
     
-    @patch('backend.services.optimized_ai_service.client')
+    @patch('backend.services.schedule_gen.client')
     def test_generate_schedule_optimized_complete_flow(self, mock_client):
         """Test the complete optimized schedule generation flow"""
         # Mock both LLM calls
@@ -352,6 +352,329 @@ def sample_task_registry():
     task1 = Task(id="1", text="workout", categories=["Exercise"])
     task2 = Task(id="2", text="meeting", categories=["Work"])
     return {"1": task1, "2": task2}
+
+
+class TestInputsConfigScenarios:
+    """Test various InputsConfig payload scenarios following dev-guide.md TDD principles"""
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_minimal_inputs_config(self, mock_client):
+        """Test minimal required fields from InputsConfig.tsx"""
+        # Mock LLM responses
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Morning", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+        
+        # Minimal required payload from InputsConfig
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": [],
+            "priorities": {},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "timebox"
+            },
+            "tasks": [{"id": "1", "text": "test task", "categories": ["Work"]}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert "tasks" in result
+        assert result["layout_type"] == "todolist-structured"
+        assert result["ordering_pattern"] == "timebox"
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_full_inputs_config(self, mock_client):
+        """Test complete InputsConfig payload with all fields"""
+        # Mock LLM responses
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Morning", "order": 1},
+                {"task_id": "2", "section": "Afternoon", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+        
+        # Full payload from InputsConfig.tsx
+        user_data = {
+            "date": "2024-01-15",
+            "name": "Test User",
+            "work_start_time": "09:00",
+            "work_end_time": "17:00", 
+            "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "energy_patterns": ["peak_morning", "high_all_day"],
+            "priorities": {
+                "health": "1",
+                "relationships": "2", 
+                "ambitions": "3",
+                "fun_activities": "4"
+            },
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "timebox"
+            },
+            "tasks": [
+                {"id": "1", "text": "morning workout", "categories": ["Exercise"]},
+                {"id": "2", "text": "team meeting", "categories": ["Work"]}
+            ]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert len([t for t in result["tasks"] if not t.get("is_section")]) == 2
+        
+        # Verify task preservation with original IDs
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        task_ids = [t["id"] for t in regular_tasks]
+        assert "1" in task_ids and "2" in task_ids
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_priority_subcategory_layout(self, mock_client):
+        """Test priority-based layout preference"""
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "High Priority", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"health": "1", "work": "2"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "priority",
+                "orderingPattern": "timebox"
+            },
+            "tasks": [{"id": "1", "text": "important task", "categories": ["Work"]}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        # Check that priority sections are created
+        sections = [t for t in result["tasks"] if t.get("is_section")]
+        section_names = [s["text"] for s in sections]
+        assert "High Priority" in section_names
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_category_subcategory_layout(self, mock_client):
+        """Test category-based layout preference"""
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Work", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_afternoon"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured", 
+                "subcategory": "category",
+                "orderingPattern": "batching"
+            },
+            "tasks": [{"id": "1", "text": "project work", "categories": ["Work"]}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert result["ordering_pattern"] == "batching"
+        # Check that category sections are created
+        sections = [t for t in result["tasks"] if t.get("is_section")]
+        section_names = [s["text"] for s in sections]
+        assert "Work" in section_names
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_unstructured_layout(self, mock_client):
+        """Test unstructured layout preference"""
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Morning", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["low_energy"],
+            "priorities": {"health": "1"},
+            "layout_preference": {
+                "layout": "todolist-unstructured",
+                "orderingPattern": "alternating"
+            },
+            "tasks": [{"id": "1", "text": "flexible task", "categories": ["Fun"]}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert result["layout_type"] == "todolist-unstructured"
+        assert result["ordering_pattern"] == "alternating"
+    
+    def test_empty_tasks_list(self):
+        """Test handling empty tasks list from InputsConfig"""
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": [],
+            "priorities": {},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "timebox"
+            },
+            "tasks": []
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert result["tasks"] == []
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_mixed_categorized_uncategorized_tasks(self, mock_client):
+        """Test mixed categorized and uncategorized tasks"""
+        # Mock categorization call
+        categorization_response = Mock()
+        categorization_response.content = [Mock()]
+        categorization_response.content[0].text = json.dumps({
+            "categorizations": [
+                {"task_id": "2", "categories": ["Fun"]}
+            ]
+        })
+        
+        # Mock ordering call
+        ordering_response = Mock()
+        ordering_response.content = [Mock()]
+        ordering_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Morning", "order": 1},
+                {"task_id": "2", "section": "Evening", "order": 1}
+            ]
+        })
+        
+        mock_client.messages.create.side_effect = [categorization_response, ordering_response]
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_evening"],
+            "priorities": {"work": "1", "fun": "2"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "three-three-three"
+            },
+            "tasks": [
+                {"id": "1", "text": "categorized task", "categories": ["Work"]},
+                {"id": "2", "text": "uncategorized task", "categories": []}
+            ]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        assert result["success"] is True
+        assert result["ordering_pattern"] == "three-three-three"
+        
+        # Verify both tasks are included
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 2
+        
+        # Verify the uncategorized task got categorized
+        uncategorized_task = next(t for t in regular_tasks if t["id"] == "2")
+        assert uncategorized_task["categories"] == ["Fun"]
+
+
+class TestErrorHandling:
+    """Test error handling scenarios following dev-guide.md practices"""
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_llm_categorization_failure(self, mock_client):
+        """Test graceful handling of categorization API failure"""
+        # Mock categorization failure, but ordering success
+        categorization_response = Exception("API Error")
+        ordering_response = Mock()
+        ordering_response.content = [Mock()]
+        ordering_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "1", "section": "Morning", "order": 1}
+            ]
+        })
+        
+        mock_client.messages.create.side_effect = [categorization_response, ordering_response]
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "timebox"
+            },
+            "tasks": [{"id": "1", "text": "uncategorized task", "categories": []}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        # Should still succeed with fallback categories
+        assert result["success"] is True
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 1
+        assert regular_tasks[0]["categories"] == ["Work"]  # Fallback category
+    
+    @patch('backend.services.schedule_gen.client')
+    def test_llm_ordering_failure(self, mock_client):
+        """Test graceful handling of ordering API failure"""
+        # Mock ordering failure (second call fails)
+        mock_client.messages.create.side_effect = [Mock(), Exception("API Error")]
+        
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "orderingPattern": "timebox"
+            },
+            "tasks": [{"id": "1", "text": "test task", "categories": ["Work"]}]
+        }
+        
+        result = generate_schedule(user_data)
+        
+        # Should still succeed with fallback error response
+        assert result["success"] is False
+        assert "error" in result
+        assert "tasks" in result  # Should include fallback tasks
 
 
 if __name__ == "__main__":
