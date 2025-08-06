@@ -10,7 +10,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
         <div className="text-center lg:text-left animate-fade-in">
           <div className="flex items-center justify-center lg:justify-start mb-6">
             <Image
-              src="/yourdai_logo.png"
+              src="/favicon-96x96.png"
               alt="yourdai logo"
               width={152}
               height={40}

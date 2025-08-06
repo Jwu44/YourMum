@@ -8,7 +8,7 @@ const Footer = () => {
           <div className="md:col-span-2">
             <div className="flex items-center mb-4">
               <Image
-                src="/yourdai_logo.png"
+                src="/favicon-96x96.png"
                 alt="yourdai logo"
                 width={124}
                 height={32}
