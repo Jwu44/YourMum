@@ -176,13 +176,18 @@ export function AppSidebar (): JSX.Element {
               src="/favicon-96x96.png"
               alt="yourdai logo"
               width={126}
-              height={24}
-              className="h-6 w-auto"
+              height={48}
+              className="h-10 w-auto"
               data-testid="sidebar-header-icon"
               priority
               quality={100}
               style={{ imageRendering: 'crisp-edges' }}
             />
+            <span 
+              className="ml-2.5 text-lg font-semibold text-foreground truncate sm:text-xl h-10 flex items-center"
+            >
+              YourMum
+            </span>
           </div>
         </Link>
       </SidebarHeader>
