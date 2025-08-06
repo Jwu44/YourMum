@@ -71,7 +71,7 @@ class Task:
     """
     def __init__(self, 
                  text: str,
-                 categories: Optional[Union[List[str], set]] = None,
+                 categories: Optional[List[str]] = None,
                  id: Optional[str] = None,
                  is_subtask: bool = False,
                  is_microstep: bool = False,
@@ -90,8 +90,7 @@ class Task:
                  energy_level_required: Optional[str] = None,
                  # New Slack integration fields
                  source: Optional[str] = None,
-                 slack_message_url: Optional[str] = None,
-                 metadata: Optional[Dict] = None):
+                 slack_message_url: Optional[str] = None):
                  
         """
         Initialize a task with all its attributes.
@@ -117,7 +116,6 @@ class Task:
         # Add Slack integration fields
         self.source = source
         self.slack_message_url = slack_message_url
-        self.metadata = metadata or {}
 
         # Handle recurrence pattern
         if isinstance(is_recurring, dict):
@@ -153,8 +151,6 @@ class Task:
             base_dict["source"] = self.source
         if self.slack_message_url:
             base_dict["slack_message_url"] = self.slack_message_url
-        if self.metadata:
-            base_dict["metadata"] = self.metadata
         
         # Only include microstep fields if they exist
         if self.is_microstep:
