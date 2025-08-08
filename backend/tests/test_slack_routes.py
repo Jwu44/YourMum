@@ -10,6 +10,7 @@ import hashlib
 import base64
 import time
 import uuid
+import os
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 from flask import Flask
@@ -373,6 +374,122 @@ class TestSlackRoutes:
             assert 'Invalid state parameter' in data['error']
 
 
+class TestSlackService:
+    """Unit tests for SlackService methods"""
+    
+    @pytest.fixture
+    def slack_service(self):
+        """Create SlackService instance for testing"""
+        # Mock environment variables
+        with patch.dict(os.environ, {
+            'SLACK_CLIENT_ID': 'test_client_id',
+            'SLACK_CLIENT_SECRET': 'test_client_secret',
+            'SLACK_SIGNING_SECRET': 'test_signing_secret'
+        }):
+            return SlackService()
+    
+    def test_extract_integration_data_success(self, slack_service):
+        """Test successful integration data extraction"""
+        oauth_data = {
+            'ok': True,
+            'access_token': 'xoxb-bot-token',
+            'token_type': 'bot',
+            'scope': 'app_mentions:read,chat:write',
+            'bot_user_id': 'U0KRQLJ9H',
+            'team': {
+                'name': 'Test Workspace',
+                'id': 'T9TK3CUKW'
+            },
+            'authed_user': {
+                'id': 'U1234',
+                'access_token': 'xoxp-user-token',
+                'token_type': 'user'
+            }
+        }
+        
+        result = slack_service._extract_integration_data(oauth_data)
+        
+        assert result['workspace_id'] == 'T9TK3CUKW'
+        assert result['workspace_name'] == 'Test Workspace'
+        assert result['bot_token'] == 'xoxb-bot-token'
+        assert result['access_token'] == 'xoxp-user-token'
+        assert result['slack_user_id'] == 'U1234'
+    
+    def test_extract_integration_data_missing_bot_token(self, slack_service):
+        """Test integration data extraction with missing bot token"""
+        oauth_data = {
+            'ok': True,
+            'team': {
+                'name': 'Test Workspace',
+                'id': 'T9TK3CUKW'
+            }
+            # Missing access_token (bot token)
+        }
+        
+        with pytest.raises(ValueError, match="Missing bot access token"):
+            slack_service._extract_integration_data(oauth_data)
+    
+    def test_extract_integration_data_missing_team_info(self, slack_service):
+        """Test integration data extraction with missing team information"""
+        oauth_data = {
+            'ok': True,
+            'access_token': 'xoxb-bot-token'
+            # Missing team information
+        }
+        
+        with pytest.raises(ValueError, match="Missing team information"):
+            slack_service._extract_integration_data(oauth_data)
+    
+    def test_extract_integration_data_oauth_not_ok(self, slack_service):
+        """Test integration data extraction when OAuth response indicates failure"""
+        oauth_data = {
+            'ok': False,
+            'error': 'invalid_code'
+        }
+        
+        with pytest.raises(ValueError, match="OAuth failed: invalid_code"):
+            slack_service._extract_integration_data(oauth_data)
+    
+    def test_extract_integration_data_no_user_token(self, slack_service):
+        """Test integration data extraction without user token (should work)"""
+        oauth_data = {
+            'ok': True,
+            'access_token': 'xoxb-bot-token',
+            'team': {
+                'name': 'Test Workspace',
+                'id': 'T9TK3CUKW'
+            }
+            # No authed_user section
+        }
+        
+        result = slack_service._extract_integration_data(oauth_data)
+        
+        assert result['bot_token'] == 'xoxb-bot-token'
+        assert result['access_token'] is None  # Should be None, not empty string
+        assert result['slack_user_id'] is None
+    
+    def test_sanitize_oauth_response_for_logging(self, slack_service):
+        """Test OAuth response sanitization for safe logging"""
+        oauth_data = {
+            'ok': True,
+            'access_token': 'xoxb-secret-token',  # Should not appear in sanitized version
+            'team': {'id': 'T123', 'name': 'Test Team'},
+            'authed_user': {
+                'id': 'U456',
+                'access_token': 'xoxp-secret-user-token'  # Should not appear
+            }
+        }
+        
+        sanitized = slack_service._sanitize_oauth_response_for_logging(oauth_data)
+        
+        assert sanitized['ok'] is True
+        assert sanitized['has_access_token'] is True
+        assert 'xoxb-secret-token' not in str(sanitized)  # Token should not be in sanitized output
+        assert sanitized['team']['id'] == 'T123'
+        assert sanitized['authed_user']['has_access_token'] is True
+        assert 'xoxp-secret-user-token' not in str(sanitized)  # User token should not be in sanitized output
+
+
 class TestSlackRoutesIntegration:
     """Integration test cases for Slack routes"""
 
@@ -383,6 +500,22 @@ class TestSlackRoutesIntegration:
         app.config['TESTING'] = True
         app.register_blueprint(slack_bp, url_prefix='/api/integrations/slack')
         return app
+    
+    @pytest.fixture
+    def client(self, app_with_db):
+        """Create test client"""
+        return app_with_db.test_client()
+    
+    @pytest.fixture
+    def mock_slack_service(self):
+        """Mock SlackService instance"""
+        mock = Mock(spec=SlackService)
+        mock.validate_and_extract_user_from_state.return_value = None
+        mock.handle_oauth_callback = AsyncMock(return_value={
+            'success': True,
+            'workspace_name': 'Test Workspace'
+        })
+        return mock
 
     @pytest.fixture
     def mock_database(self):
@@ -449,6 +582,96 @@ class TestSlackRoutesIntegration:
         assert loop is not None
         loop.close()
 
+    def test_oauth_callback_missing_bot_token(self, client, mock_slack_service):
+        """Test OAuth callback when Slack response is missing bot token"""
+        import base64
+        import time
+        import uuid
+        
+        # Create valid state token
+        user_id = "test-user-123"
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        
+        # Mock the validate method to return user_id
+        mock_slack_service.validate_and_extract_user_from_state.return_value = user_id
+        
+        # Mock handle_oauth_callback to simulate missing bot token error
+        mock_slack_service.handle_oauth_callback = AsyncMock(return_value={
+            'success': False,
+            'error': 'Missing bot access token in OAuth response'
+        })
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={secure_state}')
+            
+            assert response.status_code == 500
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert 'Missing bot access token' in data['error']
+    
+    def test_oauth_callback_invalid_oauth_response(self, client, mock_slack_service):
+        """Test OAuth callback when Slack returns oauth error"""
+        import base64
+        import time
+        import uuid
+        
+        # Create valid state token
+        user_id = "test-user-123"
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        
+        # Mock the validate method to return user_id
+        mock_slack_service.validate_and_extract_user_from_state.return_value = user_id
+        
+        # Mock handle_oauth_callback to simulate OAuth error from Slack
+        mock_slack_service.handle_oauth_callback = AsyncMock(return_value={
+            'success': False,
+            'error': 'OAuth failed: invalid_code'
+        })
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=invalid_code&state={secure_state}')
+            
+            assert response.status_code == 500
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert 'OAuth failed: invalid_code' in data['error']
+    
+    def test_oauth_callback_missing_team_info(self, client, mock_slack_service):
+        """Test OAuth callback when Slack response is missing team information"""
+        import base64
+        import time
+        import uuid
+        
+        # Create valid state token
+        user_id = "test-user-123"
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        
+        # Mock the validate method to return user_id
+        mock_slack_service.validate_and_extract_user_from_state.return_value = user_id
+        
+        # Mock handle_oauth_callback to simulate missing team info error
+        mock_slack_service.handle_oauth_callback = AsyncMock(return_value={
+            'success': False,
+            'error': 'Missing team information in OAuth response'
+        })
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={secure_state}')
+            
+            assert response.status_code == 500
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert 'Missing team information' in data['error']
+    
     def test_security_validation_placeholder(self):
         """Test placeholder for security validation"""
         # TODO: Test security measures:

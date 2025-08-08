@@ -175,8 +175,11 @@ class SlackService:
             # Extract integration data
             integration_data = self._extract_integration_data(oauth_data)
             
-            # Encrypt tokens before storage
-            integration_data['access_token'] = encrypt_token(integration_data['access_token'])
+            # Encrypt tokens before storage (only if they exist)
+            if integration_data['access_token']:
+                integration_data['access_token'] = encrypt_token(integration_data['access_token'])
+            
+            # Bot token is required and should always exist
             integration_data['bot_token'] = encrypt_token(integration_data['bot_token'])
             
             # Store integration in database
@@ -190,10 +193,39 @@ class SlackService:
             }
             
         except Exception as e:
+            error_msg = str(e)
+            print(f"[OAuth] Error processing callback: {error_msg}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': error_msg
             }
+    
+    def _sanitize_oauth_response_for_logging(self, oauth_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a sanitized version of OAuth response for safe logging"""
+        if not oauth_data:
+            return {}
+        
+        sanitized = {
+            'ok': oauth_data.get('ok'),
+            'has_access_token': bool(oauth_data.get('access_token')),
+            'token_type': oauth_data.get('token_type'),
+            'scope': oauth_data.get('scope'),
+            'bot_user_id': oauth_data.get('bot_user_id'),
+            'app_id': oauth_data.get('app_id'),
+            'team': {
+                'id': oauth_data.get('team', {}).get('id'),
+                'name': oauth_data.get('team', {}).get('name')
+            } if oauth_data.get('team') else None,
+            'authed_user': {
+                'id': oauth_data.get('authed_user', {}).get('id'),
+                'has_access_token': bool(oauth_data.get('authed_user', {}).get('access_token')),
+                'token_type': oauth_data.get('authed_user', {}).get('token_type'),
+                'scope': oauth_data.get('authed_user', {}).get('scope')
+            } if oauth_data.get('authed_user') else None,
+            'error': oauth_data.get('error'),
+            'warning': oauth_data.get('warning')
+        }
+        return sanitized
     
     async def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
         """Exchange OAuth code for access tokens"""
@@ -211,14 +243,29 @@ class SlackService:
     
     def _extract_integration_data(self, oauth_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract and structure integration data from OAuth response"""
+        # Validate OAuth response structure
+        if not oauth_data.get('ok'):
+            raise ValueError(f"OAuth failed: {oauth_data.get('error', 'Unknown error')}")
+        
+        if not oauth_data.get('team', {}).get('id'):
+            raise ValueError("Missing team information in OAuth response")
+        
+        # Extract bot token (required)
+        bot_token = oauth_data.get('access_token')
+        if not bot_token:
+            raise ValueError("Missing bot access token in OAuth response")
+        
+        # Extract user token (optional for some integrations)
+        user_token = oauth_data.get('authed_user', {}).get('access_token')
+        
         return {
             'workspace_id': oauth_data['team']['id'],
             'workspace_name': oauth_data['team']['name'],
             'team_id': oauth_data['team']['id'],
             'slack_user_id': oauth_data.get('authed_user', {}).get('id'),
             'slack_username': oauth_data.get('authed_user', {}).get('name', 'Unknown User'),
-            'access_token': oauth_data.get('authed_user', {}).get('access_token', ''),
-            'bot_token': oauth_data.get('access_token', ''),
+            'access_token': user_token if user_token else None,  # Keep as None if not present
+            'bot_token': bot_token,
             'bot_user_id': oauth_data.get('bot_user_id'),
             'connected_at': datetime.utcnow().isoformat(),
             'last_event_at': None,
