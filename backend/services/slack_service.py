@@ -72,7 +72,7 @@ class SlackService:
         
         params = {
             'client_id': self.client_id,
-            'scope': ','.join(scopes),
+            'scope': ' '.join(scopes),
             'state': state_token,
             'redirect_uri': redirect_uri,
             'user_scope': 'identity.basic'
