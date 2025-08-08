@@ -1,398 +1,439 @@
 """
-Slack Service Module - Klavis AI MCP Integration
-
-This module provides Slack integration functionality through Klavis AI MCP server:
-- Creating Slack MCP server instances
-- Handling OAuth flow for Slack authorization
-- Converting Slack messages to yourdai Task objects
-- Managing Slack integration status and connections
+Slack Service Module
+Handles Slack OAuth, event processing, and task creation
 """
 
 import os
+import hmac
+import hashlib
 import json
-from typing import Dict, List, Any, Tuple, Optional
+import uuid
+import asyncio
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
-from dotenv import load_dotenv
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import aiohttp
 
 from backend.models.task import Task
+from backend.utils.encryption import encrypt_token, decrypt_token
 
-# Load environment variables
-load_dotenv()
 
 class SlackService:
-    """
-    Service class for managing Slack integration through Klavis AI MCP server.
+    """Handles Slack OAuth, event processing, and task creation"""
     
-    Handles all Slack-related operations including OAuth, message processing,
-    and task creation from Slack @mentions.
-    """
-
-    def __init__(self):
-        """Initialize the Slack service with Klavis AI configuration."""
-        self.klavis_api_key = os.environ.get("KLAVIS_API_KEY")
-        if not self.klavis_api_key:
-            raise ValueError("KLAVIS_API_KEY environment variable is required")
-
-    def create_slack_server_instance(
-        self, 
-        user_id: str, 
-        platform_name: str = "yourdai"
-    ) -> Tuple[bool, Dict[str, Any]]:
+    def __init__(self, db_client=None, message_processor=None):
         """
-        Create a new Slack MCP server instance via Klavis AI.
+        Initialize SlackService with required credentials and dependencies
         
         Args:
-            user_id: User's unique identifier
-            platform_name: Platform name for the integration
+            db_client: MongoDB client instance
+            message_processor: SlackMessageProcessor instance
+        """
+        self.client_id = os.environ.get('SLACK_CLIENT_ID')
+        self.client_secret = os.environ.get('SLACK_CLIENT_SECRET')
+        self.signing_secret = os.environ.get('SLACK_SIGNING_SECRET')
+        self.app_id = os.environ.get('SLACK_APP_ID')
+        
+        if not all([self.client_id, self.client_secret, self.signing_secret]):
+            raise ValueError("Missing required Slack environment variables")
+        
+        self.db_client = db_client
+        self.message_processor = message_processor
+        
+        # Base OAuth URL for Slack
+        self.oauth_base_url = "https://slack.com/oauth/v2/authorize"
+        
+    def generate_oauth_url(self, state_token: str, redirect_uri: str = None) -> Tuple[str, str]:
+        """
+        Generate OAuth URL for Slack workspace connection
+        
+        Args:
+            state_token: CSRF protection state token
+            redirect_uri: Optional custom redirect URI
             
         Returns:
-            Tuple of (success: bool, result: Dict) where result contains either
-            server instance data on success or error message on failure
+            Tuple of (oauth_url, state_token)
+        """
+        scopes = [
+            'app_mentions:read',
+            'channels:history',
+            'groups:history',
+            'im:history',
+            'chat:write',
+            'users:read',
+            'team:read',
+            'identity.basic'
+        ]
+        
+        # Default redirect URI
+        if not redirect_uri:
+            redirect_uri = f"{os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')}/api/integrations/slack/auth/callback"
+        
+        params = {
+            'client_id': self.client_id,
+            'scope': ','.join(scopes),
+            'state': state_token,
+            'redirect_uri': redirect_uri,
+            'user_scope': 'identity.basic'
+        }
+        
+        param_string = '&'.join([f"{key}={value}" for key, value in params.items()])
+        oauth_url = f"{self.oauth_base_url}?{param_string}"
+        
+        return oauth_url, state_token
+    
+    async def handle_oauth_callback(self, code: str, state: str, user_id: str) -> Dict[str, Any]:
+        """
+        Handle OAuth callback from Slack and store integration data
+        
+        Args:
+            code: OAuth authorization code from Slack
+            state: State token for CSRF protection
+            user_id: YourdAI user ID
+            
+        Returns:
+            Dictionary with success status and integration data
         """
         try:
-            # Import klavis here to avoid issues if not installed
-            from klavis import Klavis
-            from klavis.types import McpServerName
+            # Exchange code for tokens
+            oauth_data = await self._exchange_code_for_tokens(code)
             
-            # Initialize Klavis client
-            klavis_client = Klavis(api_key=self.klavis_api_key)
+            if not oauth_data.get('ok'):
+                raise ValueError(f"OAuth failed: {oauth_data.get('error', 'Unknown error')}")
             
-            # Create Slack MCP server instance
-            slack_server = klavis_client.mcp_server.create_server_instance(
-                server_name=McpServerName.SLACK,
-                user_id=user_id,
-                platform_name=platform_name,
-            )
+            # Extract integration data
+            integration_data = self._extract_integration_data(oauth_data)
             
-            return True, {
-                "serverUrl": slack_server.server_url,
-                "instanceId": slack_server.instance_id,
-                "oauthUrl": slack_server.oauth_url
+            # Encrypt tokens before storage
+            integration_data['access_token'] = encrypt_token(integration_data['access_token'])
+            integration_data['bot_token'] = encrypt_token(integration_data['bot_token'])
+            
+            # Store integration in database
+            await self._store_integration_data(user_id, integration_data)
+            
+            return {
+                'success': True,
+                'workspace_id': integration_data['workspace_id'],
+                'workspace_name': integration_data['workspace_name'],
+                'connected_at': integration_data['connected_at']
             }
             
-        except ImportError:
-            return False, {"error": "Klavis SDK not installed. Please install klavis package."}
         except Exception as e:
-            return False, {"error": f"Failed to create Slack server instance: {str(e)}"}
-
-    def get_slack_integration_status(
-        self, 
-        user_id: str, 
-        instance_id: Optional[str] = None
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Check the status of Slack integration for a user.
-        
-        Args:
-            user_id: User's unique identifier
-            instance_id: Optional Klavis instance ID to check specific instance
-            
-        Returns:
-            Tuple of (success: bool, result: Dict) with integration status
-        """
-        try:
-            # For now, return basic status - this can be enhanced with actual
-            # Klavis API calls to check instance status when available
-            status = {
-                "connected": bool(instance_id),
-                "instanceId": instance_id,
-                "lastSyncTime": datetime.now().isoformat() if instance_id else None
+            return {
+                'success': False,
+                'error': str(e)
             }
-            
-            return True, status
-            
-        except Exception as e:
-            return False, {"error": f"Failed to get integration status: {str(e)}"}
-
-    def process_slack_webhook(
-        self, 
-        webhook_data: Dict[str, Any]
-    ) -> Tuple[bool, Optional[Task], Optional[str]]:
+    
+    async def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
+        """Exchange OAuth code for access tokens"""
+        oauth_url = "https://slack.com/api/oauth.v2.access"
+        
+        data = {
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'code': code
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(oauth_url, data=data) as response:
+                return await response.json()
+    
+    def _extract_integration_data(self, oauth_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract and structure integration data from OAuth response"""
+        return {
+            'workspace_id': oauth_data['team']['id'],
+            'workspace_name': oauth_data['team']['name'],
+            'team_id': oauth_data['team']['id'],
+            'slack_user_id': oauth_data.get('authed_user', {}).get('id'),
+            'slack_username': oauth_data.get('authed_user', {}).get('name', 'Unknown User'),
+            'access_token': oauth_data.get('authed_user', {}).get('access_token', ''),
+            'bot_token': oauth_data.get('access_token', ''),
+            'bot_user_id': oauth_data.get('bot_user_id'),
+            'connected_at': datetime.utcnow().isoformat(),
+            'last_event_at': None,
+            'channels_joined': []
+        }
+    
+    async def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
+        """Store integration data in user document"""
+        if not self.db_client:
+            raise ValueError("Database client not configured")
+        
+        # Get users collection
+        users_collection = self.db_client.get_collection('users')
+        
+        # Update user document with Slack integration
+        await users_collection.update_one(
+            {'googleId': user_id},
+            {'$set': {'slack_integration': integration_data}},
+            upsert=False
+        )
+    
+    def verify_webhook_signature(self, request_body: str, headers: Dict[str, str]) -> bool:
         """
-        Process incoming webhook data from Klavis AI when user gets @mentioned.
+        Verify webhook request is from Slack using HMAC-SHA256
         
         Args:
-            webhook_data: Webhook payload from Klavis AI containing Slack message data
+            request_body: Raw request body as string
+            headers: Request headers dictionary
             
         Returns:
-            Tuple of (success: bool, task: Optional[Task], error_message: Optional[str]) 
-            where task is the created Task object or None if processing failed
+            True if signature is valid, False otherwise
         """
         try:
-            # Validate webhook payload structure
-            validation_success, validation_error = self._validate_webhook_payload(webhook_data)
-            if not validation_success:
-                print(f"Webhook validation failed: {validation_error}")
-                return False, None, validation_error
+            timestamp = headers.get('X-Slack-Request-Timestamp', '')
+            slack_signature = headers.get('X-Slack-Signature', '')
             
-            # Extract message data from webhook
-            message_data = webhook_data.get("message", {})
-            message_text = message_data.get("text", "")
-            slack_message_url = message_data.get("permalink", "")
-            message_ts = message_data.get("ts", "")
-            channel_id = message_data.get("channel", "")
-            
-            # Validate required message fields
-            if not message_text.strip():
-                return False, None, "Empty message text"
-            
-            if not message_ts:
-                return False, None, "Missing message timestamp"
-            
-            # Create Task object from Slack message with additional metadata
-            task = self.convert_slack_message_to_task(
-                message_text=message_text,
-                slack_message_url=slack_message_url,
-                message_ts=message_ts,
-                channel_id=channel_id
-            )
-            
-            return True, task, None
-            
-        except Exception as e:
-            error_msg = f"Error processing Slack webhook: {str(e)}"
-            print(error_msg)
-            return False, None, error_msg
-
-    def _validate_webhook_payload(self, webhook_data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
-        """
-        Validate the structure of incoming webhook payload.
-        
-        Args:
-            webhook_data: Webhook payload to validate
-            
-        Returns:
-            Tuple of (is_valid: bool, error_message: Optional[str])
-        """
-        try:
-            # Check for required top-level fields
-            if not isinstance(webhook_data, dict):
-                return False, "Webhook data must be a dictionary"
-            
-            # Check for message field
-            if "message" not in webhook_data:
-                return False, "Missing 'message' field in webhook data"
-            
-            message = webhook_data["message"]
-            if not isinstance(message, dict):
-                return False, "Message field must be a dictionary"
-            
-            # Check for required message fields
-            required_fields = ["text", "ts"]
-            missing_fields = [field for field in required_fields if field not in message]
-            if missing_fields:
-                return False, f"Missing required message fields: {', '.join(missing_fields)}"
-            
-            return True, None
-            
-        except Exception as e:
-            return False, f"Validation error: {str(e)}"
-
-    def check_duplicate_message(
-        self, 
-        user_id: str, 
-        message_ts: str, 
-        channel_id: str
-    ) -> bool:
-        """
-        Check if a Slack message has already been processed to prevent duplicates.
-        
-        Args:
-            user_id: User's unique identifier
-            message_ts: Slack message timestamp
-            channel_id: Slack channel ID
-            
-        Returns:
-            True if message is duplicate, False if it's new
-        """
-        try:
-            # Development bypass for database operations
-            if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
-                print(f"DEBUG: Skipping duplicate check for dev user {user_id}")
+            if not timestamp or not slack_signature:
                 return False
             
-            from backend.db_config import get_database
+            # Check timestamp to prevent replay attacks (within 5 minutes)
+            current_time = int(datetime.utcnow().timestamp())
+            if abs(current_time - int(timestamp)) > 300:
+                return False
             
-            # Get database and create collection for tracking processed messages
-            db = get_database()
-            processed_messages = db['slack_processed_messages']
+            # Create signature base string
+            sig_basestring = f"v0:{timestamp}:{request_body}"
             
-            # Create unique identifier for this message
-            message_key = f"{user_id}:{channel_id}:{message_ts}"
+            # Calculate expected signature
+            expected_signature = "v0=" + hmac.new(
+                self.signing_secret.encode(),
+                sig_basestring.encode(),
+                hashlib.sha256
+            ).hexdigest()
             
-            # Check if message already exists
-            existing = processed_messages.find_one({"message_key": message_key})
+            # Compare signatures
+            return hmac.compare_digest(expected_signature, slack_signature)
             
-            if existing:
-                print(f"Duplicate Slack message detected: {message_key}")
-                return True
-            
-            # Mark message as processed
-            processed_messages.insert_one({
-                "message_key": message_key,
-                "user_id": user_id,
-                "channel_id": channel_id,
-                "message_ts": message_ts,
-                "processed_at": datetime.now(),
-                "created_at": datetime.now()
-            })
-            
+        except Exception:
             return False
-            
-        except Exception as e:
-            print(f"Error checking duplicate message: {str(e)}")
-            # If we can't check for duplicates, allow the message through
-            return False
-
-    def convert_slack_message_to_task(
-        self, 
-        message_text: str, 
-        slack_message_url: Optional[str] = None,
-        message_ts: Optional[str] = None,
-        channel_id: Optional[str] = None
-    ) -> Task:
+    
+    async def process_event(self, event_data: Dict[str, Any], user_id: str) -> Optional[Task]:
         """
-        Convert a Slack message into a yourdai Task object.
+        Process Slack event and create task if needed
         
         Args:
-            message_text: Raw Slack message text
-            slack_message_url: URL to the original Slack message
-            message_ts: Slack message timestamp for tracking
-            channel_id: Slack channel ID for reference
+            event_data: Slack event data
+            user_id: YourdAI user ID
             
         Returns:
-            Task object configured for Slack-sourced tasks
-        """
-        # Clean up message text (remove @mentions, extra whitespace)
-        cleaned_text = self._clean_slack_message_text(message_text)
-        
-        # Enhance task text with channel context if available
-        if channel_id and not slack_message_url:
-            # If we don't have a permalink but have channel ID, note the source
-            enhanced_text = f"{cleaned_text} (from Slack #{channel_id})"
-        else:
-            enhanced_text = cleaned_text
-        
-        # Create Task with Slack-specific configuration
-        task = Task(
-            text=enhanced_text,
-            categories=["Work"],  # Hard-coded as per requirements
-            source="slack",
-            slack_message_url=slack_message_url,
-            completed=False
-        )
-        
-        return task
-
-    def disconnect_slack_integration(
-        self, 
-        user_id: str, 
-        instance_id: str
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Disconnect Slack integration for a user.
-        
-        Args:
-            user_id: User's unique identifier
-            instance_id: Klavis instance ID to disconnect
-            
-        Returns:
-            Tuple of (success: bool, result: Dict) with disconnection status
+            Task object if message is actionable, None otherwise
         """
         try:
-            # Development bypass for external API calls
-            if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
-                print(f"DEBUG: Skipping external Klavis API disconnect call for dev user {user_id}")
-                return True, {"message": "Slack integration disconnected successfully (dev mode)"}
+            # Extract event details
+            event = event_data.get('event', {})
+            event_type = event.get('type')
             
-            # TODO: Add actual Klavis API call to delete instance when available
-            # For now, return success - this can be enhanced with actual
-            # Klavis API calls to delete instance when available
-            return True, {"message": "Slack integration disconnected successfully"}
+            # Only process message events
+            if event_type != 'message':
+                return None
             
-        except Exception as e:
-            return False, {"error": f"Failed to disconnect integration: {str(e)}"}
-
-    def _clean_slack_message_text(self, message_text: str) -> str:
-        """
-        Clean up Slack message text for use as task text.
-        
-        Args:
-            message_text: Raw Slack message text
+            # Skip bot messages
+            if event.get('bot_id'):
+                return None
             
-        Returns:
-            Cleaned message text suitable for task creation
-        """
-        # Remove @mentions (e.g., <@U1234567>)
-        import re
-        cleaned = re.sub(r'<@[A-Z0-9]+>', '', message_text)
-        
-        # Remove extra whitespace
-        cleaned = ' '.join(cleaned.split())
-        
-        # Remove leading/trailing whitespace
-        cleaned = cleaned.strip()
-        
-        return cleaned 
-
-    def check_oauth_completion_status(
-        self, 
-        instance_id: str
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Check if OAuth has been completed for a Klavis server instance.
-        
-        This method attempts to verify if the Slack OAuth flow has been completed
-        by checking if the server instance can authenticate with Slack.
-        
-        Args:
-            instance_id: The Klavis server instance ID to check
+            # Get user integration data
+            integration_data = await self._get_user_integration(user_id)
+            if not integration_data:
+                return None
             
-        Returns:
-            Tuple of (success: bool, status: Dict) where status contains:
-            - oauth_completed: boolean indicating if OAuth is complete
-            - authenticated: boolean indicating if instance is authenticated
-            - error: error message if check failed
-        """
-        try:
-            # Import klavis here to avoid issues if not installed
-            from klavis import Klavis
+            # Check if user is mentioned
+            if not self._is_user_mentioned(event, integration_data['slack_user_id']):
+                return None
             
-            # Initialize Klavis client
-            klavis_client = Klavis(api_key=self.klavis_api_key)
+            # Enrich event with additional context
+            enriched_event = await self._enrich_event_data(event, integration_data)
             
-            # Attempt to get server instance details or test authentication
-            # Note: This is a simplified check - actual Klavis SDK method may differ
-            try:
-                # Try to list tools for the instance - this requires authentication
-                server_url = f"https://slack-mcp-server.klavis.ai/mcp/?instance_id={instance_id}"
-                tools_response = klavis_client.mcp_server.list_tools(server_url=server_url)
+            # Process with AI to determine if actionable
+            if not self.message_processor:
+                return None
                 
-                # If we can list tools, OAuth is complete and authenticated
-                if tools_response and hasattr(tools_response, 'tools'):
-                    return True, {
-                        "oauth_completed": True,
-                        "authenticated": True
-                    }
-                else:
-                    return True, {
-                        "oauth_completed": False,
-                        "authenticated": False
-                    }
-                    
-            except Exception as auth_error:
-                # If authentication fails, OAuth might not be complete
-                error_str = str(auth_error).lower()
-                if "unauthorized" in error_str or "authentication" in error_str:
-                    return True, {
-                        "oauth_completed": False,
-                        "authenticated": False
-                    }
-                else:
-                    # Some other error occurred
-                    return False, {"error": f"OAuth check failed: {str(auth_error)}"}
+            is_actionable, task_text = await self.message_processor.process_mention(enriched_event)
             
-        except ImportError:
-            return False, {"error": "Klavis SDK not installed. Please install klavis package."}
+            if not is_actionable or not task_text:
+                return None
+            
+            # Create task from Slack event
+            task = Task.from_slack_event(
+                event=enriched_event,
+                task_text=task_text,
+                user_id=user_id
+            )
+            
+            # Store task in database
+            await self._store_task(task, user_id)
+            
+            return task
+            
         except Exception as e:
-            return False, {"error": f"Failed to check OAuth status: {str(e)}"} 
+            # Log error but don't raise to avoid webhook failures
+            print(f"Error processing Slack event: {str(e)}")
+            return None
+    
+    async def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user's Slack integration data from database"""
+        if not self.db_client:
+            return None
+        
+        users_collection = self.db_client.get_collection('users')
+        user_doc = await users_collection.find_one({'googleId': user_id})
+        
+        if not user_doc or 'slack_integration' not in user_doc:
+            return None
+        
+        return user_doc['slack_integration']
+    
+    def _is_user_mentioned(self, event: Dict[str, Any], slack_user_id: str) -> bool:
+        """Check if the user is mentioned in the message"""
+        text = event.get('text', '')
+        
+        # Direct mention
+        if f'<@{slack_user_id}>' in text:
+            return True
+        
+        # Channel-wide mentions (@here, @channel, @everyone)
+        channel_mentions = ['<!here>', '<!channel>', '<!everyone>']
+        if any(mention in text for mention in channel_mentions):
+            return True
+        
+        return False
+    
+    async def _enrich_event_data(self, event: Dict[str, Any], integration_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Enrich event data with additional context from Slack API"""
+        # Add team/workspace information
+        enriched_event = {
+            **event,
+            'team_id': integration_data['team_id'],
+            'team_domain': integration_data['workspace_name'].lower().replace(' ', ''),
+            'team_name': integration_data['workspace_name']
+        }
+        
+        # Try to get channel name if not present
+        if 'channel_name' not in enriched_event:
+            enriched_event['channel_name'] = await self._get_channel_name(
+                event.get('channel'),
+                integration_data
+            )
+        
+        # Try to get user name if not present
+        if 'user_name' not in enriched_event:
+            enriched_event['user_name'] = await self._get_user_name(
+                event.get('user'),
+                integration_data
+            )
+        
+        return enriched_event
+    
+    async def _get_channel_name(self, channel_id: str, integration_data: Dict[str, Any]) -> str:
+        """Get channel name from Slack API"""
+        try:
+            bot_token = decrypt_token(integration_data['bot_token'])
+            client = WebClient(token=bot_token)
+            
+            response = client.conversations_info(channel=channel_id)
+            if response['ok']:
+                return response['channel']['name']
+        except Exception:
+            pass
+        
+        return 'Unknown Channel'
+    
+    async def _get_user_name(self, user_id: str, integration_data: Dict[str, Any]) -> str:
+        """Get user name from Slack API"""
+        try:
+            bot_token = decrypt_token(integration_data['bot_token'])
+            client = WebClient(token=bot_token)
+            
+            response = client.users_info(user=user_id)
+            if response['ok']:
+                return response['user']['name']
+        except Exception:
+            pass
+        
+        return 'Unknown User'
+    
+    async def _store_task(self, task: Task, user_id: str):
+        """Store task in database"""
+        if not self.db_client:
+            return
+        
+        # For now, we'll add to today's schedule
+        # This should integrate with existing schedule service
+        tasks_collection = self.db_client.get_collection('UserSchedules')
+        
+        today = datetime.utcnow().strftime('%Y-%m-%d')
+        
+        # Try to add to existing schedule or create new one
+        await tasks_collection.update_one(
+            {'userId': user_id, 'date': today},
+            {
+                '$push': {'schedule': task.to_dict()},
+                '$set': {'last_modified': datetime.utcnow().isoformat()}
+            },
+            upsert=True
+        )
+    
+    async def disconnect_integration(self, user_id: str) -> Dict[str, Any]:
+        """
+        Disconnect Slack integration for a user
+        
+        Args:
+            user_id: YourdAI user ID
+            
+        Returns:
+            Dictionary with success status
+        """
+        try:
+            if not self.db_client:
+                raise ValueError("Database client not configured")
+            
+            users_collection = self.db_client.get_collection('users')
+            
+            # Remove Slack integration data
+            await users_collection.update_one(
+                {'googleId': user_id},
+                {'$unset': {'slack_integration': ""}}
+            )
+            
+            return {'success': True}
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def get_integration_status(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get Slack integration status for a user
+        
+        Args:
+            user_id: YourdAI user ID
+            
+        Returns:
+            Dictionary with integration status
+        """
+        try:
+            integration_data = await self._get_user_integration(user_id)
+            
+            if not integration_data:
+                return {
+                    'connected': False,
+                    'workspace_name': None,
+                    'connected_at': None
+                }
+            
+            return {
+                'connected': True,
+                'workspace_name': integration_data.get('workspace_name'),
+                'workspace_id': integration_data.get('workspace_id'),
+                'connected_at': integration_data.get('connected_at'),
+                'last_event_at': integration_data.get('last_event_at')
+            }
+            
+        except Exception as e:
+            return {
+                'connected': False,
+                'error': str(e)
+            }

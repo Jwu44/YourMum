@@ -1,7 +1,7 @@
 /**
  * @file SlackIntegrationCard.tsx
  * @description Slack integration card component with OAuth connection handling
- * Implements TASK-07 requirements for Slack MCP Server integration via Klavis AI
+ * Updated to use actual backend API endpoints from slack_routes.py
  */
 
 'use client'
@@ -15,46 +15,14 @@ import { Button } from '@/components/ui/button'
 // Icons
 import { Slack, ExternalLink, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
-// Auth
-import { auth } from '@/auth/firebase'
-
 // Hooks
 import { useToast } from '@/hooks/use-toast'
 
-// Types and Utils
+// API and Types
+import slackApi, { type SlackIntegrationStatus } from '@/lib/api/slack'
+
+// Utils
 import { cn } from '@/lib/utils'
-
-// Constants
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
-
-/**
- * Slack integration status interface
- */
-interface SlackIntegrationStatus {
-  connected: boolean
-  instanceId?: string
-  serverUrl?: string
-  connectedAt?: string
-  lastSyncTime?: string
-}
-
-/**
- * Get the current user's Firebase ID token for API authentication
- */
-const getAuthToken = async (): Promise<string> => {
-  // In development mode with bypass enabled, return a mock token
-  if (IS_DEVELOPMENT && BYPASS_AUTH) {
-    return 'mock-token-for-development'
-  }
-
-  const currentUser = auth.currentUser
-  if (!currentUser) {
-    throw new Error('User not authenticated')
-  }
-  return await currentUser.getIdToken()
-}
 
 /**
  * Slack Integration Card Component
@@ -71,34 +39,8 @@ const SlackIntegrationCard: React.FC = () => {
   const checkSlackStatus = useCallback(async () => {
     try {
       setIsCheckingStatus(true)
-
-      const token = await getAuthToken()
-      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `Failed to check status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.status) {
-        setStatus({
-          connected: data.status.connected || false,
-          instanceId: data.status.instanceId,
-          serverUrl: data.status.serverUrl,
-          connectedAt: data.status.connectedAt,
-          lastSyncTime: data.status.lastSyncTime
-        })
-      } else {
-        setStatus({ connected: false })
-      }
+      const data = await slackApi.getStatus()
+      setStatus(data)
     } catch (error) {
       console.error('Error checking Slack status:', error)
       setStatus({ connected: false })
@@ -121,24 +63,9 @@ const SlackIntegrationCard: React.FC = () => {
    */
   const checkOAuthStatus = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await getAuthToken()
-      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/oauth-status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('OAuth status check failed:', errorData.error || response.status)
-        return false
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.oauth_completed && data.connected) {
+      const isCompleted = await slackApi.checkOAuthCompletion()
+      
+      if (isCompleted) {
         // OAuth is complete and user is connected
         toast({
           title: 'Success',
@@ -155,38 +82,18 @@ const SlackIntegrationCard: React.FC = () => {
   }, [toast])
 
   /**
-   * Handle Slack connection with enhanced OAuth completion detection
+   * Handle Slack connection with OAuth flow
    */
   const handleConnect = useCallback(async () => {
     try {
       setIsLoading(true)
 
-      // Get authentication token
-      const token = await getAuthToken()
-
-      // Create Klavis AI Slack MCP server instance
-      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `Failed to connect: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (!data.success || !data.oauthUrl) {
-        throw new Error(data.error || 'No OAuth URL received')
-      }
+      // Get OAuth URL from backend
+      const oauthData = await slackApi.getOAuthUrl()
 
       // Open OAuth URL in new tab
       const oauthWindow = window.open(
-        data.oauthUrl,
+        oauthData.oauth_url,
         'slack-oauth',
         'width=600,height=700,scrollbars=yes,resizable=yes'
       )
@@ -272,27 +179,10 @@ const SlackIntegrationCard: React.FC = () => {
     try {
       setIsLoading(true)
 
-      // Get authentication token
-      const token = await getAuthToken()
-
-      // Call disconnect API endpoint
-      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `Failed to disconnect: ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await slackApi.disconnect()
 
       if (!data.success) {
-        throw new Error(data.error || 'Disconnection failed')
+        throw new Error(data.message || 'Disconnection failed')
       }
 
       // Update local status
@@ -300,7 +190,7 @@ const SlackIntegrationCard: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Slack integration disconnected successfully'
+        description: data.message || 'Slack integration disconnected successfully'
       })
     } catch (error) {
       console.error('Error disconnecting Slack:', error)
@@ -374,14 +264,14 @@ const SlackIntegrationCard: React.FC = () => {
 
           {status.connected && (
             <div className="text-xs text-muted-foreground mt-1 space-y-1">
-              {status.connectedAt && (
-                <div>Connected on {new Date(status.connectedAt).toLocaleDateString()}</div>
+              {status.workspace_name && (
+                <div>Workspace: {status.workspace_name}</div>
               )}
-              {status.lastSyncTime && (
-                <div>Last sync: {new Date(status.lastSyncTime).toLocaleString()}</div>
+              {status.connected_at && (
+                <div>Connected on {new Date(status.connected_at).toLocaleDateString()}</div>
               )}
-              {status.instanceId && (
-                <div className="font-mono">Instance: {status.instanceId.substring(0, 8)}...</div>
+              {status.workspace_id && (
+                <div className="font-mono">ID: {status.workspace_id}</div>
               )}
             </div>
           )}

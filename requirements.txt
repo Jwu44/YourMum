@@ -25,3 +25,6 @@ PyYAML==6.0.1
 boto3==1.38.14
 klavis>=1.0.1
 pytz==2024.1
+slack-sdk>=3.31.0
+aiohttp>=3.9.0
+cryptography>=42.0.0

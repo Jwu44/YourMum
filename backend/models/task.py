@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Dict, Union, List
+from typing import Optional, Dict, Union, List, Any
 
 class RecurrenceType:
     """
@@ -90,7 +90,8 @@ class Task:
                  energy_level_required: Optional[str] = None,
                  # New Slack integration fields
                  source: Optional[str] = None,
-                 slack_message_url: Optional[str] = None):
+                 slack_message_url: Optional[str] = None,
+                 slack_metadata: Optional[Dict[str, Any]] = None):
                  
         """
         Initialize a task with all its attributes.
@@ -116,6 +117,7 @@ class Task:
         # Add Slack integration fields
         self.source = source
         self.slack_message_url = slack_message_url
+        self.slack_metadata = slack_metadata
 
         # Handle recurrence pattern
         if isinstance(is_recurring, dict):
@@ -151,6 +153,8 @@ class Task:
             base_dict["source"] = self.source
         if self.slack_message_url:
             base_dict["slack_message_url"] = self.slack_message_url
+        if self.slack_metadata:
+            base_dict["slack_metadata"] = self.slack_metadata
         
         # Only include microstep fields if they exist
         if self.is_microstep:
@@ -193,6 +197,7 @@ class Task:
             energy_level_required=data.get("energy_level_required"),
             source=data.get("source"),
             slack_message_url=data.get("slack_message_url"),
+            slack_metadata=data.get("slack_metadata"),
         )
 
     def add_category(self, category: str) -> None:
@@ -251,3 +256,54 @@ class Task:
     def __repr__(self) -> str:
         """Representation of the task."""
         return self.__str__()
+
+    @classmethod
+    def from_slack_event(cls, event: Dict[str, Any], task_text: str, user_id: str) -> 'Task':
+        """
+        Factory method to create Task from Slack event.
+        
+        Args:
+            event: Slack event data
+            task_text: AI-processed actionable task text
+            user_id: yourdai user ID
+            
+        Returns:
+            Task object with Slack metadata
+        """
+        # Build Slack metadata
+        slack_metadata = {
+            'message_url': cls._build_web_url(event),
+            'deep_link': cls._build_deep_link(event),
+            'channel_id': event.get('channel'),
+            'channel_name': event.get('channel_name', 'Unknown Channel'),
+            'sender_id': event.get('user'),
+            'sender_name': event.get('user_name', 'Unknown User'),
+            'original_text': event.get('text'),
+            'thread_ts': event.get('thread_ts'),
+            'workspace_id': event.get('team_id'),
+            'workspace_name': event.get('team_name', 'Unknown Workspace'),
+            'event_ts': event.get('ts')
+        }
+        
+        return cls(
+            id=str(uuid.uuid4()),
+            text=task_text,
+            source='slack',
+            slack_metadata=slack_metadata
+        )
+    
+    @staticmethod
+    def _build_web_url(event: Dict[str, Any]) -> str:
+        """Build Slack web URL for the message."""
+        team_domain = event.get('team_domain', 'workspace')
+        channel = event.get('channel', '')
+        timestamp = event.get('ts', '').replace('.', '')
+        return f"https://{team_domain}.slack.com/archives/{channel}/p{timestamp}"
+    
+    @staticmethod
+    def _build_deep_link(event: Dict[str, Any]) -> str:
+        """Build Slack deep link for native app."""
+        team_id = event.get('team_id', '')
+        channel = event.get('channel', '')
+        timestamp = event.get('ts', '')
+        return f"slack://channel?team={team_id}&id={channel}&message={timestamp}"
