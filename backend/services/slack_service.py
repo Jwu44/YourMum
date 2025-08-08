@@ -8,15 +8,12 @@ import hmac
 import hashlib
 import json
 import uuid
-import asyncio
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-import aiohttp
 
 from backend.models.task import Task
-from backend.utils.encryption import encrypt_token, decrypt_token
 
 
 class SlackService:
@@ -81,7 +78,7 @@ class SlackService:
         
         return oauth_url, state_token
     
-    async def handle_oauth_callback(self, code: str, state: str, user_id: str) -> Dict[str, Any]:
+    def handle_oauth_callback(self, code: str, state: str, user_id: str) -> Dict[str, Any]:
         """
         Handle OAuth callback from Slack and store integration data
         
@@ -95,7 +92,7 @@ class SlackService:
         """
         try:
             # Exchange code for tokens
-            oauth_data = await self._exchange_code_for_tokens(code)
+            oauth_data = self._exchange_code_for_tokens(code)
             
             if not oauth_data.get('ok'):
                 raise ValueError(f"OAuth failed: {oauth_data.get('error', 'Unknown error')}")
@@ -103,12 +100,11 @@ class SlackService:
             # Extract integration data
             integration_data = self._extract_integration_data(oauth_data)
             
-            # Encrypt tokens before storage
-            integration_data['access_token'] = encrypt_token(integration_data['access_token'])
-            integration_data['bot_token'] = encrypt_token(integration_data['bot_token'])
+            # For development simplicity, store tokens as-is (no encryption)
+            # TODO: Add encryption for production deployment
             
             # Store integration in database
-            await self._store_integration_data(user_id, integration_data)
+            self._store_integration_data(user_id, integration_data)
             
             return {
                 'success': True,
@@ -123,8 +119,10 @@ class SlackService:
                 'error': str(e)
             }
     
-    async def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
+    def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
         """Exchange OAuth code for access tokens"""
+        import requests
+        
         oauth_url = "https://slack.com/api/oauth.v2.access"
         
         data = {
@@ -133,9 +131,8 @@ class SlackService:
             'code': code
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(oauth_url, data=data) as response:
-                return await response.json()
+        response = requests.post(oauth_url, data=data)
+        return response.json()
     
     def _extract_integration_data(self, oauth_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract and structure integration data from OAuth response"""
@@ -153,7 +150,7 @@ class SlackService:
             'channels_joined': []
         }
     
-    async def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
+    def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
         """Store integration data in user document"""
         if not self.db_client:
             raise ValueError("Database client not configured")
@@ -162,7 +159,7 @@ class SlackService:
         users_collection = self.db_client.get_collection('users')
         
         # Update user document with Slack integration
-        await users_collection.update_one(
+        users_collection.update_one(
             {'googleId': user_id},
             {'$set': {'slack_integration': integration_data}},
             upsert=False
@@ -207,7 +204,7 @@ class SlackService:
         except Exception:
             return False
     
-    async def process_event(self, event_data: Dict[str, Any], user_id: str) -> Optional[Task]:
+    def process_event(self, event_data: Dict[str, Any], user_id: str) -> Optional[Task]:
         """
         Process Slack event and create task if needed
         
@@ -232,7 +229,7 @@ class SlackService:
                 return None
             
             # Get user integration data
-            integration_data = await self._get_user_integration(user_id)
+            integration_data = self._get_user_integration(user_id)
             if not integration_data:
                 return None
             
@@ -241,16 +238,15 @@ class SlackService:
                 return None
             
             # Enrich event with additional context
-            enriched_event = await self._enrich_event_data(event, integration_data)
+            enriched_event = self._enrich_event_data(event, integration_data)
             
             # Process with AI to determine if actionable
             if not self.message_processor:
                 return None
                 
-            is_actionable, task_text = await self.message_processor.process_mention(enriched_event)
-            
-            if not is_actionable or not task_text:
-                return None
+            # For now, create a simple task without AI processing to test the flow
+            # TODO: Implement AI processing when message processor is ready
+            task_text = f"Task from Slack: {event.get('text', '')}"
             
             # Create task from Slack event
             task = Task.from_slack_event(
@@ -260,7 +256,7 @@ class SlackService:
             )
             
             # Store task in database
-            await self._store_task(task, user_id)
+            self._store_task(task, user_id)
             
             return task
             
@@ -269,13 +265,13 @@ class SlackService:
             print(f"Error processing Slack event: {str(e)}")
             return None
     
-    async def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
+    def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Slack integration data from database"""
         if not self.db_client:
             return None
         
         users_collection = self.db_client.get_collection('users')
-        user_doc = await users_collection.find_one({'googleId': user_id})
+        user_doc = users_collection.find_one({'googleId': user_id})
         
         if not user_doc or 'slack_integration' not in user_doc:
             return None
@@ -297,7 +293,7 @@ class SlackService:
         
         return False
     
-    async def _enrich_event_data(self, event: Dict[str, Any], integration_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _enrich_event_data(self, event: Dict[str, Any], integration_data: Dict[str, Any]) -> Dict[str, Any]:
         """Enrich event data with additional context from Slack API"""
         # Add team/workspace information
         enriched_event = {
@@ -309,24 +305,24 @@ class SlackService:
         
         # Try to get channel name if not present
         if 'channel_name' not in enriched_event:
-            enriched_event['channel_name'] = await self._get_channel_name(
+            enriched_event['channel_name'] = self._get_channel_name(
                 event.get('channel'),
                 integration_data
             )
         
         # Try to get user name if not present
         if 'user_name' not in enriched_event:
-            enriched_event['user_name'] = await self._get_user_name(
+            enriched_event['user_name'] = self._get_user_name(
                 event.get('user'),
                 integration_data
             )
         
         return enriched_event
     
-    async def _get_channel_name(self, channel_id: str, integration_data: Dict[str, Any]) -> str:
+    def _get_channel_name(self, channel_id: str, integration_data: Dict[str, Any]) -> str:
         """Get channel name from Slack API"""
         try:
-            bot_token = decrypt_token(integration_data['bot_token'])
+            bot_token = integration_data['bot_token']  # No decryption needed for development
             client = WebClient(token=bot_token)
             
             response = client.conversations_info(channel=channel_id)
@@ -337,10 +333,10 @@ class SlackService:
         
         return 'Unknown Channel'
     
-    async def _get_user_name(self, user_id: str, integration_data: Dict[str, Any]) -> str:
+    def _get_user_name(self, user_id: str, integration_data: Dict[str, Any]) -> str:
         """Get user name from Slack API"""
         try:
-            bot_token = decrypt_token(integration_data['bot_token'])
+            bot_token = integration_data['bot_token']  # No decryption needed for development
             client = WebClient(token=bot_token)
             
             response = client.users_info(user=user_id)
@@ -351,7 +347,7 @@ class SlackService:
         
         return 'Unknown User'
     
-    async def _store_task(self, task: Task, user_id: str):
+    def _store_task(self, task: Task, user_id: str):
         """Store task in database"""
         if not self.db_client:
             return
@@ -363,7 +359,7 @@ class SlackService:
         today = datetime.utcnow().strftime('%Y-%m-%d')
         
         # Try to add to existing schedule or create new one
-        await tasks_collection.update_one(
+        tasks_collection.update_one(
             {'userId': user_id, 'date': today},
             {
                 '$push': {'schedule': task.to_dict()},
@@ -372,7 +368,7 @@ class SlackService:
             upsert=True
         )
     
-    async def disconnect_integration(self, user_id: str) -> Dict[str, Any]:
+    def disconnect_integration(self, user_id: str) -> Dict[str, Any]:
         """
         Disconnect Slack integration for a user
         
@@ -389,7 +385,7 @@ class SlackService:
             users_collection = self.db_client.get_collection('users')
             
             # Remove Slack integration data
-            await users_collection.update_one(
+            users_collection.update_one(
                 {'googleId': user_id},
                 {'$unset': {'slack_integration': ""}}
             )
@@ -402,7 +398,7 @@ class SlackService:
                 'error': str(e)
             }
     
-    async def get_integration_status(self, user_id: str) -> Dict[str, Any]:
+    def get_integration_status(self, user_id: str) -> Dict[str, Any]:
         """
         Get Slack integration status for a user
         
@@ -413,7 +409,7 @@ class SlackService:
             Dictionary with integration status
         """
         try:
-            integration_data = await self._get_user_integration(user_id)
+            integration_data = self._get_user_integration(user_id)
             
             if not integration_data:
                 return {

@@ -107,59 +107,55 @@ const SlackIntegrationCard: React.FC = () => {
         description: 'Complete the authorization in the opened tab. The page will automatically refresh when done.'
       })
 
-      // Enhanced polling to check for OAuth completion
-      let oauthCheckAttempts = 0
-      const maxOauthCheckAttempts = 60 // 5 minutes with 5-second intervals
+      // Listen for OAuth completion message from popup
+      const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin.replace('3000', '8000')) {
+          return // Ignore messages from other origins
+        }
 
-      const pollInterval = setInterval(async () => {
-        try {
-          oauthCheckAttempts++
+        if (event.data.type === 'slack_oauth_success') {
+          // OAuth completed successfully
+          window.removeEventListener('message', messageHandler)
+          
+          toast({
+            title: 'Success',
+            description: `Slack integration connected successfully to ${event.data.data.workspace_name}!`
+          })
+          
+          // Refresh status to update UI
+          setTimeout(() => {
+            checkSlackStatus()
+          }, 1000)
+        } else if (event.data.type === 'slack_oauth_error') {
+          // OAuth failed
+          window.removeEventListener('message', messageHandler)
+          
+          toast({
+            title: 'OAuth Failed',
+            description: event.data.error || 'OAuth process failed. Please try again.',
+            variant: 'destructive'
+          })
+        }
+      }
 
-          // Check if the OAuth window is still open
-          const windowClosed = oauthWindow.closed
+      window.addEventListener('message', messageHandler)
 
-          // If window is closed or we've been polling for a while, check OAuth status
-          if (windowClosed || oauthCheckAttempts % 6 === 0) { // Check OAuth every 30 seconds or when window closes
-            const oauthCompleted = await checkOAuthStatus()
-
-            if (oauthCompleted) {
-              // OAuth completed successfully
-              clearInterval(pollInterval)
-              // Refresh status to update UI
-              setTimeout(() => {
-                checkSlackStatus()
-              }, 1000)
-              return
-            }
-
-            // If window is closed but OAuth not completed, user may have cancelled
-            if (windowClosed) {
-              clearInterval(pollInterval)
-              toast({
-                title: 'OAuth Cancelled',
-                description: 'OAuth window was closed. Please try connecting again if you want to complete the setup.',
-                variant: 'destructive'
-              })
-              return
-            }
-          }
-
-          // Stop polling after maximum attempts
-          if (oauthCheckAttempts >= maxOauthCheckAttempts) {
-            clearInterval(pollInterval)
-            if (!oauthWindow.closed) {
-              oauthWindow.close()
-            }
+      // Optional: Check if window is closed manually
+      const checkWindowClosed = setInterval(() => {
+        if (oauthWindow.closed) {
+          clearInterval(checkWindowClosed)
+          window.removeEventListener('message', messageHandler)
+          
+          // If we haven't received a success message, assume user cancelled
+          setTimeout(() => {
             toast({
-              title: 'OAuth Timeout',
-              description: 'OAuth process timed out. Please try connecting again.',
+              title: 'OAuth Cancelled',
+              description: 'OAuth window was closed. The integration was not completed.',
               variant: 'destructive'
             })
-          }
-        } catch (error) {
-          console.error('Error during OAuth polling:', error)
+          }, 500)
         }
-      }, 5000) // Poll every 5 seconds
+      }, 1000)
     } catch (error) {
       console.error('Error connecting to Slack:', error)
       toast({
