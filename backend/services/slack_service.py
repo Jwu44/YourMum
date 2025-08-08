@@ -274,7 +274,7 @@ class SlackService:
     
     async def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
         """Store integration data in user document"""
-        if not self.db_client:
+        if self.db_client is None:
             raise ValueError("Database client not configured")
         
         # Get users collection
@@ -390,7 +390,7 @@ class SlackService:
     
     async def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Slack integration data from database"""
-        if not self.db_client:
+        if self.db_client is None:
             return None
         
         users_collection = self.db_client.get_collection('users')
@@ -472,7 +472,7 @@ class SlackService:
     
     async def _store_task(self, task: Task, user_id: str):
         """Store task in database"""
-        if not self.db_client:
+        if self.db_client is None:
             return
         
         # For now, we'll add to today's schedule
@@ -502,7 +502,7 @@ class SlackService:
             Dictionary with success status
         """
         try:
-            if not self.db_client:
+            if self.db_client is None:
                 raise ValueError("Database client not configured")
             
             users_collection = self.db_client.get_collection('users')
