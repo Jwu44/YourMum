@@ -51,45 +51,10 @@ def extract_user_from_request() -> tuple[Optional[str], Optional[Dict[str, Any]]
     return user.get('googleId'), None
 
 
-async def store_oauth_state(state_token: str, user_id: str):
-    """Store OAuth state token with user_id for callback verification"""
-    # Use a temporary collection for OAuth states (expires after 10 minutes)
-    oauth_states_collection = db_client.get_collection('oauth_states')
-    
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    
-    await oauth_states_collection.insert_one({
-        'state_token': state_token,
-        'user_id': user_id,
-        'created_at': datetime.utcnow(),
-        'expires_at': expires_at
-    })
-    
-    # Create TTL index for automatic cleanup (if not exists)
-    try:
-        await oauth_states_collection.create_index("expires_at", expireAfterSeconds=0)
-    except Exception:
-        pass  # Index might already exist
-
-
-async def get_user_from_oauth_state(state_token: str) -> Optional[str]:
-    """Retrieve user_id from OAuth state token and remove the state"""
-    oauth_states_collection = db_client.get_collection('oauth_states')
-    
-    # Find and remove the state token (one-time use)
-    state_doc = await oauth_states_collection.find_one_and_delete({
-        'state_token': state_token,
-        'expires_at': {'$gt': datetime.utcnow()}  # Not expired
-    })
-    
-    if state_doc:
-        return state_doc.get('user_id')
-    
-    return None
 
 
 @slack_bp.route('/auth/connect', methods=['GET'])
-async def generate_oauth_url():
+def generate_oauth_url():
     """
     Generate Slack OAuth URL for workspace connection
     
@@ -107,11 +72,8 @@ async def generate_oauth_url():
         if not user_id:
             return jsonify(error_response), 401
         
-        # Generate state token for CSRF protection
+        # Generate state token for CSRF protection  
         state_token = str(uuid.uuid4())
-        
-        # Store state token with user_id for callback verification
-        await store_oauth_state(state_token, user_id)
         
         # Generate OAuth URL
         oauth_url, returned_state = slack_service.generate_oauth_url(state_token)
@@ -130,7 +92,7 @@ async def generate_oauth_url():
 
 
 @slack_bp.route('/auth/callback', methods=['GET'])
-async def handle_oauth_callback():
+def handle_oauth_callback():
     """
     Handle OAuth callback from Slack
     
@@ -173,16 +135,44 @@ async def handle_oauth_callback():
                 "error": "Missing state parameter"
             }), 400
         
-        # Get user_id from state token instead of requiring auth headers
-        user_id = await get_user_from_oauth_state(state)
-        if not user_id:
+        # Extract Firebase token from state parameter
+        try:
+            state_data = json.loads(state)
+            firebase_token = state_data.get('firebaseToken')
+            csrf_token = state_data.get('csrf')
+            
+            if not firebase_token or not csrf_token:
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid state parameter"
+                }), 400
+                
+            # Validate Firebase token
+            user = get_user_from_token(firebase_token)
+            if not user or not user.get('googleId'):
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid authentication token"
+                }), 401
+                
+            user_id = user.get('googleId')
+            
+        except (json.JSONDecodeError, KeyError) as e:
             return jsonify({
                 "success": False,
-                "error": "Invalid or expired state token"
+                "error": "Malformed state parameter"
             }), 400
         
-        # Handle OAuth callback (now in async context)
-        result = await slack_service.handle_oauth_callback(code, state, user_id)
+        # Handle OAuth callback (run async function in sync context)
+        try:
+            import asyncio
+            result = asyncio.run(slack_service.handle_oauth_callback(code, state, user_id))
+        except RuntimeError:
+            # Handle case where event loop is already running (in tests)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, slack_service.handle_oauth_callback(code, state, user_id))
+                result = future.result()
         
         if result.get('success'):
             # Return an HTML page that closes the popup and notifies parent window
