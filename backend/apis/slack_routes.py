@@ -15,6 +15,10 @@ from backend.db_config import get_database
 from backend.services.slack_service import SlackService
 from backend.services.slack_message_processor import SlackMessageProcessor
 from backend.apis.routes import get_user_from_token
+
+# Use an explicit frontend URL (prefer these envs, fallback to dev Next port)
+frontend_base_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL') or 'http://localhost:8000'
+
 # Create blueprint
 slack_bp = Blueprint("slack_integration", __name__)
 
@@ -169,9 +173,6 @@ def handle_oauth_callback():
                 'connected_at': result.get('connected_at', '')
             }
             
-            # Build the success page URL (assuming frontend runs on port 8000 in dev)
-            # This should be configurable via environment variable for production
-            frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(success_params)}"
             
             return redirect(success_url)
@@ -182,7 +183,6 @@ def handle_oauth_callback():
                 'error': result.get('error', 'OAuth callback failed')
             }
             
-            frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
             
             return redirect(success_url)
@@ -196,7 +196,6 @@ def handle_oauth_callback():
             'error': f"OAuth callback failed: {str(e)}"
         }
         
-        frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
         success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
         
         return redirect(success_url)
