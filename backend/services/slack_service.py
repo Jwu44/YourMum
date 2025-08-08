@@ -62,8 +62,7 @@ class SlackService:
             'im:history',
             'chat:write',
             'users:read',
-            'team:read',
-            'identity.basic'
+            'team:read'
         ]
         
         # Default redirect URI
