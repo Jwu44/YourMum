@@ -7,7 +7,7 @@ import os
 import json
 import uuid
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any, Optional
 
@@ -51,8 +51,45 @@ def extract_user_from_request() -> tuple[Optional[str], Optional[Dict[str, Any]]
     return user.get('googleId'), None
 
 
+async def store_oauth_state(state_token: str, user_id: str):
+    """Store OAuth state token with user_id for callback verification"""
+    # Use a temporary collection for OAuth states (expires after 10 minutes)
+    oauth_states_collection = db_client.get_collection('oauth_states')
+    
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    
+    await oauth_states_collection.insert_one({
+        'state_token': state_token,
+        'user_id': user_id,
+        'created_at': datetime.utcnow(),
+        'expires_at': expires_at
+    })
+    
+    # Create TTL index for automatic cleanup (if not exists)
+    try:
+        await oauth_states_collection.create_index("expires_at", expireAfterSeconds=0)
+    except Exception:
+        pass  # Index might already exist
+
+
+async def get_user_from_oauth_state(state_token: str) -> Optional[str]:
+    """Retrieve user_id from OAuth state token and remove the state"""
+    oauth_states_collection = db_client.get_collection('oauth_states')
+    
+    # Find and remove the state token (one-time use)
+    state_doc = await oauth_states_collection.find_one_and_delete({
+        'state_token': state_token,
+        'expires_at': {'$gt': datetime.utcnow()}  # Not expired
+    })
+    
+    if state_doc:
+        return state_doc.get('user_id')
+    
+    return None
+
+
 @slack_bp.route('/auth/connect', methods=['GET'])
-def generate_oauth_url():
+async def generate_oauth_url():
     """
     Generate Slack OAuth URL for workspace connection
     
@@ -73,11 +110,11 @@ def generate_oauth_url():
         # Generate state token for CSRF protection
         state_token = str(uuid.uuid4())
         
+        # Store state token with user_id for callback verification
+        await store_oauth_state(state_token, user_id)
+        
         # Generate OAuth URL
         oauth_url, returned_state = slack_service.generate_oauth_url(state_token)
-        
-        # Store state token in session/database for verification
-        # For now, we'll trust the returned state matches our generated token
         
         return jsonify({
             "oauth_url": oauth_url,
@@ -93,7 +130,7 @@ def generate_oauth_url():
 
 
 @slack_bp.route('/auth/callback', methods=['GET'])
-def handle_oauth_callback():
+async def handle_oauth_callback():
     """
     Handle OAuth callback from Slack
     
@@ -136,35 +173,88 @@ def handle_oauth_callback():
                 "error": "Missing state parameter"
             }), 400
         
-        # Extract user ID
-        user_id, error_response = extract_user_from_request()
+        # Get user_id from state token instead of requiring auth headers
+        user_id = await get_user_from_oauth_state(state)
         if not user_id:
-            return jsonify(error_response), 401
-        
-        # Handle OAuth callback (run async function in sync context)
-        try:
-            import asyncio
-            result = asyncio.run(slack_service.handle_oauth_callback(code, state, user_id))
-        except RuntimeError:
-            # Handle case where event loop is already running (in tests)
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, slack_service.handle_oauth_callback(code, state, user_id))
-                result = future.result()
-        
-        if result.get('success'):
-            return jsonify({
-                "success": True,
-                "message": "Slack integration connected successfully",
-                "workspace_name": result.get('workspace_name'),
-                "workspace_id": result.get('workspace_id'),
-                "connected_at": result.get('connected_at')
-            }), 200
-        else:
             return jsonify({
                 "success": False,
-                "error": result.get('error', 'OAuth callback failed')
-            }), 500
+                "error": "Invalid or expired state token"
+            }), 400
+        
+        # Handle OAuth callback (now in async context)
+        result = await slack_service.handle_oauth_callback(code, state, user_id)
+        
+        if result.get('success'):
+            # Return an HTML page that closes the popup and notifies parent window
+            success_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Slack Integration Success</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
+                    .success {{ color: #28a745; }}
+                </style>
+            </head>
+            <body>
+                <div class="success">
+                    <h1>✅ Success!</h1>
+                    <p>Slack integration connected successfully.</p>
+                    <p>Workspace: {result.get('workspace_name', 'Unknown')}</p>
+                    <p>You can close this window.</p>
+                </div>
+                <script>
+                    // Notify parent window and close popup
+                    if (window.opener) {{
+                        window.opener.postMessage({{
+                            type: 'slack_oauth_success',
+                            data: {{
+                                success: true,
+                                workspace_name: '{result.get('workspace_name', '')}',
+                                workspace_id: '{result.get('workspace_id', '')}',
+                                connected_at: '{result.get('connected_at', '')}'
+                            }}
+                        }}, '*');
+                        window.close();
+                    }}
+                </script>
+            </body>
+            </html>
+            """
+            return success_html, 200, {'Content-Type': 'text/html'}
+        else:
+            # Return error HTML page
+            error_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Slack Integration Failed</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
+                    .error {{ color: #dc3545; }}
+                </style>
+            </head>
+            <body>
+                <div class="error">
+                    <h1>❌ Integration Failed</h1>
+                    <p>Failed to connect Slack integration.</p>
+                    <p>Error: {result.get('error', 'OAuth callback failed')}</p>
+                    <p>You can close this window and try again.</p>
+                </div>
+                <script>
+                    // Notify parent window of error
+                    if (window.opener) {{
+                        window.opener.postMessage({{
+                            type: 'slack_oauth_error',
+                            error: '{result.get('error', 'OAuth callback failed')}'
+                        }}, '*');
+                        window.close();
+                    }}
+                </script>
+            </body>
+            </html>
+            """
+            return error_html, 500, {'Content-Type': 'text/html'}
             
     except Exception as e:
         print(f"Error in OAuth callback: {str(e)}")
