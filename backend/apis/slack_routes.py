@@ -6,7 +6,6 @@ API endpoints for Slack OAuth, webhook handling, and integration management
 import os
 import json
 import uuid
-import asyncio
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any, Optional
@@ -135,7 +134,7 @@ def handle_oauth_callback():
                 "error": "Missing state parameter"
             }), 400
         
-        # Extract Firebase token from state parameter
+        # Extract Firebase token from state parameter (simplified approach)
         try:
             state_data = json.loads(state)
             firebase_token = state_data.get('firebaseToken')
@@ -163,16 +162,8 @@ def handle_oauth_callback():
                 "error": "Malformed state parameter"
             }), 400
         
-        # Handle OAuth callback (run async function in sync context)
-        try:
-            import asyncio
-            result = asyncio.run(slack_service.handle_oauth_callback(code, state, user_id))
-        except RuntimeError:
-            # Handle case where event loop is already running (in tests)
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, slack_service.handle_oauth_callback(code, state, user_id))
-                result = future.result()
+        # Handle OAuth callback (now synchronous)
+        result = slack_service.handle_oauth_callback(code, state, user_id)
         
         if result.get('success'):
             # Return an HTML page that closes the popup and notifies parent window
@@ -182,19 +173,38 @@ def handle_oauth_callback():
             <head>
                 <title>Slack Integration Success</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
-                    .success {{ color: #28a745; }}
+                    body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8f9fa; }}
+                    .success {{ color: #28a745; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }}
+                    .close-btn {{ background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 20px; }}
+                    .close-btn:hover {{ background: #5a6268; }}
                 </style>
             </head>
             <body>
                 <div class="success">
                     <h1>✅ Success!</h1>
                     <p>Slack integration connected successfully.</p>
-                    <p>Workspace: {result.get('workspace_name', 'Unknown')}</p>
-                    <p>You can close this window.</p>
+                    <p><strong>Workspace:</strong> {result.get('workspace_name', 'Unknown')}</p>
+                    <p>Your Slack integration is now active!</p>
+                    <button class="close-btn" onclick="closeWindow()">Close Window</button>
                 </div>
                 <script>
-                    // Notify parent window and close popup
+                    function closeWindow() {{
+                        if (window.opener) {{
+                            // Notify parent window of success
+                            window.opener.postMessage({{
+                                type: 'slack_oauth_success',
+                                data: {{
+                                    success: true,
+                                    workspace_name: '{result.get('workspace_name', '')}',
+                                    workspace_id: '{result.get('workspace_id', '')}',
+                                    connected_at: '{result.get('connected_at', '')}'
+                                }}
+                            }}, '*');
+                        }}
+                        window.close();
+                    }}
+                    
+                    // Auto-notify parent but don't auto-close - let user see success message
                     if (window.opener) {{
                         window.opener.postMessage({{
                             type: 'slack_oauth_success',
@@ -205,7 +215,6 @@ def handle_oauth_callback():
                                 connected_at: '{result.get('connected_at', '')}'
                             }}
                         }}, '*');
-                        window.close();
                     }}
                 </script>
             </body>
@@ -305,15 +314,15 @@ def handle_webhook():
         
         if event_type == 'event_callback':
             # Handle workspace events (mentions, messages, etc.)
-            asyncio.run(process_workspace_event(event_data))
+            process_workspace_event(event_data)
             
         elif event_type == 'slash_command':
-            # Handle slash commands (future feature)
-            asyncio.run(process_slash_command(event_data))
+            # Handle slash commands (future feature)  
+            process_slash_command(event_data)
             
         elif event_type == 'interactive_component':
             # Handle interactive components (future feature)
-            asyncio.run(process_interactive_component(event_data))
+            process_interactive_component(event_data)
         
         # Return success response
         return jsonify({
@@ -329,7 +338,7 @@ def handle_webhook():
         }), 500
 
 
-async def process_workspace_event(event_data: Dict[str, Any]):
+def process_workspace_event(event_data: Dict[str, Any]):
     """
     Process Slack workspace events (app mentions, messages)
     
@@ -353,8 +362,8 @@ async def process_workspace_event(event_data: Dict[str, Any]):
         for user in connected_users:
             user_id = user.get('googleId')
             if user_id:
-                # Process event through SlackService (run async function)
-                task = await slack_service.process_event(event_data, user_id)
+                # Process event through SlackService (now synchronous)
+                task = slack_service.process_event(event_data, user_id)
                 
                 if task:
                     print(f"Created task from Slack event: {task.text} for user {user_id}")
@@ -363,7 +372,7 @@ async def process_workspace_event(event_data: Dict[str, Any]):
         print(f"Error processing workspace event: {str(e)}")
 
 
-async def process_slash_command(event_data: Dict[str, Any]):
+def process_slash_command(event_data: Dict[str, Any]):
     """
     Process Slack slash commands (future feature)
     
@@ -375,7 +384,7 @@ async def process_slash_command(event_data: Dict[str, Any]):
     pass
 
 
-async def process_interactive_component(event_data: Dict[str, Any]):
+def process_interactive_component(event_data: Dict[str, Any]):
     """
     Process Slack interactive components (future feature)
     
@@ -406,15 +415,8 @@ def get_integration_status():
         if not user_id:
             return jsonify(error_response), 401
         
-        # Get integration status
-        try:
-            status = asyncio.run(slack_service.get_integration_status(user_id))
-        except RuntimeError:
-            # Handle case where event loop is already running (in tests)
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, slack_service.get_integration_status(user_id))
-                status = future.result()
+        # Get integration status (now synchronous)
+        status = slack_service.get_integration_status(user_id)
         
         return jsonify(status), 200
         
@@ -445,15 +447,8 @@ def disconnect_integration():
         if not user_id:
             return jsonify(error_response), 401
         
-        # Disconnect integration
-        try:
-            result = asyncio.run(slack_service.disconnect_integration(user_id))
-        except RuntimeError:
-            # Handle case where event loop is already running (in tests)
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, slack_service.disconnect_integration(user_id))
-                result = future.result()
+        # Disconnect integration (now synchronous)
+        result = slack_service.disconnect_integration(user_id)
         
         if result.get('success'):
             return jsonify({
