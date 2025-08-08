@@ -74,8 +74,7 @@ class SlackService:
             'client_id': self.client_id,
             'scope': ' '.join(scopes),
             'state': state_token,
-            'redirect_uri': redirect_uri,
-            'user_scope': 'identity.basic'
+            'redirect_uri': redirect_uri
         }
         
         param_string = '&'.join([f"{key}={value}" for key, value in params.items()])
