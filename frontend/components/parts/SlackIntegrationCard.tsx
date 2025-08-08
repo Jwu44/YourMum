@@ -140,20 +140,42 @@ const SlackIntegrationCard: React.FC = () => {
 
       window.addEventListener('message', messageHandler)
 
-      // Optional: Check if window is closed manually
+      // Check if window is closed manually and add fallback refresh
       const checkWindowClosed = setInterval(() => {
         if (oauthWindow.closed) {
           clearInterval(checkWindowClosed)
           window.removeEventListener('message', messageHandler)
           
+          // Add fallback: refresh status after window closes
+          // This ensures UI updates even if postMessage fails
+          setTimeout(async () => {
+            try {
+              await checkSlackStatus()
+            } catch (error) {
+              console.error('Error refreshing status after OAuth window closed:', error)
+            }
+          }, 1000)
+          
           // If we haven't received a success message, assume user cancelled
+          // But wait a bit longer to allow for the status refresh
           setTimeout(() => {
-            toast({
-              title: 'OAuth Cancelled',
-              description: 'OAuth window was closed. The integration was not completed.',
-              variant: 'destructive'
+            // Only show cancelled message if still not connected
+            checkSlackStatus().then(() => {
+              if (!status.connected) {
+                toast({
+                  title: 'OAuth Cancelled',
+                  description: 'OAuth window was closed. The integration was not completed.',
+                  variant: 'destructive'
+                })
+              }
+            }).catch(() => {
+              toast({
+                title: 'OAuth Cancelled',
+                description: 'OAuth window was closed. The integration was not completed.',
+                variant: 'destructive'
+              })
             })
-          }, 500)
+          }, 2000)
         }
       }, 1000)
     } catch (error) {
@@ -201,11 +223,26 @@ const SlackIntegrationCard: React.FC = () => {
   }, [toast])
 
   /**
-   * Check status on component mount
+   * Check status on component mount and when window regains focus
    */
   useEffect(() => {
     checkSlackStatus()
-  }, [checkSlackStatus])
+    
+    // Add focus listener to refresh status when user returns to main window
+    // This catches cases where OAuth was completed in main browser window
+    const handleWindowFocus = () => {
+      // Only refresh if currently not connected (to avoid unnecessary API calls)
+      if (!status.connected && !isCheckingStatus) {
+        checkSlackStatus()
+      }
+    }
+    
+    window.addEventListener('focus', handleWindowFocus)
+    
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus)
+    }
+  }, [checkSlackStatus, status.connected, isCheckingStatus])
 
   return (
     <Card className="relative">
