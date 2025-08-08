@@ -8,7 +8,8 @@ import json
 import uuid
 import asyncio
 from datetime import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect, url_for
+from urllib.parse import urlencode
 from typing import Dict, Any, Optional
 
 from backend.db_config import get_database
@@ -160,25 +161,47 @@ def handle_oauth_callback():
                 result = future.result()
         
         if result.get('success'):
-            return jsonify({
-                "success": True,
-                "message": "Slack integration connected successfully",
-                "workspace_name": result.get('workspace_name'),
-                "workspace_id": result.get('workspace_id'),
-                "connected_at": result.get('connected_at')
-            }), 200
+            # Redirect to success page instead of returning JSON
+            # Construct query parameters for the success page
+            success_params = {
+                'success': 'true',
+                'message': result.get('message', 'Slack integration connected successfully'),
+                'workspace_name': result.get('workspace_name', ''),
+                'workspace_id': result.get('workspace_id', ''),
+                'connected_at': result.get('connected_at', '')
+            }
+            
+            # Build the success page URL (assuming frontend runs on port 3000 in dev)
+            # This should be configurable via environment variable for production
+            frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+            success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(success_params)}"
+            
+            return redirect(success_url)
         else:
-            return jsonify({
-                "success": False,
-                "error": result.get('error', 'OAuth callback failed')
-            }), 500
+            # For errors, still redirect to success page but with error parameters
+            error_params = {
+                'success': 'false',
+                'error': result.get('error', 'OAuth callback failed')
+            }
+            
+            frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+            success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
+            
+            return redirect(success_url)
             
     except Exception as e:
         print(f"Error in OAuth callback: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": f"OAuth callback failed: {str(e)}"
-        }), 500
+        
+        # For exceptions, also redirect to success page with error
+        error_params = {
+            'success': 'false',
+            'error': f"OAuth callback failed: {str(e)}"
+        }
+        
+        frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+        success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
+        
+        return redirect(success_url)
 
 
 @slack_bp.route('/webhook', methods=['POST'])
