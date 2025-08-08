@@ -9,6 +9,8 @@ import hashlib
 import json
 import uuid
 import asyncio
+import base64
+import time
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from slack_sdk import WebClient
@@ -44,16 +46,83 @@ class SlackService:
         # Base OAuth URL for Slack
         self.oauth_base_url = "https://slack.com/oauth/v2/authorize"
         
-    def generate_oauth_url(self, state_token: str, redirect_uri: str = None) -> Tuple[str, str]:
+    def generate_secure_state_token(self, user_id: str) -> str:
         """
-        Generate OAuth URL for Slack workspace connection
+        Generate secure state token with embedded user ID
+        
+        Format: base64(user_id:timestamp:uuid)
         
         Args:
-            state_token: CSRF protection state token
+            user_id: YourdAI user ID to embed in state
+            
+        Returns:
+            Base64 encoded secure state token
+        """
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        
+        # Use URL-safe base64 encoding and remove padding
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        return secure_state
+    
+    def validate_and_extract_user_from_state(self, state_token: str, max_age_minutes: int = 10) -> Optional[str]:
+        """
+        Validate secure state token and extract user ID
+        
+        Args:
+            state_token: Base64 encoded state token
+            max_age_minutes: Maximum age of state token in minutes
+            
+        Returns:
+            User ID if state is valid, None otherwise
+        """
+        try:
+            # Add padding for base64 decoding if needed
+            padding = 4 - len(state_token) % 4
+            if padding != 4:
+                state_token += '=' * padding
+            
+            # Decode state token
+            decoded_state = base64.urlsafe_b64decode(state_token).decode()
+            parts = decoded_state.split(':')
+            
+            # Validate format
+            if len(parts) != 3:
+                return None
+            
+            user_id, timestamp_str, uuid_str = parts
+            
+            # Validate timestamp is numeric
+            try:
+                timestamp = int(timestamp_str)
+            except ValueError:
+                return None
+            
+            # Check if token is expired
+            current_time = int(time.time())
+            if current_time - timestamp > max_age_minutes * 60:
+                return None
+            
+            # Validate UUID format (basic check)
+            if len(uuid_str) != 36 or uuid_str.count('-') != 4:
+                return None
+            
+            return user_id
+            
+        except Exception:
+            return None
+    
+    def generate_oauth_url(self, user_id: str, redirect_uri: str = None) -> Tuple[str, str]:
+        """
+        Generate OAuth URL for Slack workspace connection with secure state token
+        
+        Args:
+            user_id: YourdAI user ID to embed in state token
             redirect_uri: Optional custom redirect URI
             
         Returns:
-            Tuple of (oauth_url, state_token)
+            Tuple of (oauth_url, secure_state_token)
         """
         scopes = [
             'app_mentions:read',
@@ -65,6 +134,9 @@ class SlackService:
             'team:read'
         ]
         
+        # Generate secure state token with embedded user ID
+        secure_state_token = self.generate_secure_state_token(user_id)
+        
         # Default redirect URI
         if not redirect_uri:
             redirect_uri = f"{os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')}/api/integrations/slack/auth/callback"
@@ -72,14 +144,14 @@ class SlackService:
         params = {
             'client_id': self.client_id,
             'scope': ' '.join(scopes),
-            'state': state_token,
+            'state': secure_state_token,
             'redirect_uri': redirect_uri
         }
         
         param_string = '&'.join([f"{key}={value}" for key, value in params.items()])
         oauth_url = f"{self.oauth_base_url}?{param_string}"
         
-        return oauth_url, state_token
+        return oauth_url, secure_state_token
     
     async def handle_oauth_callback(self, code: str, state: str, user_id: str) -> Dict[str, Any]:
         """

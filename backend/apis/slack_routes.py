@@ -70,18 +70,12 @@ def generate_oauth_url():
         if not user_id:
             return jsonify(error_response), 401
         
-        # Generate state token for CSRF protection
-        state_token = str(uuid.uuid4())
-        
-        # Generate OAuth URL
-        oauth_url, returned_state = slack_service.generate_oauth_url(state_token)
-        
-        # Store state token in session/database for verification
-        # For now, we'll trust the returned state matches our generated token
+        # Generate OAuth URL with secure state token containing user ID
+        oauth_url, secure_state_token = slack_service.generate_oauth_url(user_id)
         
         return jsonify({
             "oauth_url": oauth_url,
-            "state": returned_state
+            "state": secure_state_token
         }), 200
         
     except Exception as e:
@@ -99,16 +93,12 @@ def handle_oauth_callback():
     
     Query Parameters:
         code: OAuth authorization code (required)
-        state: CSRF protection state token (required)
+        state: Secure state token containing user ID (required)
         error: Error code if authorization failed (optional)
-    
-    Headers:
-        Authorization: Bearer <firebase_id_token> (required)
     
     Returns:
         200: Integration connected successfully
-        400: Missing code or state, or authorization denied
-        401: Authentication required
+        400: Missing code/state, invalid state, or authorization denied
         500: Internal server error
     """
     try:
@@ -136,10 +126,27 @@ def handle_oauth_callback():
                 "error": "Missing state parameter"
             }), 400
         
-        # Extract user ID
-        user_id, error_response = extract_user_from_request()
+        # Extract user ID from secure state token
+        user_id = slack_service.validate_and_extract_user_from_state(state)
         if not user_id:
-            return jsonify(error_response), 401
+            # Check if this is a legacy simple state token (backward compatibility)
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                # Try legacy auth method
+                token = auth_header.split(' ')[1]
+                user = get_user_from_token(token)
+                if user and user.get('googleId'):
+                    user_id = user.get('googleId')
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": "Invalid state parameter - malformed or expired"
+                    }), 400
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid state parameter - malformed or expired"
+                }), 400
         
         # Handle OAuth callback (run async function in sync context)
         try:
