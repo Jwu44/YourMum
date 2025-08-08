@@ -7,6 +7,9 @@ import pytest
 import json
 import hmac
 import hashlib
+import base64
+import time
+import uuid
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 from flask import Flask
@@ -58,6 +61,7 @@ class TestSlackRoutes:
             'workspace_name': 'Test Workspace',
             'connected_at': '2024-01-01T00:00:00Z'
         })
+        mock.validate_and_extract_user_from_state.return_value = None  # Default to None, tests will override
         mock.verify_webhook_signature.return_value = True
         mock.process_event = AsyncMock(return_value=None)
         mock.get_integration_status = AsyncMock(return_value={
@@ -89,6 +93,12 @@ class TestSlackRoutes:
 
     def test_oauth_url_generation(self, client, mock_firebase_token, mock_slack_service):
         """Test OAuth URL generation endpoint"""
+        # Mock the generate_oauth_url to accept user_id parameter
+        mock_slack_service.generate_oauth_url.return_value = (
+            'https://slack.com/oauth/v2/authorize?client_id=test_id&scope=app_mentions:read&state=secure_state',
+            'secure_state'
+        )
+        
         with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
             response = client.get('/api/integrations/slack/auth/connect', 
                                 headers={'Authorization': 'Bearer valid_token'})
@@ -98,11 +108,49 @@ class TestSlackRoutes:
             assert 'oauth_url' in data
             assert 'state' in data
             assert data['oauth_url'].startswith('https://slack.com/oauth/v2/authorize')
-
-    def test_oauth_callback_success(self, client, mock_firebase_token, mock_slack_service):
-        """Test successful OAuth callback handling"""
+            # Verify generate_oauth_url was called with user_id
+            mock_slack_service.generate_oauth_url.assert_called_once_with('test-user-123')
+    
+    def test_oauth_url_generation_with_secure_state(self, client, mock_firebase_token, mock_slack_service):
+        """Test OAuth URL generation creates secure state token"""
+        # Test that the service generates a proper secure state token
+        def mock_generate_oauth_url(user_id):
+            # Generate the same secure state format we expect
+            timestamp = str(int(time.time()))
+            random_uuid = str(uuid.uuid4())
+            state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+            secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+            oauth_url = f'https://slack.com/oauth/v2/authorize?client_id=test_id&scope=app_mentions:read&state={secure_state}'
+            return oauth_url, secure_state
+        
+        mock_slack_service.generate_oauth_url.side_effect = mock_generate_oauth_url
+        
         with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
-            response = client.get('/api/integrations/slack/auth/callback?code=test_code&state=test_state',
+            response = client.get('/api/integrations/slack/auth/connect', 
+                                headers={'Authorization': 'Bearer valid_token'})
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            
+            # Decode and validate the state token
+            state_token = data['state']
+            # Add padding for base64 decoding if needed
+            padding = 4 - len(state_token) % 4
+            if padding != 4:
+                state_token += '=' * padding
+            
+            decoded_state = base64.urlsafe_b64decode(state_token).decode()
+            parts = decoded_state.split(':')
+            
+            assert len(parts) == 3
+            assert parts[0] == 'test-user-123'  # user_id
+            assert parts[1].isdigit()  # timestamp
+            assert len(parts[2]) == 36  # UUID length
+
+    def test_oauth_callback_success_legacy_with_auth(self, client, mock_firebase_token, mock_slack_service):
+        """Test successful OAuth callback handling with legacy auth (backward compatibility)"""
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get('/api/integrations/slack/auth/callback?code=test_code&state=simple_state',
                                 headers={'Authorization': 'Bearer valid_token'})
             
             assert response.status_code == 200
@@ -239,14 +287,90 @@ class TestSlackRoutes:
             data = json.loads(response.data)
             assert 'Authentication required' in data['error']
 
-    def test_oauth_callback_authentication_required(self, client):
-        """Test OAuth callback authentication when code/state are provided"""
-        # Test with code and state to bypass parameter validation and check auth
-        response = client.get('/api/integrations/slack/auth/callback?code=test_code&state=test_state')
+    def test_oauth_callback_with_secure_state_success(self, client, mock_slack_service):
+        """Test OAuth callback with secure state token containing user ID"""
+        import base64
+        import time
+        import uuid
         
-        assert response.status_code == 401
-        data = json.loads(response.data)
-        assert 'Authentication required' in data['error']
+        # Create secure state token (user_id:timestamp:uuid)
+        user_id = "test-user-123"
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        
+        # Mock the validate_and_extract_user_from_state method to return the user_id
+        mock_slack_service.validate_and_extract_user_from_state.return_value = user_id
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={secure_state}')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['success'] is True
+            assert 'workspace_name' in data
+            # Verify state validation was called
+            mock_slack_service.validate_and_extract_user_from_state.assert_called_once_with(secure_state)
+            # Verify slack_service.handle_oauth_callback was called with extracted user_id
+            mock_slack_service.handle_oauth_callback.assert_called_once_with('test_code', secure_state, user_id)
+    
+    def test_oauth_callback_with_malformed_state(self, client, mock_slack_service):
+        """Test OAuth callback with malformed state token"""
+        malformed_states = [
+            'invalid_base64',
+            'dGVzdA==',  # base64 for 'test' - too short
+            base64.urlsafe_b64encode('only:two:parts'.encode()).decode().rstrip('='),
+            base64.urlsafe_b64encode('user:not_timestamp:uuid'.encode()).decode().rstrip('=')
+        ]
+        
+        # Mock validation to return None for all malformed states
+        mock_slack_service.validate_and_extract_user_from_state.return_value = None
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            for malformed_state in malformed_states:
+                response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={malformed_state}')
+                
+                assert response.status_code == 400
+                data = json.loads(response.data)
+                assert data['success'] is False
+                assert 'Invalid state parameter' in data['error']
+    
+    def test_oauth_callback_with_expired_state(self, client, mock_slack_service):
+        """Test OAuth callback with expired state token (older than 10 minutes)"""
+        import base64
+        import uuid
+        
+        # Create expired state token (11 minutes ago)
+        user_id = "test-user-123"
+        old_timestamp = str(int(time.time()) - 11 * 60)  # 11 minutes ago
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{old_timestamp}:{random_uuid}"
+        expired_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+        
+        # Mock validation to return None for expired state
+        mock_slack_service.validate_and_extract_user_from_state.return_value = None
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={expired_state}')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert 'Invalid state parameter' in data['error']
+    
+    def test_oauth_callback_authentication_required_legacy(self, client, mock_slack_service):
+        """Test OAuth callback authentication for legacy non-secure state (backward compatibility)"""
+        # Mock validation to return None (simulating legacy state format)
+        mock_slack_service.validate_and_extract_user_from_state.return_value = None
+        
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            # Test with simple UUID state (old format) - should return invalid state error
+            response = client.get('/api/integrations/slack/auth/callback?code=test_code&state=simple-uuid-state')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+            assert 'Invalid state parameter' in data['error']
 
 
 class TestSlackRoutesIntegration:
