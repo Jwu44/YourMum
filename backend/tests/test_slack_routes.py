@@ -70,7 +70,7 @@ class TestSlackRoutes:
             'workspace_name': None,
             'connected_at': None
         })
-        mock.disconnect_integration = AsyncMock(return_value={'success': True})
+        mock.disconnect_integration.return_value = {'success': True}
         return mock
 
     @pytest.fixture

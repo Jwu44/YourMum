@@ -373,14 +373,7 @@ def disconnect_integration():
             return jsonify(error_response), 401
         
         # Disconnect integration
-        try:
-            result = asyncio.run(slack_service.disconnect_integration(user_id))
-        except RuntimeError:
-            # Handle case where event loop is already running (in tests)
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, slack_service.disconnect_integration(user_id))
-                result = future.result()
+        result = slack_service.disconnect_integration(user_id)
         
         if result.get('success'):
             return jsonify({
