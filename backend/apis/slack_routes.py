@@ -171,9 +171,9 @@ def handle_oauth_callback():
                 'connected_at': result.get('connected_at', '')
             }
             
-            # Build the success page URL (assuming frontend runs on port 3000 in dev)
+            # Build the success page URL (assuming frontend runs on port 8000 in dev)
             # This should be configurable via environment variable for production
-            frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+            frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(success_params)}"
             
             return redirect(success_url)
@@ -184,7 +184,7 @@ def handle_oauth_callback():
                 'error': result.get('error', 'OAuth callback failed')
             }
             
-            frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+            frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
             
             return redirect(success_url)
@@ -198,7 +198,7 @@ def handle_oauth_callback():
             'error': f"OAuth callback failed: {str(e)}"
         }
         
-        frontend_base_url = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+        frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
         success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
         
         return redirect(success_url)
