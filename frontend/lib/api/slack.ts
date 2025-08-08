@@ -101,24 +101,7 @@ export const slackApi = {
       throw new Error(errorData.error || `Failed to get OAuth URL: ${response.status}`)
     }
 
-    const data = await response.json()
-    
-    // Modify the OAuth URL to include Firebase token in state
-    const currentUser = auth.currentUser
-    if (currentUser) {
-      const firebaseToken = await currentUser.getIdToken()
-      const state = JSON.stringify({
-        csrf: data.state,
-        firebaseToken: firebaseToken
-      })
-      
-      // Replace the state parameter in the OAuth URL
-      const url = new URL(data.oauth_url)
-      url.searchParams.set('state', state)
-      data.oauth_url = url.toString()
-    }
-    
-    return data
+    return await response.json()
   },
 
   /**
