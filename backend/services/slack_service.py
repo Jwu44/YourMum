@@ -183,7 +183,7 @@ class SlackService:
             integration_data['bot_token'] = encrypt_token(integration_data['bot_token'])
             
             # Store integration in database
-            await self._store_integration_data(user_id, integration_data)
+            self._store_integration_data(user_id, integration_data)
             
             return {
                 'success': True,
@@ -272,7 +272,7 @@ class SlackService:
             'channels_joined': []
         }
     
-    async def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
+    def _store_integration_data(self, user_id: str, integration_data: Dict[str, Any]):
         """Store integration data in user document"""
         if self.db_client is None:
             raise ValueError("Database client not configured")
@@ -281,7 +281,7 @@ class SlackService:
         users_collection = self.db_client.get_collection('users')
         
         # Update user document with Slack integration
-        await users_collection.update_one(
+        users_collection.update_one(
             {'googleId': user_id},
             {'$set': {'slack_integration': integration_data}},
             upsert=False
@@ -379,7 +379,7 @@ class SlackService:
             )
             
             # Store task in database
-            await self._store_task(task, user_id)
+            self._store_task(task, user_id)
             
             return task
             
@@ -470,7 +470,7 @@ class SlackService:
         
         return 'Unknown User'
     
-    async def _store_task(self, task: Task, user_id: str):
+    def _store_task(self, task: Task, user_id: str):
         """Store task in database"""
         if self.db_client is None:
             return
@@ -482,7 +482,7 @@ class SlackService:
         today = datetime.utcnow().strftime('%Y-%m-%d')
         
         # Try to add to existing schedule or create new one
-        await tasks_collection.update_one(
+        tasks_collection.update_one(
             {'userId': user_id, 'date': today},
             {
                 '$push': {'schedule': task.to_dict()},
@@ -491,7 +491,7 @@ class SlackService:
             upsert=True
         )
     
-    async def disconnect_integration(self, user_id: str) -> Dict[str, Any]:
+    def disconnect_integration(self, user_id: str) -> Dict[str, Any]:
         """
         Disconnect Slack integration for a user
         
@@ -508,7 +508,7 @@ class SlackService:
             users_collection = self.db_client.get_collection('users')
             
             # Remove Slack integration data
-            await users_collection.update_one(
+            users_collection.update_one(
                 {'googleId': user_id},
                 {'$unset': {'slack_integration': ""}}
             )
