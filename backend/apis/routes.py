@@ -1,10 +1,7 @@
 from flask import Blueprint, jsonify, request
 from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
-from backend.services.slack_service import SlackService
 import traceback
 
-# Initialize Slack service
-slack_service = SlackService()
 from bson import ObjectId
 from datetime import datetime, timezone 
 from backend.models.task import Task
@@ -35,6 +32,9 @@ from backend.services.archive_service import (
     move_archived_task_to_today,
     delete_archived_task
 )
+
+from backend.services.slack_service import SlackService
+slack_service = SlackService()
 
 api_bp = Blueprint("api", __name__)
 
@@ -1549,24 +1549,14 @@ def delete_user_account():
         failures = []
         
         # Step 1: Disconnect Slack integration if exists
-        try:
-            slack_data = user.get("slack", {})
-            instance_id = slack_data.get("instanceId")
-            
-            if instance_id:
-                print(f"Disconnecting Slack integration for user {user_google_id}")
-                success, result = slack_service.disconnect_slack_integration(user_google_id, instance_id)
-                if not success:
-                    failures.append(f"Slack disconnection: {result.get('error', 'Unknown error')}")
-                    print(f"Slack disconnection failed: {result}")
-                else:
-                    print("Slack integration disconnected successfully")
-            else:
-                print("No Slack integration found for user")
-        except Exception as e:
-            failures.append(f"Slack disconnection error: {str(e)}")
-            print(f"Error disconnecting Slack: {e}")
-        
+        print(f"Disconnecting Slack integration for user {user_google_id}")
+        success, result = slack_service.disconnect_integration(user_google_id)
+        if not success:
+            failures.append(f"Slack disconnection: {result.get('error', 'Unknown error')}")
+            print(f"Slack disconnection failed: {result}")
+        else:
+            print("Slack integration disconnected successfully")
+    
         # Step 2: Get database and clean up all user-related data
         db = get_database()
         
