@@ -109,9 +109,8 @@ const SlackIntegrationCard: React.FC = () => {
 
       // Listen for OAuth completion message from popup
       const messageHandler = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin.replace('3000', '8000')) {
-          return // Ignore messages from other origins
-        }
+        const allowedOrigin = window.location.origin
+        if (event.origin !== allowedOrigin) return
 
         if (event.data.type === 'slack_oauth_success') {
           // OAuth completed successfully
@@ -227,22 +226,17 @@ const SlackIntegrationCard: React.FC = () => {
    */
   useEffect(() => {
     checkSlackStatus()
-    
-    // Add focus listener to refresh status when user returns to main window
-    // This catches cases where OAuth was completed in main browser window
+  }, [checkSlackStatus])
+
+  useEffect(() => {
     const handleWindowFocus = () => {
-      // Only refresh if currently not connected (to avoid unnecessary API calls)
       if (!status.connected && !isCheckingStatus) {
         checkSlackStatus()
       }
     }
-    
     window.addEventListener('focus', handleWindowFocus)
-    
-    return () => {
-      window.removeEventListener('focus', handleWindowFocus)
-    }
-  }, [checkSlackStatus, status.connected, isCheckingStatus])
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [status.connected, isCheckingStatus, checkSlackStatus])
 
   return (
     <Card className="relative">
