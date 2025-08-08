@@ -5,7 +5,6 @@ API endpoints for Slack OAuth, webhook handling, and integration management
 
 import os
 import json
-import uuid
 import asyncio
 from datetime import datetime
 from flask import Blueprint, request, jsonify, redirect, url_for
@@ -15,8 +14,7 @@ from typing import Dict, Any, Optional
 from backend.db_config import get_database
 from backend.services.slack_service import SlackService
 from backend.services.slack_message_processor import SlackMessageProcessor
-from backend.apis.routes import verify_firebase_token, get_user_from_token
-
+from backend.apis.routes import get_user_from_token
 # Create blueprint
 slack_bp = Blueprint("slack_integration", __name__)
 
@@ -173,7 +171,7 @@ def handle_oauth_callback():
             
             # Build the success page URL (assuming frontend runs on port 8000 in dev)
             # This should be configurable via environment variable for production
-            frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
+            frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(success_params)}"
             
             return redirect(success_url)
@@ -184,7 +182,7 @@ def handle_oauth_callback():
                 'error': result.get('error', 'OAuth callback failed')
             }
             
-            frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
+            frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
             success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
             
             return redirect(success_url)
@@ -198,7 +196,7 @@ def handle_oauth_callback():
             'error': f"OAuth callback failed: {str(e)}"
         }
         
-        frontend_base_url = os.environ.get('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
+        frontend_base_url = os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')
         success_url = f"{frontend_base_url}/integrations/slack/callback/success?{urlencode(error_params)}"
         
         return redirect(success_url)
