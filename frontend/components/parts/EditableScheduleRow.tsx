@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
 import { TypographyH4 } from '../../app/fonts/text'
-import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical } from 'lucide-react'
+import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
@@ -564,6 +564,26 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      {/* Slack "View" link - only for top-level Slack tasks */}
+      {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
+        (() => {
+          const slackLink = task.slack_metadata?.deep_link || task.slack_metadata?.message_url || task.slack_message_url
+          if (!slackLink) return null
+          return (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            >
+              <a href={slackLink} target="_blank" rel="noopener noreferrer" aria-label="View Slack message" className="inline-flex items-center gap-1">
+                <ExternalLink className="h-4 w-4" />
+                <span>View</span>
+              </a>
+            </Button>
+          )
+        })()
+      )}
       {/* Decompose button - existing functionality */}
       {canDecompose && (
         <Button
