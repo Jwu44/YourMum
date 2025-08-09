@@ -86,7 +86,7 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
 const IntegrationsPage: React.FC = () => {
   return (
     <SidebarLayout>
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe mobile-scroll">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe mobile-scroll">
         {/* Page Header */}
         <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
           <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -99,7 +99,7 @@ const IntegrationsPage: React.FC = () => {
         </div>
 
         {/* Integrations Grid */}
-        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 xl:grid-cols-3 justify-items-stretch sm:justify-items-center px-2 sm:px-4 max-w-none">
           {integrationServices.map((service) => {
             if (service.status === 'available' && service.component) {
               const ServiceComponent = service.component
@@ -108,30 +108,6 @@ const IntegrationsPage: React.FC = () => {
               return <ComingSoonCard key={service.id} service={service} />
             }
           })}
-        </div>
-
-        {/* Help Section */}
-        <div className="mt-12">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Need Help?</CardTitle>
-              <CardDescription>
-                Learn more about setting up integrations and managing your connected services
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Visit our{' '}
-                <a
-                  href="#"
-                  className="text-primary hover:underline"
-                >
-                  documentation
-                </a>{' '}
-                for detailed setup guides and troubleshooting tips.
-              </p>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </SidebarLayout>
