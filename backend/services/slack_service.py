@@ -16,6 +16,7 @@ from slack_sdk import WebClient
 import aiohttp
 
 from backend.models.task import Task
+from backend.models.schedule_schema import format_schedule_date
 from backend.utils.encryption import encrypt_token, decrypt_token
 
 
@@ -508,15 +509,17 @@ class SlackService:
         # For now, we'll add to today's schedule
         # This should integrate with existing schedule service
         tasks_collection = self.db_client.get_collection('UserSchedules')
-        
-        today = datetime.utcnow().strftime('%Y-%m-%d')
-        
-        # Try to add to existing schedule or create new one
+
+        # Store under normalized date key used across schedule service
+        today_str = datetime.utcnow().strftime('%Y-%m-%d')
+        formatted_date = format_schedule_date(today_str)
+
+        # Add task and update metadata timestamp without breaking existing schema
         tasks_collection.update_one(
-            {'userId': user_id, 'date': today},
+            {'userId': user_id, 'date': formatted_date},
             {
                 '$push': {'schedule': task.to_dict()},
-                '$set': {'last_modified': datetime.utcnow().isoformat()}
+                '$set': {'metadata.last_modified': datetime.utcnow().isoformat()}
             },
             upsert=True
         )
