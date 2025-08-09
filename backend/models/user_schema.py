@@ -52,18 +52,7 @@ user_schema_validation = {
                     }
                 }
             },
-            # Add Slack integration fields
-            "slack": {
-                "bsonType": "object",
-                "properties": {
-                    "connected": { "bsonType": "bool" },
-                    "instanceId": { "bsonType": ["string", "null"] },
-                    "serverUrl": { "bsonType": ["string", "null"] },
-                    "oauthUrl": { "bsonType": ["string", "null"] },
-                    "connectedAt": { "bsonType": ["date", "null"] },
-                    "lastSyncTime": { "bsonType": ["date", "null"] }
-                }
-            }
+            # Note: Legacy `slack` schema removed. Slack integration data is stored under `slack_integration`.
         }
     }
 }
