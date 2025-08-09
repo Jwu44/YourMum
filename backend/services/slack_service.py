@@ -4,17 +4,15 @@ Handles Slack OAuth, event processing, and task creation
 """
 
 import os
+import re
 import hmac
 import hashlib
-import json
 import uuid
-import asyncio
 import base64
 import time
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
 import aiohttp
 
 from backend.models.task import Task
@@ -363,17 +361,16 @@ class SlackService:
             if not self._is_user_mentioned(event, integration_data['slack_user_id']):
                 return None
             
-            # Enrich event with additional context
+            # Enrich event with additional context (best effort; do not fail task creation)
             enriched_event = await self._enrich_event_data(event, integration_data)
-            
-            # Process with AI to determine if actionable
-            if not self.message_processor:
-                return None
-                
-            is_actionable, task_text = await self.message_processor.process_mention(enriched_event)
-            
-            if not is_actionable or not task_text:
-                return None
+
+            # Derive a task title directly from message text without AI gating
+            raw_text = event.get('text', '')
+            task_text = self._extract_task_text(raw_text)
+            if not task_text:
+                # Provide a sensible fallback to ensure a task is always created
+                channel_name = enriched_event.get('channel_name', 'Slack')
+                task_text = f"Follow up on message in #{channel_name}"
             
             # Create task from Slack event
             task = Task.from_slack_event(
@@ -385,12 +382,41 @@ class SlackService:
             # Store task in database
             self._store_task(task, user_id)
             
+            # Light debug log for observability
+            try:
+                print(f"[Slack] Task created for user {user_id}: '{task_text}' (channel={enriched_event.get('channel_name','?')})")
+            except Exception:
+                pass
+            
             return task
             
         except Exception as e:
             # Log error but don't raise to avoid webhook failures
             print(f"Error processing Slack event: {str(e)}")
             return None
+
+    def _extract_task_text(self, text: str) -> str:
+        """
+        Convert a raw Slack message into a concise task title.
+        - Removes user mentions like <@Uxxxx>
+        - Removes broadcast mentions like <!here>, <!channel>, <!everyone>
+        - Collapses whitespace and trims
+        - Truncates to a reasonable length to keep task titles tidy
+        """
+        if not text:
+            return ""
+
+        cleaned = re.sub(r"<@[UW][A-Z0-9]+>", "", text)  # remove user mentions
+        cleaned = re.sub(r"<!(?:here|channel|everyone)>", "", cleaned, flags=re.IGNORECASE)  # remove broadcast mentions
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+        # Slack often includes punctuation-only prompts; guard against empties
+        if not cleaned:
+            return ""
+
+        # Keep task titles readable
+        max_len = 140
+        return cleaned if len(cleaned) <= max_len else cleaned[: max_len - 1] + "…"
     
     def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Slack integration data from database (synchronous)"""
