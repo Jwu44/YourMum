@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional
 
 from backend.db_config import get_database
 from backend.services.slack_service import SlackService
+from backend.services.event_bus import event_bus
 from backend.services.slack_message_processor import SlackMessageProcessor
 from backend.apis.routes import get_user_from_token
 
@@ -305,7 +306,13 @@ async def process_workspace_event(event_data: Dict[str, Any]):
                 
                 if task:
                     print(f"Created task from Slack event: {task.text} for user {user_id}")
-                    
+                    # Notify user's active clients that today's schedule has been updated
+                    # Using UTC date to match current storage semantics
+                    date_str = datetime.utcnow().strftime('%Y-%m-%d')
+                    event_bus.publish(user_id, {
+                        "type": "schedule_updated",
+                        "date": date_str
+                    })
     except Exception as e:
         print(f"Error processing workspace event: {str(e)}")
 

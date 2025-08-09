@@ -46,7 +46,7 @@ const Dashboard: React.FC = () => {
   const { state } = useForm()
   const { toast } = useToast()
   const isMobile = useIsMobile()
-  const { calendarConnectionStage } = useAuth()
+  const { calendarConnectionStage, currentUser } = useAuth()
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
@@ -1261,6 +1261,60 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     document.documentElement.classList.remove('dark')
   }, [])
+
+  useEffect(() => {
+    let es: EventSource | null = null
+
+    const connect = async () => {
+      try {
+        if (!currentUser) return
+        const token = await currentUser.getIdToken()
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+        es = new EventSource(`${apiBase}/api/events/stream?token=${encodeURIComponent(token)}`)
+
+        es.onmessage = async (ev) => {
+          try {
+            const payload = JSON.parse(ev.data)
+            if (payload?.type === 'schedule_updated') {
+              const eventDate = payload.date as string
+              const currentDateStr = getDateString(currentDayIndex)
+              if (eventDate === currentDateStr) {
+                const res = await loadSchedule(currentDateStr)
+                if (res.success && res.schedule) {
+                  setScheduleDays(prev => {
+                    const newDays = [...prev]
+                    const dayIndex = Math.abs(currentDayIndex)
+                    newDays[dayIndex] = res.schedule!
+                    return newDays
+                  })
+                  setScheduleCache(prev => {
+                    const newCache = new Map(prev)
+                    newCache.set(currentDateStr, res.schedule!)
+                    return newCache
+                  })
+                }
+              }
+            }
+          } catch (_) {
+            // ignore malformed messages
+          }
+        }
+
+        es.onerror = () => {
+          // allow native reconnection
+        }
+      } catch (e) {
+        console.error('SSE connection error:', e)
+      }
+    }
+
+    connect()
+
+    return () => {
+      if (es) es.close()
+    }
+  }, [currentDayIndex, currentUser?.uid])
 
   // Show calendar connection loader during OAuth flow
   if (calendarConnectionStage) {
