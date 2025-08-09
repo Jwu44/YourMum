@@ -230,13 +230,17 @@ class SlackService:
     async def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
         """Exchange OAuth code for access tokens"""
         oauth_url = "https://slack.com/api/oauth.v2.access"
-        
+
+        # Use the same redirect_uri used during the authorization request
+        redirect_uri = f"{os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')}/api/integrations/slack/auth/callback"
+
         data = {
             'client_id': self.client_id,
             'client_secret': self.client_secret,
-            'code': code
+            'code': code,
+            'redirect_uri': redirect_uri
         }
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(oauth_url, data=data) as response:
                 return await response.json()
@@ -350,8 +354,8 @@ class SlackService:
             if event.get('bot_id'):
                 return None
             
-            # Get user integration data
-            integration_data = await self._get_user_integration(user_id)
+            # Get user integration data (sync read)
+            integration_data = self._get_user_integration(user_id)
             if not integration_data:
                 return None
             
@@ -388,17 +392,17 @@ class SlackService:
             print(f"Error processing Slack event: {str(e)}")
             return None
     
-    async def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user's Slack integration data from database"""
+    def _get_user_integration(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user's Slack integration data from database (synchronous)"""
         if self.db_client is None:
             return None
-        
+
         users_collection = self.db_client.get_collection('users')
-        user_doc = await users_collection.find_one({'googleId': user_id})
-        
+        user_doc = users_collection.find_one({'googleId': user_id})
+
         if not user_doc or 'slack_integration' not in user_doc:
             return None
-        
+
         return user_doc['slack_integration']
     
     def _is_user_mentioned(self, event: Dict[str, Any], slack_user_id: str) -> bool:
@@ -532,7 +536,7 @@ class SlackService:
             Dictionary with integration status
         """
         try:
-            integration_data = await self._get_user_integration(user_id)
+            integration_data = self._get_user_integration(user_id)
             
             if not integration_data:
                 return {
