@@ -1,5 +1,11 @@
 import { type User } from 'firebase/auth'
 
+// Minimal Slack metadata used by the UI for deep linking back to the message
+export interface SlackMetadata {
+  message_url?: string
+  deep_link?: string
+}
+
 export interface Task {
   id: string
   text: string
@@ -24,6 +30,8 @@ export interface Task {
   // New Slack integration fields
   source?: 'slack'
   slack_message_url?: string
+  // Preferred container for Slack message links; UI will prefer deep_link, then message_url
+  slack_metadata?: SlackMetadata
 }
 
 export interface FormData {
