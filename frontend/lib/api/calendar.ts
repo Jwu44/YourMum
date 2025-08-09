@@ -77,18 +77,26 @@ export const calendarApi = {
   /**
    * Disconnect user's Google Calendar
    */
-  async disconnectCalendar () {
+  async disconnectCalendar (userId?: string) {
+    // Backend expects { userId } in body
     const token = await getAuthToken()
+    const uid = userId || auth.currentUser?.uid
+    if (!uid) {
+      throw new Error('User not authenticated')
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify({ userId: uid })
     })
 
     if (!response.ok) {
-      throw new Error('Failed to disconnect calendar')
+      const error = await response.json().catch(() => ({} as any))
+      throw new Error(error.error || 'Failed to disconnect calendar')
     }
 
     return await response.json()

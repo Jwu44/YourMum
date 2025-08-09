@@ -1,19 +1,19 @@
 /**
  * @file SlackIntegrationCard.tsx
- * @description Slack integration card component with OAuth connection handling
- * Updated to use actual backend API endpoints from slack_routes.py
+ * @description Slack integration card using standardized IntegrationCardShell
+ * UI simplified per TASK-14 while preserving existing OAuth/connect logic
  */
 
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
 
-// UI Components
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+// Standardized shell UI
+import IntegrationCardShell from '@/components/parts/IntegrationCardShell'
+import { IntegrationLogo } from '@/components/ui/integration-logo'
 
 // Icons
-import { Slack, ExternalLink, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Slack } from 'lucide-react'
 
 // Hooks
 import { useToast } from '@/hooks/use-toast'
@@ -22,7 +22,6 @@ import { useToast } from '@/hooks/use-toast'
 import slackApi, { type SlackIntegrationStatus } from '@/lib/api/slack'
 
 // Utils
-import { cn } from '@/lib/utils'
 
 /**
  * Slack Integration Card Component
@@ -238,147 +237,27 @@ const SlackIntegrationCard: React.FC = () => {
     return () => window.removeEventListener('focus', handleWindowFocus)
   }, [status.connected, isCheckingStatus, checkSlackStatus])
 
+  // Map current state to shell props
+  const isConnected = Boolean(status.connected)
+  const isBusy = isLoading || isCheckingStatus
+  const ctaVariant = isConnected ? 'destructive' : 'default'
+  const ctaLabel = isCheckingStatus
+    ? 'Checking...'
+    : isLoading
+      ? (isConnected ? 'Disconnecting...' : 'Connecting...')
+      : (isConnected ? 'Disconnect' : 'Connect')
+
   return (
-    <Card className="relative">
-      {/* Connection Status Indicator */}
-      <div className="absolute top-3 right-3">
-        {isCheckingStatus
-          ? (
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            )
-          : status.connected
-            ? (
-          <CheckCircle className="w-4 h-4 text-green-500" />
-              )
-            : (
-          <AlertCircle className="w-4 h-4 text-muted-foreground" />
-              )}
-      </div>
-
-      <CardHeader className="pb-4">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-slack-green/10 rounded-lg">
-            <Slack className="w-6 h-6 text-slack-green" style={{ color: '#4A154B' }} />
-          </div>
-          <div className="flex-1">
-            <CardTitle className="text-lg">Slack</CardTitle>
-            <CardDescription className="text-sm">
-              Connect your Slack workspace to automatically create tasks from @mentions
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        {/* Connection Status */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Status:</span>
-            <span
-              className={cn(
-                'font-medium',
-                status.connected ? 'text-green-600' : 'text-muted-foreground'
-              )}
-            >
-              {isCheckingStatus
-                ? 'Checking...'
-                : status.connected
-                  ? 'Connected'
-                  : 'Not connected'
-              }
-            </span>
-          </div>
-
-          {status.connected && (
-            <div className="text-xs text-muted-foreground mt-1 space-y-1">
-              {status.workspace_name && (
-                <div>Workspace: {status.workspace_name}</div>
-              )}
-              {status.connected_at && (
-                <div>Connected on {new Date(status.connected_at).toLocaleDateString()}</div>
-              )}
-              {status.workspace_id && (
-                <div className="font-mono">ID: {status.workspace_id}</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Features List */}
-        <div className="mb-6">
-          <h4 className="text-sm font-medium mb-2">Features:</h4>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            <li>• Auto-create tasks from @mentions</li>
-            <li>• Real-time message monitoring</li>
-            <li>• Direct links to original messages</li>
-          </ul>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          {status.connected
-            ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={checkSlackStatus}
-                disabled={isCheckingStatus}
-                className="px-3"
-              >
-                {isCheckingStatus
-                  ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                    )
-                  : (
-                      'Refresh'
-                    )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDisconnect}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading
-                  ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Disconnecting...
-                  </>
-                    )
-                  : (
-                      'Disconnect'
-                    )}
-              </Button>
-            </>
-              )
-            : (
-            <Button
-              size="sm"
-              onClick={handleConnect}
-              disabled={isLoading || isCheckingStatus}
-              className="flex-1"
-            >
-              {isLoading
-                ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-                  )
-                : (
-                <>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Connect
-                </>
-                  )}
-            </Button>
-              )}
-        </div>
-      </CardContent>
-    </Card>
+    <IntegrationCardShell
+      icon={<IntegrationLogo src="/images/integrations/slack_logo.webp" alt="Slack" />}
+      name="Slack"
+      description="To automatically create tasks from @mentions, please ensure the bot is added to the channels you want to use."
+      connected={isConnected}
+      isBusy={isBusy}
+      ctaLabel={ctaLabel}
+      ctaVariant={ctaVariant as any}
+      onCtaClick={isConnected ? handleDisconnect : handleConnect}
+    />
   )
 }
 
