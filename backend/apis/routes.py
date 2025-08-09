@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response, stream_with_context
 from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 
@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from backend.models.task import Task
 from typing import List, Dict, Any, Optional, Union, Tuple
 import json
+from queue import Empty
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
@@ -53,6 +54,83 @@ def handle_options_requests(path=None):
     """
     response = jsonify({"status": "ok"})
     return response
+
+
+# -----------------------------
+# Server-Sent Events (SSE)
+# -----------------------------
+@api_bp.route("/events/stream", methods=["GET"])
+def events_stream():
+    """
+    Establish a Server-Sent Events stream for realtime user notifications.
+
+    Authentication:
+        - Accepts Firebase ID token via Authorization header (Bearer) or
+          as a query parameter `token` (EventSource cannot set headers)
+
+    Streamed message format:
+        data: {"type": str, "date": "YYYY-MM-DD", ...}\n\n
+    Heartbeats are sent periodically to keep the connection alive through proxies.
+    """
+    try:
+        # Extract token from header or query param as fallback for EventSource
+        auth_header = request.headers.get('Authorization', '')
+        token = auth_header.split(' ')[1] if auth_header.startswith('Bearer ') else request.args.get('token')
+
+        if not token:
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Lazy import to avoid any circular dependencies at module load
+        from backend.services.event_bus import event_bus
+
+        def generate_stream():
+            subscriber_queue = event_bus.subscribe(user_id)
+            try:
+                # Initial ping so the client knows the connection is up
+                yield "event: ping\ndata: {}\n\n"
+                while True:
+                    try:
+                        message = subscriber_queue.get(timeout=15)
+                        yield f"data: {json.dumps(message)}\n\n"
+                    except Empty:
+                        # Heartbeat to prevent idle timeouts through proxies/load balancers
+                        yield ": keep-alive\n\n"
+            finally:
+                event_bus.unsubscribe(user_id, subscriber_queue)
+
+        headers = {
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # for nginx to disable buffering
+            "Connection": "keep-alive",
+        }
+        return Response(stream_with_context(generate_stream()),
+                        headers=headers,
+                        mimetype="text/event-stream")
+
+    except Exception as e:
+        print(f"Error in events_stream: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Failed to establish event stream: {str(e)}"
+        }), 500
+
+
+@api_bp.route("/events/stream", methods=["OPTIONS"])
+def handle_events_stream_options():
+    """Handle CORS preflight requests for the events stream endpoint."""
+    return jsonify({"status": "ok"})
 
 if not firebase_admin._apps:
     # Use environment variable or path to service account credentials
