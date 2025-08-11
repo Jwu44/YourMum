@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarConnectionLoader } from '@/components/parts/CalendarConnectionLoader'
 import { useToast } from '@/hooks/use-toast'
+import { calendarApi } from '@/lib/api/calendar'
+import { formatDateToString } from '@/lib/helper'
 
 /**
  * Connecting page shown during calendar connection process
@@ -13,7 +15,7 @@ import { useToast } from '@/hooks/use-toast'
 export default function ConnectingPage () {
   const router = useRouter()
   const { toast } = useToast()
-  const [stage, setStage] = useState<'connecting' | 'verifying' | 'complete'>('connecting')
+  const [stage, setStage] = useState<'connecting' | 'verifying' | 'fetching-events' | 'complete'>('connecting')
   const [message, setMessage] = useState<string>('')
 
   useEffect(() => {
@@ -66,8 +68,41 @@ export default function ConnectingPage () {
           setStage('verifying')
           setMessage('Confirming calendar access is ready')
         } else if (connectionProgress === 'complete') {
-          setStage('complete')
-          setMessage('Calendar connected successfully!')
+          // Begin calendar events fetching
+          setStage('fetching-events')
+          setMessage('Loading your events for today')
+
+          try {
+            // Fetch calendar events for today
+            const today = formatDateToString(new Date())
+            console.log('Fetching calendar events for:', today)
+            
+            const calendarResponse = await calendarApi.fetchEvents(today)
+            
+            if (calendarResponse.success) {
+              console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
+              setStage('complete')
+              setMessage('Calendar events loaded successfully!')
+            } else if (calendarResponse.notConnected) {
+              // Calendar not connected - this is the race condition case
+              console.log('Calendar not connected yet, but proceeding to dashboard:', calendarResponse.error)
+              setStage('complete')
+              setMessage('Calendar connection is still processing')
+              
+              // Set flag to inform user that calendar sync is still in progress
+              localStorage.setItem('calendarSyncPending', 'true')
+            } else {
+              // Other calendar error - proceed anyway
+              console.log('Calendar events fetch failed, proceeding without calendar sync:', calendarResponse.error)
+              setStage('complete')
+              setMessage('Proceeding to dashboard')
+            }
+          } catch (error) {
+            // Error fetching calendar events - proceed anyway
+            console.error('Error fetching calendar events:', error)
+            setStage('complete')
+            setMessage('Proceeding to dashboard')
+          }
 
           // Short delay to show completion state
           setTimeout(() => {
@@ -84,7 +119,7 @@ export default function ConnectingPage () {
         }
 
         // Listen for progress updates (in case connection is still in progress)
-        const handleStorageChange = (e: StorageEvent) => {
+        const handleStorageChange = async (e: StorageEvent) => {
           if (e.key === 'calendarConnectionProgress') {
             const newProgress = e.newValue
             console.log('Progress updated:', newProgress)
@@ -93,8 +128,41 @@ export default function ConnectingPage () {
               setStage('verifying')
               setMessage('Confirming calendar access is ready')
             } else if (newProgress === 'complete') {
-              setStage('complete')
-              setMessage('Calendar connected successfully!')
+              // Begin calendar events fetching
+              setStage('fetching-events')
+              setMessage('Loading your events for today')
+
+              try {
+                // Fetch calendar events for today
+                const today = formatDateToString(new Date())
+                console.log('Fetching calendar events for:', today)
+                
+                const calendarResponse = await calendarApi.fetchEvents(today)
+                
+                if (calendarResponse.success) {
+                  console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
+                  setStage('complete')
+                  setMessage('Calendar events loaded successfully!')
+                } else if (calendarResponse.notConnected) {
+                  // Calendar not connected - this is the race condition case
+                  console.log('Calendar not connected yet, but proceeding to dashboard:', calendarResponse.error)
+                  setStage('complete')
+                  setMessage('Calendar connection is still processing')
+                  
+                  // Set flag to inform user that calendar sync is still in progress
+                  localStorage.setItem('calendarSyncPending', 'true')
+                } else {
+                  // Other calendar error - proceed anyway
+                  console.log('Calendar events fetch failed, proceeding without calendar sync:', calendarResponse.error)
+                  setStage('complete')
+                  setMessage('Proceeding to dashboard')
+                }
+              } catch (error) {
+                // Error fetching calendar events - proceed anyway
+                console.error('Error fetching calendar events:', error)
+                setStage('complete')
+                setMessage('Proceeding to dashboard')
+              }
 
               setTimeout(() => {
                 const finalDestination = localStorage.getItem('finalRedirectDestination') || '/dashboard'

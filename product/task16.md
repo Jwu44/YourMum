@@ -13,7 +13,8 @@ I am facing a bug where after google sso and approving google calendar connectio
 
 # Notes:
 - I do see today's google calendar events synced if I go to /integrations > disconnect > reconnect
-- Perhaps this means there's an issue in loading the initial schedule?
+- I also see today's google calendar events synced if I just hard refresh /dashboard 
+- Perhaps this means there's an issue in loading the initial schedule? e.g. race condition?
 
 # Resources
 ## Backend server logs

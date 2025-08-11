@@ -128,6 +128,7 @@ export const calendarApi = {
     count: number
     date: string
     error?: string
+    notConnected?: boolean
   }> {
     // Convert Date object to string if needed
     const dateString = date instanceof Date
@@ -163,12 +164,17 @@ export const calendarApi = {
       const result = await response.json()
 
       if (!response.ok || !result.success) {
+        // Check for specific calendar not connected error
+        const isNotConnected = result.error && 
+          result.error.includes('Google Calendar not connected')
+        
         return {
           success: false,
           tasks: [],
           count: 0,
           date: dateString,
-          error: result.error || `Failed to fetch calendar events (${response.status})`
+          error: result.error || `Failed to fetch calendar events (${response.status})`,
+          notConnected: isNotConnected
         }
       }
 
@@ -176,7 +182,8 @@ export const calendarApi = {
         success: true,
         tasks: result.tasks || [],
         count: result.count || 0,
-        date: result.date || dateString
+        date: result.date || dateString,
+        notConnected: false
       }
     } catch (error) {
       console.error('Error fetching calendar events:', error)
@@ -185,7 +192,8 @@ export const calendarApi = {
         tasks: [],
         count: 0,
         date: dateString,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        notConnected: false
       }
     }
   },

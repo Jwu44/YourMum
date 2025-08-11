@@ -2,7 +2,7 @@ import React from 'react'
 import { Loader2, Calendar, CheckCircle } from 'lucide-react'
 
 interface CalendarConnectionLoaderProps {
-  stage: 'connecting' | 'verifying' | 'complete'
+  stage: 'connecting' | 'verifying' | 'fetching-events' | 'complete'
   message?: string
 }
 
@@ -28,10 +28,16 @@ export const CalendarConnectionLoader: React.FC<CalendarConnectionLoaderProps> =
           title: 'Verifying Connection...',
           description: 'Confirming calendar access is ready'
         }
+      case 'fetching-events':
+        return {
+          icon: <Loader2 className="w-8 h-8 animate-spin text-purple-600" />,
+          title: 'Fetching Calendar Events...',
+          description: 'Loading your events for today'
+        }
       case 'complete':
         return {
           icon: <CheckCircle className="w-8 h-8 text-green-600" />,
-          title: 'Calendar Connected!',
+          title: 'All Set!',
           description: 'Redirecting to your dashboard'
         }
     }
@@ -77,8 +83,10 @@ export const CalendarConnectionLoader: React.FC<CalendarConnectionLoaderProps> =
             <div
               className={`bg-purple-600 h-2 rounded-full transition-all duration-500 ${
                 stage === 'connecting'
-? 'w-1/3'
-                : stage === 'verifying' ? 'w-2/3' : 'w-full'
+                  ? 'w-1/4'
+                  : stage === 'verifying' ? 'w-1/2' 
+                  : stage === 'fetching-events' ? 'w-3/4' 
+                  : 'w-full'
               }`}
             />
           </div>
@@ -100,6 +108,14 @@ export const CalendarConnectionLoader: React.FC<CalendarConnectionLoaderProps> =
                 stage === 'verifying' ? 'bg-purple-600' : 'bg-gray-300'
               }`} />
               <span>Verifying calendar access</span>
+            </div>
+            <div className={`flex items-center space-x-2 ${
+              stage === 'fetching-events' ? 'text-purple-600' : 'text-gray-400'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                stage === 'fetching-events' ? 'bg-purple-600' : 'bg-gray-300'
+              }`} />
+              <span>Fetching calendar events</span>
             </div>
             <div className={`flex items-center space-x-2 ${
               stage === 'complete' ? 'text-green-600' : 'text-gray-400'
