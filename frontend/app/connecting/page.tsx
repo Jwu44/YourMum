@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarConnectionLoader } from '@/components/parts/CalendarConnectionLoader'
 import { useToast } from '@/hooks/use-toast'
+import { calendarApi } from '@/lib/api/calendar'
 
 /**
  * Connecting page shown during calendar connection process
@@ -15,6 +16,34 @@ export default function ConnectingPage () {
   const { toast } = useToast()
   const [stage, setStage] = useState<'connecting' | 'verifying' | 'complete'>('connecting')
   const [message, setMessage] = useState<string>('')
+  const hasSyncedRef = useRef<boolean>(false)
+
+  const syncTodayEventsAndRedirect = async () => {
+    if (hasSyncedRef.current) return
+    hasSyncedRef.current = true
+    try {
+      // Use Date object; calendarApi handles formatting internally
+      await calendarApi.fetchEvents(new Date())
+      // Proceed regardless of success; backend merge happens if possible
+      // Small delay to show completion state
+      setTimeout(() => {
+        const finalDestination = localStorage.getItem('finalRedirectDestination') || '/dashboard'
+        localStorage.removeItem('calendarConnectionProgress')
+        localStorage.removeItem('finalRedirectDestination')
+        console.log('Redirecting to final destination:', finalDestination)
+        router.push(finalDestination)
+      }, 1500)
+    } catch (err) {
+      // Even on error, proceed with existing fallback behavior
+      setTimeout(() => {
+        const finalDestination = localStorage.getItem('finalRedirectDestination') || '/dashboard'
+        localStorage.removeItem('calendarConnectionProgress')
+        localStorage.removeItem('finalRedirectDestination')
+        console.log('Redirecting to final destination after sync error:', finalDestination)
+        router.push(finalDestination)
+      }, 1500)
+    }
+  }
 
   useEffect(() => {
     const handleCalendarConnection = async () => {
@@ -68,19 +97,13 @@ export default function ConnectingPage () {
         } else if (connectionProgress === 'complete') {
           setStage('complete')
           setMessage('Calendar connected successfully!')
-
-          // Short delay to show completion state
-          setTimeout(() => {
-            const finalDestination = localStorage.getItem('finalRedirectDestination') || '/dashboard'
-            localStorage.removeItem('calendarConnectionProgress')
-            localStorage.removeItem('finalRedirectDestination')
-            console.log('Redirecting to final destination:', finalDestination)
-            router.push(finalDestination)
-          }, 1500)
+          // Fetch today's events before redirecting
+          await syncTodayEventsAndRedirect()
         } else {
-          // No progress found, redirect to dashboard
-          console.log('No connection progress found, redirecting to dashboard')
-          router.push('/dashboard')
+          // No progress found: stay on loader and wait for updates or fallback
+          console.log('No connection progress found; waiting...')
+          setStage('connecting')
+          setMessage('Preparing your account...')
         }
 
         // Listen for progress updates (in case connection is still in progress)
@@ -95,14 +118,8 @@ export default function ConnectingPage () {
             } else if (newProgress === 'complete') {
               setStage('complete')
               setMessage('Calendar connected successfully!')
-
-              setTimeout(() => {
-                const finalDestination = localStorage.getItem('finalRedirectDestination') || '/dashboard'
-                localStorage.removeItem('calendarConnectionProgress')
-                localStorage.removeItem('finalRedirectDestination')
-                console.log('Redirecting to final destination:', finalDestination)
-                router.push(finalDestination)
-              }, 1500)
+              // Fetch today's events before redirecting
+              syncTodayEventsAndRedirect()
             }
           }
 
