@@ -32,7 +32,7 @@ user_schema_validation = {
                     "connected": { "bsonType": "bool" },
                     "lastSyncTime": { "bsonType": ["date", "null"] },
                     "syncStatus": { 
-                        "enum": ["never", "in_progress", "completed", "failed"] 
+                        "enum": ["never", "in_progress", "completed", "failed", "disconnected"] 
                     },
                     "selectedCalendars": {
                         "bsonType": "array",

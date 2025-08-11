@@ -320,23 +320,29 @@ def disconnect_google_calendar():
     """
     Disconnect a user's Google Calendar integration
     
-    Expected request body:
-    {
-        "userId": str
-    }
+    Authentication:
+        - Requires Authorization header with Firebase ID token
+    Body:
+        - No body required
+        - Legacy support: will ignore any provided userId in body
     
     Returns:
         JSON response with status of disconnection
     """
     try:
-        data = request.json
-        if not data or 'userId' not in data:
+        # Extract user ID from Authorization header token
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+        else:
+            token = auth_header
+        
+        user_id = get_user_id_from_token(token)
+        if not user_id:
             return jsonify({
                 "success": False,
-                "error": "Missing required parameter: userId"
-            }), 400
-        
-        user_id = data['userId']
+                "error": "Invalid or missing authentication token"
+            }), 401
         
         # Get database instance
         db = get_database()
@@ -345,13 +351,19 @@ def disconnect_google_calendar():
         # Update user to remove calendar credentials and connection
         result = users.update_one(
             {"googleId": user_id},
-            {"$set": {
-                "calendar.connected": False,
-                "calendar.credentials": None,
-                "calendar.syncStatus": "disconnected",
-                "calendar.lastSyncTime": datetime.now(timezone.utc),
-                "calendarSynced": False
-            }}
+            {
+                "$set": {
+                    "calendar.connected": False,
+                    "calendar.syncStatus": "disconnected",
+                    "calendar.lastSyncTime": None,
+                    "calendarSynced": False,
+                    "metadata.lastModified": datetime.now(timezone.utc)
+                },
+                "$unset": {
+                    "calendar.credentials": "",
+                    "calendar.selectedCalendars": ""
+                }
+            }
         )
         
         if result.modified_count == 0:
