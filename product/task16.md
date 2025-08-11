@@ -130,3 +130,65 @@ site.webmanifest:1  GET https://yourdai.app/site.webmanifest 401 (Unauthorized)
 581-a1632655d6d93f16.js:1 Connecting to Google Calendar...
 581-a1632655d6d93f16.js:1 Connected to Google Calendar successfully
 page-35182c0365bf100e.js:1 ⚠️ Rendering legacy structure
+
+---
+
+# Key Findings & Analysis
+
+## Core Race Condition Issue
+**The fundamental problem**: User arrives at `/dashboard` BEFORE the calendar connection process completes in the backend, causing a 400 "Calendar not connected" error.
+
+## Critical Timeline Analysis
+Based on console logs, the actual execution order is:
+
+1. **Line 109**: `RouteGuard State: {user: 'Justin Wu', pathname: '/dashboard'}` - **User is already on dashboard**
+2. **Line 108**: `Attempting to fetch calendar events for: 2025-08-11` - **Dashboard tries to fetch calendar events**
+3. **Line 118**: `400 (Bad Request)` - **Calendar API fails because connection not ready**
+4. **Line 121**: `Calendar not connected, loading regular schedule` - **Dashboard falls back to regular schedule**
+5. **Line 125-131**: Calendar connection process happens **AFTER** dashboard has already loaded
+
+## Root Cause: Double Race Condition
+1. **Frontend Race**: Dashboard `useEffect` (line 1183-1250) runs **before** AuthContext calendar connection completes
+2. **Backend Race**: Calendar API call happens before backend calendar connection is established
+
+## Failed Fix Attempts & Lessons
+
+### Attempt 1: /connecting Page Flow
+- **What we tried**: Enhanced /connecting page to fetch calendar events before redirect
+- **Why it failed**: RouteGuard still allowed direct access to /dashboard, bypassing /connecting entirely
+- **Key insight**: Users were never reaching /connecting page - they went straight to /dashboard
+
+### Attempt 2: RouteGuard + AuthContext Coordination
+- **What we tried**: 
+  - RouteGuard redirects to /connecting when `calendarConnectionProgress` flag exists
+  - AuthContext sets localStorage flags instead of redirecting
+- **Why it failed**: The localStorage flag is set too late - dashboard already loads and executes its `useEffect`
+- **Key insight**: By the time localStorage is set, dashboard has already made the failing API call
+
+## Technical Deep Dive
+
+### The Timing Problem
+```
+Millisecond 0:    OAuth completes
+Millisecond 1:    AuthContext starts calendar connection  
+Millisecond 1:    RouteGuard sees authenticated user → allows /dashboard
+Millisecond 2:    Dashboard loads and useEffect runs
+Millisecond 3:    Dashboard calls calendar API → 400 error
+Millisecond 100:  AuthContext completes calendar connection
+Millisecond 101:  AuthContext sets localStorage flag (too late!)
+```
+
+### Backend State Issue
+- **Line 105**: Backend shows `200 OK` for calendar events API
+- **But frontend gets 400**: This suggests the backend calendar connection happens asynchronously
+- **The disconnect**: Backend logs show success, frontend gets failure - timing-dependent backend state
+
+## The Real Solution Required
+The issue persists because we need to prevent dashboard's **initial calendar API call** from happening, not just prevent navigation. The dashboard `useEffect` (line 1194-1211) executes immediately when the component mounts, regardless of navigation timing.
+
+## Proposed Next Steps
+1. **Backend synchronization**: Ensure calendar connection is atomic and immediately available
+2. **Frontend state coordination**: Dashboard should check for calendar connection state before attempting API calls
+
+## Status: Requires Deeper Backend Analysis
+The 200 OK in backend logs vs 400 error in frontend suggests the issue may be in the backend calendar connection timing or token/credentials propagation delay.

@@ -305,6 +305,24 @@ def connect_google_calendar():
                 "error": "User not found"
             }), 404
         
+        # Verify the connection is actually readable before returning success
+        # This ensures write consistency and prevents race conditions with /events endpoint
+        verification_user = users.find_one({"googleId": user_id})
+        if not verification_user:
+            return jsonify({
+                "success": False,
+                "error": "User verification failed after connection update"
+            }), 500
+            
+        verification_calendar = verification_user.get('calendar', {})
+        if not verification_calendar.get('connected') or not verification_calendar.get('credentials'):
+            return jsonify({
+                "success": False,
+                "error": "Calendar connection verification failed - please try again"
+            }), 500
+            
+        print(f"DEBUG: Calendar connection verified - connection ready for API calls")
+        
         return jsonify({
             "success": True,
             "data": {
