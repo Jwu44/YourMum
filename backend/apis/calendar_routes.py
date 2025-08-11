@@ -12,6 +12,7 @@ from firebase_admin import credentials, get_app
 import firebase_admin
 from backend.services.ai_service import categorize_task
 from backend.services.schedule_service import schedule_service
+from backend.services.event_bus import event_bus
 import pytz  # Add pytz for timezone handling
 
 calendar_bp = Blueprint("calendar", __name__)
@@ -322,6 +323,13 @@ def connect_google_calendar():
             }), 500
             
         print(f"DEBUG: Calendar connection verified - connection ready for API calls")
+
+        # Ensure Google Calendar watch is established for realtime updates
+        try:
+            ensure_calendar_watch_for_user(user_id)
+        except Exception as _e:
+            # Non-fatal in v1; proceed without blocking connect
+            pass
         
         return jsonify({
             "success": True,
@@ -717,3 +725,255 @@ def get_calendar_status(user_id: str):
             "lastSyncTime": None,
             "hasCredentials": False
         }), 500
+
+
+@calendar_bp.route("/webhook", methods=["POST"])
+def calendar_webhook():
+    """
+    Google Calendar push notification webhook.
+    Validates channel headers, then fetches and syncs today's events for the user,
+    and publishes a schedule_updated SSE event.
+    """
+    try:
+        channel_id = request.headers.get('X-Goog-Channel-ID')
+        resource_id = request.headers.get('X-Goog-Resource-ID')
+        channel_token = request.headers.get('X-Goog-Channel-Token')
+
+        if not channel_id or not resource_id or not channel_token:
+            # Acknowledge but do nothing (avoid retries)
+            return jsonify({"status": "ignored"}), 200
+
+        # Find user by matching watch info
+        db = get_database()
+        users = db['users']
+        user = users.find_one({
+            'calendar.watch.channelId': channel_id,
+            'calendar.watch.resourceId': resource_id,
+            'calendar.watch.token': channel_token
+        })
+
+        if not user:
+            return jsonify({"status": "no-user"}), 200
+
+        user_id = user.get('googleId')
+        calendar_data = user.get('calendar', {})
+        credentials_data = calendar_data.get('credentials', {})
+        if not calendar_data.get('connected') or not credentials_data:
+            return jsonify({"status": "not-connected"}), 200
+
+        # Ensure token valid
+        access_token = _ensure_access_token_valid(users, user_id, credentials_data)
+        if not access_token:
+            return jsonify({"status": "no-token"}), 200
+
+        # Compute today's date in user's timezone (or UTC)
+        user_timezone = user.get('timezone') or 'UTC'
+        try:
+            tz = pytz.timezone(user_timezone)
+        except Exception:
+            tz = pytz.UTC
+        now_local = datetime.now(tz)
+        date_str = now_local.strftime('%Y-%m-%d')
+
+        # Fetch and convert
+        events = fetch_google_calendar_events(access_token, date_str, user_timezone)
+        calendar_tasks = []
+        for ev in events:
+            task = convert_calendar_event_to_task(ev, date_str)
+            if task:
+                calendar_tasks.append(task)
+
+        # Persist via schedule service
+        success, _ = schedule_service.create_schedule_from_calendar_sync(
+            user_id=user_id,
+            date=date_str,
+            calendar_tasks=calendar_tasks
+        )
+
+        # Publish realtime notification regardless of success for v1 simplicity
+        try:
+            event_bus.publish(user_id, {"type": "schedule_updated", "date": date_str})
+        except Exception:
+            pass
+
+        return jsonify({"status": "ok", "synced": success}), 200
+    except Exception as e:
+        print(f"Error handling calendar webhook: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error"}), 200
+
+
+# -----------------------------
+# Google Calendar Push: Watch Management
+# -----------------------------
+
+def _parse_expiration_ms(expiration_value: str) -> Optional[datetime]:
+    """Parse Google watch expiration (ms since epoch) to timezone-aware datetime."""
+    try:
+        ms = int(expiration_value)
+        seconds = ms / 1000.0
+        return datetime.fromtimestamp(seconds, tz=timezone.utc)
+    except Exception:
+        return None
+
+
+def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, any]) -> Optional[str]:
+    """Ensure access token is valid; refresh if needed. Returns access_token or None."""
+    access_token = credentials_data.get('accessToken')
+    if not access_token:
+        return None
+
+    expires_at = credentials_data.get('expiresAt')
+    refresh_token = credentials_data.get('refreshToken') or credentials_data.get('refresh_token')
+
+    # Normalize expiresAt
+    try:
+        expires_dt = None
+        if isinstance(expires_at, (int, float)):
+            ts_seconds = expires_at / 1000 if expires_at > 1e12 else expires_at
+            expires_dt = datetime.fromtimestamp(ts_seconds, tz=timezone.utc)
+        elif isinstance(expires_at, datetime):
+            expires_dt = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+    except Exception:
+        expires_dt = None
+
+    if expires_dt and expires_dt < datetime.now(timezone.utc) and refresh_token:
+        try:
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            token_url = 'https://oauth2.googleapis.com/token'
+            payload = {
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'client_id': client_id,
+                'client_secret': client_secret
+            }
+            token_resp = requests.post(token_url, data=payload)
+            if token_resp.status_code == 200:
+                token_json = token_resp.json()
+                new_access_token = token_json.get('access_token')
+                expires_in = token_json.get('expires_in', 3600)
+                if new_access_token:
+                    access_token = new_access_token
+                    new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                    users.update_one(
+                        {"googleId": user_id},
+                        {"$set": {
+                            "calendar.credentials": {
+                                **credentials_data,
+                                "accessToken": access_token,
+                                "expiresAt": new_expires_at
+                            }
+                        }}
+                    )
+            else:
+                return None
+        except Exception:
+            return None
+
+    return access_token
+
+
+def ensure_calendar_watch_for_user(user_id: str) -> Tuple[bool, Dict[str, any]]:
+    """
+    Ensure a Google Calendar watch channel exists for the user's primary calendar.
+    Creates a new channel if missing or expired.
+    """
+    db = get_database()
+    users = db['users']
+
+    user = users.find_one({"googleId": user_id})
+    if not user:
+        return False, {"error": "User not found"}
+
+    calendar_data = user.get('calendar', {})
+    if not calendar_data.get('connected') or not calendar_data.get('credentials'):
+        return False, {"error": "Calendar not connected"}
+
+    credentials_data = calendar_data.get('credentials', {})
+
+    # Ensure access token is valid
+    access_token = _ensure_access_token_valid(users, user_id, credentials_data)
+    if not access_token:
+        return False, {"error": "No valid access token"}
+
+    watch_info = calendar_data.get('watch') or {}
+    not_expired = False
+    if watch_info:
+        expiration = watch_info.get('expiration')
+        if isinstance(expiration, datetime):
+            not_expired = expiration > datetime.now(timezone.utc)
+    if watch_info and not_expired:
+        return True, {"watch": {
+            "channelId": watch_info.get('channelId'),
+            "resourceId": watch_info.get('resourceId'),
+            "expiration": watch_info.get('expiration').isoformat() if isinstance(watch_info.get('expiration'), datetime) else watch_info.get('expiration')
+        }}
+
+    # Create new watch channel via Google Calendar API
+    webhook_address = os.getenv('GOOGLE_CALENDAR_WEBHOOK_URL')
+    if not webhook_address:
+        return False, {"error": "GOOGLE_CALENDAR_WEBHOOK_URL not configured"}
+
+    channel_id = str(uuid.uuid4())
+    channel_token = str(uuid.uuid4())
+
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/watch"
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+    body = {
+        'id': channel_id,
+        'type': 'web_hook',
+        'address': webhook_address,
+        'token': channel_token
+    }
+    resp = requests.post(url, headers=headers, json=body)
+    if resp.status_code != 200:
+        return False, {"error": f"Failed to create watch: {resp.text}"}
+
+    data = resp.json()
+    expiration_dt = None
+    if 'expiration' in data:
+        expiration_dt = _parse_expiration_ms(data['expiration'])
+
+    watch_doc = {
+        'channelId': data.get('id', channel_id),
+        'resourceId': data.get('resourceId'),
+        'expiration': expiration_dt or (datetime.now(timezone.utc) + timedelta(hours=1)),
+        'token': channel_token
+    }
+
+    users.update_one(
+        {"googleId": user_id},
+        {"$set": {"calendar.watch": watch_doc}}
+    )
+
+    return True, {"watch": {
+        "channelId": watch_doc['channelId'],
+        "resourceId": watch_doc['resourceId'],
+        "expiration": watch_doc['expiration'].isoformat() if isinstance(watch_doc['expiration'], datetime) else watch_doc['expiration']
+    }}
+
+
+@calendar_bp.route("/watch/ensure", methods=["POST"])
+def ensure_calendar_watch():
+    """Endpoint to ensure Google Calendar push notifications are configured for current user."""
+    try:
+        # Get user ID from token
+        auth_header = request.headers.get('Authorization', '')
+        token = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
+        user_id = get_user_id_from_token(token)
+        if not user_id:
+            return jsonify({"success": False, "error": "Invalid or missing authentication token"}), 401
+
+        ok, result = ensure_calendar_watch_for_user(user_id)
+        if not ok:
+            return jsonify({"success": False, **result}), 400
+
+        return jsonify({"success": True, **result}), 200
+    except Exception as e:
+        print(f"Error ensuring calendar watch: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
