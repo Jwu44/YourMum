@@ -1244,10 +1244,18 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
+    // Reset hasInitiallyLoaded when calendarConnectionStage changes from truthy to null
+    // This allows schedule to reload with calendar events after connection completes
+    const prevCalendarStageRef = useRef(calendarConnectionStage)
+    if (prevCalendarStageRef.current && !calendarConnectionStage) {
+      hasInitiallyLoaded.current = false
+    }
+    prevCalendarStageRef.current = calendarConnectionStage
+
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage) {
       loadInitialSchedule()
     }
-  }, [state.formUpdate?.response, toast])
+  }, [state.formUpdate?.response, toast, calendarConnectionStage])
 
   useEffect(() => {
     document.documentElement.classList.remove('dark')
