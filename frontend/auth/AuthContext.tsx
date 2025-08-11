@@ -79,19 +79,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Connected to Google Calendar successfully");
         setCalendarConnectionStage('complete');
         
-        // Success - reset OAuth state. Do NOT redirect here; connecting page handles final fetch and redirect
+        // Small delay to ensure all async operations complete before resetting OAuth state
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Success - reset OAuth state and redirect to dashboard
         setIsOAuthInProgress(false);
-        setCalendarConnectionStage(null);
-        // Signal completion to connecting page listeners
-        try { localStorage.setItem('calendarConnectionProgress', 'complete'); } catch {}
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        
+        // Check if we're already on the target page to avoid unnecessary reload
+        if (window.location.pathname === redirectTo) {
+          // Just clear the calendar connection stage to show dashboard content
+          setCalendarConnectionStage(null);
+        } else {
+          // Navigate to different page
+          setCalendarConnectionStage(null);
+          window.location.href = redirectTo;
+        }
         
       } else {
-        // No calendar access, reset state and route to connecting for consistency
+        // No calendar access, reset OAuth state and redirect directly to dashboard
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
-        try { localStorage.setItem('calendarConnectionProgress', 'complete'); } catch {}
-        const destination = localStorage.getItem('authRedirectDestination') || '/connecting';
-        window.location.href = destination;
+        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+        localStorage.removeItem('authRedirectDestination');
+        
+        // Check if we're already on the target page to avoid unnecessary reload
+        if (window.location.pathname === redirectTo) {
+          console.log("No calendar access, already on target page:", redirectTo);
+          // Already on target page, no navigation needed
+        } else {
+          console.log("No calendar access, navigating to:", redirectTo);
+          window.location.href = redirectTo;
+        }
       }
       
     } catch (error) {
@@ -100,9 +120,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCalendarConnectionStage(null);
       setError(error instanceof Error ? error.message : 'Failed to connect calendar');
       
-        // Redirect to connecting to display error consistently
-        try { localStorage.setItem('calendarConnectionError', JSON.stringify({ error: 'Failed to connect to Google Calendar', action: 'redirect_to_integrations' })) } catch {}
-        window.location.href = localStorage.getItem('authRedirectDestination') || '/connecting';
+      // Redirect to dashboard and let user retry from integrations page
+      const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+      localStorage.removeItem('authRedirectDestination');
+      
+      // Check if we're already on the target page to avoid unnecessary reload
+      if (window.location.pathname === redirectTo) {
+        // Already on target page, no navigation needed
+      } else {
+        window.location.href = redirectTo;
+      }
     }
   };
 
@@ -119,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Calendar access status:", hasCalendarAccess);
       
       // Check if NEXT_PUBLIC_API_URL is set correctly
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
       console.log("API Base URL:", apiBaseUrl);
 
       const response = await fetch(`${apiBaseUrl}/api/auth/user`, {
@@ -211,8 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!credential || !credential.accessToken) {
             console.error("Missing credential or access token");
             setIsOAuthInProgress(false); // Reset OAuth state
-            // Go to connecting page to handle errors consistently
-            window.location.href = localStorage.getItem('authRedirectDestination') || '/connecting';
+            // Get intended redirect destination
+            const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
+            localStorage.removeItem('authRedirectDestination');
+            window.location.href = redirectTo;
             return;
           }
           
@@ -250,12 +279,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // Store destinations for the OAuth flow
-      // - finalRedirectDestination: where the user should land after connecting page completes
-      // - authRedirectDestination: intermediate page to handle connection progress
-      localStorage.setItem('finalRedirectDestination', redirectTo);
-      localStorage.setItem('authRedirectDestination', '/connecting');
-      console.log("Stored redirect destinations in localStorage");
+      // Store the intended destination
+      localStorage.setItem('authRedirectDestination', redirectTo);
+      console.log("Stored redirect destination in localStorage");
       
       // Configure provider to request calendar access and force consent screen
       provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
@@ -280,8 +306,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (credential && credential.accessToken) {
           await processCalendarAccess(credential);
         } else {
-          // Missing calendar access; still proceed to connecting to handle gracefully
-          const destination = localStorage.getItem('authRedirectDestination') || '/connecting';
+          // No calendar access, redirect anyway
+          const destination = localStorage.getItem('authRedirectDestination') || '/dashboard';
+          localStorage.removeItem('authRedirectDestination');
           window.location.href = destination;
         }
       } catch (popupError: any) {
