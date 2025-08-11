@@ -36,6 +36,7 @@ from backend.services.archive_service import (
 
 from backend.services.slack_service import SlackService
 slack_service = SlackService()
+from backend.apis.calendar_routes import ensure_calendar_watch_for_user
 
 api_bp = Blueprint("api", __name__)
 
@@ -94,6 +95,12 @@ def events_stream():
 
         # Lazy import to avoid any circular dependencies at module load
         from backend.services.event_bus import event_bus
+
+        # Best-effort ensure Google Calendar watch is active for realtime calendar sync
+        try:
+            ensure_calendar_watch_for_user(user_id)
+        except Exception:
+            pass
 
         def generate_stream():
             subscriber_queue = event_bus.subscribe(user_id)
