@@ -1176,6 +1176,17 @@ const Dashboard: React.FC = () => {
     })
   }, [])
 
+  // Separate useEffect to detect calendar connection completion
+  const prevCalendarStageRef = useRef(calendarConnectionStage)
+  useEffect(() => {
+    // Reset hasInitiallyLoaded when calendarConnectionStage changes from truthy to null
+    // This allows schedule to reload with calendar events after connection completes
+    if (prevCalendarStageRef.current && !calendarConnectionStage) {
+      hasInitiallyLoaded.current = false
+    }
+    prevCalendarStageRef.current = calendarConnectionStage
+  }, [calendarConnectionStage])
+
   useEffect(() => {
     // Prevent duplicate loads in React Strict Mode
     if (hasInitiallyLoaded.current) return
@@ -1243,14 +1254,6 @@ const Dashboard: React.FC = () => {
         setIsLoadingSchedule(false)
       }
     }
-
-    // Reset hasInitiallyLoaded when calendarConnectionStage changes from truthy to null
-    // This allows schedule to reload with calendar events after connection completes
-    const prevCalendarStageRef = useRef(calendarConnectionStage)
-    if (prevCalendarStageRef.current && !calendarConnectionStage) {
-      hasInitiallyLoaded.current = false
-    }
-    prevCalendarStageRef.current = calendarConnectionStage
 
     if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage) {
       loadInitialSchedule()
