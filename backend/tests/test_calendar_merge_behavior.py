@@ -24,18 +24,24 @@ def _make_schedule_doc(user_id: str, date: str, tasks):
         "userId": user_id,
         "date": date,
         "schedule": tasks,
-        "metadata": {}
+        "metadata": {
+            "created_at": "2025-01-01T00:00:00",
+            "last_modified": "2025-01-01T00:00:00",
+            "source": "test"
+        },
+        "inputs": {}
     }
 
 
-def test_reuse_existing_task_id_and_preserve_user_fields(reset_mock_collection: MagicMock):
+def test_replace_calendar_tasks_simple_strategy(reset_mock_collection: MagicMock):
+    """Test that calendar tasks are simply replaced, not merged with user edits."""
     user_id = "user-1"
     date = "2025-07-29"
 
-    # Existing schedule has a calendar task with same gcal_event_id and user-edited fields
+    # Existing schedule has calendar tasks and manual tasks
     existing_calendar_task = {
         "id": "old123",
-        "text": "Old Title",
+        "text": "Old Calendar Event",
         "completed": True,  # user completed it
         "categories": ["Work"],  # user category
         "start_time": "09:00",
@@ -45,21 +51,28 @@ def test_reuse_existing_task_id_and_preserve_user_fields(reset_mock_collection: 
         "from_gcal": True,
         "type": "task"
     }
+    
+    manual_task = {
+        "id": "manual1",
+        "text": "Manual Task",
+        "completed": False,
+        "from_gcal": False,
+        "type": "task"
+    }
 
-    reset_mock_collection.find_one.return_value = _make_schedule_doc(user_id, date, [existing_calendar_task])
+    reset_mock_collection.find_one.return_value = _make_schedule_doc(user_id, date, [existing_calendar_task, manual_task])
     reset_mock_collection.update_one.return_value = MagicMock(modified_count=1)
 
-    # Incoming calendar-provided task (e.g., from conversion), with updated title/time
+    # Incoming calendar task - completely different from existing
     incoming_calendar_task = {
-        "id": "new456",  # should be replaced by old id
-        "text": "New Title",
-        "completed": False,  # should preserve existing True
-        "categories": ["Auto"],  # should preserve existing ["Work"]
-        "start_time": "10:00",
-        "end_time": "11:00",
+        "id": "new456",
+        "text": "New Calendar Event",
+        "completed": False,
+        "categories": ["Meeting"],
+        "start_time": "14:00",
+        "end_time": "15:00",
         "start_date": date,
-        "gcal_event_id": "ev1",
-        "from_gcal": True,
+        "gcal_event_id": "ev2",
         "type": "task"
     }
 
@@ -70,38 +83,42 @@ def test_reuse_existing_task_id_and_preserve_user_fields(reset_mock_collection: 
     )
 
     assert success is True
-    merged = result["schedule"]
-    # Expect exactly one calendar task for ev1
-    ev1_tasks = [t for t in merged if t.get("gcal_event_id") == "ev1"]
-    assert len(ev1_tasks) == 1
-    merged_task = ev1_tasks[0]
+    final_schedule = result["schedule"]
+    
+    # Should have 2 tasks: 1 new calendar task + 1 manual task
+    assert len(final_schedule) == 2
+    
+    # Calendar task should be first and completely replaced (no merge)
+    calendar_tasks = [t for t in final_schedule if t.get("from_gcal", False)]
+    manual_tasks = [t for t in final_schedule if not t.get("from_gcal", False)]
+    
+    assert len(calendar_tasks) == 1
+    assert len(manual_tasks) == 1
+    
+    # New calendar task should have all incoming values (no preservation of old values)
+    new_calendar_task = calendar_tasks[0]
+    assert new_calendar_task["text"] == "New Calendar Event"
+    assert new_calendar_task["gcal_event_id"] == "ev2"
+    assert new_calendar_task["start_time"] == "14:00"
+    assert new_calendar_task["from_gcal"] is True
+    
+    # Manual task should be preserved
+    preserved_manual = manual_tasks[0]
+    assert preserved_manual["id"] == "manual1"
+    assert preserved_manual["text"] == "Manual Task"
 
-    # ID should be stable (reuse old id)
-    assert merged_task["id"] == "old123"
-    # Overwritten fields should come from incoming
-    assert merged_task["text"] == "New Title"
-    assert merged_task["start_time"] == "10:00"
-    assert merged_task["end_time"] == "11:00"
-    assert merged_task["start_date"] == date
-    # User-edited fields preserved
-    assert merged_task["completed"] is True
-    assert merged_task["categories"] == ["Work"]
 
-
-def test_skip_recreation_when_manual_conversion(reset_mock_collection: MagicMock):
+def test_preserve_manual_tasks_ignore_calendar_duplicates(reset_mock_collection: MagicMock):
+    """Test that manual tasks are preserved regardless of calendar events with same gcal_event_id."""
     user_id = "user-2"
     date = "2025-07-29"
 
-    # User manually converted calendar task to manual (from_gcal: False) but kept gcal_event_id
+    # User has a manual task (no special handling for gcal_event_id in simplified approach)
     manual_task = {
         "id": "manu1",
-        "text": "Custom Title",
+        "text": "Custom Manual Task",
         "completed": False,
         "categories": ["Personal"],
-        "start_time": "12:00",
-        "end_time": "13:00",
-        "start_date": date,
-        "gcal_event_id": "ev2",
         "from_gcal": False,
         "type": "task"
     }
@@ -109,17 +126,16 @@ def test_skip_recreation_when_manual_conversion(reset_mock_collection: MagicMock
     reset_mock_collection.find_one.return_value = _make_schedule_doc(user_id, date, [manual_task])
     reset_mock_collection.update_one.return_value = MagicMock(modified_count=1)
 
-    # Incoming calendar contains the same event ev2
+    # Incoming calendar task
     incoming_calendar_task = {
         "id": "new999",
-        "text": "Calendar Title",
+        "text": "Calendar Event",
         "completed": False,
-        "categories": ["Auto"],
+        "categories": ["Meeting"],
         "start_time": "12:00",
         "end_time": "13:00",
         "start_date": date,
         "gcal_event_id": "ev2",
-        "from_gcal": True,
         "type": "task"
     }
 
@@ -130,12 +146,28 @@ def test_skip_recreation_when_manual_conversion(reset_mock_collection: MagicMock
     )
 
     assert success is True
-    merged = result["schedule"]
-    # Should keep only the manual version, not recreate a calendar copy
-    ev2_tasks = [t for t in merged if t.get("gcal_event_id") == "ev2"]
-    assert len(ev2_tasks) == 1
-    assert ev2_tasks[0]["from_gcal"] is False
-    assert ev2_tasks[0]["id"] == "manu1"
+    final_schedule = result["schedule"]
+
+    # Should have 2 tasks: 1 calendar + 1 manual
+    assert len(final_schedule) == 2
+
+    calendar_tasks = [t for t in final_schedule if t.get("from_gcal", False)]
+    manual_tasks = [t for t in final_schedule if not t.get("from_gcal", False)]
+
+    assert len(calendar_tasks) == 1
+    assert len(manual_tasks) == 1
+
+    # Calendar task should be added with from_gcal flag
+    calendar_task = calendar_tasks[0]
+    assert calendar_task["text"] == "Calendar Event"
+    assert calendar_task["gcal_event_id"] == "ev2"
+    assert calendar_task["from_gcal"] is True
+
+    # Manual task should remain unchanged
+    preserved_manual = manual_tasks[0]
+    assert preserved_manual["id"] == "manu1"
+    assert preserved_manual["text"] == "Custom Manual Task"
+    assert preserved_manual["from_gcal"] is False
 
 
 def test_calendar_tasks_ordered_first(reset_mock_collection: MagicMock):
