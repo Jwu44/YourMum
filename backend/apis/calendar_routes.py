@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from backend.db_config import get_database
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from backend.models.task import Task
 import uuid
 import requests
@@ -266,6 +266,8 @@ def connect_google_calendar():
             }), 401
         
         credentials = data['credentials']
+        # Optional timezone from client (persist as user preference)
+        requested_timezone = data.get('timezone')
         
         # Convert expiresAt timestamp to datetime object
         if 'expiresAt' in credentials and isinstance(credentials['expiresAt'], (int, float)):
@@ -279,16 +281,20 @@ def connect_google_calendar():
         print(f"DEBUG: Calendar credentials provided: {bool(credentials.get('accessToken'))}")
         
         # Update user with calendar credentials and connection status
+        update_set = {
+            "calendar.connected": True,
+            "calendar.credentials": credentials,
+            "calendar.syncStatus": "completed",
+            "calendar.lastSyncTime": datetime.now(timezone.utc),
+            "calendarSynced": True,
+            "metadata.lastModified": datetime.now(timezone.utc)
+        }
+        if isinstance(requested_timezone, str) and requested_timezone:
+            update_set["timezone"] = requested_timezone
+
         result = users.update_one(
             {"googleId": user_id},
-            {"$set": {
-                "calendar.connected": True,
-                "calendar.credentials": credentials,
-                "calendar.syncStatus": "completed",
-                "calendar.lastSyncTime": datetime.now(timezone.utc),
-                "calendarSynced": True,
-                "metadata.lastModified": datetime.now(timezone.utc)
-            }}
+            {"$set": update_set}
         )
         
         print(f"DEBUG: Calendar connection update result - modified count: {result.modified_count}")
@@ -513,17 +519,79 @@ def get_calendar_events():
                 "tasks": []
             }), 400 if not is_post_request else 200
         
-        # Get access token from stored credentials
-        access_token = calendar_data['credentials'].get('accessToken')
+        # Get access token and handle refresh if expired
+        credentials_data = calendar_data.get('credentials', {})
+        access_token = credentials_data.get('accessToken')
         if not access_token:
             return jsonify({
                 "success": False,
                 "error": "No valid access token found",
                 "tasks": []
             }), 400 if not is_post_request else 200
+
+        # Detect expiration, normalize expiresAt to datetime
+        expires_at = credentials_data.get('expiresAt')
+        refresh_token = credentials_data.get('refreshToken') or credentials_data.get('refresh_token')
+        try:
+            expires_dt = None
+            if isinstance(expires_at, (int, float)):
+                ts_seconds = expires_at / 1000 if expires_at > 1e12 else expires_at
+                expires_dt = datetime.fromtimestamp(ts_seconds, tz=timezone.utc)
+            elif isinstance(expires_at, datetime):
+                expires_dt = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+        except Exception:
+            expires_dt = None
+
+        # If expired and refresh token present, attempt refresh
+        if expires_dt and expires_dt < datetime.now(timezone.utc) and refresh_token:
+            try:
+                client_id = os.getenv('GOOGLE_CLIENT_ID')
+                client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+                token_url = 'https://oauth2.googleapis.com/token'
+                payload = {
+                    'grant_type': 'refresh_token',
+                    'refresh_token': refresh_token,
+                    'client_id': client_id,
+                    'client_secret': client_secret
+                }
+                token_resp = requests.post(token_url, data=payload)
+                if token_resp.status_code == 200:
+                    token_json = token_resp.json()
+                    new_access_token = token_json.get('access_token')
+                    expires_in = token_json.get('expires_in', 3600)
+                    if new_access_token:
+                        access_token = new_access_token
+                        # Persist refreshed credentials
+                        new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                        users.update_one(
+                            {"googleId": user_id},
+                            {"$set": {
+                                "calendar.credentials": {
+                                    **credentials_data,
+                                    "accessToken": access_token,
+                                    "expiresAt": new_expires_at
+                                }
+                            }}
+                        )
+                    else:
+                        raise ValueError('No access_token in refresh response')
+                else:
+                    error_msg = f"Failed to refresh access token: {token_resp.text}"
+                    return jsonify({
+                        "success": False,
+                        "error": error_msg,
+                        "tasks": []
+                    }), 400 if not is_post_request else 200
+            except Exception as e:
+                return jsonify({
+                    "success": False,
+                    "error": f"Failed to refresh access token: {str(e)}",
+                    "tasks": []
+                }), 400 if not is_post_request else 200
         
-        # Get user's timezone (with fallback to UTC)
-        user_timezone = user.get('timezone', 'UTC')
+        # Get user's timezone (with fallback to query timezone or UTC)
+        query_timezone = request.args.get('timezone') if not is_post_request else None
+        user_timezone = user.get('timezone') or query_timezone or 'UTC'
         
         # Fetch events from Google Calendar with timezone-aware boundaries
         calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
