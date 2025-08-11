@@ -79,17 +79,28 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex])
 
-  // TASK-21: Check for calendar connection errors and show toast
+  // Check for calendar sync status and show appropriate messages
   useEffect(() => {
+    // Check for general calendar connection errors
     const calendarError = localStorage.getItem('calendarConnectionError')
     if (calendarError) {
       toast({
-        title: 'Calendar Connection Failed',
-        description: `${calendarError}. You can reconnect your calendar in Settings > Integrations.`,
-        variant: 'destructive'
+        title: 'Calendar Connection Issue',
+        description: 'To sync calendar events, please connect your Google Calendar in Integrations.',
+        variant: 'default'
       })
-      // Clear the error flag immediately to prevent showing again
       localStorage.removeItem('calendarConnectionError')
+    }
+
+    // Check for calendar sync pending (race condition resolved)
+    const syncPending = localStorage.getItem('calendarSyncPending')
+    if (syncPending) {
+      toast({
+        title: 'Calendar Sync in Progress',
+        description: 'Your calendar events will appear shortly. Refresh the page in a moment to see them.',
+        variant: 'default'
+      })
+      localStorage.removeItem('calendarSyncPending')
     }
   }, [toast])
 
@@ -1177,7 +1188,7 @@ const Dashboard: React.FC = () => {
       try {
         const today = getDateString(0)
 
-        // TASK-21 FIX: Try calendar sync first if user is authenticated
+        // Try calendar sync first if user is authenticated
         const currentUser = auth.currentUser
         if (currentUser) {
           try {
@@ -1186,21 +1197,20 @@ const Dashboard: React.FC = () => {
 
             if (calendarResponse.success) {
               console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
-              // Calendar API returns the complete merged schedule
               setScheduleDays([calendarResponse.tasks])
               setScheduleCache(new Map([[today, calendarResponse.tasks]]))
               return
+            } else if (calendarResponse.notConnected) {
+              console.log('Calendar not connected, loading regular schedule')
             } else {
-              console.log('Calendar not connected, loading regular schedule:', calendarResponse.error)
-              // Don't show error toast here - calendar might legitimately not be connected
+              console.log('Calendar error, loading regular schedule:', calendarResponse.error)
             }
           } catch (calendarError) {
             console.error('Error fetching calendar events:', calendarError)
-            // Don't show error toast - this could be expected if calendar isn't set up
           }
         }
 
-        // Fallback: Load existing schedule if calendar sync fails
+        // Fallback: Load existing schedule 
         const existingSchedule = await loadSchedule(today)
 
         if (existingSchedule.success && existingSchedule.schedule) {
@@ -1209,45 +1219,26 @@ const Dashboard: React.FC = () => {
           return
         }
 
-        // Show empty state if no schedule and no calendar events
-        console.log('No existing schedule or calendar events found, creating empty schedule in backend')
-
-        // Create empty schedule in backend with user inputs from FormContext
+        // Create empty schedule in backend
+        console.log('No existing schedule found, creating empty schedule')
+        
         try {
           const emptyScheduleResult = await updateSchedule(today, [])
           if (emptyScheduleResult.success) {
             const backendSchedule = emptyScheduleResult.schedule || []
             setScheduleDays([backendSchedule])
             setScheduleCache(new Map([[today, backendSchedule]]))
-            console.log('Empty schedule created successfully in backend with', backendSchedule.length, 'tasks')
-            console.log('Schedule contains sections:', backendSchedule.filter(t => t.is_section).map(t => t.text))
+            console.log('Empty schedule created with', backendSchedule.length, 'tasks')
           } else {
-            // Show error toast and continue with frontend-only empty state
-            toast({
-              title: 'Warning',
-              description: 'Could not save empty schedule to database.',
-              variant: 'destructive'
-            })
             setScheduleDays([[]])
-            console.log('Backend creation failed, continuing with frontend-only empty state')
           }
         } catch (createError) {
-          console.error('Error creating empty schedule in backend:', createError)
-          toast({
-            title: 'Warning',
-            description: 'Could not save empty schedule to database.',
-            variant: 'destructive'
-          })
+          console.error('Error creating empty schedule:', createError)
           setScheduleDays([[]])
         }
       } catch (error) {
         console.error('Error loading initial schedule:', error)
         setScheduleDays([[]])
-
-        toast({
-          title: 'Notice',
-          description: 'Could not load schedule. You can start adding tasks manually.'
-        })
       } finally {
         setIsLoadingSchedule(false)
       }

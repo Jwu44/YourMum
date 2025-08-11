@@ -82,20 +82,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Small delay to ensure all async operations complete before resetting OAuth state
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Success - reset OAuth state and redirect to dashboard
+        // Success - reset OAuth state but let /connecting page handle redirect
         setIsOAuthInProgress(false);
-        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-        localStorage.removeItem('authRedirectDestination');
+        setCalendarConnectionStage(null);
         
-        // Check if we're already on the target page to avoid unnecessary reload
-        if (window.location.pathname === redirectTo) {
-          // Just clear the calendar connection stage to show dashboard content
-          setCalendarConnectionStage(null);
-        } else {
-          // Navigate to different page
-          setCalendarConnectionStage(null);
-          window.location.href = redirectTo;
-        }
+        // Set localStorage flag to let /connecting page know calendar connection is complete
+        localStorage.setItem('calendarConnectionProgress', 'complete');
+        
+        // Don't redirect here - let /connecting page handle the full flow including calendar events fetch
         
       } else {
         // No calendar access, reset OAuth state and redirect directly to dashboard
