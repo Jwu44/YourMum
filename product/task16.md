@@ -17,25 +17,93 @@ I am facing a bug where after google sso and approving google calendar connectio
 
 # Resources
 ## Backend server logs
-DEBUG - Token verification successful. User ID: Si3NryNNjSMbW8q1t0niKX8sYng1
-
-DEBUG: Setting new calendar state for user Si3NryNNjSMbW8q1t0niKX8sYng1: False
-
-DEBUG - Token verification successful. User ID: Si3NryNNjSMbW8q1t0niKX8sYng1
-
-Received authentication request. Headers: Host: yourdai-production.up.railway.app
-
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36
-
-Content-Length: 243
-
 Accept: */*
+
+Referer: https://yourdai.app/
+
+Content-Type: application/json
+
+Content-Type: application/json
+
+Origin: https://yourdai.app
+
+Sec-Ch-Ua: "Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"
+
+Origin: https://yourdai.app
+
+Priority: u=1, i
+
+Sec-Ch-Ua-Mobile: ?1
+
+Referer: https://yourdai.app/
+
+Sec-Ch-Ua-Platform: "Android"
+
+Sec-Ch-Ua-Platform: "Android"
+
+Sec-Ch-Ua: "Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"
+
+Sec-Fetch-Dest: empty
+
+Sec-Fetch-Dest: empty
+
+Sec-Ch-Ua-Mobile: ?1
+
+Sec-Fetch-Mode: cors
+
+Sec-Fetch-Mode: cors
+
+Sec-Ch-Ua-Platform: "Android"
+
+Sec-Fetch-Site: cross-site
+
+Sec-Fetch-Dest: empty
+
+Sec-Fetch-Site: cross-site
+
+Sec-Gpc: 1
+
+Sec-Fetch-Mode: cors
+
+Sec-Gpc: 1
+
+X-Forwarded-For: 1.129.111.94
+
+Sec-Fetch-Site: cross-site
+
+Sec-Gpc: 1
+
+X-Forwarded-Host: yourdai-production.up.railway.app
+
+X-Forwarded-For: 1.129.111.94
+
+X-Forwarded-For: 1.129.111.94
+
+X-Forwarded-Proto: https
+
+X-Forwarded-Host: yourdai-production.up.railway.app
+
+X-Forwarded-Host: yourdai-production.up.railway.app
+
+X-Forwarded-Proto: https
+
+X-Railway-Edge: railway/us-west2
+
+X-Forwarded-Proto: https
 
 Accept-Encoding: gzip, deflate, br, zstd
 
-Accept-Language: en-GB,en;q=0.5
+X-Railway-Request-Id: aZTqi33BR4WfcyHxn6XIxQ
 
-Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjJiN2JhZmIyZjEwY2FlMmIxZjA3ZjM4MTZjNTQyMmJlY2NhNWMyMjMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiSnVzdGluIFd1IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0wwTFN2bGs4d2xsdW5JZWkzM3BQXzFDY2U0dDREeUhtbEJyVGFMMUxOVll5S2FVNjhGaUE9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20veW91cmRhaSIsImF1ZCI6InlvdXJkYWkiLCJhdXRoX3RpbWUiOjE3NTQ4NzUwMzYsInVzZXJfaWQiOiJTaTNOcnlOTmpTTWJXOHExdDBuaUtYOHNZbmcxIiwic3ViIjoiU2kzTnJ5Tk5qU01iVzhxMXQwbmlLWDhzWW5nMSIsImlhdCI6MTc1NDg3Nzk5NCwiZXhwIjoxNzU0ODgxNTk0LCJlbWFpbCI6Imp1c3Rpbi53dTQ0NDRAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMTMwMjY1MDI5MTE2OTg1ODM1NTQiXSwiZW1haWwiOlsianVzdGluLnd1NDQ0NEBnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.CFnPtNpOb7gNwyOU1QwwzQA3tLe3hM2Y6GBvfJGqCXzT8H1GE0BnjiXN0XVhyLfEWxdZq-b1eefe7u5IQgXIeEX81THCJ3QpUZYBphWoERHw5vqJrwxb1EAt0fDcYiRmPb-acPVgameGjiZMywREksVxFCb7qDzmnmzA7WT_naKZqzKWw4jCZAiX1Ht5EdoAkec0F0OUUpTYKrHQs35Mec0gHMlmAs0R66Tt56vEFRm8yCTy1k9XjoI-cmQxXyVuhhdUWWdVngJMOVn2ybUpgEuwsOtWz74Wr2D7O9QrF6gYT1kfM5rEfgCiP3XovF3IomatQIxhF3zfPOOSjwtMZg
+X-Real-Ip: 1.129.111.94
+
+Accept-Language: en-GB,en;q=0.9
+
+X-Railway-Edge: railway/us-west2
+
+X-Request-Start: 1754887151634
+
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjJiN2JhZmIyZjEwY2FlMmIxZjA3ZjM4MTZjNTQyMmJlY2NhNWMyMjMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiSnVzdGluIFd1IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0wwTFN2bGs4d2xsdW5JZWkzM3BQXzFDY2U0dDREeUhtbEJyVGFMMUxOVll5S2FVNjhGaUE9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20veW91cmRhaSIsImF1ZCI6InlvdXJkYWkiLCJhdXRoX3RpbWUiOjE3NTQ4ODcxMzgsInVzZXJfaWQiOiJTaTNOcnlOTmpTTWJXOHExdDBuaUtYOHNZbmcxIiwic3ViIjoiU2kzTnJ5Tk5qU01iVzhxMXQwbmlLWDhzWW5nMSIsImlhdCI6MTc1NDg4NzE2OCwiZXhwIjoxNzU0ODkwNzY4LCJlbWFpbCI6Imp1c3Rpbi53dTQ0NDRAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMTMwMjY1MDI5MTE2OTg1ODM1NTQiXSwiZW1haWwiOlsianVzdGluLnd1NDQ0NEBnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.ryODGokkyY8_DlsH78DgR0OEF9TQYRzIzLPyW9Jm1BBzgKhjA70DzWeEU8q_tp9pv2XyZYBhiN3tmhKxH5l0WBDiJlr1BY9ZTWYlbkQPrmHg14JpwlonNK2k5KNaxce7QkYRnRTUd21p04YiiSUn_HwuSmDzTeYgoglybBTw5iVAIeibvXuLjWT8ZRGYE29J77nfr6dz08mljtRz7TDwQpWGuEXuYAnwgVRsoeE7_IOy3wGyq2Ltv9Q4UVJG7IpWMKsgQf-lQSUeNnq_8oiuSppZAWI-pKMe1UpuGS30vh-uNdzR18sM3t92qQLHK64D9GaNMVHo5_MbFUekbCWG3w
 
 Content-Type: application/json
 
@@ -47,55 +115,14 @@ Referer: https://yourdai.app/
 
 Sec-Ch-Ua: "Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"
 
-Sec-Ch-Ua-Mobile: ?0
-
-Sec-Ch-Ua-Platform: "macOS"
-
-Sec-Fetch-Dest: empty
-
-Sec-Fetch-Mode: cors
-
-Sec-Fetch-Site: cross-site
-
-Sec-Gpc: 1
-
-X-Forwarded-For: 1.129.106.102
-
-X-Forwarded-Host: yourdai-production.up.railway.app
-
-X-Forwarded-Proto: https
-
-X-Railway-Edge: railway/us-west2
-
-X-Railway-Request-Id: I3XFGEb6RJiyCOMGn6XIxQ
-
-X-Real-Ip: 1.129.106.102
-
-X-Request-Start: 1754877995640
+Sec-Ch-Ua-Mobile: ?1
 
 
-100.64.0.3 - - [11/Aug/2025 02:06:36] "GET /api/auth/user HTTP/1.1" 200 -
+100.64.0.4 - - [11/Aug/2025 04:39:31] "GET /api/auth/user HTTP/1.1" 200 -
 
-100.64.0.3 - - [11/Aug/2025 02:06:36] "GET /api/calendar/events?date=2025-08-11&timezone=Australia/Sydney HTTP/1.1" 400 -
+100.64.0.4 - - [11/Aug/2025 04:39:31] "POST /api/auth/user HTTP/1.1" 200 -
 
-100.64.0.3 - - [11/Aug/2025 02:06:36] "POST /api/auth/user HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:06:38] "OPTIONS /api/schedules/2025-08-11 HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:06:39] "GET /api/schedules/2025-08-11 HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:06:41] "OPTIONS /api/integrations/slack/status HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:06:41] "GET /api/calendar/status/Si3NryNNjSMbW8q1t0niKX8sYng1 HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:06:42] "GET /api/integrations/slack/status HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:07:11] "OPTIONS /api/calendar/connect HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:07:12] "POST /api/calendar/connect HTTP/1.1" 200 -
-
-100.64.0.3 - - [11/Aug/2025 02:07:13] "GET /api/calendar/status/Si3NryNNjSMbW8q1t0niKX8sYng1 HTTP/1.1" 200 -
-
+100.64.0.4 - - [11/Aug/2025 04:39:33] "GET /api/calendar/events?date=2025-08-11&timezone=Australia/Sydney HTTP/1.1" 200 -
 
 ## Console logs
 User creation date: Sun Mar 02 2025 11:01:54 GMT+1100 (Australian Eastern Daylight Time)
