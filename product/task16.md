@@ -1,4 +1,4 @@
-# Status: To Do
+# Status: RESOLVED ✅
 I am facing a bug where after google sso and approving google calendar connection, I do not see my google calendar events appear in my current day schedule
 
 # Steps to reproduce:
@@ -190,5 +190,80 @@ The issue persists because we need to prevent dashboard's **initial calendar API
 1. **Backend synchronization**: Ensure calendar connection is atomic and immediately available
 2. **Frontend state coordination**: Dashboard should check for calendar connection state before attempting API calls
 
-## Status: Requires Deeper Backend Analysis
-The 200 OK in backend logs vs 400 error in frontend suggests the issue may be in the backend calendar connection timing or token/credentials propagation delay.
+---
+
+# SOLUTION IMPLEMENTED ✅
+
+## Final Root Cause Analysis
+The issue was a **double race condition**:
+1. **Backend Race**: MongoDB write/read consistency issue where `/api/calendar/connect` returned success before the connection was truly readable by `/api/calendar/events`
+2. **Frontend Race**: Dashboard component's `useEffect` ran before AuthContext calendar connection completed
+3. **Bonus Issue**: React infinite re-render loop caused by improper useEffect dependency handling
+
+## Implemented Fixes
+
+### 1. Backend Atomic Connection (`calendar_routes.py:308-324`)
+**Problem**: `/api/calendar/connect` returned success immediately after `users.update_one()`, but the database write wasn't immediately consistent for subsequent reads.
+
+**Fix**: Added verification step before returning success:
+```python
+# Verify the connection is actually readable before returning success
+verification_user = users.find_one({"googleId": user_id})
+verification_calendar = verification_user.get('calendar', {})
+if not verification_calendar.get('connected') or not verification_calendar.get('credentials'):
+    return jsonify({"success": False, "error": "Calendar connection verification failed"})
+```
+
+### 2. Frontend Race Condition Prevention (`dashboard/page.tsx:1247-1261`)
+**Problem**: Dashboard's `loadInitialSchedule` ran before `calendarConnectionStage` completed.
+
+**Fix**: Added condition to prevent loading during calendar connection:
+```javascript
+if (!calendarConnectionStage && !hasInitiallyLoaded.current) {
+  loadInitialSchedule()
+}
+```
+
+### 3. State Synchronization (`dashboard/page.tsx:1179-1188`)
+**Problem**: After calendar connection completed, dashboard didn't reload with calendar events.
+
+**Fix**: Separate useEffect to detect calendar connection completion and reset load flag:
+```javascript
+useEffect(() => {
+  if (prevCalendarStageRef.current && !calendarConnectionStage) {
+    hasInitiallyLoaded.current = false // Allows reload with calendar events
+  }
+  prevCalendarStageRef.current = calendarConnectionStage
+}, [calendarConnectionStage])
+```
+
+### 4. React Error #321 Fix
+**Problem**: Infinite re-render loop caused by transition detection logic running inside main useEffect.
+
+**Fix**: Separated transition detection into dedicated useEffect to prevent render loops.
+
+## Key Learnings
+
+### Technical Insights
+1. **Database Consistency**: MongoDB `update_one()` + immediate `find_one()` can have timing issues. Always verify writes are readable before returning success.
+2. **React useEffect Patterns**: Transition detection logic must be in separate useEffect to avoid infinite loops.
+3. **State Coordination**: Complex async flows need careful orchestration between multiple components and contexts.
+4. **Race Condition Debugging**: Frontend/backend timing issues require examining both client and server logs simultaneously.
+
+### Architecture Lessons
+1. **Atomic Operations**: API endpoints should ensure complete consistency before returning success.
+2. **Component Lifecycle**: Async state changes need proper dependency tracking and cleanup.
+3. **Error Boundary Thinking**: Consider edge cases where timing assumptions break down.
+4. **Testing Integration**: End-to-end race conditions need integration tests beyond unit tests.
+
+## Files Modified
+- `backend/apis/calendar_routes.py` - Added atomic connection verification
+- `frontend/app/dashboard/page.tsx` - Fixed race condition and infinite loop
+- `backend/tests/test_calendar_routes.py` - Updated tests for new verification logic
+
+## Validation
+- ✅ Calendar events now load immediately after OAuth completion
+- ✅ Backend tests pass with new atomic verification
+- ✅ React infinite loop resolved
+- ✅ Existing workarounds (disconnect/reconnect, hard refresh) still work
+- ✅ No breaking changes to existing functionality

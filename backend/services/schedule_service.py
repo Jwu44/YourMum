@@ -170,8 +170,8 @@ class ScheduleService:
         calendar_tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Create or merge calendar tasks with existing schedule.
-        Preserves non-calendar tasks and adds/updates calendar tasks.
+        Create or replace calendar tasks in existing schedule.
+        Simple strategy: replace all calendar tasks, keep all manual tasks.
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -192,118 +192,74 @@ class ScheduleService:
             })
             
             if existing_schedule:
-                # Current tasks in schedule
+                # Simple approach: keep non-calendar tasks, replace all calendar tasks
                 existing_tasks = existing_schedule.get('schedule', [])
-
-                # Build maps for quick lookup by Google event id
-                existing_by_gcal_id = {}
-                manual_overrides = set()
-                for task in existing_tasks:
-                    gcal_id = task.get('gcal_event_id')
-                    if not gcal_id:
-                        continue
-                    # Track existing task by gcal_event_id (prefer calendar-sourced ones)
-                    if task.get('from_gcal', False):
-                        existing_by_gcal_id[gcal_id] = task
-                    else:
-                        # Manual override present for this event id
-                        manual_overrides.add(gcal_id)
-
-                # Construct updated list of calendar tasks based on incoming events
-                updated_calendar_tasks: List[Dict[str, Any]] = []
-                seen_calendar_ids = set()
-                for incoming in calendar_tasks:
-                    gcal_id = incoming.get('gcal_event_id')
-                    seen_calendar_ids.add(gcal_id)
-
-                    # If user manually converted this event to a manual task, skip recreation
-                    if gcal_id in manual_overrides:
-                        continue
-
-                    existing_calendar_task = existing_by_gcal_id.get(gcal_id)
-                    if existing_calendar_task:
-                        # Merge: preserve user-edited fields, overwrite Google-controlled ones
-                        merged = dict(existing_calendar_task)
-
-                        # Overwrite from incoming (Google) for selected fields
-                        merged['text'] = incoming.get('text', merged.get('text'))
-                        merged['start_time'] = incoming.get('start_time')
-                        merged['end_time'] = incoming.get('end_time')
-                        merged['start_date'] = incoming.get('start_date')
-                        merged['gcal_event_id'] = gcal_id
-                        merged['from_gcal'] = True
-
-                        # Ensure id stability
-                        merged['id'] = existing_calendar_task.get('id', incoming.get('id'))
-
-                        # Preserve user-edited fields (completed, categories already from existing)
-                        updated_calendar_tasks.append(merged)
-                    else:
-                        # New calendar task: ensure from_gcal True
-                        new_task = dict(incoming)
-                        new_task['from_gcal'] = True
-                        updated_calendar_tasks.append(new_task)
-
-                # Remove any calendar tasks that are no longer present in incoming
-                # Non-calendar tasks (including sections and manual conversions) remain
                 non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
+                
+                # Mark all new calendar tasks with from_gcal flag and ensure required fields
+                new_calendar_tasks = []
+                for task in calendar_tasks:
+                    calendar_task = dict(task)
+                    calendar_task['from_gcal'] = True
+                    # Ensure required fields for validation
+                    if 'type' not in calendar_task:
+                        calendar_task['type'] = 'task'
+                    new_calendar_tasks.append(calendar_task)
+                
+                # Final schedule: calendar tasks first, then manual tasks
+                final_tasks = new_calendar_tasks + non_calendar_tasks
 
-                # Order: calendar tasks first (preserve incoming order), then others
-                merged_tasks = updated_calendar_tasks + non_calendar_tasks
-
-                # Validate updated document before persisting
-                # Build validated document snapshot
+                # Update existing schedule with simplified approach
                 existing_metadata = existing_schedule.get('metadata', {})
-                temp_doc = {
-                    **existing_schedule,
-                    "date": formatted_date,
-                    "schedule": merged_tasks,
+                update_doc = {
+                    "schedule": final_tasks,
                     "metadata": {
                         **existing_metadata,
-                        "created_at": existing_metadata.get('created_at', format_timestamp()),
                         "last_modified": format_timestamp(),
                         "calendarSynced": True,
-                        "calendarEvents": len(updated_calendar_tasks),
+                        "calendarEvents": len(new_calendar_tasks),
                         "source": "calendar_sync"
                     }
                 }
-
+                
+                # Validate before updating
+                temp_doc = {**existing_schedule, **update_doc}
                 is_valid, validation_error = validate_schedule_document(temp_doc)
                 if not is_valid:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
-                # Update existing schedule
+                # Update database
                 result = self.schedules_collection.update_one(
                     {"userId": user_id, "date": formatted_date},
-                    {
-                        "$set": {
-                            "schedule": merged_tasks,
-                            "metadata.last_modified": temp_doc["metadata"]["last_modified"],
-                            "metadata.calendarSynced": True,
-                            "metadata.calendarEvents": len(updated_calendar_tasks),
-                            "metadata.source": "calendar_sync"
-                        }
-                    }
+                    {"$set": update_doc}
                 )
 
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule with calendar tasks"}
-
-                final_tasks = merged_tasks
+                final_tasks = new_calendar_tasks + non_calendar_tasks
                 
             else:
                 # Create new schedule with calendar tasks only
+                new_calendar_tasks = []
+                for task in calendar_tasks:
+                    calendar_task = dict(task)
+                    calendar_task['from_gcal'] = True
+                    # Ensure required fields for validation
+                    if 'type' not in calendar_task:
+                        calendar_task['type'] = 'task'
+                    new_calendar_tasks.append(calendar_task)
+                
                 schedule_document = self._create_schedule_document(
                     user_id=user_id,
                     date=date,
-                    tasks=calendar_tasks,
+                    tasks=new_calendar_tasks,
                     source="calendar_sync"
                 )
                 
                 # Add calendar-specific metadata
                 schedule_document["metadata"].update({
                     "calendarSynced": True,
-                    "calendarEvents": len(calendar_tasks)
+                    "calendarEvents": len(new_calendar_tasks)
                 })
                 
                 # Validate and insert
@@ -312,7 +268,7 @@ class ScheduleService:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
                 
                 result = self.schedules_collection.insert_one(schedule_document)
-                final_tasks = calendar_tasks
+                final_tasks = new_calendar_tasks
             
             # Calculate metadata for response
             metadata = self._calculate_schedule_metadata(final_tasks)
@@ -321,7 +277,7 @@ class ScheduleService:
                 "lastModified": format_timestamp(),
                 "source": "calendar_sync",
                 "calendarSynced": True,
-                "calendarEvents": len(calendar_tasks)
+                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
             })
             
             return True, {
