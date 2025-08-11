@@ -30,14 +30,26 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const isPublicPath = publicPaths.includes(pathname);
       const inAuthFlow = isAuthRedirect();
       
+      // Check for calendar connection in progress
+      const calendarConnectionInProgress = typeof window !== 'undefined' && 
+        localStorage.getItem('calendarConnectionProgress');
+      
       console.log("RouteGuard State:", {
         user: user ? `${user.displayName} (${user.email})` : null,
         loading,
         pathname,
         isPublicPath,
         inAuthFlow,
+        calendarConnectionInProgress,
         currentUrl: typeof window !== 'undefined' ? window.location.href : 'server'
       });
+      
+      // If authenticated user and calendar connection is in progress, redirect to /connecting
+      if (user && calendarConnectionInProgress && pathname !== '/connecting') {
+        console.log("Calendar connection in progress, redirecting to /connecting");
+        router.push('/connecting');
+        return;
+      }
       
       // Don't redirect if in auth flow or if user is authenticated
       if (!user && !isPublicPath && !inAuthFlow) {
