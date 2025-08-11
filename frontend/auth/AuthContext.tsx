@@ -82,30 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Small delay to ensure all async operations complete before resetting OAuth state
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Success - reset OAuth state but let /connecting page handle redirect
+        // Success - reset OAuth state and set localStorage flag
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
         
-        // Set localStorage flag to let /connecting page know calendar connection is complete
+        // Set localStorage flag to let RouteGuard redirect to /connecting page
         localStorage.setItem('calendarConnectionProgress', 'complete');
         
-        // Don't redirect here - let /connecting page handle the full flow including calendar events fetch
+        // Don't redirect here - let RouteGuard handle navigation to /connecting
         
       } else {
-        // No calendar access, reset OAuth state and redirect directly to dashboard
+        // No calendar access, reset OAuth state - let RouteGuard handle navigation
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
-        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-        localStorage.removeItem('authRedirectDestination');
-        
-        // Check if we're already on the target page to avoid unnecessary reload
-        if (window.location.pathname === redirectTo) {
-          console.log("No calendar access, already on target page:", redirectTo);
-          // Already on target page, no navigation needed
-        } else {
-          console.log("No calendar access, navigating to:", redirectTo);
-          window.location.href = redirectTo;
-        }
+        console.log("No calendar access granted - RouteGuard will handle navigation");
       }
       
     } catch (error) {
@@ -114,16 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCalendarConnectionStage(null);
       setError(error instanceof Error ? error.message : 'Failed to connect calendar');
       
-      // Redirect to dashboard and let user retry from integrations page
-      const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-      localStorage.removeItem('authRedirectDestination');
+      // Store error information for connecting page to handle
+      localStorage.setItem('calendarConnectionError', JSON.stringify({
+        error: error instanceof Error ? error.message : 'Failed to connect calendar',
+        action: 'redirect_to_integrations'
+      }));
       
-      // Check if we're already on the target page to avoid unnecessary reload
-      if (window.location.pathname === redirectTo) {
-        // Already on target page, no navigation needed
-      } else {
-        window.location.href = redirectTo;
-      }
+      // Let RouteGuard handle navigation
+      console.log("Calendar connection error - RouteGuard will handle navigation");
     }
   };
 
@@ -232,10 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!credential || !credential.accessToken) {
             console.error("Missing credential or access token");
             setIsOAuthInProgress(false); // Reset OAuth state
-            // Get intended redirect destination
-            const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-            localStorage.removeItem('authRedirectDestination');
-            window.location.href = redirectTo;
+            console.log("Missing credential - RouteGuard will handle navigation");
             return;
           }
           
@@ -247,10 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Redirect sign-in error:", error);
         setIsOAuthInProgress(false); // Reset OAuth state on error
         setError('Failed to sign in with Google');
-        // Get intended redirect destination
-        const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
-        localStorage.removeItem('authRedirectDestination');
-        window.location.href = redirectTo;
+        console.log("Redirect sign-in error - RouteGuard will handle navigation");
       }
     };
     
@@ -268,8 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Check if user is already authenticated
       if (user) {
-        console.log("User already authenticated, redirecting to:", redirectTo);
-        window.location.href = redirectTo;
+        console.log("User already authenticated - RouteGuard will handle navigation");
         return;
       }
       
@@ -300,10 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (credential && credential.accessToken) {
           await processCalendarAccess(credential);
         } else {
-          // No calendar access, redirect anyway
-          const destination = localStorage.getItem('authRedirectDestination') || '/dashboard';
-          localStorage.removeItem('authRedirectDestination');
-          window.location.href = destination;
+          // No calendar access - let RouteGuard handle navigation
+          console.log("No calendar access from popup - RouteGuard will handle navigation");
         }
       } catch (popupError: any) {
         // If popup fails, try redirect as fallback
@@ -325,8 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Sign in error:', error);
       setIsOAuthInProgress(false); // Reset OAuth state on error
       setError('Failed to sign in with Google');
-      // Clean up localStorage on error
-      localStorage.removeItem('authRedirectDestination');
+      console.log("Sign in error - RouteGuard will handle navigation");
       throw error;
     }
   };
