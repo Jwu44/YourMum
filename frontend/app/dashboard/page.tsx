@@ -47,8 +47,6 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const { calendarConnectionStage, currentUser } = useAuth()
-  // Show loader after connection completes while initial post-connect fetch runs
-  const [isInitialCalendarSyncing, setIsInitialCalendarSyncing] = useState(false)
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
@@ -1172,8 +1170,8 @@ const Dashboard: React.FC = () => {
     if (hasInitiallyLoaded.current) return
 
     const loadInitialSchedule = async () => {
-      // Begin initial post-connect sync
-      setIsInitialCalendarSyncing(true)
+      // Set flag immediately to prevent race conditions in React Strict Mode
+      hasInitiallyLoaded.current = true
       setIsLoadingSchedule(true)
 
       try {
@@ -1251,22 +1249,14 @@ const Dashboard: React.FC = () => {
           description: 'Could not load schedule. You can start adding tasks manually.'
         })
       } finally {
-        // Mark initial load complete and hide loader
-        hasInitiallyLoaded.current = true
         setIsLoadingSchedule(false)
-        setIsInitialCalendarSyncing(false)
       }
-    }
-
-    // Defer initial load until calendar connection stage is cleared
-    if (calendarConnectionStage) {
-      return
     }
 
     if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
       loadInitialSchedule()
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage])
+  }, [state.formUpdate?.response, toast])
 
   useEffect(() => {
     document.documentElement.classList.remove('dark')
@@ -1326,9 +1316,9 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, currentUser?.uid])
 
-  // Show calendar connection loader during OAuth flow or while initial post-connect fetch runs
-  if (calendarConnectionStage || isInitialCalendarSyncing) {
-    return <CalendarConnectionLoader stage={calendarConnectionStage ?? 'verifying'} />
+  // Show calendar connection loader during OAuth flow
+  if (calendarConnectionStage) {
+    return <CalendarConnectionLoader stage={calendarConnectionStage} />
   }
 
   return (
