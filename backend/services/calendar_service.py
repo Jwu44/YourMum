@@ -171,7 +171,7 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str) -> List[Dict]:
         if not access_token:
             return []
 
-        user_timezone = user.get('timezone') or 'UTC'
+        user_timezone = user.get('timezone') or 'Australia/Sydney'
 
         # Fetch events (patched in tests)
         events = fetch_google_calendar_events(access_token, date, user_timezone) or []

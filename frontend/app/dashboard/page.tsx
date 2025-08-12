@@ -98,17 +98,6 @@ const Dashboard: React.FC = () => {
       })
       localStorage.removeItem('calendarConnectionError')
     }
-
-    // Check for calendar sync pending (race condition resolved)
-    const syncPending = localStorage.getItem('calendarSyncPending')
-    if (syncPending) {
-      toast({
-        title: 'Calendar Sync in Progress',
-        description: 'Your calendar events will appear shortly. Refresh the page in a moment to see them.',
-        variant: 'default'
-      })
-      localStorage.removeItem('calendarSyncPending')
-    }
   }, [toast])
 
   // Fetch user creation date on component mount
