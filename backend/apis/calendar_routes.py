@@ -574,8 +574,8 @@ def calendar_webhook():
         if not access_token:
             return jsonify({"status": "no-token"}), 200
 
-        # Compute today's date in user's timezone (or UTC)
-        user_timezone = user.get('timezone') or 'UTC'
+        # Compute today's date in user's timezone (fallback to Australia/Sydney for consistency)
+        user_timezone = user.get('timezone') or 'Australia/Sydney'
         try:
             tz = pytz.timezone(user_timezone)
         except Exception:
