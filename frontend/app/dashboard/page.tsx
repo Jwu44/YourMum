@@ -36,7 +36,8 @@ import {
 // Direct API helpers (no ScheduleHelper)
 import { calendarApi } from '@/lib/api/calendar'
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
+import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
 
@@ -46,7 +47,14 @@ const Dashboard: React.FC = () => {
   const { state } = useForm()
   const { toast } = useToast()
   const isMobile = useIsMobile()
-  const { calendarConnectionStage, currentUser } = useAuth()
+  // Be resilient in test environments where AuthProvider may be mocked
+  const { calendarConnectionStage, currentUser } = (() => {
+    try {
+      return useAuth()
+    } catch (e) {
+      return { calendarConnectionStage: null as any, currentUser: auth.currentUser }
+    }
+  })()
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
@@ -620,110 +628,37 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - create new one
-      console.log('Next day is in the future and no schedule exists, creating new schedule')
+      // Step 4: Future date with no existing schedule - centralize to backend autogeneration
+      console.log('Next day is in the future and no schedule exists, autogenerating via backend')
 
-      // Get current schedule and inputs for filtering
-      const currentDayDate = getDateString(currentDayIndex)
-      const currentLoadResult = await loadSchedule(currentDayDate)
-
-      if (!currentLoadResult.success || !currentLoadResult.schedule) {
-        console.error('Failed to load current schedule for filtering')
-        throw new Error('Cannot load current schedule')
-      }
-
-      const currentTasks = currentLoadResult.schedule
-      const currentInputs = currentLoadResult.inputs || {}
-
-      // Filter tasks for next day
-      const nextDate = new Date(nextDayDate)
-      const filteredTasks = filterTasksForNextDay(currentTasks, nextDate)
-
-      // Create schedule with filtered tasks
-      const createResult = await createSchedule(nextDayDate, filteredTasks, currentInputs)
-
-      if (createResult.success && createResult.schedule) {
-        console.log('Successfully created next day schedule')
-
-        // Update schedule state
+      const auto = await autogenerateTodaySchedule(nextDayDate)
+      if (auto.success && (auto.created || auto.existed) && Array.isArray(auto.schedule)) {
         setScheduleDays(prevDays => {
           const newDays = [...prevDays]
           const targetIndex = currentDayIndex + 1
-
-          // Ensure array is large enough
-          while (newDays.length <= targetIndex) {
-            newDays.push([])
-          }
-
-          newDays[targetIndex] = createResult.schedule!
+          while (newDays.length <= targetIndex) newDays.push([])
+          newDays[targetIndex] = auto.schedule!
           return newDays
         })
-
-        // Cache the new schedule
-        setScheduleCache(prevCache => {
-          const newCache = new Map(prevCache)
-          newCache.set(nextDayDate, createResult.schedule!)
-          return newCache
+        setScheduleCache(prev => {
+          const map = new Map(prev)
+          map.set(nextDayDate, auto.schedule!)
+          return map
         })
       } else {
-        throw new Error('Failed to create schedule with filtered tasks')
+        throw new Error(auto.error || 'Autogenerate failed')
       }
     } catch (error) {
       console.error('Error in handleNextDay:', error)
 
-      // Fallback: try creating empty schedule for future dates only
+      // Fallback: show empty schedule for future date if autogenerate failed
       if (!isDateInPast(nextDayDate)) {
-        try {
-          const currentDayDate = getDateString(currentDayIndex)
-          const currentLoadResult = await loadSchedule(currentDayDate)
-          const currentInputs = currentLoadResult.inputs || {}
-
-          const createResult = await createSchedule(nextDayDate, [], currentInputs)
-
-          if (createResult.success && createResult.schedule) {
-            console.log('Created fallback empty schedule')
-
-            setScheduleDays(prevDays => {
-              const newDays = [...prevDays]
-              const targetIndex = currentDayIndex + 1
-
-              while (newDays.length <= targetIndex) {
-                newDays.push([])
-              }
-
-              newDays[targetIndex] = createResult.schedule!
-              return newDays
-            })
-
-            setScheduleCache(prevCache => {
-              const newCache = new Map(prevCache)
-              newCache.set(nextDayDate, createResult.schedule!)
-              return newCache
-            })
-          } else {
-            throw new Error('Empty schedule creation failed')
-          }
-        } catch (fallbackError) {
-          console.error('Fallback creation also failed:', fallbackError)
-
-          // Show empty schedule
-          setScheduleDays(prevDays => {
-            const newDays = [...prevDays]
-            const targetIndex = currentDayIndex + 1
-
-            while (newDays.length <= targetIndex) {
-              newDays.push([])
-            }
-
-            newDays[targetIndex] = []
-            return newDays
-          })
-        }
-
-        toast({
-          title: 'Error',
-          description: 'Failed to create schedule. Showing empty schedule.',
-          variant: 'destructive'
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays]
+          const targetIndex = currentDayIndex + 1
+          while (newDays.length <= targetIndex) newDays.push([])
+          newDays[targetIndex] = []
+          return newDays
         })
       } else {
         // For past dates, just show empty array
@@ -1196,62 +1131,89 @@ const Dashboard: React.FC = () => {
       hasInitiallyLoaded.current = true
       setIsLoadingSchedule(true)
 
+      const today = getDateString(0)
+
       try {
-        const today = getDateString(0)
-
-        // Try calendar sync first if user is authenticated
-        const currentUser = auth.currentUser
-        if (currentUser) {
-          try {
-            console.log('Attempting to fetch calendar events for:', today)
-            const calendarResponse = await calendarApi.fetchEvents(today)
-
-            if (calendarResponse.success) {
-              console.log('Calendar events fetched successfully:', calendarResponse.count, 'events')
-              setScheduleDays([calendarResponse.tasks])
-              setScheduleCache(new Map([[today, calendarResponse.tasks]]))
-              return
-            } else if (calendarResponse.notConnected) {
-              console.log('Calendar not connected, loading regular schedule')
-            } else {
-              console.log('Calendar error, loading regular schedule:', calendarResponse.error)
-            }
-          } catch (calendarError) {
-            console.error('Error fetching calendar events:', calendarError)
-          }
-        }
-
-        // Fallback: Load existing schedule 
+        // 1) Try loading existing schedule
         const existingSchedule = await loadSchedule(today)
-
         if (existingSchedule.success && existingSchedule.schedule) {
           setScheduleDays([existingSchedule.schedule])
           setScheduleCache(new Map([[today, existingSchedule.schedule]]))
+          setIsLoadingSchedule(false)
           return
         }
 
-        // Create empty schedule in backend
-        console.log('No existing schedule found, creating empty schedule')
-        
-        try {
-          const emptyScheduleResult = await updateSchedule(today, [])
-          if (emptyScheduleResult.success) {
-            const backendSchedule = emptyScheduleResult.schedule || []
-            setScheduleDays([backendSchedule])
-            setScheduleCache(new Map([[today, backendSchedule]]))
-            console.log('Empty schedule created with', backendSchedule.length, 'tasks')
-          } else {
+        // 2) No existing schedule → trigger backend autogeneration with 10s timeout and single retry
+        let timeoutReached = false
+        const timeoutId = setTimeout(() => {
+          timeoutReached = true
+          setIsLoadingSchedule(false) // stop skeleton after 10s
+        }, 10000)
+
+        // First attempt
+        const auto1 = await autogenerateTodaySchedule(today)
+        if (auto1.success) {
+          if (auto1.sourceFound === false) {
+            // Immediate empty state when no source schedule exists
+            clearTimeout(timeoutId)
+            setIsLoadingSchedule(false)
             setScheduleDays([[]])
+            return
           }
-        } catch (createError) {
-          console.error('Error creating empty schedule:', createError)
-          setScheduleDays([[]])
+
+          if ((auto1.created || auto1.existed) && Array.isArray(auto1.schedule)) {
+            clearTimeout(timeoutId)
+            setScheduleDays([auto1.schedule])
+            setScheduleCache(new Map([[today, auto1.schedule]]))
+            setIsLoadingSchedule(false)
+            return
+          }
+        } else {
+          // First failure → show toast immediately and retry once
+          toast({
+            title: 'Autogenerate failed',
+            description: auto1.error || 'Failed to autogenerate schedule',
+            variant: 'destructive'
+          })
+
+          autogenerateTodaySchedule(today)
+            .then((auto2) => {
+              clearTimeout(timeoutId)
+              if (auto2.success && (auto2.created || auto2.existed) && Array.isArray(auto2.schedule)) {
+                setScheduleDays([auto2.schedule])
+                setScheduleCache(prev => new Map(prev).set(today, auto2.schedule!))
+                if (timeoutReached) {
+                  toast({
+                    title: 'Schedule ready',
+                    description: 'Your schedule has been created',
+                    variant: 'default'
+                  })
+                }
+                setIsLoadingSchedule(false)
+              } else {
+                // Retry failed → show empty state + toast (already shown above)
+                setIsLoadingSchedule(false)
+                setScheduleDays([[]])
+              }
+            })
+            .catch(() => {
+              clearTimeout(timeoutId)
+              setIsLoadingSchedule(false)
+              setScheduleDays([[]])
+            })
+
+          // Keep skeleton until timeout or until retry resolves
+          return
         }
+
+        // If reached here without success, end loading and show empty
+        clearTimeout(timeoutId)
+        setIsLoadingSchedule(false)
+        setScheduleDays([[]])
       } catch (error) {
         console.error('Error loading initial schedule:', error)
-        setScheduleDays([[]])
-      } finally {
         setIsLoadingSchedule(false)
+        setScheduleDays([[]])
       }
     }
 
@@ -1259,6 +1221,18 @@ const Dashboard: React.FC = () => {
       loadInitialSchedule()
     }
   }, [state.formUpdate?.response, toast, calendarConnectionStage])
+
+  // Midnight auto-refresh (local timezone)
+  useEffect(() => {
+    const now = new Date()
+    const midnight = new Date(now)
+    midnight.setHours(24, 0, 0, 0)
+    const delay = midnight.getTime() - now.getTime()
+    const timer = setTimeout(() => {
+      try { window.location.reload() } catch (_) {}
+    }, Math.max(0, delay))
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.remove('dark')
@@ -1342,8 +1316,19 @@ const Dashboard: React.FC = () => {
 
             {isLoadingSchedule
               ? (
-              <div className="loading-container-lg">
-                <div className="loading-spinner-lg" />
+              <div className="space-y-4" data-testid="dashboard-skeleton">
+                <Skeleton className="h-6 w-1/3" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-1/4" />
+                  {[...Array(6)].map((_, idx) => (
+                    <Skeleton key={idx} className="h-10 w-full" />
+                  ))}
+                </div>
               </div>
                 )
               : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0

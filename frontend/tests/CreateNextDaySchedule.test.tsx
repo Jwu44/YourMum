@@ -2,12 +2,45 @@
  * Test for create next day schedule functionality following TDD approach
  * These tests should FAIL initially and PASS after implementation
  */
+// Critical mocks that must apply before importing Dashboard
+jest.mock('@/auth/AuthContext', () => ({
+  __esModule: true,
+  useAuth: () => ({
+    user: { uid: 'test', email: 'test@example.com' },
+    calendarConnectionStage: null,
+    currentUser: { uid: 'test', getIdToken: async () => 'mock-token' }
+  }),
+  AuthProvider: ({ children }: any) => children
+}))
+
+jest.mock('@/auth/firebase', () => ({
+  __esModule: true,
+  auth: {
+    currentUser: { uid: 'test', getIdToken: async () => 'mock-token' }
+  }
+}))
+
+// Stub firebase/auth used by real AuthProvider internals so using the real hook won't throw
+jest.mock('firebase/auth', () => ({
+  onAuthStateChanged: (_auth: any, cb: any) => {
+    cb({ uid: 'test', email: 'test@example.com', getIdToken: async () => 'mock-token' })
+    return () => {}
+  },
+  signOut: jest.fn(),
+  GoogleAuthProvider: { credentialFromResult: jest.fn(() => ({ accessToken: 'token' })) },
+  signInWithPopup: jest.fn(async () => ({ user: { uid: 'test', email: 'test@example.com' } })),
+  signInWithRedirect: jest.fn(async () => {}),
+  getRedirectResult: jest.fn(async () => null)
+}))
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { jest } from '@jest/globals';
 import Dashboard from '@/app/dashboard/page';
 import { FormProvider } from '@/lib/FormContext';
 import { Task } from '@/lib/types';
+
+// Env is set in jest.setup.js; keep tests self-contained without overriding here
 
 // Create mock functions first
 const mockLoadSchedule = jest.fn() as jest.MockedFunction<any>;
@@ -17,6 +50,7 @@ const mockUpdateSchedule = jest.fn() as jest.MockedFunction<any>;
 const mockDeleteTask = jest.fn() as jest.MockedFunction<any>;
 const mockFetchEvents = jest.fn() as jest.MockedFunction<any>;
 const mockGetUserCreationDate = jest.fn() as jest.MockedFunction<any>;
+const mockAutogenerate = jest.fn() as jest.MockedFunction<any>;
 
 // Mock the API functions that will be called
 jest.mock('@/lib/ScheduleHelper', () => ({
@@ -24,7 +58,8 @@ jest.mock('@/lib/ScheduleHelper', () => ({
   createSchedule: mockCreateSchedule,
   updateSchedule: mockUpdateSchedule,
   deleteTask: mockDeleteTask,
-  shouldTaskRecurOnDate: mockShouldTaskRecurOnDate
+  shouldTaskRecurOnDate: mockShouldTaskRecurOnDate,
+  autogenerateTodaySchedule: mockAutogenerate
 }));
 
 jest.mock('@/hooks/use-toast', () => ({
@@ -45,13 +80,21 @@ jest.mock('@/lib/api/users', () => ({
   }
 }));
 
+// Auth and related mocks are defined at top to ensure they apply before Dashboard import
+
 // Test wrapper component with FormProvider
 
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <FormProvider>
-    <div data-testid="test-wrapper">{children}</div>
-  </FormProvider>
-);
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { AuthProvider } = require('@/auth/AuthContext')
+  return (
+    <AuthProvider>
+      <FormProvider>
+        <div data-testid="test-wrapper">{children}</div>
+      </FormProvider>
+    </AuthProvider>
+  )
+}
 
 // Sample test data
 const mockSectionTask: Task = {
@@ -534,4 +577,110 @@ describe('handleNextDay navigation and error handling', () => {
     // Should call createSchedule ONLY for future dates without existing schedules
     // This test will fail until future date creation logic is implemented
   });
+
+// NEW TESTS: Centralize next-day creation to backend autogenerate endpoint
+describe('autogenerate centralization for next-day navigation', () => {
+  test('calls backend autogenerate for future next day when no existing schedule', async () => {
+    // Determine today and next day strings in test runtime
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const next = new Date(today);
+    next.setDate(today.getDate() + 1);
+    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+
+    // Initial load: today schedule exists
+    mockLoadSchedule.mockImplementation(async (dateStr: string) => {
+      if (dateStr === todayStr) {
+        return { success: true, schedule: [{ id: 't1', text: 'A', type: 'task' }], inputs: {} };
+      }
+      if (dateStr === nextStr) {
+        return { success: false, error: 'No schedule found' };
+      }
+      return { success: false, error: 'unexpected' };
+    });
+
+    // Autogenerate returns a created schedule
+    mockAutogenerate.mockResolvedValue({ success: true, created: true, sourceFound: true, schedule: [{ id: 'n1', text: 'Task', type: 'task' }] });
+
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    // Click Next day
+    const nextBtn = await screen.findByRole('button', { name: /Next day/i });
+    nextBtn.click();
+
+    await waitFor(() => {
+      expect(mockAutogenerate).toHaveBeenCalledWith(nextStr);
+    });
+
+    // Ensure legacy createSchedule path is not used for next-day centralization
+    expect(mockCreateSchedule).not.toHaveBeenCalled();
+  });
+
+  test('does not autogenerate when next day schedule already exists', async () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const next = new Date(today);
+    next.setDate(today.getDate() + 1);
+    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+
+    mockLoadSchedule.mockImplementation(async (dateStr: string) => {
+      if (dateStr === todayStr) {
+        return { success: true, schedule: [{ id: 't1', text: 'A', type: 'task' }], inputs: {} };
+      }
+      if (dateStr === nextStr) {
+        return { success: true, schedule: [{ id: 't2', text: 'B', type: 'task' }], inputs: {} };
+      }
+      return { success: false, error: 'unexpected' };
+    });
+
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    const nextBtn = await screen.findByRole('button', { name: /Next day/i });
+    nextBtn.click();
+
+    await waitFor(() => {
+      expect(mockLoadSchedule).toHaveBeenCalledWith(nextStr);
+    });
+
+    expect(mockAutogenerate).not.toHaveBeenCalled();
+  });
+
+  test('does not autogenerate when navigating to a past day without schedule', async () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const prev = new Date(today);
+    prev.setDate(today.getDate() - 1);
+    const prevStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`;
+
+    mockLoadSchedule.mockImplementation(async (dateStr: string) => {
+      if (dateStr === todayStr) {
+        return { success: true, schedule: [{ id: 't1', text: 'A', type: 'task' }], inputs: {} };
+      }
+      if (dateStr === prevStr) {
+        return { success: false, error: 'No schedule found' };
+      }
+      return { success: false, error: 'unexpected' };
+    });
+
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    const prevBtn = await screen.findByRole('button', { name: /Previous day/i });
+    prevBtn.click();
+
+    // Ensure autogenerate is not triggered for past navigation
+    expect(mockAutogenerate).not.toHaveBeenCalled();
+  });
+});
 }); 

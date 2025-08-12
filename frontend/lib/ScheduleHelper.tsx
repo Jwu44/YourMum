@@ -462,6 +462,45 @@ export const updateSchedule = async (date: string, tasks: Task[]): Promise<{
 }
 
 /**
+ * Autogenerate today's schedule via backend
+ * Centralized backend logic to find recent-with-tasks and build today's schedule
+ */
+export const autogenerateTodaySchedule = async (date: string): Promise<{
+  success: boolean
+  existed?: boolean
+  created?: boolean
+  sourceFound?: boolean
+  schedule?: Task[]
+  error?: string
+}> => {
+  try {
+    if (!/\d{4}-\d{2}-\d{2}/.test(date)) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD')
+    }
+
+    const token = await getAuthToken()
+    const response = await fetch(`${API_BASE_URL}/api/schedules/autogenerate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ date })
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to autogenerate schedule' }
+    }
+
+    return { success: true, ...data }
+  } catch (error) {
+    console.error('Error autogenerating schedule:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Autogenerate failed' }
+  }
+}
+
+/**
  * Determine if a task should recur on a given date
  *
  * Checks if a recurring task should appear on the specified date based on its recurrence pattern.

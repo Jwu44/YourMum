@@ -71,3 +71,9 @@ beforeAll(() => {
 afterAll(() => {
   console.error = originalError
 }) 
+
+// Global test environment defaults
+// Ensure development-like environment and bypass auth for tests unless explicitly overridden
+process.env.NODE_ENV = process.env.NODE_ENV || 'development'
+process.env.NEXT_PUBLIC_BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH || 'true'
+process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'

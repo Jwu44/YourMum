@@ -480,6 +480,166 @@ class ScheduleService:
             traceback.print_exc()
             return False, {"error": f"Internal error: {str(e)}"}
 
+    def get_most_recent_schedule_with_tasks(
+        self,
+        user_id: str,
+        before_date: str,
+        max_days_back: int = 30
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find the most recent schedule (strictly before before_date) that has at least one
+        non-section task. Schedules containing only Google Calendar events still count as
+        having tasks, as long as they are non-section tasks.
+
+        Args:
+            user_id: User's Google ID or Firebase UID
+            before_date: Date string in YYYY-MM-DD format to search backwards from
+            max_days_back: Maximum number of days to search backwards (default 30)
+
+        Returns:
+            The schedule document if found, otherwise None
+        """
+        try:
+            target_dt = datetime.strptime(before_date, '%Y-%m-%d')
+
+            for days_back in range(1, max_days_back + 1):
+                search_dt = target_dt - timedelta(days=days_back)
+                formatted_date = format_schedule_date(search_dt.strftime('%Y-%m-%d'))
+
+                schedule_doc = self.schedules_collection.find_one({
+                    "userId": user_id,
+                    "date": formatted_date
+                })
+
+                if not schedule_doc:
+                    continue
+
+                tasks = schedule_doc.get('schedule', [])
+                non_section = [t for t in tasks if not t.get('is_section', False) and t.get('type') != 'section']
+                if len(non_section) > 0:
+                    return schedule_doc
+
+            return None
+        except Exception as e:
+            print(f"Error in get_most_recent_schedule_with_tasks: {str(e)}")
+            traceback.print_exc()
+            return None
+
+    def autogenerate_schedule(
+        self,
+        user_id: str,
+        date: str,
+        max_days_back: int = 30
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Autogenerate a schedule for the given date by:
+        - If schedule for the date exists: return existed=True
+        - Else, find most recent schedule with ≥1 non-section task within max_days_back
+          (calendar-only schedules qualify). If none, return sourceFound=False.
+        - Build today's schedule by:
+            - Including all sections (new IDs)
+            - Including incomplete non-recurring tasks (new IDs), excluding calendar-origin tasks
+            - Including recurring tasks that should occur on the target date (new IDs)
+            - Setting start_date of included tasks to target date
+          Reuse inputs from the most recent schedule with inputs.
+
+        Returns tuple (success, result_dict)
+        """
+        try:
+            # If schedule already exists, no-op
+            exists, existing = self.get_schedule_by_date(user_id, date)
+            if exists:
+                return True, {
+                    "existed": True,
+                    "created": False,
+                    "sourceFound": True,
+                    "date": date,
+                    "schedule": existing.get('schedule', [])
+                }
+
+            # Find source schedule
+            source_schedule = self.get_most_recent_schedule_with_tasks(user_id, date, max_days_back)
+            if not source_schedule:
+                return True, {
+                    "existed": False,
+                    "created": False,
+                    "sourceFound": False,
+                    "date": date,
+                    "schedule": []
+                }
+
+            # Build new tasks
+            section_tasks = self._copy_sections_from_schedule(source_schedule)
+
+            # Incomplete non-recurring from source (exclude calendar-origin tasks)
+            source_tasks = source_schedule.get('schedule', [])
+            carry_over_tasks: List[Dict[str, Any]] = []
+            for task in source_tasks:
+                if task.get('is_section', False) or task.get('type') == 'section':
+                    continue
+                if task.get('is_recurring'):
+                    continue
+                if task.get('completed', False):
+                    continue
+                if task.get('from_gcal', False) or task.get('gcal_event_id'):
+                    # Avoid copying past calendar events
+                    continue
+                new_task = {**task}
+                new_task['id'] = str(uuid.uuid4())
+                new_task['start_date'] = date
+                if 'type' not in new_task:
+                    new_task['type'] = 'task'
+                carry_over_tasks.append(new_task)
+
+            # Recurring tasks due on target date
+            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
+
+            final_tasks = section_tasks + recurring_tasks + carry_over_tasks
+
+            # Inputs from most recent schedule with inputs
+            recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
+            inputs = recent_with_inputs.get('inputs', {}) if recent_with_inputs else {}
+
+            # Create and upsert document (use source='manual' to satisfy schema)
+            schedule_document = self._create_schedule_document(
+                user_id=user_id,
+                date=date,
+                tasks=final_tasks,
+                source="manual",
+                inputs=inputs
+            )
+
+            is_valid, validation_error = validate_schedule_document(schedule_document)
+            if not is_valid:
+                return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+            formatted_date = format_schedule_date(date)
+            result = self.schedules_collection.replace_one(
+                {"userId": user_id, "date": formatted_date},
+                schedule_document,
+                upsert=True
+            )
+
+            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata.update({
+                "generatedAt": schedule_document["metadata"]["created_at"],
+                "lastModified": schedule_document["metadata"]["last_modified"],
+                "source": "manual"
+            })
+
+            return True, {
+                "existed": False,
+                "created": True,
+                "sourceFound": True,
+                "date": date,
+                "schedule": final_tasks,
+                "metadata": metadata
+            }
+        except Exception as e:
+            print(f"Error in autogenerate_schedule: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to autogenerate schedule: {str(e)}"}
+
     def _create_schedule_document(
         self,
         user_id: str,

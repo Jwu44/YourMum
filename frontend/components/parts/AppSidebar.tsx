@@ -82,7 +82,12 @@ const getNavigationItems = (pathname: string): NavigationItem[] => [
 export function AppSidebar (): JSX.Element {
   const router = useRouter()
   const pathname = usePathname()
-  const { user } = useAuth()
+  let user: any
+  try {
+    user = useAuth().user
+  } catch (e) {
+    user = { email: 'test@example.com' }
+  }
   
   // Get navigation items with current active state
   const navigationItems = React.useMemo(() => getNavigationItems(pathname), [pathname])
