@@ -18,7 +18,7 @@ from datetime import datetime
 from backend.db_config import get_database
 
 
-# NOTE:
+# NOTE: need this to avoid circular dependency with schedule_service
 # In tests, this symbol is patched directly within this module.
 # In production, delegate to the real implementation in backend.apis.calendar_routes.
 def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str) -> List[Dict]:  # pragma: no cover - thin wrapper
