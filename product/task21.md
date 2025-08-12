@@ -8,8 +8,8 @@ I am facing a bug where adding an to my google calendar overwrites my current da
 
 
 # Expected behaviour:
-- adding google calendar events in real time should be shown as new events being appended in the current schedule
-- google calendar events should be removed
+- adding google calendar events in real time should be shown as new events being appended in the current schedule via the event bus/sse stream
+- google calendar events should not be removed or filtered from the targetted schedule
 - e.g. with the example I should see 6 tasks after adding a new event for today (3 manually created and 3 sourced from google calendar)
 
 # Resources

@@ -228,14 +228,15 @@ def test_calendar_tasks_ordered_first(reset_mock_collection: MagicMock):
     assert merged[2].get("type") == "section"
 
 
-def test_delete_removed_calendar_events(reset_mock_collection: MagicMock):
+def test_preserve_incomplete_existing_calendar_events_when_absent_from_fetch(reset_mock_collection: MagicMock):
+    """When fetched set is missing some events, preserve existing incomplete gcal tasks (carry-over)."""
     user_id = "user-4"
     date = "2025-07-29"
 
     existing_tasks = [
         {
-            "id": "keep-id",
-            "text": "Keep Me",
+            "id": "keep-old",
+            "text": "Keep Me (old)",
             "completed": False,
             "categories": [],
             "start_time": "09:00",
@@ -246,14 +247,14 @@ def test_delete_removed_calendar_events(reset_mock_collection: MagicMock):
             "type": "task"
         },
         {
-            "id": "remove-id",
-            "text": "Remove Me",
+            "id": "carry-id",
+            "text": "Carry Over Not In Fetch",
             "completed": False,
             "categories": [],
             "start_time": "11:00",
             "end_time": "12:00",
             "start_date": date,
-            "gcal_event_id": "ev-remove",
+            "gcal_event_id": "ev-carry",
             "from_gcal": True,
             "type": "task"
         },
@@ -270,8 +271,8 @@ def test_delete_removed_calendar_events(reset_mock_collection: MagicMock):
 
     incoming_calendar_tasks = [
         {
-            "id": "new-id-ignored",
-            "text": "Keep Me Updated",
+            "id": "new-keep",
+            "text": "Keep Me (new)",
             "completed": False,
             "categories": [],
             "start_time": "09:30",
@@ -281,6 +282,7 @@ def test_delete_removed_calendar_events(reset_mock_collection: MagicMock):
             "from_gcal": True,
             "type": "task"
         }
+        # Note: ev-carry is NOT in fetched set
     ]
 
     success, result = schedule_service.create_schedule_from_calendar_sync(
@@ -291,10 +293,52 @@ def test_delete_removed_calendar_events(reset_mock_collection: MagicMock):
 
     assert success is True
     merged = result["schedule"]
-    # Only ev-keep should remain among calendar tasks; ev-remove should be gone. Manual remains.
+    # Calendar IDs should include ev-keep (from fetch) and ev-carry (preserved carry-over)
     gcal_ids = [t.get("gcal_event_id") for t in merged if t.get("from_gcal")]
-    assert gcal_ids == ["ev-keep"]
+    assert set(gcal_ids) == {"ev-keep", "ev-carry"}
     # Manual still present
     assert any(t.get("id") == "manual-id" for t in merged)
+
+
+def test_empty_fetch_leaves_calendar_tasks_untouched(reset_mock_collection: MagicMock):
+    """If fetched calendar list is empty, leave existing gcal tasks in place (non-destructive)."""
+    user_id = "user-5"
+    date = "2025-07-29"
+
+    existing_tasks = [
+        {
+            "id": "cal-1",
+            "text": "Existing A",
+            "completed": False,
+            "start_time": "08:00",
+            "end_time": "09:00",
+            "start_date": date,
+            "gcal_event_id": "ev-A",
+            "from_gcal": True,
+            "type": "task"
+        },
+        {
+            "id": "manual-1",
+            "text": "Manual Task",
+            "from_gcal": False,
+            "type": "task"
+        }
+    ]
+
+    reset_mock_collection.find_one.return_value = _make_schedule_doc(user_id, date, existing_tasks)
+    # No DB update should be required for empty fetch preservation, but allow modified_count==0
+    reset_mock_collection.update_one.return_value = MagicMock(modified_count=0)
+
+    success, result = schedule_service.create_schedule_from_calendar_sync(
+        user_id=user_id,
+        date=date,
+        calendar_tasks=[]  # empty fetch
+    )
+
+    assert success is True
+    merged = result["schedule"]
+    # Should be identical to existing schedule (calendar task preserved)
+    assert any(t.get("gcal_event_id") == "ev-A" for t in merged)
+    assert any(t.get("id") == "manual-1" for t in merged)
 
 

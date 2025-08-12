@@ -197,24 +197,56 @@ class ScheduleService:
             })
             
             if existing_schedule:
-                # Simple approach: keep non-calendar tasks, replace all calendar tasks
+                # Non-destructive merge strategy:
+                # - Keep non-calendar tasks untouched
+                # - If fetched calendar list is empty: preserve existing calendar tasks
+                # - Otherwise: replace calendar tasks with fetched set PLUS any existing
+                #   incomplete carry-over calendar tasks that are not in the fetched set
                 existing_tasks = existing_schedule.get('schedule', [])
                 non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
-                
-                # Mark all new calendar tasks with from_gcal flag and ensure required fields
-                new_calendar_tasks = []
+                existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
+
+                # Normalize incoming tasks as calendar tasks with required fields
+                normalized_incoming_calendar_tasks: List[Dict[str, Any]] = []
                 for task in calendar_tasks:
                     calendar_task = dict(task)
                     calendar_task['from_gcal'] = True
-                    # Ensure required fields for validation
                     if 'type' not in calendar_task:
                         calendar_task['type'] = 'task'
-                    new_calendar_tasks.append(calendar_task)
-                
-                # Final schedule: calendar tasks first, then manual tasks
-                final_tasks = new_calendar_tasks + non_calendar_tasks
+                    normalized_incoming_calendar_tasks.append(calendar_task)
 
-                # Update existing schedule with simplified approach
+                # If incoming list is empty, leave existing calendar tasks untouched
+                if len(normalized_incoming_calendar_tasks) == 0:
+                    final_tasks = existing_calendar_tasks + non_calendar_tasks
+                    # Do not update DB to avoid unnecessary writes; return current state
+                    metadata = self._calculate_schedule_metadata(final_tasks)
+                    metadata.update({
+                        "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
+                        "lastModified": existing_schedule.get('metadata', {}).get('last_modified', ''),
+                        "source": existing_schedule.get('metadata', {}).get('source', 'calendar_sync'),
+                        "calendarSynced": True,
+                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                    })
+                    return True, {
+                        "schedule": final_tasks,
+                        "date": date,
+                        "metadata": metadata
+                    }
+
+                # Otherwise, merge: fetched + preserve existing incomplete not present by gcal_event_id
+                fetched_ids = {t.get('gcal_event_id') for t in normalized_incoming_calendar_tasks if t.get('gcal_event_id')}
+                carry_over_incomplete = []
+                for t in existing_calendar_tasks:
+                    is_incomplete = not t.get('completed', False)
+                    gcal_id = t.get('gcal_event_id')
+                    not_in_fetched = (gcal_id not in fetched_ids) if gcal_id else True
+                    if is_incomplete and not_in_fetched:
+                        carry_over_incomplete.append(t)
+
+                merged_calendar_tasks = normalized_incoming_calendar_tasks + carry_over_incomplete
+                final_tasks = merged_calendar_tasks + non_calendar_tasks
+
+                # Update existing schedule with merged calendar tasks at top
                 existing_metadata = existing_schedule.get('metadata', {})
                 update_doc = {
                     "schedule": final_tasks,
@@ -222,26 +254,24 @@ class ScheduleService:
                         **existing_metadata,
                         "last_modified": format_timestamp(),
                         "calendarSynced": True,
-                        "calendarEvents": len(new_calendar_tasks),
+                        "calendarEvents": len([t for t in merged_calendar_tasks if t.get('from_gcal', False)]),
                         "source": "calendar_sync"
                     }
                 }
-                
+
                 # Validate before updating
                 temp_doc = {**existing_schedule, **update_doc}
+                # Ensure date is in canonical format for validation
+                temp_doc["date"] = formatted_date
                 is_valid, validation_error = validate_schedule_document(temp_doc)
                 if not is_valid:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
-                # Update database
-                result = self.schedules_collection.update_one(
+                # Update database (treat no-op as success to avoid false failure)
+                self.schedules_collection.update_one(
                     {"userId": user_id, "date": formatted_date},
                     {"$set": update_doc}
                 )
-
-                if result.modified_count == 0:
-                    return False, {"error": "Failed to update schedule with calendar tasks"}
-                final_tasks = new_calendar_tasks + non_calendar_tasks
                 
             else:
                 # Create new schedule with calendar tasks only
