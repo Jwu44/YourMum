@@ -577,6 +577,129 @@ def process_user_for_response(user: Dict[str, Any]) -> Dict[str, Any]:
     
     return processed_user
 
+@api_bp.route("/schedules/autogenerate", methods=["POST"])
+def autogenerate_schedule_api():
+    """
+    Autogenerate a schedule for a given date for the authenticated user.
+
+    Body: { "date": "YYYY-MM-DD" }
+    """
+    try:
+        # Auth required
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        data = request.json or {}
+        date = data.get('date')
+        if not date:
+            return jsonify({
+                "success": False,
+                "error": "Missing required field: date"
+            }), 400
+        # Validate date format
+        try:
+            from datetime import datetime as dt
+            dt.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        success, result = schedule_service.autogenerate_schedule(user_id, date)
+        if not success:
+            return jsonify({
+                "success": False,
+                "error": result.get('error', 'Failed to autogenerate')
+            }), 500
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+    except Exception as e:
+        print(f"Error in autogenerate_schedule_api: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@api_bp.route("/schedules/recent-with-tasks", methods=["GET"])
+def get_recent_with_tasks_api():
+    """
+    Return the most recent schedule (within N days before a given date) that has ≥1 non-section task.
+    Query: before=YYYY-MM-DD&days=30
+    """
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+        user_id = user.get('googleId')
+
+        before = request.args.get('before')
+        days_param = request.args.get('days', '30')
+        if not before:
+            return jsonify({
+                "success": False,
+                "error": "Missing required query param: before"
+            }), 400
+        try:
+            from datetime import datetime as dt
+            dt.strptime(before, '%Y-%m-%d')
+            days = int(days_param)
+        except Exception:
+            return jsonify({
+                "success": False,
+                "error": "Invalid query params. Use before=YYYY-MM-DD and days as integer"
+            }), 400
+
+        schedule_doc = schedule_service.get_most_recent_schedule_with_tasks(user_id, before, days)
+        if not schedule_doc:
+            return jsonify({
+                "success": True,
+                "found": False
+            })
+
+        # Remove Mongo _id if present
+        doc_copy = {k: v for k, v in schedule_doc.items() if k != '_id'}
+        return jsonify({
+            "success": True,
+            "found": True,
+            **doc_copy
+        })
+    except Exception as e:
+        print(f"Error in get_recent_with_tasks_api: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
 @api_bp.route("/user/<user_id>", methods=["GET"])
 def get_user(user_id):
     try:
