@@ -21,6 +21,7 @@ from backend.models.schedule_schema import (
     format_schedule_date, 
     format_timestamp
 )
+import backend.services.calendar_service as calendar_service
 
 
 class ScheduleService:
@@ -34,6 +35,10 @@ class ScheduleService:
     def __init__(self):
         """Initialize the schedule service."""
         self.schedules_collection = get_user_schedules_collection()
+
+    def _get_calendar_fetch_timeout(self) -> float:
+        """Sub-timeout in seconds for calendar fetch; override in tests if needed."""
+        return 8.0
 
     def get_schedule_by_date(
         self, 
@@ -570,10 +575,18 @@ class ScheduleService:
 
             # Build new tasks
             section_tasks = self._copy_sections_from_schedule(source_schedule)
+            first_section_text: Optional[str] = None
+            if section_tasks:
+                try:
+                    first_section = section_tasks[0]
+                    first_section_text = first_section.get('text') or None
+                except Exception:
+                    first_section_text = None
 
             # Incomplete non-recurring from source (exclude calendar-origin tasks)
             source_tasks = source_schedule.get('schedule', [])
             carry_over_tasks: List[Dict[str, Any]] = []
+            carry_over_calendar_tasks: List[Dict[str, Any]] = []
             for task in source_tasks:
                 if task.get('is_section', False) or task.get('type') == 'section':
                     continue
@@ -581,20 +594,84 @@ class ScheduleService:
                     continue
                 if task.get('completed', False):
                     continue
+                # Separate handling for calendar-origin vs manual tasks
                 if task.get('from_gcal', False) or task.get('gcal_event_id'):
-                    # Avoid copying past calendar events
-                    continue
-                new_task = {**task}
-                new_task['id'] = str(uuid.uuid4())
-                new_task['start_date'] = date
-                if 'type' not in new_task:
-                    new_task['type'] = 'task'
-                carry_over_tasks.append(new_task)
+                    # Carry-over INCOMPLETE Google Calendar tasks to next day per spec
+                    calendar_copy = {**task}
+                    calendar_copy['id'] = str(uuid.uuid4())
+                    calendar_copy['start_date'] = date  # keep times, move date
+                    if 'type' not in calendar_copy:
+                        calendar_copy['type'] = 'task'
+                    # Ensure flags
+                    calendar_copy['from_gcal'] = True
+                    carry_over_calendar_tasks.append(calendar_copy)
+                else:
+                    new_task = {**task}
+                    new_task['id'] = str(uuid.uuid4())
+                    new_task['start_date'] = date
+                    if 'type' not in new_task:
+                        new_task['type'] = 'task'
+                    carry_over_tasks.append(new_task)
 
             # Recurring tasks due on target date
             recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
 
-            final_tasks = section_tasks + recurring_tasks + carry_over_tasks
+            # Fetch calendar tasks for target date with sub-timeout to respect 10s UX
+            fetched_calendar_tasks: List[Dict[str, Any]] = []
+            try:
+                # Allow tests to override fetch timeout via method
+                timeout_seconds = self._get_calendar_fetch_timeout()
+            except Exception:
+                timeout_seconds = 8.0
+
+            try:
+                from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+                def _fetch():
+                    return calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    future = executor.submit(_fetch)
+                    try:
+                        fetched_calendar_tasks = future.result(timeout=timeout_seconds)
+                    except FuturesTimeout:
+                        # Proceed without calendar on timeout
+                        fetched_calendar_tasks = []
+                    except Exception:
+                        fetched_calendar_tasks = []
+            except Exception:
+                # Fallback to direct fetch without timeout (still protected)
+                try:
+                    fetched_calendar_tasks = calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+                except Exception:
+                    fetched_calendar_tasks = []
+
+            # Deduplicate by gcal_event_id (prefer fetched over carry-over)
+            fetched_ids = {t.get('gcal_event_id') for t in fetched_calendar_tasks if t.get('gcal_event_id')}
+            carry_over_unique = [t for t in carry_over_calendar_tasks if t.get('gcal_event_id') not in fetched_ids]
+            calendar_block = list(fetched_calendar_tasks) + carry_over_unique
+            # Ensure deterministic ordering within block: all-day first, then time, then text
+            calendar_block = self._sort_calendar_block(calendar_block)
+
+            # Assign section for calendar events if first section exists
+            if first_section_text:
+                for t in calendar_block:
+                    t['section'] = first_section_text
+
+            # Position calendar block:
+            final_tasks: List[Dict[str, Any]] = []
+            if section_tasks:
+                # Insert after first section
+                final_tasks.append(section_tasks[0])
+                final_tasks.extend(calendar_block)
+                final_tasks.extend(section_tasks[1:])
+            else:
+                # No sections, calendar block at top
+                final_tasks.extend(calendar_block)
+
+            # Append other groups after sections/calendars
+            final_tasks.extend(recurring_tasks)
+            final_tasks.extend(carry_over_tasks)
 
             # Inputs from most recent schedule with inputs
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
@@ -743,6 +820,21 @@ class ScheduleService:
             print(f"Error finding recent schedule with inputs: {str(e)}")
             traceback.print_exc()
             return None
+
+    def _sort_calendar_block(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Sort calendar tasks as a contiguous block: all-day first, then by start_time (HH:MM),
+        tie-break by text alphabetically. Returns a new sorted list.
+        """
+        try:
+            def sort_key(t: Dict[str, Any]):
+                start_time = t.get('start_time')
+                text = (t.get('text') or '').lower()
+                return (0 if not start_time else 1, start_time or '', text)
+
+            return sorted(tasks, key=sort_key)
+        except Exception:
+            return tasks
 
     def _create_sections_from_config(self, layout_preference: Dict[str, Any]) -> List[Dict[str, Any]]:
         """

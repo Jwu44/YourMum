@@ -45,6 +45,7 @@ cd frontend && npm run dev  # Frontend on port 3000
 - **AI**: Anthropic Claude API (Sonnet & Haiku models)
 - **Auth**: Firebase Authentication
 - **External APIs**: Google Calendar, Slack (via Klavis AI MCP)
+- **Documentation**: Context7 MCP for up-to-date library documentation
 
 ### Core Architecture Patterns
 
@@ -109,6 +110,14 @@ interface Task {
 - `ANTHROPIC_API_KEY` - Claude API access
 - `FIREBASE_ADMIN_CREDENTIALS` - Firebase service account path
 - `KLAVIS_API_KEY` - Required for Slack integration via Klavis AI MCP
+
+## MCP Server Configuration
+
+**Context7 Documentation Server**:
+- Provides up-to-date documentation and code examples
+- Usage: Add "use context7" to prompts for accurate library information
+- Tools: `resolve-library-id` and `get-library-docs`
+- Supports major libraries: React, Next.js, TypeScript, Python frameworks
 
 **Frontend (.env.local)**:
 - `NEXT_PUBLIC_FIREBASE_API_KEY` - Firebase web config
