@@ -18,10 +18,17 @@ from datetime import datetime
 from backend.db_config import get_database
 
 
-# NOTE: In production, this function is implemented in calendar_routes.
-# Tests patch this symbol in this module directly.
-def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str) -> List[Dict]:  # pragma: no cover - patched in tests
-    raise NotImplementedError
+# NOTE:
+# In tests, this symbol is patched directly within this module.
+# In production, delegate to the real implementation in backend.apis.calendar_routes.
+def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str) -> List[Dict]:  # pragma: no cover - thin wrapper
+    try:
+        # Lazy import to avoid circular dependencies during module import
+        from backend.apis.calendar_routes import fetch_google_calendar_events as _routes_fetch  # type: ignore
+        return _routes_fetch(access_token, date, user_timezone) or []
+    except Exception:
+        # Be resilient; the caller will gracefully proceed with an empty list
+        return []
 
 
 def _event_overlaps_date(event: Dict, date: str) -> bool:

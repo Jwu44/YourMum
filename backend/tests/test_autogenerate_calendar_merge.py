@@ -59,6 +59,10 @@ def fake_collection():
         def replace_one(self, *args, **kwargs):
             return SimpleNamespace(upserted_id='xyz')
 
+        # Used by _get_recurring_tasks_for_date path; return None for simplicity
+        def find_one(self, *args, **kwargs):
+            return None
+
     return FakeCollection()
 
 
@@ -110,6 +114,151 @@ class TestAutogenerateCalendarMerge:
         assert any(t.get('is_section') and t['text'] == 'Afternoon' for t in tasks[3:])
         # Ensure calendar tasks are associated with first section
         assert tasks[1]['section'] == 'Morning' and tasks[2]['section'] == 'Morning'
+
+    @patch('backend.services.calendar_service.get_database')
+    @patch('backend.services.calendar_service.fetch_google_calendar_events')
+    @patch('backend.services.schedule_service.ScheduleService._get_most_recent_schedule_with_inputs')
+    @patch('backend.services.schedule_service.ScheduleService.get_most_recent_schedule_with_tasks')
+    @patch('backend.services.schedule_service.ScheduleService.get_schedule_by_date')
+    def test_autogenerate_includes_todays_calendar_events_via_service(
+        self,
+        mock_get_by_date,
+        mock_recent_with_tasks,
+        mock_recent_with_inputs,
+        mock_fetch_events,
+        mock_get_db,
+        fake_collection
+    ):
+        # No existing schedule for target date
+        mock_get_by_date.return_value = (False, {'error': 'No schedule'})
+        # Source schedule with a first section
+        source_doc = {
+            'date': '2025-08-11',
+            'schedule': [
+                _section('Morning')
+            ]
+        }
+        mock_recent_with_tasks.return_value = source_doc
+        mock_recent_with_inputs.return_value = {'inputs': {}}
+
+        # Calendar events for 2025-08-12 (today)
+        mock_fetch_events.return_value = [
+            {
+                'id': 'ev-sync',
+                'summary': 'sync gcal',
+                'status': 'confirmed',
+                'start': { 'date': '2025-08-12' },
+                'end':   { 'date': '2025-08-13' }
+            },
+            {
+                'id': 'ev-test2',
+                'summary': 'test 2',
+                'status': 'confirmed',
+                'start': { 'date': '2025-08-12' },
+                'end':   { 'date': '2025-08-13' }
+            },
+            {
+                'id': 'ev-test1',
+                'summary': 'test 1',
+                'status': 'confirmed',
+                'start': { 'dateTime': '2025-08-12T02:30:00Z' },
+                'end':   { 'dateTime': '2025-08-12T03:30:00Z' }
+            }
+        ]
+
+        # Provide a minimal user document for calendar_service lookup
+        class _Users:
+            def __init__(self, user_doc):
+                self._user_doc = user_doc
+            def find_one(self, query):
+                if query.get('googleId') == self._user_doc.get('googleId'):
+                    return self._user_doc
+                return None
+            def update_one(self, *args, **kwargs):
+                return SimpleNamespace(modified_count=1)
+
+        user_doc = {
+            'googleId': 'u1',
+            'timezone': 'Australia/Sydney',
+            'calendar': {
+                'connected': True,
+                'credentials': { 'accessToken': 'token' }
+            }
+        }
+        mock_get_db.return_value = { 'users': _Users(user_doc) }
+
+        from backend.services.schedule_service import schedule_service
+        schedule_service.schedules_collection = fake_collection
+
+        ok, result = schedule_service.autogenerate_schedule('u1', '2025-08-12')
+        assert ok
+        titles = [t['text'] for t in result['schedule'] if t.get('from_gcal')]
+        # Expected events are present
+        assert 'sync gcal' in titles
+        assert 'test 2' in titles
+        assert 'test 1' in titles
+
+    @patch('backend.services.calendar_service.get_database')
+    @patch('backend.services.calendar_service.fetch_google_calendar_events')
+    @patch('backend.services.schedule_service.ScheduleService._get_most_recent_schedule_with_inputs')
+    @patch('backend.services.schedule_service.ScheduleService.get_most_recent_schedule_with_tasks')
+    @patch('backend.services.schedule_service.ScheduleService.get_schedule_by_date')
+    def test_autogenerate_includes_tomorrows_calendar_events(
+        self,
+        mock_get_by_date,
+        mock_recent_with_tasks,
+        mock_recent_with_inputs,
+        mock_fetch_events,
+        mock_get_db,
+        fake_collection
+    ):
+        mock_get_by_date.return_value = (False, {'error': 'No schedule'})
+        source_doc = {
+            'date': '2025-08-12',
+            'schedule': [ _section('Morning') ]
+        }
+        mock_recent_with_tasks.return_value = source_doc
+        mock_recent_with_inputs.return_value = {'inputs': {}}
+
+        # Events for 2025-08-13 (tomorrow)
+        mock_fetch_events.return_value = [
+            {
+                'id': 'ev-boulder',
+                'summary': 'Boulder',
+                'status': 'confirmed',
+                'start': { 'dateTime': '2025-08-13T08:00:00Z' },
+                'end':   { 'dateTime': '2025-08-13T12:00:00Z' }
+            }
+        ]
+
+        # Minimal user doc for calendar_service lookup
+        class _Users:
+            def __init__(self, user_doc):
+                self._user_doc = user_doc
+            def find_one(self, query):
+                if query.get('googleId') == self._user_doc.get('googleId'):
+                    return self._user_doc
+                return None
+            def update_one(self, *args, **kwargs):
+                return SimpleNamespace(modified_count=1)
+
+        user_doc = {
+            'googleId': 'u1',
+            'timezone': 'Australia/Sydney',
+            'calendar': {
+                'connected': True,
+                'credentials': { 'accessToken': 'token' }
+            }
+        }
+        mock_get_db.return_value = { 'users': _Users(user_doc) }
+
+        from backend.services.schedule_service import schedule_service
+        schedule_service.schedules_collection = fake_collection
+
+        ok, result = schedule_service.autogenerate_schedule('u1', '2025-08-13')
+        assert ok
+        titles = [t['text'] for t in result['schedule'] if t.get('from_gcal')]
+        assert 'Boulder' in titles
 
     @patch('backend.services.calendar_service.get_calendar_tasks_for_user_date')
     @patch('backend.services.schedule_service.ScheduleService._get_most_recent_schedule_with_inputs')

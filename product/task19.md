@@ -100,6 +100,22 @@ The autogeneration feature currently creates daily schedules by filtering incomp
 - Calendar events stored as regular tasks with additional identifiers
 - Utilize existing task structure with calendar-specific fields
 
+## Testing
+
+### Automated
+- Added backend unit/integration tests to validate calendar merge behavior and timeout fallback:
+  - `backend/tests/test_calendar_service.py`: conversion, sorting, limiting, all-day/multi-day inclusion, failure fallback
+  - `backend/tests/test_autogenerate_calendar_merge.py`: block insertion after first section, dedup (carry-over vs fetched), no-sections (calendar at top)
+  - `backend/tests/test_autogenerate_calendar_timeout.py`: server-side sub-timeout fallback (proceed without calendar)
+  - `backend/tests/test_autogenerate_route_calendar_merge.py`: route-level merge in `/api/schedules/autogenerate`
+
+### Manual
+- Connect calendar (optional) via `POST /api/calendar/connect` with valid credentials; set timezone
+- Autogenerate today via `POST /api/schedules/autogenerate {"date":"YYYY-MM-DD"}`
+  - Expect contiguous calendar block after first section (or at top), ordered all-day first then by time; max 10
+  - If not connected or on error/timeout, schedule returns without calendar tasks (non-blocking)
+- Next day generation: ensure incomplete GCal tasks carry over with same times (date updated) and are deduped against fetched events
+
 ## Definition of Done
 - [ ] Calendar integration check implemented
 - [ ] Calendar events fetched for target date (today/tomorrow)
