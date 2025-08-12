@@ -41,7 +41,7 @@ jest.mock('@/lib/FormContext', () => ({
 
 // Mock auth context with variable state
 const mockAuthState = {
-  currentUser: { uid: 'test-user-id' },
+  currentUser: { uid: 'test-user-id' } as any,
   loading: false,
   error: null,
   calendarConnectionStage: null as 'connecting' | 'verifying' | 'complete' | null
@@ -161,25 +161,8 @@ describe('Calendar Integration in Dashboard', () => {
   });
 
   test('should prevent double dashboard load after Google SSO (TASK-22)', async () => {
-    // Mock successful calendar events response
-    (calendarApi.fetchEvents as jest.Mock).mockResolvedValue({
-      success: true,
-      tasks: [
-        {
-          id: 'gcal1',
-          text: 'Team Meeting',
-          completed: false,
-          start_time: '2025-07-29T09:00:00Z',
-          end_time: '2025-07-29T10:00:00Z',
-          gcal_event_id: 'event123'
-        }
-      ],
-      count: 1,
-      date: '2025-07-29'
-    });
-
     // Simulate user already authenticated with calendar connected
-    mockAuthState.currentUser = { uid: 'test-user-id', email: 'test@example.com' };
+    mockAuthState.currentUser = { uid: 'test-user-id' };
     mockAuthState.calendarConnectionStage = null;
     
     const { rerender } = render(<MockDashboard />);

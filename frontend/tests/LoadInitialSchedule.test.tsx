@@ -11,21 +11,17 @@ import { FormProvider } from '@/lib/FormContext';
 // Mock the API functions
 const mockLoadSchedule = jest.fn() as jest.MockedFunction<any>;
 const mockUpdateSchedule = jest.fn() as jest.MockedFunction<any>;
-const mockCalendarFetchEvents = jest.fn() as jest.MockedFunction<any>;
 const mockGetUserCreationDate = jest.fn() as jest.MockedFunction<any>;
 
 jest.mock('@/lib/ScheduleHelper', () => ({
   loadSchedule: mockLoadSchedule,
   updateSchedule: mockUpdateSchedule,
   generateSchedule: jest.fn(),
-  deleteTask: jest.fn()
+  deleteTask: jest.fn(),
+  autogenerateTodaySchedule: jest.fn()
 }));
 
-jest.mock('@/lib/api/calendar', () => ({
-  calendarApi: {
-    fetchEvents: mockCalendarFetchEvents
-  }
-}));
+// No direct calendar API usage in the new flow
 
 jest.mock('@/lib/api/users', () => ({
   userApi: {
@@ -68,13 +64,8 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
     mockGetUserCreationDate.mockResolvedValue(new Date('2024-01-01'));
   });
 
-  it('should create empty schedule in backend when no calendar events and no existing schedule', async () => {
-    // Mock calendar API returning no events
-    mockCalendarFetchEvents.mockResolvedValue({
-      success: false,
-      tasks: [],
-      error: 'No calendar events found'
-    });
+  it('should show empty state when no existing schedule and no source found during autogeneration', async () => {
+    const { autogenerateTodaySchedule } = require('@/lib/ScheduleHelper');
 
     // Mock loadSchedule returning 404 (no existing schedule)
     mockLoadSchedule.mockResolvedValue({
@@ -82,55 +73,45 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
       error: 'No schedule found for this date'
     });
 
-    // Mock updateSchedule succeeding (creating empty schedule)
-    mockUpdateSchedule.mockResolvedValue({
+    // Mock backend autogeneration finding no source schedule
+    (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({
       success: true,
-      schedule: [],
-      metadata: {
-        totalTasks: 0,
-        calendarEvents: 0,
-        recurringTasks: 0,
-        generatedAt: new Date().toISOString()
-      }
+      sourceFound: false,
+      created: false,
+      schedule: []
     });
 
-    // Render the Dashboard component
     render(
       <TestWrapper>
         <Dashboard />
       </TestWrapper>
     );
 
-    // Wait for initial load to complete
-    await waitFor(() => {
-      expect(mockCalendarFetchEvents).toHaveBeenCalledTimes(1);
-    });
-
+    // loadSchedule called once
     await waitFor(() => {
       expect(mockLoadSchedule).toHaveBeenCalledTimes(1);
     });
 
-    // Verify that updateSchedule was called to create empty schedule
+    // autogenerate called once
     await waitFor(() => {
-      expect(mockUpdateSchedule).toHaveBeenCalledTimes(1);
+      expect(autogenerateTodaySchedule).toHaveBeenCalledTimes(1);
     });
 
-    // Check that updateSchedule was called with today's date and empty tasks
-    const updateCall = mockUpdateSchedule.mock.calls[0];
-    const [date, tasks] = updateCall;
-    
-    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/); // Should be today's date in YYYY-MM-DD format
-    expect(tasks).toEqual([]); // Should be empty tasks array
-
-    // Verify empty state is shown initially
+    // Verify empty state is shown
     expect(screen.getByText('No schedule found for selected date')).toBeInTheDocument();
   });
 
-  it('should NOT create empty schedule when calendar events exist', async () => {
-    // Mock calendar API returning events
-    mockCalendarFetchEvents.mockResolvedValue({
+  it('should NOT create empty schedule when backend autogeneration returns schedule (calendar events exist)', async () => {
+    const { autogenerateTodaySchedule } = require('@/lib/ScheduleHelper');
+
+    // No existing schedule
+    mockLoadSchedule.mockResolvedValue({ success: false, error: 'No schedule found for this date' });
+
+    // Backend returns schedule (e.g., from calendar events)
+    (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({
       success: true,
-      tasks: [
+      created: true,
+      schedule: [
         {
           id: 'calendar-event-1',
           text: 'Meeting at 10 AM',
@@ -151,32 +132,24 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
       ]
     });
 
-    // Render the Dashboard component
     render(
       <TestWrapper>
         <Dashboard />
       </TestWrapper>
     );
 
-    // Wait for initial load to complete
     await waitFor(() => {
-      expect(mockCalendarFetchEvents).toHaveBeenCalledTimes(1);
+      expect(mockLoadSchedule).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(autogenerateTodaySchedule).toHaveBeenCalledTimes(1);
     });
 
-    // Verify that loadSchedule and updateSchedule were NOT called
-    // since calendar events were found
-    expect(mockLoadSchedule).not.toHaveBeenCalled();
+    // No client-side creation via updateSchedule in this flow
     expect(mockUpdateSchedule).not.toHaveBeenCalled();
   });
 
   it('should NOT create empty schedule when existing schedule exists', async () => {
-    // Mock calendar API returning no events
-    mockCalendarFetchEvents.mockResolvedValue({
-      success: false,
-      tasks: [],
-      error: 'No calendar events found'
-    });
-
     // Mock loadSchedule returning existing schedule
     mockLoadSchedule.mockResolvedValue({
       success: true,
@@ -208,11 +181,6 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
       </TestWrapper>
     );
 
-    // Wait for initial load to complete
-    await waitFor(() => {
-      expect(mockCalendarFetchEvents).toHaveBeenCalledTimes(1);
-    });
-
     await waitFor(() => {
       expect(mockLoadSchedule).toHaveBeenCalledTimes(1);
     });
@@ -221,7 +189,7 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
     expect(mockUpdateSchedule).not.toHaveBeenCalled();
   });
 
-  it('should show error toast and continue with frontend state when backend creation fails', async () => {
+  it('should show error toast and continue with empty state when backend autogeneration fails', async () => {
     const mockToast = jest.fn();
     
     // Re-mock useToast to capture toast calls
@@ -231,24 +199,15 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
       })
     }));
 
-    // Mock calendar API returning no events
-    mockCalendarFetchEvents.mockResolvedValue({
-      success: false,
-      tasks: [],
-      error: 'No calendar events found'
-    });
-
     // Mock loadSchedule returning 404
     mockLoadSchedule.mockResolvedValue({
       success: false,
       error: 'No schedule found for this date'
     });
 
-    // Mock updateSchedule failing
-    mockUpdateSchedule.mockResolvedValue({
-      success: false,
-      error: 'Failed to create schedule in database'
-    });
+    // Mock autogeneration failing
+    const { autogenerateTodaySchedule } = require('@/lib/ScheduleHelper');
+    (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({ success: false, error: 'Autogenerate failed' });
 
     // Render the Dashboard component
     render(
@@ -256,11 +215,6 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
         <Dashboard />
       </TestWrapper>
     );
-
-    // Wait for initial load to complete
-    await waitFor(() => {
-      expect(mockUpdateSchedule).toHaveBeenCalledTimes(1);
-    });
 
     // Verify empty state is still shown (frontend continues with empty state)
     expect(screen.getByText('No schedule found for selected date')).toBeInTheDocument();

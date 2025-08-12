@@ -78,7 +78,7 @@ describe('TASK-21: Calendar Connection Race Condition Fix - RESOLVED', () => {
       
       // The backend fix ensures calendarSynced: true is preserved when
       // existing_user.calendar.connected is true, preventing race condition
-      const connectionStatus = await mockGetCalendarStatus()
+      const connectionStatus = await mockGetCalendarStatus('test-user-123')
       expect(connectionStatus.connected).toBe(true)
     })
 
@@ -107,11 +107,11 @@ describe('TASK-21: Calendar Connection Race Condition Fix - RESOLVED', () => {
       })
 
       // Simulate auth state changes that previously caused race condition
-      const firstCheck = await mockGetCalendarStatus()
+      const firstCheck = await mockGetCalendarStatus('test-user-123')
       expect(firstCheck.connected).toBe(true)
 
       // Simulate second auth state change - connection should persist
-      const secondCheck = await mockGetCalendarStatus()
+      const secondCheck = await mockGetCalendarStatus('test-user-123')
       expect(secondCheck.connected).toBe(true)
 
       // The fix ensures calendar connection is not lost during auth state updates
@@ -219,7 +219,7 @@ describe('TASK-21: Calendar Connection Race Condition Fix - RESOLVED', () => {
       }, 500)
 
       // Calendar connection should remain stable
-      const status = await mockGetCalendarStatus()
+      const status = await mockGetCalendarStatus('test-user-123')
       expect(status.connected).toBe(true)
       expect(status.syncStatus).toBe('completed')
     })
@@ -231,14 +231,14 @@ describe('TASK-21: Calendar Connection Race Condition Fix - RESOLVED', () => {
       const mockGetCalendarStatus = calendarApi.getCalendarStatus as jest.MockedFunction<typeof calendarApi.getCalendarStatus>
       mockGetCalendarStatus.mockResolvedValue({
         connected: false,
-        credentials: null,
+        credentials: undefined,
         lastSyncTime: null,
         syncStatus: 'never',
         selectedCalendars: [],
         error: 'Google Calendar not connected. Please connect your calendar in the Integrations page to sync events.'
       })
 
-      const status = await mockGetCalendarStatus()
+      const status = await mockGetCalendarStatus('test-user-123')
       expect(status.connected).toBe(false)
       expect(status.error).toContain('Google Calendar not connected')
       
