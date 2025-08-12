@@ -34,9 +34,8 @@ import {
 } from '@/lib/helper'
 
 // Direct API helpers (no ScheduleHelper)
-import { calendarApi } from '@/lib/api/calendar'
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, createSchedule, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
