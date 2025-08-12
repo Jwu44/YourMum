@@ -13,7 +13,7 @@
 2. **Token Management Complexity** (calendar_routes.py:550-608)
    - Multiple timestamp format handling
    - Inline token refresh mixed with event fetching
-   - **STATUS: PENDING** - Need to extract to dedicated method
+   - **STATUS: PARTIAL** - Helper `_ensure_access_token_valid()` now exists and is used by webhook/watch, but `/events` GET still contains duplicated inline refresh logic. Refactor GET to call the helper for a single source of truth.
 
 3. **Dual API Methods** (calendar_routes.py:448-667)
    - Single `/events` endpoint with GET/POST different behaviors
@@ -52,11 +52,24 @@
 - **Need**: Extract `_refresh_access_token()` method, standardize timestamp handling
 - **Target**: Lines 550-608 complex inline refresh logic
 
-### ó PENDING STEPS
+### ï¿½ PENDING STEPS
 3. **Remove POST Handler** - `/events` endpoint to GET-only
-4. **Hardcode Sydney Timezone** - Remove timezone detection, use `Australia/Sydney`
 5. **Consolidate CalendarHelper.tsx** - Remove unused `syncCalendarEventsForDate()`
-6. **Simplify calendar.ts** - Remove timezone detection logic
+7. **Unify Eventâ†’Task Conversion (Backend)**
+   - Duplicate implementations exist in `backend/apis/calendar_routes.py` and `backend/services/calendar_service.py`, plus a third in `frontend/lib/CalendarHelper.tsx`.
+   - Make `backend/services/calendar_service.py:convert_calendar_event_to_task()` the single source of truth; import and use it in API routes. Drop AI categorization during conversion to keep fetch lightweight (categories can be assigned later server-side if needed).
+8. **Consolidate Token Verification**
+   - Duplicate token verification: `calendar_routes.get_user_id_from_token()` vs `routes.verify_firebase_token()/get_user_from_token()`.
+   - Centralize in a single utility (e.g. `backend/utils/auth.py`) and reuse everywhere.
+9. **Deprecate Client-Side Calendar Fetch Helpers**
+   - `frontend/lib/CalendarHelper.tsx` (`syncTodaysCalendarEvents`, `syncCalendarEventsForDate`, `initializeCalendarIntegration`) and `calendarApi.fetchEvents()` are redundant with server-driven sync (webhook + `/schedules`). Remove after tests are updated.
+   - Mark `/api/calendar/events` (GET) as deprecated once frontend fully relies on `/api/schedules` and autogeneration. Current POST is unused and should still be removed immediately.
+10. **Remove Dead LocalStorage Flag**
+   - `calendarSyncPending` is read in `frontend/app/dashboard/page.tsx` but never set. Remove the read/toast block.
+11. **Set Server-Side TZ Default to Australia/Sydney**
+   - Default to `Australia/Sydney` in backend fallbacks (`calendar_routes.py` and `calendar_service.py`) for consistency with Requirement 7.
+12. **Optional: Avoid Watch Ensure on SSE Connect**
+   - `/api/events/stream` calls `ensure_calendar_watch_for_user` on every connection. Consider removing or rate-limiting to reduce redundant DB/external calls.
 
 ## Test Status
 - Calendar merge tests updated for simplified behavior

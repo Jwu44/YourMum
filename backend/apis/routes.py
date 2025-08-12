@@ -11,6 +11,7 @@ from queue import Empty
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
+from backend.utils.auth import verify_firebase_token as utils_verify_firebase_token
 import os
 # Import AI service functions directly
 from backend.services.ai_service import (
@@ -152,31 +153,8 @@ if not firebase_admin._apps:
         firebase_admin.initialize_app()
 
 def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Verify a Firebase ID token and return the decoded token.
-    
-    Args:
-        token: The Firebase ID token to verify
-        
-    Returns:
-        The decoded token payload or None if verification fails
-    """
-    try:
-        # Development bypass
-        if os.getenv('NODE_ENV') == 'development' and token == 'mock-token-for-development':
-            return {
-                'uid': 'dev-user-123',
-                'email': 'dev@example.com',
-                'name': 'Dev User'
-            }
-        
-        # Verify the token
-        decoded_token = firebase_auth.verify_id_token(token)
-        return decoded_token
-    except Exception as e:
-        print(f"Token verification error: {e}")
-        traceback.print_exc()
-        return None
+    """Centralized verification via backend.utils.auth."""
+    return utils_verify_firebase_token(token)
 
 def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     """

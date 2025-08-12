@@ -1,14 +1,9 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { calendarApi } from '@/lib/api/calendar';
+// No direct calendar API usage in the new flow
 
 // Mock all external dependencies
-jest.mock('@/lib/api/calendar', () => ({
-  calendarApi: {
-    fetchEvents: jest.fn()
-  }
-}));
 
 jest.mock('@/lib/api/users', () => ({
   userApi: {
@@ -17,11 +12,12 @@ jest.mock('@/lib/api/users', () => ({
 }));
 
 jest.mock('@/lib/ScheduleHelper', () => ({
-  loadSchedule: jest.fn().mockResolvedValue([]),
+  loadSchedule: jest.fn().mockResolvedValue({ success: true, schedule: [] }),
   updateSchedule: jest.fn().mockResolvedValue({}),
   deleteTask: jest.fn(),
   createSchedule: jest.fn(),
-  shouldTaskRecurOnDate: jest.fn()
+  shouldTaskRecurOnDate: jest.fn(),
+  autogenerateTodaySchedule: jest.fn().mockResolvedValue({ success: true, created: true, schedule: [] })
 }));
 
 jest.mock('@/auth/firebase', () => ({
@@ -77,10 +73,11 @@ const MockDashboard = () => {
     return <div>Calendar Connected!</div>;
   }
   
-  // Simulate calendar events fetch
+  // Simulate schedule load on ready state (no calendarConnectionStage)
   React.useEffect(() => {
     if (!calendarConnectionStage) {
-      calendarApi.fetchEvents();
+      const { loadSchedule } = require('@/lib/ScheduleHelper');
+      loadSchedule('2025-07-29');
     }
   }, [calendarConnectionStage]);
   
@@ -94,26 +91,11 @@ describe('Calendar Integration in Dashboard', () => {
     mockAuthState.calendarConnectionStage = null;
   });
 
-  test('should load calendar events when available', async () => {
-    // Mock calendar events
-    const mockEvents = [
-      {
-        id: 'event1',
-        text: 'Team Meeting',
-        completed: false,
-        start_time: '2023-07-01T09:00:00Z',
-        end_time: '2023-07-01T10:00:00Z',
-        gcal_event_id: 'event123'
-      }
-    ];
-    
-    (calendarApi.fetchEvents as jest.Mock).mockResolvedValue(mockEvents);
-    
-    // Render mock dashboard
+  test('should load schedule when available', async () => {
+    const { loadSchedule } = require('@/lib/ScheduleHelper');
     render(<MockDashboard />);
-    
     await waitFor(() => {
-      expect(calendarApi.fetchEvents).toHaveBeenCalled();
+      expect(loadSchedule).toHaveBeenCalled();
     });
   });
 
@@ -148,13 +130,8 @@ describe('Calendar Integration in Dashboard', () => {
     // Ensure no calendar connection stage
     mockAuthState.calendarConnectionStage = null;
     
-    // Mock successful calendar fetch
-    (calendarApi.fetchEvents as jest.Mock).mockResolvedValue({
-      success: true,
-      tasks: [],
-      count: 0,
-      date: '2023-07-01'
-    });
+    const { loadSchedule } = require('@/lib/ScheduleHelper');
+    (loadSchedule as jest.Mock).mockResolvedValue({ success: true, schedule: [] });
     
     const { queryByText } = render(<MockDashboard />);
     
@@ -207,9 +184,10 @@ describe('Calendar Integration in Dashboard', () => {
     
     const { rerender } = render(<MockDashboard />);
 
-    // Verify calendar events are fetched only once initially
+    // Verify schedule is loaded only once initially
     await waitFor(() => {
-      expect(calendarApi.fetchEvents).toHaveBeenCalledTimes(1);
+      const { loadSchedule } = require('@/lib/ScheduleHelper');
+      expect(loadSchedule).toHaveBeenCalledTimes(1);
     });
 
     // Clear the mock call count to test re-render behavior
@@ -221,8 +199,9 @@ describe('Calendar Integration in Dashboard', () => {
     // Force re-render to simulate auth state update
     rerender(<MockDashboard />);
 
-    // Calendar events should not be called again on re-render, preventing double load
-    expect(calendarApi.fetchEvents).not.toHaveBeenCalled();
+    // Schedule should not be loaded again on re-render, preventing double load
+    const { loadSchedule } = require('@/lib/ScheduleHelper');
+    expect(loadSchedule).not.toHaveBeenCalled();
   });
 
   test('should show CalendarConnectionLoader when calendar access is being processed (TASK-22)', async () => {
@@ -235,21 +214,21 @@ describe('Calendar Integration in Dashboard', () => {
     expect(getByText('Connecting to Google Calendar...')).toBeInTheDocument();
     expect(getByText('Setting Up Your Calendar')).toBeInTheDocument();
     
-    // Should NOT attempt to fetch calendar events during connection
-    expect(calendarApi.fetchEvents).not.toHaveBeenCalled();
+    // Should NOT attempt to load schedule during connection
+    const { loadSchedule } = require('@/lib/ScheduleHelper');
+    expect(loadSchedule).not.toHaveBeenCalled();
   });
 
   test('should handle auth state stabilization after Google SSO (TASK-22)', async () => {
     let renderCount = 0;
     
-    // Mock fetchEvents to track render cycles
-    (calendarApi.fetchEvents as jest.Mock).mockImplementation(() => {
+    // Mock loadSchedule to track render cycles
+    const { loadSchedule } = require('@/lib/ScheduleHelper');
+    (loadSchedule as jest.Mock).mockImplementation(() => {
       renderCount++;
       return Promise.resolve({
         success: true,
-        tasks: [],
-        count: 0,
-        date: '2025-07-29'
+        schedule: []
       });
     });
 
@@ -260,8 +239,8 @@ describe('Calendar Integration in Dashboard', () => {
     
     const { rerender } = render(<MockDashboard />);
 
-    // Should not fetch events while in connection stage
-    expect(calendarApi.fetchEvents).not.toHaveBeenCalled();
+    // Should not load schedule while in connection stage
+    expect(loadSchedule).not.toHaveBeenCalled();
 
     // Simulate auth completing and connection finishing
     mockAuthState.loading = false;
@@ -270,9 +249,9 @@ describe('Calendar Integration in Dashboard', () => {
     
     rerender(<MockDashboard />);
 
-    // Should fetch events only once after auth stabilizes
+    // Should load schedule only once after auth stabilizes
     await waitFor(() => {
-      expect(calendarApi.fetchEvents).toHaveBeenCalledTimes(1);
+      expect(loadSchedule).toHaveBeenCalledTimes(1);
     });
     
     expect(renderCount).toBe(1);

@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request
 from backend.db_config import get_database
 import traceback
 from datetime import datetime, timezone, timedelta
-from backend.models.task import Task
 import uuid
 import requests
 import os
@@ -10,10 +9,11 @@ import json
 from typing import List, Dict, Optional, Tuple
 from firebase_admin import credentials, get_app
 import firebase_admin
-from backend.services.ai_service import categorize_task
+from backend.services.calendar_service import convert_calendar_event_to_task
 from backend.services.schedule_service import schedule_service
 from backend.services.event_bus import event_bus
 import pytz  # Add pytz for timezone handling
+from backend.utils.auth import get_user_id_from_token as auth_get_user_id_from_token
 
 calendar_bp = Blueprint("calendar", __name__)
 
@@ -55,43 +55,10 @@ def initialize_firebase() -> Optional[firebase_admin.App]:
         raise ValueError(f"Failed to initialize Firebase: {str(e)}")
 
 def get_user_id_from_token(token: str) -> Optional[str]:
-    """
-    Verify a Firebase ID token and extract the user ID.
-    
-    Args:
-        token (str): Firebase ID token
-    
-    Returns:
-        Optional[str]: User ID if token is valid, None otherwise
-    """
-    if not token:
-        print("No token provided for verification")
-        return None
-    
-    # Development bypass
-    if os.getenv('NODE_ENV') == 'development' and token == 'mock-token-for-development':
-        print("DEBUG - Using development bypass for authentication")
-        return 'dev-user-123'
-        
-    # Ensure Firebase is initialized
-    if not firebase_admin._apps:
-        app = initialize_firebase()
-        if not app:
-            print("Cannot verify token: Firebase initialization failed")
-            return None
-    
-    try:
-        from firebase_admin import auth
-        decoded_token = auth.verify_id_token(token)
-        print(f"DEBUG - Token verification successful. User ID: {decoded_token.get('uid')}")
-        return decoded_token.get('uid')
-    except Exception as e:
-        print(f"DEBUG - Token verification error: {str(e)}")
-        print(f"DEBUG - Exception type: {type(e).__name__}")
-        traceback.print_exc()
-        return None
+    """Backwards-compatible shim to centralized auth utility."""
+    return auth_get_user_id_from_token(token)
 
-def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str = "UTC") -> List[Dict]:
+def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str = "Australia/Sydney") -> List[Dict]:
     """
     Fetch Google Calendar events for a specific date using the access token.
     
@@ -109,8 +76,8 @@ def fetch_google_calendar_events(access_token: str, date: str, user_timezone: st
         try:
             user_tz = pytz.timezone(user_timezone)
         except pytz.UnknownTimeZoneError:
-            print(f"Invalid timezone '{user_timezone}', falling back to UTC")
-            user_tz = pytz.UTC
+            print(f"Invalid timezone '{user_timezone}', falling back to Australia/Sydney")
+            user_tz = pytz.timezone('Australia/Sydney')
             
         utc_tz = pytz.UTC
         
@@ -162,70 +129,7 @@ def fetch_google_calendar_events(access_token: str, date: str, user_timezone: st
         traceback.print_exc()
         return []
 
-def convert_calendar_event_to_task(event: Dict, date: str) -> Optional[Dict]:
-    """
-    Convert a Google Calendar event to a Task object.
-    
-    Args:
-        event (Dict): Google Calendar event data
-    
-    Returns:
-        Optional[Dict]: Task object dictionary or None if conversion fails
-    """
-    try:
-        # Extract event title
-        title = event.get('summary', 'Untitled Event')
-        
-        # Skip if no title or if it's a declined event
-        if not title or event.get('status') == 'cancelled':
-            return None
-        
-        # Categorize the event using existing AI service
-        categories = categorize_task(title)
-        
-        # Extract start and end times
-        start_time = None
-        end_time = None
-        
-        start_data = event.get('start', {})
-        end_data = event.get('end', {})
-        
-        # Handle both dateTime and date fields (all-day events vs timed events)
-        if 'dateTime' in start_data:
-            start_dt = datetime.fromisoformat(start_data['dateTime'].replace('Z', '+00:00'))
-            start_time = start_dt.strftime('%H:%M')
-        
-        if 'dateTime' in end_data:
-            end_dt = datetime.fromisoformat(end_data['dateTime'].replace('Z', '+00:00'))
-            end_time = end_dt.strftime('%H:%M')
-        
-        # Create Task object
-        task_data = {
-            'id': str(uuid.uuid4()),
-            'text': title,
-            'categories': categories,
-            'completed': False,
-            'is_subtask': False,
-            'is_section': False,
-            'section': None,
-            'parent_id': None,
-            'level': 0,
-            'section_index': 0,
-            'type': 'task',
-            'start_time': start_time,
-            'end_time': end_time,
-            'is_recurring': None,
-            'start_date': date,
-            'gcal_event_id': event.get('id'),  # Store original event ID for reference
-            'from_gcal': True  # Flag to identify calendar-sourced tasks
-        }
-        
-        return task_data
-        
-    except Exception as e:
-        print(f"Error converting calendar event to task: {e}")
-        traceback.print_exc()
-        return None
+# Use unified conversion from backend.services.calendar_service
 
 @calendar_bp.route("/connect", methods=["POST"])
 def connect_google_calendar():
@@ -453,66 +357,40 @@ def store_schedule_for_user(user_id: str, date: str, calendar_tasks: List[Dict])
         traceback.print_exc()
         return False, None
 
-@calendar_bp.route("/events", methods=["GET", "POST"])
+@calendar_bp.route("/events", methods=["GET"])
 def get_calendar_events():
     """
     Fetch Google Calendar events for a user and convert them to tasks
     
-    GET method: 
+    GET method only:
     - Query parameters: date (YYYY-MM-DD)
     - Requires Authorization header with Firebase ID token
     - Merges calendar events with existing schedule and returns complete merged schedule
-    
-    POST method:
-    - Request body: { "userId": str, "date": str }
-    - Direct user ID-based authentication
-    - Returns only calendar events without merging
-    
-    Returns standardized response with calendar events as tasks
+
+    Returns standardized response with calendar events merged into schedule
     """
     try:
-        # Determine request type and extract parameters
-        is_post_request = request.method == "POST"
-        
-        if is_post_request:
-            # Extract from POST body
-            data = request.json
-            if not data:
-                return jsonify({
-                    "success": False,
-                    "error": "Missing request body"
-                }), 400
-                
-            user_id = data.get('userId')
-            date = data.get('date')
-            
-            if not user_id or not date:
-                return jsonify({
-                    "success": False,
-                    "error": "Missing required parameters: userId and date"
-                }), 400
+        # Extract from GET query parameters
+        date = request.args.get('date')
+        if not date:
+            return jsonify({
+                "success": False,
+                "error": "Missing date parameter"
+            }), 400
+
+        # Get user ID from token
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]  # Remove 'Bearer ' prefix
         else:
-            # Extract from GET query parameters
-            date = request.args.get('date')
-            if not date:
-                return jsonify({
-                    "success": False,
-                    "error": "Missing date parameter"
-                }), 400
-                
-            # Get user ID from token
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer '):
-                token = auth_header[7:]  # Remove 'Bearer ' prefix
-            else:
-                token = auth_header
-            
-            user_id = get_user_id_from_token(token)
-            if not user_id:
-                return jsonify({
-                    "success": False,
-                    "error": "Invalid or missing authentication token"
-                }), 401
+            token = auth_header
+        
+        user_id = get_user_id_from_token(token)
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Invalid or missing authentication token"
+            }), 401
         
         # Validate date format
         try:
@@ -535,7 +413,7 @@ def get_calendar_events():
                 "success": False,
                 "error": "User not found",
                 "tasks": []
-            }), 404 if not is_post_request else 200
+            }), 404
         
         calendar_data = user.get('calendar', {})
         if not calendar_data.get('connected') or not calendar_data.get('credentials'):
@@ -543,81 +421,21 @@ def get_calendar_events():
                 "success": False,
                 "error": "Google Calendar not connected. Please connect your calendar in the Integrations page to sync events.",
                 "tasks": []
-            }), 400 if not is_post_request else 200
+            }), 400
         
-        # Get access token and handle refresh if expired
+        # Get access token via centralized helper (handles refresh if needed)
         credentials_data = calendar_data.get('credentials', {})
-        access_token = credentials_data.get('accessToken')
+        access_token = _ensure_access_token_valid(users, user_id, credentials_data)
         if not access_token:
             return jsonify({
                 "success": False,
-                "error": "No valid access token found",
+                "error": "No valid access token",
                 "tasks": []
-            }), 400 if not is_post_request else 200
-
-        # Detect expiration, normalize expiresAt to datetime
-        expires_at = credentials_data.get('expiresAt')
-        refresh_token = credentials_data.get('refreshToken') or credentials_data.get('refresh_token')
-        try:
-            expires_dt = None
-            if isinstance(expires_at, (int, float)):
-                ts_seconds = expires_at / 1000 if expires_at > 1e12 else expires_at
-                expires_dt = datetime.fromtimestamp(ts_seconds, tz=timezone.utc)
-            elif isinstance(expires_at, datetime):
-                expires_dt = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
-        except Exception:
-            expires_dt = None
-
-        # If expired and refresh token present, attempt refresh
-        if expires_dt and expires_dt < datetime.now(timezone.utc) and refresh_token:
-            try:
-                client_id = os.getenv('GOOGLE_CLIENT_ID')
-                client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-                token_url = 'https://oauth2.googleapis.com/token'
-                payload = {
-                    'grant_type': 'refresh_token',
-                    'refresh_token': refresh_token,
-                    'client_id': client_id,
-                    'client_secret': client_secret
-                }
-                token_resp = requests.post(token_url, data=payload)
-                if token_resp.status_code == 200:
-                    token_json = token_resp.json()
-                    new_access_token = token_json.get('access_token')
-                    expires_in = token_json.get('expires_in', 3600)
-                    if new_access_token:
-                        access_token = new_access_token
-                        # Persist refreshed credentials
-                        new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-                        users.update_one(
-                            {"googleId": user_id},
-                            {"$set": {
-                                "calendar.credentials": {
-                                    **credentials_data,
-                                    "accessToken": access_token,
-                                    "expiresAt": new_expires_at
-                                }
-                            }}
-                        )
-                    else:
-                        raise ValueError('No access_token in refresh response')
-                else:
-                    error_msg = f"Failed to refresh access token: {token_resp.text}"
-                    return jsonify({
-                        "success": False,
-                        "error": error_msg,
-                        "tasks": []
-                    }), 400 if not is_post_request else 200
-            except Exception as e:
-                return jsonify({
-                    "success": False,
-                    "error": f"Failed to refresh access token: {str(e)}",
-                    "tasks": []
-                }), 400 if not is_post_request else 200
+            }), 400
         
         # Get user's timezone (with fallback to query timezone or UTC)
-        query_timezone = request.args.get('timezone') if not is_post_request else None
-        user_timezone = user.get('timezone') or query_timezone or 'UTC'
+        query_timezone = request.args.get('timezone')
+        user_timezone = user.get('timezone') or query_timezone or 'Australia/Sydney'
         
         # Fetch events from Google Calendar with timezone-aware boundaries
         calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
@@ -629,38 +447,28 @@ def get_calendar_events():
             if task_data:
                 calendar_tasks.append(task_data)
         
-        # Handle GET vs POST request differences
-        if not is_post_request:
-            # For GET requests: merge with existing schedule and return complete merged schedule
-            store_success, merged_result = store_schedule_for_user(user_id, date, calendar_tasks)
-            
-            if store_success and merged_result:
-                # Return complete merged schedule
-                response = {
-                    "success": True,
-                    "tasks": merged_result.get('schedule', []),
-                    "count": len(merged_result.get('schedule', [])),
-                    "date": date,
-                    "calendar_events_added": len(calendar_tasks),
-                    "metadata": merged_result.get('metadata', {})
-                }
-            else:
-                # Fallback to calendar tasks only if merge failed
-                response = {
-                    "success": True,
-                    "tasks": calendar_tasks,
-                    "count": len(calendar_tasks),
-                    "date": date,
-                    "calendar_events_added": len(calendar_tasks),
-                    "merge_failed": True
-                }
+        # Merge with existing schedule and return complete merged schedule
+        store_success, merged_result = store_schedule_for_user(user_id, date, calendar_tasks)
+        
+        if store_success and merged_result:
+            # Return complete merged schedule
+            response = {
+                "success": True,
+                "tasks": merged_result.get('schedule', []),
+                "count": len(merged_result.get('schedule', [])),
+                "date": date,
+                "calendar_events_added": len(calendar_tasks),
+                "metadata": merged_result.get('metadata', {})
+            }
         else:
-            # For POST requests: return only calendar events (no merging)
+            # Fallback to calendar tasks only if merge failed
             response = {
                 "success": True,
                 "tasks": calendar_tasks,
                 "count": len(calendar_tasks),
-                "date": date
+                "date": date,
+                "calendar_events_added": len(calendar_tasks),
+                "merge_failed": True
             }
         
         return jsonify(response)
@@ -672,7 +480,7 @@ def get_calendar_events():
             "success": False,
             "error": f"Failed to fetch Google Calendar events: {str(e)}",
             "tasks": []
-        }), 500 if request.method == "GET" else 200
+        }), 500
 
 @calendar_bp.route("/status/<user_id>", methods=["GET"])
 def get_calendar_status(user_id: str):
