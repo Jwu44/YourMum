@@ -326,6 +326,172 @@ class ScheduleService:
             traceback.print_exc()
             return False, {"error": f"Failed to sync calendar schedule: {str(e)}"}
 
+    def apply_calendar_webhook_update(
+        self,
+        user_id: str,
+        date: str,
+        calendar_tasks: List[Dict[str, Any]]
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Merge calendar events for webhook/SSE updates with a preservation-first strategy:
+        - Keep all existing calendar tasks (completed and incomplete) unless explicitly updated by fetch
+        - Upsert fetched events by gcal_event_id, preserving local completion and ID, updating Google fields
+        - Skip fetched events lacking gcal_event_id to avoid duplication
+        - Leave schedule untouched if fetched set is empty (non-destructive)
+
+        This logic is intentionally scoped to webhook/SSE updates and differs from
+        create_schedule_from_calendar_sync which is used for other sync paths.
+        """
+        try:
+            formatted_date = format_schedule_date(date)
+
+            # Load existing schedule (required for webhook behavior)
+            existing_schedule = self.schedules_collection.find_one({
+                "userId": user_id,
+                "date": formatted_date
+            })
+
+            existing_tasks: List[Dict[str, Any]] = existing_schedule.get('schedule', []) if existing_schedule else []
+            non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
+            existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
+
+            # If incoming list is empty, return current state non-destructively
+            normalized_incoming: List[Dict[str, Any]] = []
+            for task in calendar_tasks:
+                # Skip any task lacking a gcal_event_id (avoid duplicates)
+                if not task.get('gcal_event_id'):
+                    continue
+                new_task = dict(task)
+                new_task['from_gcal'] = True
+                if 'type' not in new_task:
+                    new_task['type'] = 'task'
+                normalized_incoming.append(new_task)
+
+            if len(normalized_incoming) == 0:
+                final_tasks = existing_calendar_tasks + non_calendar_tasks
+                metadata = self._calculate_schedule_metadata(final_tasks)
+                if existing_schedule:
+                    metadata.update({
+                        "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
+                        "lastModified": existing_schedule.get('metadata', {}).get('last_modified', ''),
+                        "source": existing_schedule.get('metadata', {}).get('source', 'calendar_sync'),
+                        "calendarSynced": True,
+                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                    })
+                else:
+                    metadata.update({
+                        "generatedAt": format_timestamp(),
+                        "lastModified": format_timestamp(),
+                        "source": "calendar_sync",
+                        "calendarSynced": True,
+                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                    })
+                return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+
+            # Map existing calendar tasks by gcal_event_id (include those missing id in a separate list)
+            existing_by_id: Dict[str, Dict[str, Any]] = {}
+            existing_without_id: List[Dict[str, Any]] = []
+            for t in existing_calendar_tasks:
+                gid = t.get('gcal_event_id')
+                if gid:
+                    existing_by_id[gid] = t
+                else:
+                    existing_without_id.append(t)
+
+            fetched_ids = [t.get('gcal_event_id') for t in normalized_incoming if t.get('gcal_event_id')]
+
+            # Upsert fetched events preserving ID and completion
+            upserted_calendar: List[Dict[str, Any]] = []
+            for inc in normalized_incoming:
+                gid = inc.get('gcal_event_id')
+                if not gid:
+                    continue  # safety; should be filtered already
+                if gid in existing_by_id:
+                    current = existing_by_id[gid]
+                    merged = {**current}
+                    # Preserve ID and completion and user edits; update Google-sourced fields
+                    merged['text'] = inc.get('text', merged.get('text'))
+                    merged['start_time'] = inc.get('start_time', merged.get('start_time'))
+                    merged['end_time'] = inc.get('end_time', merged.get('end_time'))
+                    merged['start_date'] = date
+                    merged['from_gcal'] = True
+                    if 'type' not in merged:
+                        merged['type'] = 'task'
+                    upserted_calendar.append(merged)
+                else:
+                    # New incoming event
+                    new_item = dict(inc)
+                    new_item['from_gcal'] = True
+                    if 'type' not in new_item:
+                        new_item['type'] = 'task'
+                    # Ensure date alignment
+                    new_item['start_date'] = date
+                    upserted_calendar.append(new_item)
+
+            # Preserve all existing calendar tasks not present in fetched set (completed and incomplete)
+            fetched_id_set = set(fetched_ids)
+            preserved_existing = []
+            for t in existing_calendar_tasks:
+                gid = t.get('gcal_event_id')
+                if not gid or gid not in fetched_id_set:
+                    preserved_existing.append(t)
+
+            merged_calendar_tasks = upserted_calendar + preserved_existing
+            final_tasks = merged_calendar_tasks + non_calendar_tasks
+
+            # Prepare update doc and validate
+            if existing_schedule:
+                existing_metadata = existing_schedule.get('metadata', {})
+                update_doc = {
+                    "schedule": final_tasks,
+                    "metadata": {
+                        **existing_metadata,
+                        "last_modified": format_timestamp(),
+                        "calendarSynced": True,
+                        "calendarEvents": len([t for t in merged_calendar_tasks if t.get('from_gcal', False)]),
+                        "source": "calendar_sync"
+                    }
+                }
+
+                temp_doc = {**existing_schedule, **update_doc}
+                temp_doc["date"] = formatted_date
+                is_valid, validation_error = validate_schedule_document(temp_doc)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+                self.schedules_collection.update_one(
+                    {"userId": user_id, "date": formatted_date},
+                    {"$set": update_doc}
+                )
+
+            else:
+                # No existing schedule for date → create one with calendar tasks only
+                schedule_document = self._create_schedule_document(
+                    user_id=user_id,
+                    date=date,
+                    tasks=final_tasks,
+                    source="calendar_sync"
+                )
+                is_valid, validation_error = validate_schedule_document(schedule_document)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
+                self.schedules_collection.insert_one(schedule_document)
+
+            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata.update({
+                "generatedAt": format_timestamp(),
+                "lastModified": format_timestamp(),
+                "source": "calendar_sync",
+                "calendarSynced": True,
+                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+            })
+
+            return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+        except Exception as e:
+            print(f"Error in apply_calendar_webhook_update: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to apply webhook calendar update: {str(e)}"}
+
     def create_empty_schedule(
         self,
         user_id: str,

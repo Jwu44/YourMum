@@ -591,8 +591,8 @@ def calendar_webhook():
             if task:
                 calendar_tasks.append(task)
 
-        # Persist via schedule service
-        success, _ = schedule_service.create_schedule_from_calendar_sync(
+        # Persist via schedule service using webhook-specific merge rules
+        success, _ = schedule_service.apply_calendar_webhook_update(
             user_id=user_id,
             date=date_str,
             calendar_tasks=calendar_tasks

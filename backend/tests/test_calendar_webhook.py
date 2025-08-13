@@ -12,7 +12,7 @@ def _mock_db(user_doc):
 
 @patch('backend.apis.calendar_routes.fetch_google_calendar_events')
 @patch('backend.services.event_bus.event_bus.publish')
-@patch('backend.apis.calendar_routes.schedule_service.create_schedule_from_calendar_sync', return_value=(True, {"schedule": []}))
+@patch('backend.apis.calendar_routes.schedule_service.apply_calendar_webhook_update', return_value=(True, {"schedule": []}))
 @patch('backend.apis.calendar_routes.get_database')
 def test_webhook_valid_triggers_sync_and_publish(mock_get_db, _mock_sync, mock_publish, mock_fetch, client=None):
     import application as app
@@ -57,10 +57,14 @@ def test_webhook_valid_triggers_sync_and_publish(mock_get_db, _mock_sync, mock_p
 
         # Verify schedule sync called with today's date
         args, kwargs = _mock_sync.call_args
-        assert args[0] == 'u-123'
-        # date is today's date in UTC
-        assert isinstance(args[1], str) and len(args[1]) == 10
-        assert isinstance(args[2], list)
+        if args and len(args) >= 3:
+            assert args[0] == 'u-123'
+            assert isinstance(args[1], str) and len(args[1]) == 10
+            assert isinstance(args[2], list)
+        else:
+            assert kwargs.get('user_id') == 'u-123'
+            assert isinstance(kwargs.get('date'), str) and len(kwargs.get('date')) == 10
+            assert isinstance(kwargs.get('calendar_tasks'), list)
 
         # Verify publish called
         assert mock_publish.called
@@ -72,7 +76,7 @@ def test_webhook_valid_triggers_sync_and_publish(mock_get_db, _mock_sync, mock_p
 
 @patch('backend.apis.calendar_routes.fetch_google_calendar_events')
 @patch('backend.services.event_bus.event_bus.publish')
-@patch('backend.apis.calendar_routes.schedule_service.create_schedule_from_calendar_sync')
+@patch('backend.apis.calendar_routes.schedule_service.apply_calendar_webhook_update')
 @patch('backend.apis.calendar_routes.get_database')
 def test_webhook_no_matching_watch_is_noop(mock_get_db, mock_sync, mock_publish, mock_fetch, client=None):
     import application as app
