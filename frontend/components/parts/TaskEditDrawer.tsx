@@ -281,7 +281,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       modal={true}
     >
       <DrawerContent
-        className="fixed bottom-0 left-0 right-0 h-[80vh] sm:h-[75vh] w-full bg-background shadow-lg outline-none mobile-padding-safe"
+        className="fixed bottom-0 left-0 right-0 max-h-[85vh] w-full bg-background shadow-lg outline-none mobile-padding-safe flex flex-col"
         onPointerDownOutside={(e) => {
           // Allow time picker interactions - check if click is on time input or its picker
           const target = e.target as HTMLElement
@@ -303,13 +303,13 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           handleClose()
         }}
       >
-        <div className="mx-auto w-full max-w-sm px-2 sm:px-0">
-          <DrawerHeader>
+        <div className="mx-auto w-full max-w-sm px-2 sm:px-0 flex flex-col min-h-0">
+          <DrawerHeader className="flex-shrink-0">
             <DrawerTitle>
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="p-3 sm:p-4 space-y-4 sm:space-y-5">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-5">
             {/* Task Name */}
             <div>
               <label htmlFor="text" className="block text-sm font-medium text-foreground mb-2">
@@ -338,7 +338,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                       key={category}
                       variant={isSelected ? 'default' : 'outline'}
                       className={cn(
-                        'cursor-pointer mobile-touch-target px-3 py-2 text-base sm:text-sm sm:px-2 sm:py-1',
+                        'cursor-pointer mobile-touch-target px-2 py-1.5 text-sm font-normal sm:px-2 sm:py-1 sm:text-xs',
                         isSelected && getCategoryVariant(category) === 'work' && 'bg-info btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'fun' && 'bg-warning btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'relationships' && 'bg-primary btn-hover-primary',
@@ -350,7 +350,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                     >
                       {category}
                       {isSelected && (
-                        <X className="ml-1 h-4 w-4 sm:h-3 sm:w-3" />
+                        <X className="ml-1 h-3 w-3" />
                       )}
                     </Badge>
                   )
@@ -359,7 +359,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
             </div>
 
             {/* Time Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
               <div>
                 <label htmlFor="start_time" className="block text-sm font-medium text-foreground mb-2">
                   Start Time
@@ -445,7 +445,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           </div>
 
           {/* Footer with improved save button */}
-          <DrawerFooter className="px-3 sm:px-6">
+          <DrawerFooter className="flex-shrink-0 px-3 sm:px-6 border-t border-border">
             <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground mobile-form-button">
               {isEditMode ? 'Save Changes' : 'Create'}
             </Button>

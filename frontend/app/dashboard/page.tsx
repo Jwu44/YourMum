@@ -1328,7 +1328,8 @@ const Dashboard: React.FC = () => {
 
   // Show calendar connection loader during OAuth flow
   if (calendarConnectionStage || isEnsuringRefresh) {
-    return <CalendarConnectionLoader stage={calendarConnectionStage} />
+    const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
+    return <CalendarConnectionLoader stage={stage} />
   }
 
   return (
