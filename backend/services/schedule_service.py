@@ -564,7 +564,8 @@ class ScheduleService:
         self,
         user_id: str,
         date: str,
-        max_days_back: int = 30
+        max_days_back: int = 30,
+        user_timezone: Optional[str] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Autogenerate a schedule for the given date by:
@@ -658,7 +659,11 @@ class ScheduleService:
                 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
                 def _fetch():
-                    return calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+                    return calendar_service.get_calendar_tasks_for_user_date(
+                        user_id,
+                        date,
+                        timezone_override=user_timezone
+                    )
 
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     future = executor.submit(_fetch)
@@ -672,7 +677,11 @@ class ScheduleService:
             except Exception:
                 # Fallback to direct fetch without timeout (still protected)
                 try:
-                    fetched_calendar_tasks = calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+                    fetched_calendar_tasks = calendar_service.get_calendar_tasks_for_user_date(
+                        user_id,
+                        date,
+                        timezone_override=user_timezone
+                    )
                 except Exception:
                     fetched_calendar_tasks = []
 

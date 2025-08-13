@@ -139,7 +139,7 @@ def convert_calendar_event_to_task(event: Dict, date: str) -> Optional[Dict]:
         return None
 
 
-def get_calendar_tasks_for_user_date(user_id: str, date: str) -> List[Dict]:
+def get_calendar_tasks_for_user_date(user_id: str, date: str, timezone_override: Optional[str] = None) -> List[Dict]:
     """
     Fetch user's calendar events for a date and convert/sort/limit to tasks.
     - Includes all-day and multi-day events overlapping the date
@@ -171,7 +171,7 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str) -> List[Dict]:
         if not access_token:
             return []
 
-        user_timezone = user.get('timezone') or 'Australia/Sydney'
+        user_timezone = timezone_override or user.get('timezone') or 'Australia/Sydney'
 
         # Fetch events (patched in tests)
         events = fetch_google_calendar_events(access_token, date, user_timezone) or []

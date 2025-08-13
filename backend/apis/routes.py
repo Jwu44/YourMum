@@ -583,6 +583,7 @@ def autogenerate_schedule_api():
 
         data = request.json or {}
         date = data.get('date')
+        timezone_override = data.get('timezone')
         if not date:
             return jsonify({
                 "success": False,
@@ -598,7 +599,11 @@ def autogenerate_schedule_api():
                 "error": "Invalid date format. Use YYYY-MM-DD"
             }), 400
 
-        success, result = schedule_service.autogenerate_schedule(user_id, date)
+        success, result = schedule_service.autogenerate_schedule(
+            user_id,
+            date,
+            user_timezone=timezone_override
+        )
         if not success:
             return jsonify({
                 "success": False,
