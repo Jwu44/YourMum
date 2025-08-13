@@ -194,20 +194,21 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6">
-      <div className="flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left section: Sidebar trigger */}
-        <div className="flex items-center gap-2 flex-shrink-0 w-12 sm:w-16">
-          {/* Sidebar trigger - mobile only */}
-          {isMobile && showSidebarTrigger && (
-            <>
-              <SidebarTrigger className="-ml-1 h-11 w-11 p-2 [&>svg]:!w-5 [&>svg]:!h-5" />
-              <div className="h-4 w-px bg-sidebar-border" />
-            </>
-          )}
-        </div>
+      {isMobile ? (
+        /* Mobile: Three-section layout with even spacing */
+        <div className="flex items-center justify-between gap-2">
+          {/* Left section: Sidebar trigger */}
+          <div className="flex items-center gap-2 flex-shrink-0 w-12">
+            {showSidebarTrigger && (
+              <>
+                <SidebarTrigger className="-ml-1 h-11 w-11 p-2 [&>svg]:!w-5 [&>svg]:!h-5" />
+                <div className="h-4 w-px bg-sidebar-border" />
+              </>
+            )}
+          </div>
 
-        {/* Center section: Date navigation */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 justify-center">
+          {/* Center section: Date navigation */}
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -216,10 +217,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     size="sm"
                     onClick={() => { onPreviousDay() }}
                     disabled={false}
-                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
+                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     aria-label="Previous day"
                   >
-                    <ChevronLeft size={20} className="sm:w-4 sm:h-4" />
+                    <ChevronLeft size={20} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -228,7 +229,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               </Tooltip>
             </TooltipProvider>
 
-            <h1 className="text-lg font-semibold text-foreground truncate sm:text-xl">
+            <h1 className="text-lg font-semibold text-foreground truncate">
               {formattedDate()}
             </h1>
 
@@ -240,70 +241,160 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     size="sm"
                     onClick={() => { onNextDay() }}
                     disabled={isCurrentDay}
-                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
+                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     aria-label="Next day"
                   >
-                    <ChevronRight size={20} className="sm:w-4 sm:h-4" />
+                    <ChevronRight size={20} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View next day</p>
                 </TooltipContent>
-              </Tooltip>
+                </Tooltip>
             </TooltipProvider>
-        </div>
+          </div>
 
-        {/* Right section: Calendar and task button */}
-        <div className="flex items-center gap-2 flex-shrink-0 w-12 sm:w-16 justify-end">
-          {/* Calendar navigation dropdown - moved to right side */}
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200 sm:h-8 sm:w-8"
-                aria-label="Open calendar navigation"
-                data-testid="calendar-dropdown-trigger"
+          {/* Right section: Calendar */}
+          <div className="flex items-center gap-2 flex-shrink-0 w-12 justify-end">
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  aria-label="Open calendar navigation"
+                  data-testid="calendar-dropdown-trigger"
+                >
+                  <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0"
+                align="center"
+                data-testid="calendar-dropdown"
               >
-                <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-auto p-0"
-              align={isMobile ? "center" : "end"}
-              data-testid="calendar-dropdown"
-            >
-              {availableDates.size === 0
-                ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  Loading available dates...
-                </div>
-                  )
-                : (
-                <CalendarComponent
-                  mode="single"
-                  selected={currentDate}
-                  onSelect={handleDateSelect}
-                  disabled={(date) => !isDateAvailable(date)}
-                  initialFocus
-                />
-                  )}
-            </PopoverContent>
-          </Popover>
+                {availableDates.size === 0
+                  ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    Loading available dates...
+                  </div>
+                    )
+                  : (
+                  <CalendarComponent
+                    mode="single"
+                    selected={currentDate}
+                    onSelect={handleDateSelect}
+                    disabled={(date) => !isDateAvailable(date)}
+                    initialFocus
+                  />
+                    )}
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      ) : (
+        /* Desktop: Previous implementation with calendar on left side */
+        <div className="flex items-center justify-between">
+          {/* Left-aligned section with date navigation and calendar */}
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            {/* Calendar navigation dropdown */}
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  aria-label="Open calendar navigation"
+                  data-testid="calendar-dropdown-trigger"
+                >
+                  <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0"
+                align="start"
+                data-testid="calendar-dropdown"
+              >
+                {availableDates.size === 0
+                  ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    Loading available dates...
+                  </div>
+                    )
+                  : (
+                  <CalendarComponent
+                    mode="single"
+                    selected={currentDate}
+                    onSelect={handleDateSelect}
+                    disabled={(date) => !isDateAvailable(date)}
+                    initialFocus
+                  />
+                    )}
+              </PopoverContent>
+            </Popover>
+
+            <div className="flex items-center gap-3 min-w-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { onPreviousDay() }}
+                      disabled={false}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                      aria-label="Previous day"
+                    >
+                      <ChevronLeft size={16} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View previous day</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <h1 className="text-xl font-semibold text-foreground truncate">
+                {formattedDate()}
+              </h1>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { onNextDay() }}
+                      disabled={isCurrentDay}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                      aria-label="Next day"
+                    >
+                      <ChevronRight size={16} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View next day</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
 
           {/* Create Task button - desktop only since mobile uses FAB */}
-          {onAddTask && !isMobile && (
-            <Button
-              size="sm"
-              onClick={onAddTask}
-              className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
-            >
-              <Plus size={16} />
-              Create Task
-            </Button>
+          {onAddTask && (
+            <div className="flex-shrink-0 ml-2">
+              <Button
+                size="sm"
+                onClick={onAddTask}
+                className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
+              >
+                <Plus size={16} />
+                Create Task
+              </Button>
+            </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
