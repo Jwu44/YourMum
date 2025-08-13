@@ -188,7 +188,8 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str, timezone_override:
 
         user_timezone = timezone_override or user.get('timezone') or 'Australia/Sydney'
 
-        # Fetch events (patched in tests)
+        # Fetch events (patched in tests). If a 401 occurs at lower level (not exposed here),
+        # callers should refresh before retry. This service already attempted a refresh via wrapper.
         events = fetch_google_calendar_events(access_token, date, user_timezone) or []
 
         # Filter: overlapping target date in the correct timezone

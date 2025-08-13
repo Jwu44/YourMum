@@ -143,3 +143,76 @@ def test_get_calendar_events(mock_fetch_google_events, mock_get_user_id, client,
     # Check mock was called correctly
     mock_users.find_one.assert_called_with({'googleId': 'testuser123'})
     mock_fetch_google_events.assert_called_once()
+
+
+@patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "csecret"}, clear=False)
+@patch('backend.apis.calendar_routes.get_user_id_from_token')
+@patch('backend.apis.calendar_routes.requests.post')
+@patch('backend.apis.calendar_routes.requests.get')
+def test_get_calendar_events_retries_on_401_refresh(mock_get, mock_post, mock_get_user_id, client, mock_db_connection):
+    """If Google returns 401 for valid-looking token, route refreshes and retries once."""
+    mock_get_user_id.return_value = 'u-401'
+
+    # Setup user with future expiresAt but with refreshToken
+    mock_users = mock_db_connection['users']
+    mock_users.find_one.return_value = {
+        'googleId': 'u-401',
+        'timezone': 'UTC',
+        'calendar': {
+            'connected': True,
+            'credentials': {
+                'accessToken': 'old-token',
+                'refreshToken': 'refresh-xyz',
+                'expiresAt': int((datetime.now().timestamp() + 3600) * 1000),
+                'scopes': []
+            }
+        }
+    }
+
+    # First Google GET returns 401
+    resp_401 = MagicMock()
+    resp_401.status_code = 401
+    resp_401.text = 'Unauthorized'
+
+    # Second GET succeeds with events
+    resp_200 = MagicMock()
+    resp_200.status_code = 200
+    resp_200.json.return_value = {
+        'items': [
+            {
+                'id': 'e1',
+                'summary': 'Retry Event',
+                'status': 'confirmed',
+                'start': {'dateTime': '2025-08-13T09:00:00Z'},
+                'end': {'dateTime': '2025-08-13T10:00:00Z'}
+            }
+        ]
+    }
+    mock_get.side_effect = [resp_401, resp_200]
+
+    # Token refresh POST
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.json.return_value = {
+        'access_token': 'new-token',
+        'expires_in': 3600
+    }
+    mock_post.return_value = token_resp
+
+    response = client.get(
+        '/api/calendar/events?date=2025-08-13&timezone=Australia/Sydney',
+        headers={'Authorization': 'Bearer mock-token'}
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['success'] is True
+    assert any(t.get('text') == 'Retry Event' for t in data['tasks'])
+
+    # Ensure refresh POST happened
+    assert mock_post.called
+    # Ensure second GET used new token
+    first_call_headers = mock_get.call_args_list[0].kwargs['headers']
+    second_call_headers = mock_get.call_args_list[1].kwargs['headers']
+    assert first_call_headers['Authorization'] == 'Bearer old-token'
+    assert second_call_headers['Authorization'] == 'Bearer new-token'

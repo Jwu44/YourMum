@@ -7,6 +7,7 @@ import requests
 import os
 import json
 from typing import List, Dict, Optional, Tuple
+from urllib.parse import urlencode, quote
 from firebase_admin import credentials, get_app
 import firebase_admin
 from backend.services.calendar_service import convert_calendar_event_to_task
@@ -120,6 +121,9 @@ def fetch_google_calendar_events(access_token: str, date: str, user_timezone: st
         if response.status_code == 200:
             events_data = response.json()
             return events_data.get('items', [])
+        elif response.status_code == 401:
+            # Bubble up 401 via special exception to allow caller to retry after refresh
+            raise PermissionError("Unauthorized")
         else:
             print(f"Google Calendar API error: {response.status_code} - {response.text}")
             return []
@@ -438,7 +442,19 @@ def get_calendar_events():
         user_timezone = user.get('timezone') or query_timezone or 'Australia/Sydney'
         
         # Fetch events from Google Calendar with timezone-aware boundaries
-        calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
+        try:
+            calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
+        except PermissionError:
+            # 401: try to refresh token once, then retry
+            refreshed = _ensure_access_token_valid(users, user_id, credentials_data)
+            if not refreshed or refreshed == access_token:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to refresh access token",
+                    "tasks": []
+                }), 400
+            access_token = refreshed
+            calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
         
         # Convert events to tasks
         calendar_tasks = []
@@ -680,6 +696,112 @@ def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, 
             return None
 
     return access_token
+
+
+@calendar_bp.route("/oauth/start", methods=["GET"])
+def start_calendar_oauth():
+    """Build Google OAuth URL for offline access (server-side code flow) without extra clicks.
+
+    Returns { success: true, url: <google_auth_url> }
+    """
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        token = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
+        user_id = get_user_id_from_token(token)
+        if not user_id:
+            return jsonify({"success": False, "error": "Invalid or missing authentication token"}), 401
+
+        client_id = os.getenv('GOOGLE_CLIENT_ID')
+        redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
+        if not client_id or not redirect_uri:
+            return jsonify({"success": False, "error": "OAuth not configured"}), 500
+
+        scope = urlencode({
+            'scope': 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly'
+        })
+        base = 'https://accounts.google.com/o/oauth2/v2/auth'
+        params = {
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'response_type': 'code',
+            'access_type': 'offline',
+            'prompt': 'consent',
+            'state': user_id
+        }
+        # Manually compose to ensure proper encoding
+        url = f"{base}?client_id={params['client_id']}&redirect_uri={quote(params['redirect_uri'])}&response_type=code&access_type=offline&prompt=consent&state={quote(params['state'])}&scope={quote('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly')}"
+        return jsonify({"success": True, "url": url})
+    except Exception as e:
+        print(f"Error starting calendar OAuth: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": "Failed to start OAuth"}), 500
+
+
+@calendar_bp.route("/oauth/callback", methods=["GET"])
+def calendar_oauth_callback():
+    """Handle Google OAuth code exchange, persist refresh token and ensure watch."""
+    try:
+        code = request.args.get('code')
+        user_id = request.args.get('state')
+        if not code or not user_id:
+            return jsonify({"success": False, "error": "Missing code or state"}), 400
+
+        client_id = os.getenv('GOOGLE_CLIENT_ID')
+        client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+        redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
+        if not client_id or not client_secret or not redirect_uri:
+            return jsonify({"success": False, "error": "OAuth not configured"}), 500
+
+        token_url = 'https://oauth2.googleapis.com/token'
+        payload = {
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        token_resp = requests.post(token_url, data=payload)
+        if token_resp.status_code != 200:
+            return jsonify({"success": False, "error": f"Token exchange failed: {token_resp.text}"}), 400
+
+        token_json = token_resp.json()
+        access_token = token_json.get('access_token')
+        refresh_token = token_json.get('refresh_token')
+        expires_in = token_json.get('expires_in', 3600)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+        db = get_database()
+        users = db['users']
+        users.update_one(
+            {"googleId": user_id},
+            {"$set": {
+                "calendar.connected": True,
+                "calendar.credentials": {
+                    "accessToken": access_token,
+                    "refreshToken": refresh_token,
+                    "expiresAt": expires_at,
+                    "scopes": [
+                        "https://www.googleapis.com/auth/calendar.events.readonly",
+                        "https://www.googleapis.com/auth/calendar.readonly"
+                    ]
+                },
+                "calendar.syncStatus": "completed",
+                "calendar.lastSyncTime": datetime.now(timezone.utc),
+                "metadata.lastModified": datetime.now(timezone.utc)
+            }}
+        )
+
+        # Best-effort ensure push watch is configured
+        try:
+            ensure_calendar_watch_for_user(user_id)
+        except Exception:
+            pass
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error in calendar OAuth callback: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": "Callback error"}), 500
 
 
 def ensure_calendar_watch_for_user(user_id: str) -> Tuple[bool, Dict[str, any]]:

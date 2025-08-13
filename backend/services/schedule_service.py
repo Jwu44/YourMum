@@ -175,8 +175,12 @@ class ScheduleService:
         calendar_tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Create or replace calendar tasks in existing schedule.
-        Simple strategy: replace all calendar tasks, keep all manual tasks.
+        Create or merge calendar tasks into existing schedule with a preservation-first strategy.
+        - Keep non-calendar tasks untouched
+        - If fetched calendar list is empty: preserve existing calendar tasks (non-destructive)
+        - Otherwise: upsert fetched events by gcal_event_id, preserving existing ID and completion,
+          updating Google-sourced fields (text, start_time, end_time, start_date). Preserve all
+          existing calendar tasks not present in the fetched set.
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -199,9 +203,8 @@ class ScheduleService:
             if existing_schedule:
                 # Non-destructive merge strategy:
                 # - Keep non-calendar tasks untouched
-                # - If fetched calendar list is empty: preserve existing calendar tasks
-                # - Otherwise: replace calendar tasks with fetched set PLUS any existing
-                #   incomplete carry-over calendar tasks that are not in the fetched set
+                # - If fetched calendar list is empty: preserve existing calendar tasks (no DB write)
+                # - Otherwise: upsert fetched by gcal_event_id, preserving ID/completed and updating text/times
                 existing_tasks = existing_schedule.get('schedule', [])
                 non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
                 existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
@@ -233,17 +236,48 @@ class ScheduleService:
                         "metadata": metadata
                     }
 
-                # Otherwise, merge: fetched + preserve existing incomplete not present by gcal_event_id
-                fetched_ids = {t.get('gcal_event_id') for t in normalized_incoming_calendar_tasks if t.get('gcal_event_id')}
-                carry_over_incomplete = []
+                # Upsert fetched by gcal_event_id, preserving existing ID and completion
+                existing_by_id: Dict[str, Dict[str, Any]] = {}
                 for t in existing_calendar_tasks:
-                    is_incomplete = not t.get('completed', False)
-                    gcal_id = t.get('gcal_event_id')
-                    not_in_fetched = (gcal_id not in fetched_ids) if gcal_id else True
-                    if is_incomplete and not_in_fetched:
-                        carry_over_incomplete.append(t)
+                    gid = t.get('gcal_event_id')
+                    if gid:
+                        existing_by_id[gid] = t
 
-                merged_calendar_tasks = normalized_incoming_calendar_tasks + carry_over_incomplete
+                fetched_ids = {t.get('gcal_event_id') for t in normalized_incoming_calendar_tasks if t.get('gcal_event_id')}
+
+                upserted_calendar: List[Dict[str, Any]] = []
+                for inc in normalized_incoming_calendar_tasks:
+                    gid = inc.get('gcal_event_id')
+                    if not gid:
+                        continue
+                    if gid in existing_by_id:
+                        current = existing_by_id[gid]
+                        merged_item = {**current}
+                        # Update Google-sourced fields while preserving local ID and completion
+                        merged_item['text'] = inc.get('text', merged_item.get('text'))
+                        merged_item['start_time'] = inc.get('start_time', merged_item.get('start_time'))
+                        merged_item['end_time'] = inc.get('end_time', merged_item.get('end_time'))
+                        merged_item['start_date'] = date
+                        merged_item['from_gcal'] = True
+                        if 'type' not in merged_item:
+                            merged_item['type'] = 'task'
+                        upserted_calendar.append(merged_item)
+                    else:
+                        new_item = dict(inc)
+                        new_item['from_gcal'] = True
+                        if 'type' not in new_item:
+                            new_item['type'] = 'task'
+                        new_item['start_date'] = date
+                        upserted_calendar.append(new_item)
+
+                # Preserve all existing calendar tasks not present in fetched set (completed and incomplete)
+                preserved_existing = []
+                for t in existing_calendar_tasks:
+                    gid = t.get('gcal_event_id')
+                    if not gid or gid not in fetched_ids:
+                        preserved_existing.append(t)
+
+                merged_calendar_tasks = upserted_calendar + preserved_existing
                 final_tasks = merged_calendar_tasks + non_calendar_tasks
 
                 # Update existing schedule with merged calendar tasks at top

@@ -342,3 +342,68 @@ def test_empty_fetch_leaves_calendar_tasks_untouched(reset_mock_collection: Magi
     assert any(t.get("id") == "manual-1" for t in merged)
 
 
+def test_upsert_preserves_completion_and_id_for_matched_gcal_event(reset_mock_collection: MagicMock):
+    """When fetched event matches by gcal_event_id, preserve existing ID and completed state while updating Google fields."""
+    user_id = "user-6"
+    date = "2025-07-29"
+
+    existing_calendar = {
+        "id": "old123",
+        "text": "Old Title",
+        "completed": True,  # user completed locally
+        "categories": ["Work"],
+        "start_time": "09:00",
+        "end_time": "10:00",
+        "start_date": date,
+        "gcal_event_id": "ev-match",
+        "from_gcal": True,
+        "type": "task"
+    }
+    manual_task = {
+        "id": "manual-x",
+        "text": "Manual remains",
+        "from_gcal": False,
+        "type": "task"
+    }
+
+    reset_mock_collection.find_one.return_value = _make_schedule_doc(user_id, date, [existing_calendar, manual_task])
+    reset_mock_collection.update_one.return_value = MagicMock(modified_count=1)
+
+    incoming = {
+        # Incoming may have a different transient ID; merge must preserve existing ID
+        "id": "new456",
+        "text": "New Title",
+        "completed": False,  # server-sourced value should not overwrite local completion
+        "categories": [],
+        "start_time": "09:30",
+        "end_time": "10:30",
+        "start_date": date,
+        "gcal_event_id": "ev-match",
+        "from_gcal": True,
+        "type": "task"
+    }
+
+    success, result = schedule_service.create_schedule_from_calendar_sync(
+        user_id=user_id,
+        date=date,
+        calendar_tasks=[incoming]
+    )
+
+    assert success is True
+    merged = result["schedule"]
+
+    # Find the merged calendar task by gcal_event_id
+    merged_match = next(t for t in merged if t.get("from_gcal") and t.get("gcal_event_id") == "ev-match")
+
+    # ID and completion preserved from existing
+    assert merged_match["id"] == "old123"
+    assert merged_match["completed"] is True
+
+    # Google-sourced fields updated from incoming
+    assert merged_match["text"] == "New Title"
+    assert merged_match["start_time"] == "09:30"
+    assert merged_match["end_time"] == "10:30"
+
+    # Manual task remains
+    assert any(t.get("id") == "manual-x" for t in merged if not t.get("from_gcal"))
+

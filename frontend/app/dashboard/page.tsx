@@ -71,6 +71,8 @@ const Dashboard: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [userCreationDate, setUserCreationDate] = useState<Date | null>(null)
   const hasInitiallyLoaded = useRef(false)
+  const hasEnsuredRefresh = useRef(false)
+  const [isEnsuringRefresh, setIsEnsuringRefresh] = useState(false)
 
   useEffect(() => {
     const date = new Date()
@@ -87,6 +89,50 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex])
 
   // Check for calendar sync status and show appropriate messages
+  useEffect(() => {
+    // One-time: ensure refresh token exists without extra user clicks
+    const ensureRefreshTokenIfMissing = async () => {
+      try {
+        if (hasEnsuredRefresh.current) return
+        hasEnsuredRefresh.current = true
+
+        // Require an authenticated user to proceed
+        const me = await userApi.getCurrentUser().catch(() => null as any)
+        if (!me) return
+
+        const calendar = (me as any).calendar || {}
+        const connected = !!calendar.connected
+        const credentials = calendar.credentials || {}
+        const hasRefresh = !!credentials.refreshToken
+
+        if (connected && !hasRefresh) {
+          setIsEnsuringRefresh(true)
+          try {
+            const token = await (currentUser || auth.currentUser)?.getIdToken(true)
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
+            const resp = await fetch(`${apiBase}/api/calendar/oauth/start`, {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${token}` }
+            })
+            const data = await resp.json().catch(() => ({} as any))
+            if (resp.ok && data?.success && data?.url) {
+              window.location.href = data.url as string
+              return
+            }
+          } catch (e) {
+            // Fall through to normal load if ensure fails
+          } finally {
+            setIsEnsuringRefresh(false)
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    ensureRefreshTokenIfMissing()
+  }, [currentUser])
+
   useEffect(() => {
     // Check for general calendar connection errors
     const calendarError = localStorage.getItem('calendarConnectionError')
@@ -1205,10 +1251,10 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage) {
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh) {
       loadInitialSchedule()
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage])
+  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
 
   // Midnight auto-refresh (local timezone)
   useEffect(() => {
@@ -1281,7 +1327,7 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex, currentUser?.uid])
 
   // Show calendar connection loader during OAuth flow
-  if (calendarConnectionStage) {
+  if (calendarConnectionStage || isEnsuringRefresh) {
     return <CalendarConnectionLoader stage={calendarConnectionStage} />
   }
 
