@@ -38,7 +38,7 @@ class ScheduleService:
 
     def _get_calendar_fetch_timeout(self) -> float:
         """Sub-timeout in seconds for calendar fetch; override in tests if needed."""
-        return 8.0
+        return 10.0
 
     def get_schedule_by_date(
         self, 
