@@ -471,7 +471,38 @@ class ScheduleService:
                     preserved_existing.append(t)
 
             merged_calendar_tasks = upserted_calendar + preserved_existing
-            final_tasks = merged_calendar_tasks + non_calendar_tasks
+            # Deduplicate: remove non-calendar tasks that duplicate incoming calendar events
+            try:
+                incoming_texts_lc = {
+                    (t.get('text') or '').strip().lower()
+                    for t in upserted_calendar
+                }
+                incoming_ids = {
+                    t.get('gcal_event_id')
+                    for t in upserted_calendar
+                    if t.get('gcal_event_id')
+                }
+
+                filtered_non_calendar = []
+                for t in non_calendar_tasks:
+                    # Keep sections and any explicit section types
+                    if t.get('is_section', False) or t.get('type') == 'section':
+                        filtered_non_calendar.append(t)
+                        continue
+
+                    task_text_lc = (t.get('text') or '').strip().lower()
+                    task_id = t.get('id')
+
+                    # Drop if matches by text (case-insensitive) or id == any gcal_event_id
+                    if task_text_lc in incoming_texts_lc or (task_id and task_id in incoming_ids):
+                        continue
+
+                    filtered_non_calendar.append(t)
+
+                final_tasks = merged_calendar_tasks + filtered_non_calendar
+            except Exception:
+                # Safety fallback: if dedup fails, proceed without filtering
+                final_tasks = merged_calendar_tasks + non_calendar_tasks
 
             # Prepare update doc and validate
             if existing_schedule:

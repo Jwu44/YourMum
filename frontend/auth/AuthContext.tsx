@@ -199,7 +199,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Cleanup subscription
     return () => unsubscribe();
   }, []); // Empty dependency array - setup once on mount
-  
+
+  // One-off timezone sync when user becomes available and not in OAuth flow
+  useEffect(() => {
+    const syncTimezoneIfNeeded = async () => {
+      if (!user || isOAuthInProgress) return
+      try {
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const tzKey = 'tzSyncedFor'
+        const cached = localStorage.getItem(tzKey)
+        if (cached === browserTz) return
+
+        // Fetch current user to read stored timezone
+        const apiBase = process.env.NEXT_PUBLIC_API_URL
+        const token = await user.getIdToken()
+        const res = await fetch(`${apiBase}/api/auth/user`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const serverTz: string | undefined = data?.user?.timezone
+        if (serverTz && serverTz === browserTz) {
+          localStorage.setItem(tzKey, browserTz)
+          return
+        }
+
+        // Update timezone via API
+        const updateRes = await fetch(`${apiBase}/api/user/timezone`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ timezone: browserTz })
+        })
+        if (updateRes.ok) {
+          localStorage.setItem(tzKey, browserTz)
+        }
+      } catch (_) {
+        // best-effort only
+      }
+    }
+    syncTimezoneIfNeeded()
+  }, [user, isOAuthInProgress])
+
   // Handle redirect result and check for calendar access
   useEffect(() => {
     const handleRedirectResult = async () => {

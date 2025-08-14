@@ -118,5 +118,31 @@ export const userApi = {
       // Fallback to a default early date on error
       return new Date('2024-01-01')
     }
+  },
+
+  /**
+   * Update the user's timezone (one-off call when browser timezone differs)
+   */
+  async updateTimezone (timezone: string): Promise<{ success: boolean, timezone?: string, error?: string }> {
+    try {
+      const token = await getAuthToken()
+      const response = await fetch(`${API_BASE_URL}/api/user/timezone`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ timezone })
+      })
+
+      const result = await response.json().catch(() => ({} as any))
+      if (!response.ok) {
+        return { success: false, error: result.error || 'Failed to update timezone' }
+      }
+      return { success: true, timezone: result.timezone }
+    } catch (error) {
+      console.error('Error updating timezone:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
   }
 }

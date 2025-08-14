@@ -103,18 +103,52 @@ def events_stream():
         except Exception:
             pass
 
+        def _get_user_timezone(user_doc: Dict[str, Any]) -> str:
+            tz = user_doc.get('timezone') or 'UTC'
+            return tz
+
+        def _today_in_tz(tz_str: str) -> str:
+            try:
+                import pytz
+                tz = pytz.timezone(tz_str)
+                now_local = datetime.now(tz)
+            except Exception:
+                now_local = datetime.now(timezone.utc)
+            return now_local.strftime('%Y-%m-%d')
+
+        def _safe_json_payload(event: Dict[str, Any]) -> str:
+            return json.dumps(event)
+
         def generate_stream():
             subscriber_queue = event_bus.subscribe(user_id)
             try:
                 # Initial ping so the client knows the connection is up
                 yield "event: ping\ndata: {}\n\n"
+                # Prepare DB poll fallback state
+                last_seen_modified: Optional[str] = None
+                user_tz = _get_user_timezone(user)
+                current_date_str = _today_in_tz(user_tz)
                 while True:
                     try:
                         message = subscriber_queue.get(timeout=15)
-                        yield f"data: {json.dumps(message)}\n\n"
+                        yield f"data: {_safe_json_payload(message)}\n\n"
                     except Empty:
-                        # Heartbeat to prevent idle timeouts through proxies/load balancers
+                        # Heartbeat plus DB poll fallback across processes
+                        # 1) Heartbeat to prevent idle timeouts
                         yield ": keep-alive\n\n"
+                        # 2) DB poll to detect schedule changes in other workers
+                        try:
+                            payload, last_seen_modified = _poll_schedule_update(
+                                user_id,
+                                user_tz,
+                                last_seen_modified,
+                                date_override=current_date_str
+                            )
+                            if payload is not None:
+                                yield f"data: {_safe_json_payload(payload)}\n\n"
+                        except Exception:
+                            # Never break the stream on poll errors
+                            pass
             finally:
                 event_bus.unsubscribe(user_id, subscriber_queue)
 
@@ -135,10 +169,106 @@ def events_stream():
         }), 500
 
 
+# Lightweight helper for SSE DB-poll fallback
+def _poll_schedule_update(
+    user_id: str,
+    user_timezone: str,
+    last_seen_modified: Optional[str],
+    date_override: Optional[str] = None
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Check the user's schedule document for "today" (in user_timezone) and
+    return a schedule_updated payload if metadata.last_modified changed.
+
+    Returns: (payload_or_none, new_last_seen_modified)
+    """
+    try:
+        # Resolve target date once per call
+        if date_override:
+            date_str = date_override
+        else:
+            try:
+                import pytz
+                tz = pytz.timezone(user_timezone or 'UTC')
+                now_local = datetime.now(tz)
+            except Exception:
+                now_local = datetime.now(timezone.utc)
+            date_str = now_local.strftime('%Y-%m-%d')
+
+        schedules = get_user_schedules_collection()
+        # Date is stored in canonical format
+        formatted_date = date_str
+        doc = schedules.find_one({
+            "userId": user_id,
+            "date": formatted_date
+        })
+        if not doc:
+            return None, last_seen_modified
+
+        metadata = (doc.get('metadata') or {})
+        current_last_modified = metadata.get('last_modified')
+        if not current_last_modified:
+            return None, last_seen_modified
+
+        if last_seen_modified is None:
+            # First observation; memorize and do not emit
+            return None, current_last_modified
+
+        if current_last_modified != last_seen_modified:
+            return {"type": "schedule_updated", "date": date_str}, current_last_modified
+
+        return None, last_seen_modified
+    except Exception:
+        return None, last_seen_modified
+
+
 @api_bp.route("/events/stream", methods=["OPTIONS"])
 def handle_events_stream_options():
     """Handle CORS preflight requests for the events stream endpoint."""
     return jsonify({"status": "ok"})
+
+# -----------------------------
+# User Settings: Timezone
+# -----------------------------
+
+@api_bp.route("/user/timezone", methods=["PUT"])
+def update_user_timezone():
+    """
+    Update the current user's timezone.
+
+    Body: { "timezone": "Australia/Sydney" }
+    Auth: Firebase ID token required (Authorization: Bearer <token>)
+    """
+    try:
+        # Auth
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"success": False, "error": "Authentication required"}), 401
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({"success": False, "error": "Invalid authentication token"}), 401
+
+        data = request.get_json(silent=True) or {}
+        tz_value = (data.get('timezone') or '').strip()
+        if not tz_value:
+            return jsonify({"success": False, "error": "Missing timezone"}), 400
+
+        # Validate timezone
+        try:
+            import pytz
+            pytz.timezone(tz_value)
+        except Exception:
+            return jsonify({"success": False, "error": f"Invalid timezone: {tz_value}"}), 400
+
+        db = get_database()
+        users = db['users']
+        users.update_one({"googleId": user['googleId']}, {"$set": {"timezone": tz_value}})
+
+        return jsonify({"success": True, "timezone": tz_value})
+    except Exception as e:
+        print(f"Error updating user timezone: {str(e)}")
+        return jsonify({"success": False, "error": f"Internal server error: {str(e)}"}), 500
 
 if not firebase_admin._apps:
     # Use environment variable or path to service account credentials
