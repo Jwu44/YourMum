@@ -470,8 +470,70 @@ class ScheduleService:
                 if not gid or gid not in fetched_id_set:
                     preserved_existing.append(t)
 
-            merged_calendar_tasks = upserted_calendar + preserved_existing
-            # Deduplicate: remove non-calendar tasks that duplicate incoming calendar events
+            # Preserve relative positions of existing calendar events.
+            # Strategy:
+            # 1) Build a map of existing calendar tasks by gcal_event_id
+            # 2) Walk the existing_tasks in order. For each item:
+            #    - If it's an existing calendar task and present in upserted_calendar, use the upserted copy in place
+            #    - If it's an existing calendar task not present in fetched set, keep it as is
+            #    - If it's a non-calendar task, include for now (filtered later for duplicates)
+            # 3) After the walk, append any brand-new calendar tasks (those not in existing list) immediately
+            #    after the last existing calendar task block to maintain grouping under the same section.
+
+            existing_calendar_map: Dict[str, Dict[str, Any]] = {}
+            for t in existing_calendar_tasks:
+                gid = t.get('gcal_event_id')
+                if gid:
+                    existing_calendar_map[gid] = t
+
+            upserted_by_id: Dict[str, Dict[str, Any]] = {}
+            new_calendar_ids: List[str] = []
+            for t in upserted_calendar:
+                gid = t.get('gcal_event_id')
+                if not gid:
+                    continue
+                upserted_by_id[gid] = t
+                if gid not in existing_calendar_map:
+                    new_calendar_ids.append(gid)
+
+            # Rebuild list preserving order of existing items
+            rebuilt: List[Dict[str, Any]] = []
+            last_calendar_index = -1
+            for item in existing_tasks:
+                if item.get('from_gcal', False):
+                    gid = item.get('gcal_event_id')
+                    if gid and gid in upserted_by_id:
+                        merged_copy = dict(upserted_by_id[gid])
+                        # Preserve the original section placement if present
+                        if item.get('section') and not merged_copy.get('section'):
+                            merged_copy['section'] = item.get('section')
+                        rebuilt.append(merged_copy)
+                    else:
+                        rebuilt.append(item)
+                    last_calendar_index = len(rebuilt) - 1
+                else:
+                    rebuilt.append(item)
+
+            # Insert brand-new calendar tasks right after the last existing calendar item
+            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else 0
+            new_items: List[Dict[str, Any]] = []
+            # Determine inherited section once based on element before insertion
+            inherited_section: Optional[str] = None
+            if insertion_index > 0:
+                try:
+                    prev = rebuilt[insertion_index - 1]
+                    inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
+                except Exception:
+                    inherited_section = None
+            for gid in new_calendar_ids:
+                new_item = dict(upserted_by_id[gid])
+                if inherited_section and not new_item.get('section'):
+                    new_item['section'] = inherited_section
+                new_items.append(new_item)
+            if new_items:
+                rebuilt = rebuilt[:insertion_index] + new_items + rebuilt[insertion_index:]
+
+            # Deduplicate in-place while preserving order of the rebuilt list
             try:
                 incoming_texts_lc = {
                     (t.get('text') or '').strip().lower()
@@ -483,26 +545,24 @@ class ScheduleService:
                     if t.get('gcal_event_id')
                 }
 
-                filtered_non_calendar = []
-                for t in non_calendar_tasks:
-                    # Keep sections and any explicit section types
-                    if t.get('is_section', False) or t.get('type') == 'section':
-                        filtered_non_calendar.append(t)
-                        continue
+                filtered_rebuilt: List[Dict[str, Any]] = []
+                for t in rebuilt:
+                    if not t.get('from_gcal', False):
+                        # Keep sections and any explicit section types
+                        if t.get('is_section', False) or t.get('type') == 'section':
+                            filtered_rebuilt.append(t)
+                            continue
+                        task_text_lc = (t.get('text') or '').strip().lower()
+                        task_id = t.get('id')
+                        if task_text_lc in incoming_texts_lc or (task_id and task_id in incoming_ids):
+                            # Drop manual duplicate of incoming calendar event
+                            continue
+                    filtered_rebuilt.append(t)
 
-                    task_text_lc = (t.get('text') or '').strip().lower()
-                    task_id = t.get('id')
-
-                    # Drop if matches by text (case-insensitive) or id == any gcal_event_id
-                    if task_text_lc in incoming_texts_lc or (task_id and task_id in incoming_ids):
-                        continue
-
-                    filtered_non_calendar.append(t)
-
-                final_tasks = merged_calendar_tasks + filtered_non_calendar
+                final_tasks = filtered_rebuilt
             except Exception:
-                # Safety fallback: if dedup fails, proceed without filtering
-                final_tasks = merged_calendar_tasks + non_calendar_tasks
+                # Safety fallback: if dedup fails, keep rebuilt order
+                final_tasks = rebuilt
 
             # Prepare update doc and validate
             if existing_schedule:
@@ -513,7 +573,7 @@ class ScheduleService:
                         **existing_metadata,
                         "last_modified": format_timestamp(),
                         "calendarSynced": True,
-                        "calendarEvents": len([t for t in merged_calendar_tasks if t.get('from_gcal', False)]),
+                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)]),
                         "source": "calendar_sync"
                     }
                 }
