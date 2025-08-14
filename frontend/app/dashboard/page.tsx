@@ -1345,7 +1345,7 @@ const Dashboard: React.FC = () => {
           showSidebarTrigger={true}
         />
 
-        <div className="flex-1 overflow-y-auto mt-4 sm:mt-8 mobile-scroll">
+        <div className="flex-1 overflow-y-auto mobile-scroll">
           <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
             {isLoadingSchedule

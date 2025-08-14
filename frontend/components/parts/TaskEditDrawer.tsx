@@ -303,13 +303,13 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           handleClose()
         }}
       >
-        <div className="mx-auto w-full max-w-sm px-2 sm:px-0 flex flex-col min-h-0">
+        <div className="mx-auto w-full max-w-sm px-3 sm:px-4 lg:px-0 flex flex-col min-h-0">
           <DrawerHeader className="flex-shrink-0">
             <DrawerTitle>
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Task Name */}
             <div>
               <label htmlFor="text" className="block text-sm font-medium text-foreground mb-2">
@@ -338,7 +338,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
                       key={category}
                       variant={isSelected ? 'default' : 'outline'}
                       className={cn(
-                        'cursor-pointer mobile-touch-target px-2 py-1.5 text-sm font-normal sm:px-2 sm:py-1 sm:text-xs',
+                        'cursor-pointer mobile-touch-target px-3 py-2 text-sm font-normal',
                         isSelected && getCategoryVariant(category) === 'work' && 'bg-info btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'fun' && 'bg-warning btn-hover-primary',
                         isSelected && getCategoryVariant(category) === 'relationships' && 'bg-primary btn-hover-primary',
@@ -445,7 +445,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           </div>
 
           {/* Footer with improved save button */}
-          <DrawerFooter className="flex-shrink-0 px-3 sm:px-6 border-t border-border">
+          <DrawerFooter className="flex-shrink-0 px-4">
             <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground mobile-form-button">
               {isEditMode ? 'Save Changes' : 'Create'}
             </Button>
