@@ -1,7 +1,5 @@
-import { categorizeTask } from './api/users'
-import { v4 as uuidv4 } from 'uuid'
 import {
-  type Task, type FormAction, type DecompositionRequest,
+  type Task, type DecompositionRequest,
   type DecompositionResponse, type MicrostepFeedback, type FeedbackResponse,
   type FormData, type GetAISuggestionsResponse
 } from './types'
@@ -9,100 +7,8 @@ import { auth } from '@/auth/firebase'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
-const today = new Date().toISOString().split('T')[0]
-
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
-
-export const handleSimpleInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) =>
-  (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target
-    setFormData(prevData => ({ ...prevData, [name]: value }))
-  }
-
-export const handleNestedInputChange = (setFormData: React.Dispatch<React.SetStateAction<FormData>>) =>
-  (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target
-    const [category, subCategory] = name.split('.')
-    setFormData(prevData => ({
-      ...prevData,
-      [category]: {
-        ...prevData[category],
-        [subCategory]: value
-      }
-    }))
-  }
-
-export const handleAddTask = async (tasks: Task[], newTask: string, categories: string[]) => {
-  const result = await categorizeTask(newTask)
-  const newTaskObject: Task = {
-    id: uuidv4(),
-    text: newTask.trim(),
-    categories: (result?.categories) || categories,
-    is_subtask: false,
-    completed: false,
-    is_section: false,
-    section: null,
-    parent_id: null,
-    level: 0,
-    section_index: tasks.length,
-    type: 'task',
-    is_recurring: null,
-    start_date: today
-  }
-  return [...tasks, newTaskObject]
-}
-
-export const handleUpdateTask = (tasks: Task[], updatedTask: Task) => {
-  return tasks.map(task => task.id === updatedTask.id ? updatedTask : task)
-}
-
-export const handleDeleteTask = (tasks: Task[], taskId: string) => {
-  return tasks.filter(task => task.id !== taskId)
-}
-
-export const cleanupTasks = async (parsedTasks: Task[], existingTasks: Task[]): Promise<Task[]> => {
-  const cleanedTasks = parsedTasks.map(task => {
-    const matchingTask = existingTasks.find(t => t && t.id === task.id)
-    return {
-      ...task,
-      categories: task.categories || (matchingTask ? matchingTask.categories : [])
-    }
-  })
-
-  return cleanedTasks
-}
-
-export const updatePriorities = (
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>,
-  priorities: Array<{ id: string }>
-): void => {
-  const updatedPriorities = {
-    health: '',
-    relationships: '',
-    fun_activities: '',
-    ambitions: ''
-  }
-  priorities.forEach((priority, index) => {
-    updatedPriorities[priority.id as keyof typeof updatedPriorities] = (index + 1).toString()
-  })
-  setFormData((prevData: FormData) => ({ ...prevData, priorities: updatedPriorities }))
-}
-
-export const handleEnergyChange = (
-  dispatch: React.Dispatch<FormAction>,
-  currentPatterns: string[]
-) => (value: string): void => {
-  const updatedPatterns = currentPatterns.includes(value)
-    ? currentPatterns.filter(pattern => pattern !== value)
-    : [...currentPatterns, value]
-
-  dispatch({
-    type: 'UPDATE_FIELD',
-    field: 'energy_patterns',
-    value: updatedPatterns
-  })
-}
 
 // Add new functions for microstep operations
 export const handleMicrostepDecomposition = async (
@@ -239,18 +145,6 @@ export const handleMicrostepSelection = async (
   }
 }
 
-// Update existing functions to use new types
-export const checkTaskCompletion = (task: Task, tasks: Task[]): boolean => {
-  // If task has no microsteps, use its own completion state
-  const microsteps = tasks.filter(
-    t => t.parent_id === task.id && t.is_microstep
-  )
-
-  if (microsteps.length === 0) return task.completed
-
-  // Task is complete if all its microsteps are complete
-  return microsteps.every(step => step.completed)
-}
 
 export const fetchAISuggestions = async (
   userId: string,
@@ -311,36 +205,4 @@ const getAuthToken = async (): Promise<string> => {
   }
   // Force refresh token to ensure it's valid and not expired
   return await currentUser.getIdToken(true)
-}
-
-/**
- * Check if a schedule exists for a specific date
- * @param date The date to check for schedule existence
- * @returns Promise<boolean> indicating if a schedule exists
- */
-export const checkScheduleExists = async (date: Date): Promise<boolean> => {
-  try {
-    // Format date for API
-    const dateStr = formatDateToString(date)
-
-    // Use the existing GET schedule endpoint to check if a schedule exists
-    const response = await fetch(
-      `${API_BASE_URL}/api/schedules/${dateStr}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${await getAuthToken()}`
-        }
-      }
-    )
-
-    // If we get a 200, schedule exists
-    // If we get a 404, schedule doesn't exist
-    // Any other error should be treated as "doesn't exist" for safety
-    return response.ok
-  } catch (error) {
-    console.error('Error checking schedule:', error)
-    return false
-  }
 }
