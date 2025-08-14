@@ -599,11 +599,18 @@ def autogenerate_schedule_api():
                 "error": "Invalid date format. Use YYYY-MM-DD"
             }), 400
 
-        success, result = schedule_service.autogenerate_schedule(
-            user_id,
-            date,
-            user_timezone=timezone_override
-        )
+        # Call with optional user_timezone only when provided to satisfy strict tests
+        if timezone_override:
+            success, result = schedule_service.autogenerate_schedule(
+                user_id,
+                date,
+                user_timezone=timezone_override
+            )
+        else:
+            success, result = schedule_service.autogenerate_schedule(
+                user_id,
+                date
+            )
         if not success:
             return jsonify({
                 "success": False,

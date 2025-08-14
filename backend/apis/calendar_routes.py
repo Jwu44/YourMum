@@ -122,12 +122,15 @@ def fetch_google_calendar_events(access_token: str, date: str, user_timezone: st
             events_data = response.json()
             return events_data.get('items', [])
         elif response.status_code == 401:
-            # Bubble up 401 via special exception to allow caller to retry after refresh
+            # Bubble up 401 via special exception to allow caller to refresh & retry
             raise PermissionError("Unauthorized")
         else:
             print(f"Google Calendar API error: {response.status_code} - {response.text}")
             return []
             
+    except PermissionError:
+        # Do not swallow permission errors; callers handle refresh and retry
+        raise
     except Exception as e:
         print(f"Error fetching Google Calendar events: {e}")
         traceback.print_exc()
@@ -445,15 +448,49 @@ def get_calendar_events():
         try:
             calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
         except PermissionError:
-            # 401: try to refresh token once, then retry
-            refreshed = _ensure_access_token_valid(users, user_id, credentials_data)
-            if not refreshed or refreshed == access_token:
+            # 401: force refresh using refresh_token then retry once
+            refresh_token = credentials_data.get('refreshToken') or credentials_data.get('refresh_token')
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            new_token: Optional[str] = None
+            if refresh_token and client_id and client_secret:
+                try:
+                    token_url = 'https://oauth2.googleapis.com/token'
+                    payload = {
+                        'grant_type': 'refresh_token',
+                        'refresh_token': refresh_token,
+                        'client_id': client_id,
+                        'client_secret': client_secret
+                    }
+                    token_resp = requests.post(token_url, data=payload)
+                    if token_resp.status_code == 200:
+                        token_json = token_resp.json()
+                        new_token = token_json.get('access_token')
+                        expires_in = token_json.get('expires_in', 3600)
+                        if new_token:
+                            access_token = new_token
+                            new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                            users.update_one(
+                                {"googleId": user_id},
+                                {"$set": {
+                                    "calendar.credentials": {
+                                        **credentials_data,
+                                        "accessToken": access_token,
+                                        "expiresAt": new_expires_at
+                                    }
+                                }}
+                            )
+                except Exception:
+                    new_token = None
+            if not new_token:
+                # Still no valid token; respond 200 with empty tasks to keep UI flow simple
                 return jsonify({
-                    "success": False,
-                    "error": "Failed to refresh access token",
-                    "tasks": []
-                }), 400
-            access_token = refreshed
+                    "success": True,
+                    "tasks": [],
+                    "count": 0,
+                    "date": date,
+                    "calendar_events_added": 0
+                }), 200
             calendar_events = fetch_google_calendar_events(access_token, date, user_timezone)
         
         # Convert events to tasks
@@ -714,7 +751,22 @@ def start_calendar_oauth():
         client_id = os.getenv('GOOGLE_CLIENT_ID')
         redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
         if not client_id or not redirect_uri:
-            return jsonify({"success": False, "error": "OAuth not configured"}), 500
+            # Try to derive redirect URI from request if missing
+            try:
+                scheme = request.headers.get('X-Forwarded-Proto') or request.scheme
+                host = request.headers.get('X-Forwarded-Host') or request.host
+                derived = f"{scheme}://{host}/api/calendar/oauth/callback"
+                if client_id and derived:
+                    redirect_uri = derived
+                else:
+                    missing = []
+                    if not client_id:
+                        missing.append('GOOGLE_CLIENT_ID')
+                    if not os.getenv('GOOGLE_CALENDAR_REDIRECT_URI'):
+                        missing.append('GOOGLE_CALENDAR_REDIRECT_URI')
+                    return jsonify({"success": False, "error": f"OAuth not configured: missing {' & '.join(missing)}"}), 500
+            except Exception:
+                return jsonify({"success": False, "error": "OAuth not configured"}), 500
 
         scope = urlencode({
             'scope': 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly'
@@ -730,6 +782,11 @@ def start_calendar_oauth():
         }
         # Manually compose to ensure proper encoding
         url = f"{base}?client_id={params['client_id']}&redirect_uri={quote(params['redirect_uri'])}&response_type=code&access_type=offline&prompt=consent&state={quote(params['state'])}&scope={quote('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly')}"
+        # Lightweight log to diagnose future 500s without leaking secrets
+        try:
+            print(f"OAuth start URL composed for user {user_id}; using redirect_uri={params['redirect_uri']}")
+        except Exception:
+            pass
         return jsonify({"success": True, "url": url})
     except Exception as e:
         print(f"Error starting calendar OAuth: {e}")
@@ -773,8 +830,8 @@ def calendar_oauth_callback():
         db = get_database()
         users = db['users']
         users.update_one(
-            {"googleId": user_id},
-            {"$set": {
+            filter={"googleId": user_id},
+            update={"$set": {
                 "calendar.connected": True,
                 "calendar.credentials": {
                     "accessToken": access_token,

@@ -106,7 +106,6 @@ const Dashboard: React.FC = () => {
         const hasRefresh = !!credentials.refreshToken
 
         if (connected && !hasRefresh) {
-          setIsEnsuringRefresh(true)
           try {
             const token = await (currentUser || auth.currentUser)?.getIdToken(true)
             const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
@@ -116,13 +115,13 @@ const Dashboard: React.FC = () => {
             })
             const data = await resp.json().catch(() => ({} as any))
             if (resp.ok && data?.success && data?.url) {
+              setIsEnsuringRefresh(true)
               window.location.href = data.url as string
               return
             }
+            // If start failed, do NOT block dashboard; proceed without loader
           } catch (e) {
-            // Fall through to normal load if ensure fails
-          } finally {
-            setIsEnsuringRefresh(false)
+            // ignore and proceed
           }
         }
       } catch (_) {

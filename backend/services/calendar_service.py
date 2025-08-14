@@ -188,9 +188,18 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str, timezone_override:
 
         user_timezone = timezone_override or user.get('timezone') or 'Australia/Sydney'
 
-        # Fetch events (patched in tests). If a 401 occurs at lower level (not exposed here),
-        # callers should refresh before retry. This service already attempted a refresh via wrapper.
-        events = fetch_google_calendar_events(access_token, date, user_timezone) or []
+        # Fetch events and on PermissionError attempt one refresh-and-retry using shared helper.
+        try:
+            events = fetch_google_calendar_events(access_token, date, user_timezone) or []
+        except PermissionError:
+            # Refresh token and retry once
+            refreshed = _ensure_access_token_valid_wrapper(users, user_id, credentials)
+            if not refreshed or refreshed == access_token:
+                return []
+            try:
+                events = fetch_google_calendar_events(refreshed, date, user_timezone) or []
+            except PermissionError:
+                return []
 
         # Filter: overlapping target date in the correct timezone
         filtered = [ev for ev in events if _event_overlaps_date(ev, date, user_timezone)]
