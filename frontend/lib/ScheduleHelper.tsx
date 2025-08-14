@@ -52,8 +52,8 @@ const getAuthToken = async (): Promise<string> => {
   if (!currentUser) {
     throw new Error('User not authenticated')
   }
-  // Force refresh token to ensure it's valid and not expired
-  return await currentUser.getIdToken(true)
+  // Avoid forcing refresh on every call; SDK auto-refreshes when needed
+  return await currentUser.getIdToken()
 }
 
 /**
