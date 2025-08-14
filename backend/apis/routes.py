@@ -130,7 +130,8 @@ def events_stream():
                 current_date_str = _today_in_tz(user_tz)
                 while True:
                     try:
-                        message = subscriber_queue.get(timeout=15)
+                        # Wake up frequently for low-latency DB poll fallback
+                        message = subscriber_queue.get(timeout=2)
                         yield f"data: {_safe_json_payload(message)}\n\n"
                     except Empty:
                         # Heartbeat plus DB poll fallback across processes
@@ -148,6 +149,12 @@ def events_stream():
                                 yield f"data: {_safe_json_payload(payload)}\n\n"
                         except Exception:
                             # Never break the stream on poll errors
+                            pass
+                        # 3) Short sleep to avoid tight loop
+                        try:
+                            import time as _t
+                            _t.sleep(2)
+                        except Exception:
                             pass
             finally:
                 event_bus.unsubscribe(user_id, subscriber_queue)

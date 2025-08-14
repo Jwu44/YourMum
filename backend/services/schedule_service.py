@@ -976,32 +976,60 @@ class ScheduleService:
                 except Exception:
                     fetched_calendar_tasks = []
 
-            # Deduplicate by gcal_event_id (prefer fetched over carry-over)
-            fetched_ids = {t.get('gcal_event_id') for t in fetched_calendar_tasks if t.get('gcal_event_id')}
-            carry_over_unique = [t for t in carry_over_calendar_tasks if t.get('gcal_event_id') not in fetched_ids]
-            calendar_block = list(fetched_calendar_tasks) + carry_over_unique
-            # Ensure deterministic ordering within block: all-day first, then time, then text
-            calendar_block = self._sort_calendar_block(calendar_block)
+            # Preserve relative positions from source schedule when placing today's calendar events.
+            # Build map of source calendar tasks by gcal_event_id
+            source_calendar_map: Dict[str, Dict[str, Any]] = {}
+            for t in source_tasks:
+                if t.get('from_gcal', False) and t.get('gcal_event_id'):
+                    source_calendar_map[t['gcal_event_id']] = t
 
-            # Assign section for calendar events if first section exists
-            if first_section_text:
-                for t in calendar_block:
-                    t['section'] = first_section_text
+            fetched_by_id: Dict[str, Dict[str, Any]] = {t.get('gcal_event_id'): t for t in fetched_calendar_tasks if t.get('gcal_event_id')}
+            fetched_ids = set(fetched_by_id.keys())
 
-            # Position calendar block:
-            final_tasks: List[Dict[str, Any]] = []
-            if section_tasks:
-                # Insert after first section
-                final_tasks.append(section_tasks[0])
-                final_tasks.extend(calendar_block)
-                final_tasks.extend(section_tasks[1:])
-            else:
-                # No sections, calendar block at top
-                final_tasks.extend(calendar_block)
+            # Rebuild from source order: replace existing calendar items with today's updates
+            rebuilt: List[Dict[str, Any]] = []
+            last_calendar_index = -1
+            for item in source_tasks:
+                if item.get('is_section', False) or item.get('type') == 'section':
+                    rebuilt.append(item)
+                    continue
+                if item.get('from_gcal', False):
+                    gid = item.get('gcal_event_id')
+                    if gid and gid in fetched_by_id:
+                        updated = dict(fetched_by_id[gid])
+                        updated['from_gcal'] = True
+                        # Preserve section of the source item
+                        if item.get('section') and not updated.get('section'):
+                            updated['section'] = item.get('section')
+                        rebuilt.append(updated)
+                        last_calendar_index = len(rebuilt) - 1
+                    else:
+                        # If not fetched today and was calendar, carry-over logic already handled separately
+                        # Do not duplicate here
+                        pass
+                else:
+                    rebuilt.append(item)
 
-            # Append other groups after sections/calendars
-            final_tasks.extend(recurring_tasks)
-            final_tasks.extend(carry_over_tasks)
+            # Insert brand-new fetched calendar events after last calendar index, inheriting nearby section
+            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else (1 if section_tasks else 0)
+            inherited_section: Optional[str] = None
+            if insertion_index > 0 and insertion_index <= len(rebuilt):
+                prev = rebuilt[insertion_index - 1]
+                inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
+
+            new_ids_in_order = [gid for gid in fetched_ids if gid not in source_calendar_map]
+            new_items = []
+            for gid in new_ids_in_order:
+                ni = dict(fetched_by_id[gid])
+                ni['from_gcal'] = True
+                if inherited_section and not ni.get('section'):
+                    ni['section'] = inherited_section
+                new_items.append(ni)
+            if new_items:
+                rebuilt = rebuilt[:insertion_index] + new_items + rebuilt[insertion_index:]
+
+            # After placing calendar items, append recurring and carry-over manual tasks at the end
+            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks
 
             # Inputs from most recent schedule with inputs
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
