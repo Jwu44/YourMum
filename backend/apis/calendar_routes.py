@@ -806,8 +806,21 @@ def calendar_oauth_callback():
         client_id = os.getenv('GOOGLE_CLIENT_ID')
         client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
         redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
-        if not client_id or not client_secret or not redirect_uri:
-            return jsonify({"success": False, "error": "OAuth not configured"}), 500
+        if not client_id or not client_secret:
+            missing = []
+            if not client_id:
+                missing.append('GOOGLE_CLIENT_ID')
+            if not client_secret:
+                missing.append('GOOGLE_CLIENT_SECRET')
+            return jsonify({"success": False, "error": f"OAuth not configured: missing {' & '.join(missing)}"}), 500
+        if not redirect_uri:
+            # Derive redirect URI from incoming request headers (must match 'start' URL)
+            try:
+                scheme = request.headers.get('X-Forwarded-Proto') or request.scheme
+                host = request.headers.get('X-Forwarded-Host') or request.host
+                redirect_uri = f"{scheme}://{host}/api/calendar/oauth/callback"
+            except Exception:
+                return jsonify({"success": False, "error": "OAuth not configured: missing GOOGLE_CALENDAR_REDIRECT_URI"}), 500
 
         token_url = 'https://oauth2.googleapis.com/token'
         payload = {
@@ -854,6 +867,20 @@ def calendar_oauth_callback():
         except Exception:
             pass
 
+        # For UX: after successful callback, redirect back to app dashboard if Accept is text/html
+        accept_header = request.headers.get('Accept', '')
+        if 'text/html' in accept_header:
+            try:
+                app_base = os.getenv('APP_BASE_URL') or 'https://yourdai.app'
+            except Exception:
+                app_base = 'https://yourdai.app'
+            # Minimal HTML redirect fallback
+            return (
+                f"<html><head><meta http-equiv='refresh' content='0;url={app_base}/dashboard' /></head>"
+                f"<body><script>window.location.href='{app_base}/dashboard'</script></body></html>",
+                200,
+                {"Content-Type": "text/html"}
+            )
         return jsonify({"success": True})
     except Exception as e:
         print(f"Error in calendar OAuth callback: {e}")
