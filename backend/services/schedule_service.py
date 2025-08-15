@@ -905,14 +905,13 @@ class ScheduleService:
                 except Exception:
                     first_section_text = None
 
-            # Incomplete non-recurring from source (exclude calendar-origin tasks)
+            # Incomplete tasks from source (including incomplete recurring tasks)
             source_tasks = source_schedule.get('schedule', [])
             carry_over_tasks: List[Dict[str, Any]] = []
             carry_over_calendar_tasks: List[Dict[str, Any]] = []
+            carried_over_recurring_texts: set = set()  # Track carried over recurring tasks
             for task in source_tasks:
                 if task.get('is_section', False) or task.get('type') == 'section':
-                    continue
-                if task.get('is_recurring'):
                     continue
                 if task.get('completed', False):
                     continue
@@ -934,9 +933,13 @@ class ScheduleService:
                     if 'type' not in new_task:
                         new_task['type'] = 'task'
                     carry_over_tasks.append(new_task)
+                    
+                    # Track if this is a recurring task being carried over
+                    if task.get('is_recurring'):
+                        carried_over_recurring_texts.add(task.get('text', ''))
 
-            # Recurring tasks due on target date
-            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
+            # Recurring tasks due on target date (exclude ones already carried over)
+            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date, exclude_texts=carried_over_recurring_texts)
 
             # Fetch calendar tasks for target date with sub-timeout to respect 10s UX
             fetched_calendar_tasks: List[Dict[str, Any]] = []
@@ -996,6 +999,9 @@ class ScheduleService:
                     continue
                 # Skip completed tasks from source schedule
                 if item.get('completed', False):
+                    continue
+                # Skip recurring tasks from rebuilt (they're handled by carry-over logic)
+                if item.get('is_recurring'):
                     continue
                 if item.get('from_gcal', False):
                     gid = item.get('gcal_event_id')
@@ -1289,7 +1295,8 @@ class ScheduleService:
         self, 
         user_id: str, 
         target_date: str, 
-        max_days_back: int = 30
+        max_days_back: int = 30,
+        exclude_texts: set = None
     ) -> List[Dict[str, Any]]:
         """
         Find all recurring tasks that should occur on the target date.
@@ -1299,6 +1306,7 @@ class ScheduleService:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format
             max_days_back: Maximum number of days to search back for recurring tasks
+            exclude_texts: Set of task texts to exclude (for tasks already carried over)
             
         Returns:
             List of recurring task objects that should occur on target date
@@ -1307,6 +1315,7 @@ class ScheduleService:
             target_dt = datetime.strptime(target_date, '%Y-%m-%d')
             recurring_tasks = []
             seen_task_texts = set()  # Prevent duplicates
+            exclude_texts = exclude_texts or set()  # Default to empty set if None
             
             # Search backwards through recent schedules
             for days_back in range(1, max_days_back + 1):
@@ -1323,9 +1332,11 @@ class ScheduleService:
                     
                     # Check each task for recurrence
                     for task in schedule_tasks:
+                        task_text = task.get('text', '')
                         if (task.get('is_recurring') and 
                             not task.get('is_section', False) and
-                            task.get('text') not in seen_task_texts):
+                            task_text not in seen_task_texts and
+                            task_text not in exclude_texts):
                             
                             if self._should_task_recur_on_date(task, target_dt):
                                 # Create a copy of the task for the new date
@@ -1336,7 +1347,7 @@ class ScheduleService:
                                     "completed": False  # Reset completion status
                                 }
                                 recurring_tasks.append(recurring_task)
-                                seen_task_texts.add(task.get('text'))
+                                seen_task_texts.add(task_text)
                                 
             print(f"Found {len(recurring_tasks)} recurring tasks for {target_date}")
             return recurring_tasks
