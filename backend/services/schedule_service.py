@@ -169,12 +169,9 @@ class ScheduleService:
         calendar_tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Create or merge calendar tasks into existing schedule with a preservation-first strategy.
-        - Keep non-calendar tasks untouched
-        - If fetched calendar list is empty: preserve existing calendar tasks (non-destructive)
-        - Otherwise: upsert fetched events by gcal_event_id, preserving existing ID and completion,
-          updating Google-sourced fields (text, start_time, end_time, start_date). Preserve all
-          existing calendar tasks not present in the fetched set.
+        Create initial schedule from Google Calendar for first-time users.
+        This method focuses on initial schedule creation only.
+        If a schedule already exists, delegates to apply_calendar_webhook_update for proper position preservation.
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -188,114 +185,51 @@ class ScheduleService:
         try:
             formatted_date = format_schedule_date(date)
             
-            # Check if schedule exists
+            # Check if schedule exists - delegate to webhook handler if it does
             existing_schedule = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
             })
             
             if existing_schedule:
-                # Non-destructive merge strategy:
-                # - Keep non-calendar tasks untouched
-                # - If fetched calendar list is empty: preserve existing calendar tasks (no DB write)
-                # - Otherwise: upsert fetched by gcal_event_id, preserving ID/completed and updating text/times
-                existing_tasks = existing_schedule.get('schedule', [])
-                non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
-                existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
-
-                # Normalize incoming tasks as calendar tasks with required fields
-                normalized_incoming_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
-
-                # If incoming list is empty, leave existing calendar tasks untouched
-                if len(normalized_incoming_calendar_tasks) == 0:
-                    final_tasks = existing_calendar_tasks + non_calendar_tasks
-                    # Do not update DB to avoid unnecessary writes; return current state
-                    metadata = self._calculate_schedule_metadata(final_tasks)
-                    metadata.update({
-                        "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
-                        "lastModified": existing_schedule.get('metadata', {}).get('last_modified', ''),
-                        "source": existing_schedule.get('metadata', {}).get('source', 'calendar_sync'),
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
-                    })
-                    return True, {
-                        "schedule": final_tasks,
-                        "date": date,
-                        "metadata": metadata
-                    }
-
-                # Use consolidated upsert logic
-                merged_calendar_tasks = self._upsert_calendar_tasks_by_id(
-                    existing_calendar_tasks,
-                    normalized_incoming_calendar_tasks,
-                    date
-                )
-                final_tasks = merged_calendar_tasks + non_calendar_tasks
-
-                # Update existing schedule with merged calendar tasks at top
-                existing_metadata = existing_schedule.get('metadata', {})
-                update_doc = {
-                    "schedule": final_tasks,
-                    "metadata": {
-                        **existing_metadata,
-                        "last_modified": format_timestamp(),
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in merged_calendar_tasks if t.get('from_gcal', False)]),
-                        "source": "calendar_sync"
-                    }
-                }
-
-                # Validate before updating
-                temp_doc = {**existing_schedule, **update_doc}
-                # Ensure date is in canonical format for validation
-                temp_doc["date"] = formatted_date
-                is_valid, validation_error = validate_schedule_document(temp_doc)
-                if not is_valid:
-                    return False, {"error": f"Schedule validation failed: {validation_error}"}
-
-                # Update database (treat no-op as success to avoid false failure)
-                self.schedules_collection.update_one(
-                    {"userId": user_id, "date": formatted_date},
-                    {"$set": update_doc}
-                )
-                
-            else:
-                # Create new schedule with calendar tasks only
-                new_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
-                
-                schedule_document = self._create_schedule_document(
-                    user_id=user_id,
-                    date=date,
-                    tasks=new_calendar_tasks,
-                    source="calendar_sync"
-                )
-                
-                # Add calendar-specific metadata
-                schedule_document["metadata"].update({
-                    "calendarSynced": True,
-                    "calendarEvents": len(new_calendar_tasks)
-                })
-                
-                # Validate and insert
-                is_valid, validation_error = validate_schedule_document(schedule_document)
-                if not is_valid:
-                    return False, {"error": f"Schedule validation failed: {validation_error}"}
-                
-                result = self.schedules_collection.insert_one(schedule_document)
-                final_tasks = new_calendar_tasks
+                # Delegate to webhook method for proper position preservation
+                return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+            
+            # Create new schedule with calendar tasks only (first-time user flow)
+            new_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
+            
+            schedule_document = self._create_schedule_document(
+                user_id=user_id,
+                date=date,
+                tasks=new_calendar_tasks,
+                source="calendar_sync"
+            )
+            
+            # Add calendar-specific metadata
+            schedule_document["metadata"].update({
+                "calendarSynced": True,
+                "calendarEvents": len(new_calendar_tasks)
+            })
+            
+            # Validate and insert
+            is_valid, validation_error = validate_schedule_document(schedule_document)
+            if not is_valid:
+                return False, {"error": f"Schedule validation failed: {validation_error}"}
+            
+            self.schedules_collection.insert_one(schedule_document)
             
             # Calculate metadata for response
-            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata = self._calculate_schedule_metadata(new_calendar_tasks)
             metadata.update({
                 "generatedAt": format_timestamp(),
                 "lastModified": format_timestamp(),
                 "source": "calendar_sync",
                 "calendarSynced": True,
-                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                "calendarEvents": len(new_calendar_tasks)
             })
             
             return True, {
-                "schedule": final_tasks,
+                "schedule": new_calendar_tasks,
                 "date": date,
                 "metadata": metadata
             }
