@@ -339,38 +339,9 @@ class ScheduleService:
             tasks_with_gcal_id = [task for task in calendar_tasks if task.get('gcal_event_id')]
             normalized_incoming = self._normalize_calendar_tasks(tasks_with_gcal_id, date)
 
-            if len(normalized_incoming) == 0:
-                final_tasks = existing_calendar_tasks + non_calendar_tasks
-                metadata = self._calculate_schedule_metadata(final_tasks)
-                if existing_schedule:
-                    metadata.update({
-                        "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
-                        "lastModified": existing_schedule.get('metadata', {}).get('last_modified', ''),
-                        "source": existing_schedule.get('metadata', {}).get('source', 'calendar_sync'),
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
-                    })
-                else:
-                    metadata.update({
-                        "generatedAt": format_timestamp(),
-                        "lastModified": format_timestamp(),
-                        "source": "calendar_sync",
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
-                    })
-                return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+            # Remove problematic early return - let all cases flow through robust position preservation logic
 
-            # Map existing calendar tasks by gcal_event_id (include those missing id in a separate list)
-            existing_by_id: Dict[str, Dict[str, Any]] = {}
-            existing_without_id: List[Dict[str, Any]] = []
-            for t in existing_calendar_tasks:
-                gid = t.get('gcal_event_id')
-                if gid:
-                    existing_by_id[gid] = t
-                else:
-                    existing_without_id.append(t)
-
-            fetched_ids = [t.get('gcal_event_id') for t in normalized_incoming if t.get('gcal_event_id')]
+            # Use helper methods consistently for all webhook scenarios
 
             # Use consolidated upsert logic
             upserted_calendar = self._upsert_calendar_tasks_by_id(
