@@ -987,11 +987,15 @@ class ScheduleService:
             fetched_ids = set(fetched_by_id.keys())
 
             # Rebuild from source order: replace existing calendar items with today's updates
+            # Filter out completed tasks from the source schedule when rebuilding
             rebuilt: List[Dict[str, Any]] = []
             last_calendar_index = -1
             for item in source_tasks:
                 if item.get('is_section', False) or item.get('type') == 'section':
                     rebuilt.append(item)
+                    continue
+                # Skip completed tasks from source schedule
+                if item.get('completed', False):
                     continue
                 if item.get('from_gcal', False):
                     gid = item.get('gcal_event_id')
