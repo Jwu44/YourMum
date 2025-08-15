@@ -1030,10 +1030,20 @@ class ScheduleService:
                     ni['section'] = inherited_section
                 new_items.append(ni)
             if new_items:
-                rebuilt = rebuilt[:insertion_index] + new_items + rebuilt[insertion_index:]
+                # Sort new calendar items by time before inserting
+                sorted_new_items = self._sort_calendar_block(new_items)
+                rebuilt = rebuilt[:insertion_index] + sorted_new_items + rebuilt[insertion_index:]
 
-            # After placing calendar items, append recurring and carry-over manual tasks at the end
-            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks
+            # Filter carry_over_calendar_tasks to exclude events already handled in rebuilt section
+            filtered_carry_over_calendar = []
+            for carry_task in carry_over_calendar_tasks:
+                carry_gcal_id = carry_task.get('gcal_event_id')
+                # Only include if this event was not fetched for today (i.e., not in fetched_ids)
+                if carry_gcal_id and carry_gcal_id not in fetched_ids:
+                    filtered_carry_over_calendar.append(carry_task)
+
+            # After placing calendar items, append recurring and carry-over tasks at the end
+            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks + filtered_carry_over_calendar
 
             # Inputs from most recent schedule with inputs
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
