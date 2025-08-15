@@ -224,48 +224,12 @@ class ScheduleService:
                         "metadata": metadata
                     }
 
-                # Upsert fetched by gcal_event_id, preserving existing ID and completion
-                existing_by_id: Dict[str, Dict[str, Any]] = {}
-                for t in existing_calendar_tasks:
-                    gid = t.get('gcal_event_id')
-                    if gid:
-                        existing_by_id[gid] = t
-
-                fetched_ids = {t.get('gcal_event_id') for t in normalized_incoming_calendar_tasks if t.get('gcal_event_id')}
-
-                upserted_calendar: List[Dict[str, Any]] = []
-                for inc in normalized_incoming_calendar_tasks:
-                    gid = inc.get('gcal_event_id')
-                    if not gid:
-                        continue
-                    if gid in existing_by_id:
-                        current = existing_by_id[gid]
-                        merged_item = {**current}
-                        # Update Google-sourced fields while preserving local ID and completion
-                        merged_item['text'] = inc.get('text', merged_item.get('text'))
-                        merged_item['start_time'] = inc.get('start_time', merged_item.get('start_time'))
-                        merged_item['end_time'] = inc.get('end_time', merged_item.get('end_time'))
-                        merged_item['start_date'] = date
-                        merged_item['from_gcal'] = True
-                        if 'type' not in merged_item:
-                            merged_item['type'] = 'task'
-                        upserted_calendar.append(merged_item)
-                    else:
-                        new_item = dict(inc)
-                        new_item['from_gcal'] = True
-                        if 'type' not in new_item:
-                            new_item['type'] = 'task'
-                        new_item['start_date'] = date
-                        upserted_calendar.append(new_item)
-
-                # Preserve all existing calendar tasks not present in fetched set (completed and incomplete)
-                preserved_existing = []
-                for t in existing_calendar_tasks:
-                    gid = t.get('gcal_event_id')
-                    if not gid or gid not in fetched_ids:
-                        preserved_existing.append(t)
-
-                merged_calendar_tasks = upserted_calendar + preserved_existing
+                # Use consolidated upsert logic
+                merged_calendar_tasks = self._upsert_calendar_tasks_by_id(
+                    existing_calendar_tasks,
+                    normalized_incoming_calendar_tasks,
+                    date
+                )
                 final_tasks = merged_calendar_tasks + non_calendar_tasks
 
                 # Update existing schedule with merged calendar tasks at top
@@ -408,104 +372,21 @@ class ScheduleService:
 
             fetched_ids = [t.get('gcal_event_id') for t in normalized_incoming if t.get('gcal_event_id')]
 
-            # Upsert fetched events preserving ID and completion
-            upserted_calendar: List[Dict[str, Any]] = []
-            for inc in normalized_incoming:
-                gid = inc.get('gcal_event_id')
-                if not gid:
-                    continue  # safety; should be filtered already
-                if gid in existing_by_id:
-                    current = existing_by_id[gid]
-                    merged = {**current}
-                    # Preserve ID and completion and user edits; update Google-sourced fields
-                    merged['text'] = inc.get('text', merged.get('text'))
-                    merged['start_time'] = inc.get('start_time', merged.get('start_time'))
-                    merged['end_time'] = inc.get('end_time', merged.get('end_time'))
-                    merged['start_date'] = date
-                    merged['from_gcal'] = True
-                    if 'type' not in merged:
-                        merged['type'] = 'task'
-                    upserted_calendar.append(merged)
-                else:
-                    # New incoming event
-                    new_item = dict(inc)
-                    new_item['from_gcal'] = True
-                    if 'type' not in new_item:
-                        new_item['type'] = 'task'
-                    # Ensure date alignment
-                    new_item['start_date'] = date
-                    upserted_calendar.append(new_item)
+            # Use consolidated upsert logic
+            upserted_calendar = self._upsert_calendar_tasks_by_id(
+                existing_calendar_tasks,
+                normalized_incoming,
+                date
+            )
+            
+            fetched_id_set = {task.get('gcal_event_id') for task in normalized_incoming if task.get('gcal_event_id')}
 
-            # Preserve all existing calendar tasks not present in fetched set (completed and incomplete)
-            fetched_id_set = set(fetched_ids)
-            preserved_existing = []
-            for t in existing_calendar_tasks:
-                gid = t.get('gcal_event_id')
-                if not gid or gid not in fetched_id_set:
-                    preserved_existing.append(t)
-
-            # Preserve relative positions of existing calendar events.
-            # Strategy:
-            # 1) Build a map of existing calendar tasks by gcal_event_id
-            # 2) Walk the existing_tasks in order. For each item:
-            #    - If it's an existing calendar task and present in upserted_calendar, use the upserted copy in place
-            #    - If it's an existing calendar task not present in fetched set, keep it as is
-            #    - If it's a non-calendar task, include for now (filtered later for duplicates)
-            # 3) After the walk, append any brand-new calendar tasks (those not in existing list) immediately
-            #    after the last existing calendar task block to maintain grouping under the same section.
-
-            existing_calendar_map: Dict[str, Dict[str, Any]] = {}
-            for t in existing_calendar_tasks:
-                gid = t.get('gcal_event_id')
-                if gid:
-                    existing_calendar_map[gid] = t
-
-            upserted_by_id: Dict[str, Dict[str, Any]] = {}
-            new_calendar_ids: List[str] = []
-            for t in upserted_calendar:
-                gid = t.get('gcal_event_id')
-                if not gid:
-                    continue
-                upserted_by_id[gid] = t
-                if gid not in existing_calendar_map:
-                    new_calendar_ids.append(gid)
-
-            # Rebuild list preserving order of existing items
-            rebuilt: List[Dict[str, Any]] = []
-            last_calendar_index = -1
-            for item in existing_tasks:
-                if item.get('from_gcal', False):
-                    gid = item.get('gcal_event_id')
-                    if gid and gid in upserted_by_id:
-                        merged_copy = dict(upserted_by_id[gid])
-                        # Preserve the original section placement if present
-                        if item.get('section') and not merged_copy.get('section'):
-                            merged_copy['section'] = item.get('section')
-                        rebuilt.append(merged_copy)
-                    else:
-                        rebuilt.append(item)
-                    last_calendar_index = len(rebuilt) - 1
-                else:
-                    rebuilt.append(item)
-
-            # Insert brand-new calendar tasks right after the last existing calendar item
-            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else 0
-            new_items: List[Dict[str, Any]] = []
-            # Determine inherited section once based on element before insertion
-            inherited_section: Optional[str] = None
-            if insertion_index > 0:
-                try:
-                    prev = rebuilt[insertion_index - 1]
-                    inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
-                except Exception:
-                    inherited_section = None
-            for gid in new_calendar_ids:
-                new_item = dict(upserted_by_id[gid])
-                if inherited_section and not new_item.get('section'):
-                    new_item['section'] = inherited_section
-                new_items.append(new_item)
-            if new_items:
-                rebuilt = rebuilt[:insertion_index] + new_items + rebuilt[insertion_index:]
+            # Use consolidated position preservation logic
+            rebuilt = self._rebuild_tasks_preserving_calendar_positions(
+                existing_tasks,
+                upserted_calendar,
+                fetched_id_set
+            )
 
             # Deduplicate in-place while preserving order of the rebuilt list
             try:
@@ -1573,6 +1454,184 @@ class ScheduleService:
         }
         
         return processed_inputs
+
+    def _upsert_calendar_tasks_by_id(
+        self, 
+        existing_calendar_tasks: List[Dict[str, Any]], 
+        incoming_calendar_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Upsert calendar tasks by gcal_event_id, preserving local state.
+        
+        Consolidates calendar task upserting logic used across multiple methods.
+        
+        Args:
+            existing_calendar_tasks: Current calendar tasks in schedule
+            incoming_calendar_tasks: Fresh calendar tasks from Google Calendar API
+            target_date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            List of merged calendar tasks with preserved local state
+        """
+        if not incoming_calendar_tasks:
+            return existing_calendar_tasks
+            
+        # Normalize incoming tasks
+        normalized_incoming = self._normalize_calendar_tasks(incoming_calendar_tasks, target_date)
+        
+        # Map existing calendar tasks by gcal_event_id
+        existing_by_id: Dict[str, Dict[str, Any]] = {}
+        existing_without_id: List[Dict[str, Any]] = []
+        for task in existing_calendar_tasks:
+            gid = task.get('gcal_event_id')
+            if gid:
+                existing_by_id[gid] = task
+            else:
+                existing_without_id.append(task)
+        
+        fetched_ids = {task.get('gcal_event_id') for task in normalized_incoming if task.get('gcal_event_id')}
+        
+        # Upsert incoming tasks
+        upserted_calendar: List[Dict[str, Any]] = []
+        for incoming in normalized_incoming:
+            gid = incoming.get('gcal_event_id')
+            if not gid:
+                continue
+                
+            if gid in existing_by_id:
+                # Update existing task while preserving local state
+                existing_task = existing_by_id[gid]
+                merged_task = {**existing_task}
+                
+                # Update Google-sourced fields
+                merged_task['text'] = incoming.get('text', merged_task.get('text'))
+                merged_task['start_time'] = incoming.get('start_time', merged_task.get('start_time'))
+                merged_task['end_time'] = incoming.get('end_time', merged_task.get('end_time'))
+                merged_task['start_date'] = target_date
+                merged_task['from_gcal'] = True
+                
+                if 'type' not in merged_task:
+                    merged_task['type'] = 'task'
+                    
+                upserted_calendar.append(merged_task)
+            else:
+                # New calendar task
+                new_task = dict(incoming)
+                new_task['from_gcal'] = True
+                new_task['start_date'] = target_date
+                if 'type' not in new_task:
+                    new_task['type'] = 'task'
+                if 'id' not in new_task:
+                    new_task['id'] = str(uuid.uuid4())
+                    
+                upserted_calendar.append(new_task)
+        
+        # Preserve existing calendar tasks not present in fetched set
+        preserved_existing = []
+        for task in existing_calendar_tasks:
+            gid = task.get('gcal_event_id')
+            if not gid or gid not in fetched_ids:
+                # Ensure preserved tasks also have correct date and required fields
+                preserved_task = dict(task)
+                preserved_task['start_date'] = target_date
+                preserved_task['from_gcal'] = True
+                if 'type' not in preserved_task:
+                    preserved_task['type'] = 'task'
+                preserved_existing.append(preserved_task)
+        
+        return upserted_calendar + preserved_existing
+
+    def _rebuild_tasks_preserving_calendar_positions(
+        self, 
+        source_tasks: List[Dict[str, Any]], 
+        upserted_calendar: List[Dict[str, Any]], 
+        fetched_calendar_ids: set
+    ) -> List[Dict[str, Any]]:
+        """
+        Rebuild task list preserving relative positions of calendar events.
+        
+        Consolidates position preservation logic used across multiple methods.
+        
+        Args:
+            source_tasks: Original task list with existing positions
+            upserted_calendar: Calendar tasks after upserting
+            fetched_calendar_ids: Set of gcal_event_ids that were fetched
+            
+        Returns:
+            Rebuilt task list with preserved positions
+        """
+        if not source_tasks and not upserted_calendar:
+            return []
+            
+        # Map calendar tasks by gcal_event_id
+        existing_calendar_map: Dict[str, Dict[str, Any]] = {}
+        for task in source_tasks:
+            if task.get('from_gcal', False):
+                gid = task.get('gcal_event_id')
+                if gid:
+                    existing_calendar_map[gid] = task
+        
+        upserted_by_id: Dict[str, Dict[str, Any]] = {}
+        new_calendar_ids: List[str] = []
+        for task in upserted_calendar:
+            gid = task.get('gcal_event_id')
+            if gid:
+                upserted_by_id[gid] = task
+                if gid not in existing_calendar_map:
+                    new_calendar_ids.append(gid)
+        
+        # Rebuild list preserving order of existing items
+        rebuilt: List[Dict[str, Any]] = []
+        last_calendar_index = -1
+        
+        for item in source_tasks:
+            if item.get('from_gcal', False):
+                gid = item.get('gcal_event_id')
+                if gid and gid in upserted_by_id:
+                    # Replace with updated version
+                    updated_task = dict(upserted_by_id[gid])
+                    # Preserve section assignment from original
+                    if item.get('section') and not updated_task.get('section'):
+                        updated_task['section'] = item.get('section')
+                    rebuilt.append(updated_task)
+                else:
+                    # Keep existing calendar task (not in current fetch)
+                    rebuilt.append(item)
+                last_calendar_index = len(rebuilt) - 1
+            else:
+                # Non-calendar task - keep as is
+                rebuilt.append(item)
+        
+        # Insert brand-new calendar tasks after last existing calendar item
+        if new_calendar_ids:
+            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else 0
+            
+            # Determine inherited section for new items
+            inherited_section: Optional[str] = None
+            if insertion_index > 0 and insertion_index <= len(rebuilt):
+                try:
+                    prev_item = rebuilt[insertion_index - 1]
+                    if not prev_item.get('is_section', False):
+                        inherited_section = prev_item.get('section')
+                    else:
+                        inherited_section = prev_item.get('text')
+                except (IndexError, KeyError):
+                    inherited_section = None
+            
+            # Add new calendar items
+            new_items: List[Dict[str, Any]] = []
+            for gid in new_calendar_ids:
+                new_item = dict(upserted_by_id[gid])
+                if inherited_section and not new_item.get('section'):
+                    new_item['section'] = inherited_section
+                new_items.append(new_item)
+            
+            # Sort new calendar items by time before inserting
+            sorted_new_items = self._sort_calendar_block(new_items)
+            rebuilt = rebuilt[:insertion_index] + sorted_new_items + rebuilt[insertion_index:]
+        
+        return rebuilt
 
 
 # Create singleton instance for import
