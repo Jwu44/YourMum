@@ -114,17 +114,8 @@ class ScheduleService:
             schedule data on success or error message on failure
         """
         try:
-            # Prepare inputs with safe defaults
-            processed_inputs = {
-                "name": inputs.get('name', ''),
-                "work_start_time": inputs.get('work_start_time', ''),
-                "work_end_time": inputs.get('work_end_time', ''),
-                "working_days": inputs.get('working_days', []),
-                "energy_patterns": inputs.get('energy_patterns', []),
-                "priorities": inputs.get('priorities', {}),
-                "layout_preference": inputs.get('layout_preference', {}),
-                "tasks": inputs.get('tasks', [])
-            }
+            # Process inputs with safe defaults
+            processed_inputs = self._process_schedule_inputs(inputs)
             
             # Create schedule document using centralized helper
             schedule_document = self._create_schedule_document(
@@ -136,9 +127,12 @@ class ScheduleService:
             )
             
             # Validate document before storage
-            is_valid, validation_error = validate_schedule_document(schedule_document)
+            is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
+                schedule_document, user_id, date
+            )
             if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
+                return False, {"error": error_msg}
+            schedule_document = validated_document
             
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
@@ -206,17 +200,11 @@ class ScheduleService:
                 # - If fetched calendar list is empty: preserve existing calendar tasks (no DB write)
                 # - Otherwise: upsert fetched by gcal_event_id, preserving ID/completed and updating text/times
                 existing_tasks = existing_schedule.get('schedule', [])
-                non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
-                existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
+                non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
+                existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
 
                 # Normalize incoming tasks as calendar tasks with required fields
-                normalized_incoming_calendar_tasks: List[Dict[str, Any]] = []
-                for task in calendar_tasks:
-                    calendar_task = dict(task)
-                    calendar_task['from_gcal'] = True
-                    if 'type' not in calendar_task:
-                        calendar_task['type'] = 'task'
-                    normalized_incoming_calendar_tasks.append(calendar_task)
+                normalized_incoming_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
 
                 # If incoming list is empty, leave existing calendar tasks untouched
                 if len(normalized_incoming_calendar_tasks) == 0:
@@ -309,14 +297,7 @@ class ScheduleService:
                 
             else:
                 # Create new schedule with calendar tasks only
-                new_calendar_tasks = []
-                for task in calendar_tasks:
-                    calendar_task = dict(task)
-                    calendar_task['from_gcal'] = True
-                    # Ensure required fields for validation
-                    if 'type' not in calendar_task:
-                        calendar_task['type'] = 'task'
-                    new_calendar_tasks.append(calendar_task)
+                new_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
                 
                 schedule_document = self._create_schedule_document(
                     user_id=user_id,
@@ -386,20 +367,13 @@ class ScheduleService:
             })
 
             existing_tasks: List[Dict[str, Any]] = existing_schedule.get('schedule', []) if existing_schedule else []
-            non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
-            existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
+            non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
+            existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
 
             # If incoming list is empty, return current state non-destructively
-            normalized_incoming: List[Dict[str, Any]] = []
-            for task in calendar_tasks:
-                # Skip any task lacking a gcal_event_id (avoid duplicates)
-                if not task.get('gcal_event_id'):
-                    continue
-                new_task = dict(task)
-                new_task['from_gcal'] = True
-                if 'type' not in new_task:
-                    new_task['type'] = 'task'
-                normalized_incoming.append(new_task)
+            # Filter out tasks without gcal_event_id to avoid duplicates
+            tasks_with_gcal_id = [task for task in calendar_tasks if task.get('gcal_event_id')]
+            normalized_incoming = self._normalize_calendar_tasks(tasks_with_gcal_id, date)
 
             if len(normalized_incoming) == 0:
                 final_tasks = existing_calendar_tasks + non_calendar_tasks
@@ -691,9 +665,12 @@ class ScheduleService:
             )
             
             # Validate document before storage
-            is_valid, validation_error = validate_schedule_document(schedule_document)
+            is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
+                schedule_document, user_id, date
+            )
             if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
+                return False, {"error": error_msg}
+            schedule_document = validated_document
             
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
@@ -1441,7 +1418,7 @@ class ScheduleService:
         Returns:
             Dictionary containing calculated metadata
         """
-        non_section_tasks = [t for t in tasks if not t.get('is_section', False)]
+        non_section_tasks = self._filter_non_section_tasks(tasks)
         calendar_events = [t for t in tasks if t.get('gcal_event_id')]
         recurring_tasks = [t for t in tasks if t.get('is_recurring')]
 
@@ -1451,6 +1428,151 @@ class ScheduleService:
             "recurringTasks": len(recurring_tasks),
             "generatedAt": format_timestamp()
         }
+
+    def _normalize_calendar_tasks(
+        self, 
+        calendar_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Normalize calendar tasks with required fields and date alignment.
+        
+        Args:
+            calendar_tasks: List of calendar task objects to normalize
+            target_date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            List of normalized calendar task objects
+        """
+        normalized_tasks = []
+        
+        for task in calendar_tasks:
+            normalized_task = dict(task)
+            normalized_task['from_gcal'] = True
+            normalized_task['start_date'] = target_date
+            
+            # Set type if not already present
+            if 'type' not in normalized_task:
+                normalized_task['type'] = 'task'
+                
+            normalized_tasks.append(normalized_task)
+            
+        return normalized_tasks
+
+    def _filter_calendar_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter tasks that are from Google Calendar.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of calendar task objects
+        """
+        return [task for task in tasks if task.get('from_gcal', False)]
+
+    def _filter_non_calendar_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter tasks that are not from Google Calendar.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of non-calendar task objects
+        """
+        return [task for task in tasks if not task.get('from_gcal', False)]
+
+    def _filter_section_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter section tasks from task list.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of section task objects
+        """
+        return [task for task in tasks if task.get('is_section', False) or task.get('type') == 'section']
+
+    def _filter_non_section_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter non-section tasks from task list.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of non-section task objects
+        """
+        return [task for task in tasks if not task.get('is_section', False) and task.get('type') != 'section']
+
+    def _validate_and_prepare_schedule_document(
+        self, 
+        base_document: Dict[str, Any], 
+        user_id: str, 
+        date: str
+    ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Validate schedule document and prepare for database storage.
+        
+        Consolidates validation logic used across multiple schedule creation methods.
+        
+        Args:
+            base_document: Base schedule document to validate
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Tuple of (is_valid: bool, error_message: Optional[str], prepared_document: Optional[Dict])
+        """
+        try:
+            # Create a copy for preparation
+            prepared_doc = dict(base_document)
+            
+            # Ensure date is in canonical format
+            formatted_date = format_schedule_date(date)
+            prepared_doc["date"] = formatted_date
+            prepared_doc["userId"] = user_id
+            
+            # Validate document structure
+            is_valid, validation_error = validate_schedule_document(prepared_doc)
+            if not is_valid:
+                return False, f"Schedule validation failed: {validation_error}", None
+                
+            return True, None, prepared_doc
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}", None
+
+    def _process_schedule_inputs(self, raw_inputs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Process and sanitize user inputs with safe defaults.
+        
+        Consolidates input processing logic used across schedule creation methods.
+        
+        Args:
+            raw_inputs: Raw user input data (can be None or incomplete)
+            
+        Returns:
+            Dictionary with processed inputs and safe defaults
+        """
+        if raw_inputs is None:
+            raw_inputs = {}
+            
+        # Prepare inputs with safe defaults and type checking
+        processed_inputs = {
+            "name": raw_inputs.get('name', '') if raw_inputs.get('name') is not None else '',
+            "work_start_time": raw_inputs.get('work_start_time', '') if raw_inputs.get('work_start_time') is not None else '',
+            "work_end_time": raw_inputs.get('work_end_time', '') if raw_inputs.get('work_end_time') is not None else '',
+            "working_days": raw_inputs.get('working_days', []) if isinstance(raw_inputs.get('working_days'), list) else [],
+            "energy_patterns": raw_inputs.get('energy_patterns', []) if isinstance(raw_inputs.get('energy_patterns'), list) else [],
+            "priorities": raw_inputs.get('priorities', {}) if isinstance(raw_inputs.get('priorities'), dict) else {},
+            "layout_preference": raw_inputs.get('layout_preference', {}) if isinstance(raw_inputs.get('layout_preference'), dict) else {},
+            "tasks": raw_inputs.get('tasks', []) if isinstance(raw_inputs.get('tasks'), list) else []
+        }
+        
+        return processed_inputs
 
 
 # Create singleton instance for import
