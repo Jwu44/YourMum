@@ -1456,7 +1456,8 @@ class ScheduleService:
         """
         Rebuild task list preserving relative positions of calendar events.
         
-        Consolidates position preservation logic used across multiple methods.
+        Strategy: Keep all existing items in their original positions, only insert 
+        new calendar events at the top (after sections) to avoid grouping existing events.
         
         Args:
             source_tasks: Original task list with existing positions
@@ -1469,7 +1470,7 @@ class ScheduleService:
         if not source_tasks and not upserted_calendar:
             return []
             
-        # Map calendar tasks by gcal_event_id
+        # Map calendar tasks by gcal_event_id for easy lookup
         existing_calendar_map: Dict[str, Dict[str, Any]] = {}
         for task in source_tasks:
             if task.get('from_gcal', False):
@@ -1478,65 +1479,75 @@ class ScheduleService:
                     existing_calendar_map[gid] = task
         
         upserted_by_id: Dict[str, Dict[str, Any]] = {}
-        new_calendar_ids: List[str] = []
+        new_calendar_tasks: List[Dict[str, Any]] = []
         for task in upserted_calendar:
             gid = task.get('gcal_event_id')
             if gid:
                 upserted_by_id[gid] = task
                 if gid not in existing_calendar_map:
-                    new_calendar_ids.append(gid)
+                    # This is a brand new calendar event
+                    new_calendar_tasks.append(task)
         
-        # Rebuild list preserving order of existing items
-        rebuilt: List[Dict[str, Any]] = []
-        last_calendar_index = -1
-        
+        # Step 1: Process existing tasks in their original positions
+        # Replace existing calendar events with updated versions, keep everything else as-is
+        updated_existing: List[Dict[str, Any]] = []
         for item in source_tasks:
             if item.get('from_gcal', False):
                 gid = item.get('gcal_event_id')
                 if gid and gid in upserted_by_id:
-                    # Replace with updated version
+                    # Replace with updated version while preserving position and section
                     updated_task = dict(upserted_by_id[gid])
-                    # Preserve section assignment from original
                     if item.get('section') and not updated_task.get('section'):
                         updated_task['section'] = item.get('section')
-                    rebuilt.append(updated_task)
+                    updated_existing.append(updated_task)
                 else:
                     # Keep existing calendar task (not in current fetch)
-                    rebuilt.append(item)
-                last_calendar_index = len(rebuilt) - 1
+                    updated_existing.append(item)
             else:
                 # Non-calendar task - keep as is
-                rebuilt.append(item)
+                updated_existing.append(item)
         
-        # Insert brand-new calendar tasks after last existing calendar item
-        if new_calendar_ids:
-            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else 0
+        # Step 2: Insert new calendar events at the top (after sections)
+        if not new_calendar_tasks:
+            return updated_existing
             
-            # Determine inherited section for new items
-            inherited_section: Optional[str] = None
-            if insertion_index > 0 and insertion_index <= len(rebuilt):
-                try:
-                    prev_item = rebuilt[insertion_index - 1]
-                    if not prev_item.get('is_section', False):
-                        inherited_section = prev_item.get('section')
-                    else:
-                        inherited_section = prev_item.get('text')
-                except (IndexError, KeyError):
-                    inherited_section = None
-            
-            # Add new calendar items
-            new_items: List[Dict[str, Any]] = []
-            for gid in new_calendar_ids:
-                new_item = dict(upserted_by_id[gid])
-                if inherited_section and not new_item.get('section'):
-                    new_item['section'] = inherited_section
-                new_items.append(new_item)
-            
-            # Sort new calendar items by time before inserting
-            sorted_new_items = self._sort_calendar_block(new_items)
-            rebuilt = rebuilt[:insertion_index] + sorted_new_items + rebuilt[insertion_index:]
+        # Find insertion point: after any leading sections but before other content
+        insertion_index = 0
+        inherited_section: Optional[str] = None
+        last_section_name: Optional[str] = None
         
-        return rebuilt
+        # Skip over leading sections and determine section inheritance
+        for i, item in enumerate(updated_existing):
+            if item.get('is_section', False) or item.get('type') == 'section':
+                insertion_index = i + 1
+                last_section_name = item.get('text')  # Remember the last section we saw
+            else:
+                # Found first non-section item - check if it has a section assigned
+                item_section = item.get('section')
+                if item_section:
+                    inherited_section = item_section
+                elif last_section_name:
+                    # If item doesn't have explicit section, use the last section we passed
+                    inherited_section = last_section_name
+                break
+        
+        # Prepare new calendar items with inherited section
+        prepared_new_items: List[Dict[str, Any]] = []
+        for new_task in new_calendar_tasks:
+            new_item = dict(new_task)
+            if inherited_section and not new_item.get('section'):
+                new_item['section'] = inherited_section
+            prepared_new_items.append(new_item)
+        
+        # Sort new calendar items by time before inserting
+        sorted_new_items = self._sort_calendar_block(prepared_new_items)
+        
+        # Insert new events at the determined position
+        final_tasks = (updated_existing[:insertion_index] + 
+                      sorted_new_items + 
+                      updated_existing[insertion_index:])
+        
+        return final_tasks
 
 
 # Create singleton instance for import
