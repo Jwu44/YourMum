@@ -814,6 +814,9 @@ class ScheduleService:
             # After placing calendar items, append recurring and carry-over tasks at the end
             final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks + filtered_carry_over_calendar
 
+            # Deduplicate tasks to fix Bug #5: prevent duplicate tasks when generating next day schedule
+            final_tasks = self._deduplicate_tasks(final_tasks, date)
+
             # Inputs from most recent schedule with inputs
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
             inputs = recent_with_inputs.get('inputs', {}) if recent_with_inputs else {}
@@ -1190,6 +1193,107 @@ class ScheduleService:
         else:
             # Days 29-31 are considered 'last' week
             return 'last'
+
+    def _deduplicate_tasks(
+        self, 
+        tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Deduplicate tasks based on text content, applying priority rules:
+        1. Calendar events (with gcal_event_id) take priority over manual tasks
+        2. Target date instances take priority over carryover instances
+        3. Preserve section assignments from the selected version
+        
+        Args:
+            tasks: List of tasks that may contain duplicates
+            target_date: Target date string for prioritization
+            
+        Returns:
+            List of deduplicated tasks
+        """
+        try:
+            if not tasks:
+                return []
+                
+            # Group tasks by text content
+            task_groups: Dict[str, List[Dict[str, Any]]] = {}
+            for task in tasks:
+                task_text = task.get('text', '').strip()
+                if not task_text:
+                    continue  # Skip tasks without text
+                    
+                if task_text not in task_groups:
+                    task_groups[task_text] = []
+                task_groups[task_text].append(task)
+            
+            deduplicated = []
+            
+            for task_text, duplicate_tasks in task_groups.items():
+                if len(duplicate_tasks) == 1:
+                    # No duplicates, keep the single task
+                    deduplicated.append(duplicate_tasks[0])
+                    continue
+                
+                # Apply priority rules to select the best task
+                selected_task = self._select_best_duplicate_task(duplicate_tasks, target_date)
+                deduplicated.append(selected_task)
+            
+            # Add tasks without text (sections, etc.) that weren't grouped
+            for task in tasks:
+                task_text = task.get('text', '').strip()
+                if not task_text:
+                    deduplicated.append(task)
+            
+            print(f"Deduplication: {len(tasks)} tasks -> {len(deduplicated)} tasks")
+            return deduplicated
+            
+        except Exception as e:
+            print(f"Error in task deduplication: {str(e)}")
+            traceback.print_exc()
+            # Return original tasks if deduplication fails
+            return tasks
+
+    def _select_best_duplicate_task(
+        self, 
+        duplicate_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> Dict[str, Any]:
+        """
+        Select the best task from a group of duplicates based on priority rules.
+        
+        Args:
+            duplicate_tasks: List of tasks with the same text
+            target_date: Target date string for prioritization
+            
+        Returns:
+            The selected task with highest priority
+        """
+        try:
+            # Priority 1: Calendar events (with gcal_event_id) over manual tasks
+            calendar_tasks = [t for t in duplicate_tasks if t.get('gcal_event_id')]
+            manual_tasks = [t for t in duplicate_tasks if not t.get('gcal_event_id')]
+            
+            # Prefer calendar tasks if available
+            candidates = calendar_tasks if calendar_tasks else manual_tasks
+            
+            # Priority 2: Target date instances over carryover instances
+            target_date_tasks = [t for t in candidates if t.get('start_date') == target_date]
+            
+            if target_date_tasks:
+                # If multiple target date tasks, prefer calendar events
+                final_candidates = [t for t in target_date_tasks if t.get('gcal_event_id')]
+                if not final_candidates:
+                    final_candidates = target_date_tasks
+                return final_candidates[0]  # Take first if multiple remain
+            else:
+                # No target date tasks, take first candidate
+                return candidates[0]
+                
+        except Exception as e:
+            print(f"Error selecting best duplicate task: {str(e)}")
+            # Return first task as fallback
+            return duplicate_tasks[0]
 
     def _calculate_schedule_metadata(
         self, 

@@ -44,7 +44,7 @@ I am facing a bug where the autogenerate() function is duplicating incomplete re
 # Current autogenerate response:
 {"created":true,"date":"2025-08-16","existed":false,"metadata":{"calendarEvents":4,"generatedAt":"2025-08-15T02:31:06.648219+00:00","lastModified":"2025-08-15T02:31:06.648239+00:00","recurringTasks":3,"source":"manual","totalTasks":7},"schedule":[{"categories":[],"completed":false,"end_time":"11:00","from_gcal":true,"gcal_event_id":"6asjk4j70u0idrh1557i0idu2g_20250815T220000Z","id":"6asjk4j70u0idrh1557i0idu2g_20250815T220000Z","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":0,"start_date":"2025-08-16","start_time":"08:00","text":"\ud83c\udfc3\u200d\u2642\ufe0fParkrun","type":"task"},{"categories":[],"completed":false,"end_time":"15:00","from_gcal":true,"gcal_event_id":"2qmm0chdup5aaku0vp8h4ktjj8_20250816T033000Z","id":"2qmm0chdup5aaku0vp8h4ktjj8_20250816T033000Z","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":0,"start_date":"2025-08-16","start_time":"13:30","text":"\ud83c\udfcb\ufe0fgym push v2","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"31a982e6-a2bb-481e-81b8-e65f55fd213f","is_recurring":{"dayOfWeek":"Monday","frequency":"daily"},"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":2,"start_date":"2025-08-15","start_time":"","text":"read fountainhead","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"90aeeee8-7af2-4232-9483-bd559162ebaa","is_recurring":{"dayOfWeek":"Monday","frequency":"daily"},"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":1,"start_date":"2025-08-16","start_time":"","text":"gym","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"e4eabab0-f1da-4e6c-84aa-ee42244f5aa9","is_recurring":{"dayOfWeek":"Monday","frequency":"daily"},"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":2,"start_date":"2025-08-16","start_time":"","text":"read fountainhead","type":"task"},{"categories":[],"completed":false,"end_time":"18:30","from_gcal":true,"gcal_event_id":"2oaa6k1uhi8fk1uqr2gka01t2h","id":"1545f484-33bb-4980-80ae-aff276435482","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":0,"start_date":"2025-08-16","start_time":"17:30","text":"haircut","type":"task"},{"categories":[],"completed":false,"end_time":"19:00","from_gcal":true,"gcal_event_id":"4b02qocptl3cotqe8lvfnbi9d4","id":"6708d0e4-b555-405d-901c-a90eb4dbc761","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":0,"start_date":"2025-08-16","start_time":"18:00","text":"fix sim card","type":"task"}],"sourceFound":true,"success":true}
 
-# Bug #4 - Status: To do
+# Bug #4 - Status: Done ✅
 I am facing a bug where the event_bus for handling google calendar events is inconsistent.
 
 # Steps to reproduce:
@@ -61,6 +61,20 @@ I am facing a bug where the event_bus for handling google calendar events is inc
 - syncing of google calendar events for today should be real time regardless of whether list has sections or not
 - should not have to manually refresh/reload the page to see synced tasks
 - for any synced google calendar tasks for today, preserve their most recent positon in the list so they are not grouped together with the calendar event added in real time
+
+# Fix Summary:
+**Root Cause**: Two architectural issues - (1) conflated responsibilities in calendar sync methods causing wrong webhook path usage, and (2) faulty position preservation logic that grouped all calendar events together when new events were added.
+
+**Solution**: 
+1. **Architectural Separation**: Implemented Single Responsibility Principle by refactoring `create_schedule_from_calendar_sync` to handle only initial schedule creation, delegating to `apply_calendar_webhook_update` for existing schedule updates
+2. **Position Preservation Fix**: Rewrote `_rebuild_tasks_preserving_calendar_positions` logic to insert new calendar events at top while preserving existing event positions (no more unwanted grouping)
+
+**Key Changes**:
+- `schedule_service.py:165-240`: Simplified calendar sync method with existence check and delegation pattern
+- `schedule_service.py:1450-1543`: Fixed position preservation to use "preserve existing positions, insert new at top" strategy instead of "insert after last calendar event" which caused grouping
+- Enhanced section-aware insertion with intelligent section inheritance
+
+**Result**: ✅ Real-time sync works, ✅ existing calendar events maintain positions, ✅ new events appear at top with proper section context
 
 # Bug #5 - Status: To do
 I am facing a bug where the autogenerate() function is duplicating incomplete tasks when generating the next day schedule
