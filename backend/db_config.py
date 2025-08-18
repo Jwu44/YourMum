@@ -190,6 +190,20 @@ def initialize_slack_collections():
         print(f"Error initializing Slack collections: {e}")
         raise
 
+def initialize_user_schedules_collection():
+    """Initialize user schedules collection with required indexes."""
+    try:
+        schedules = get_user_schedules_collection()
+        schedule_indexes = [
+            IndexModel([("userId", ASCENDING), ("date", ASCENDING)], unique=True),
+            IndexModel([("userId", ASCENDING), ("metadata.last_modified", DESCENDING)]),
+        ]
+        schedules.create_indexes(schedule_indexes)
+        print("User schedules collection initialized successfully")
+    except Exception as e:
+        print(f"Error initializing user schedules collection: {e}")
+        raise
+
 def initialize_archive_collections():
     """Initialize Archive collections and indexes."""
     try:
@@ -229,6 +243,7 @@ def initialize_db():
         initialize_calendar_collections()
         initialize_slack_collections()
         initialize_archive_collections()
+        initialize_user_schedules_collection()
 
         # Create or update collection with schema validation
         db = get_database()

@@ -38,7 +38,7 @@ class ScheduleService:
 
     def _get_calendar_fetch_timeout(self) -> float:
         """Sub-timeout in seconds for calendar fetch; override in tests if needed."""
-        return 8.0
+        return 10.0
 
     def get_schedule_by_date(
         self, 
@@ -114,17 +114,8 @@ class ScheduleService:
             schedule data on success or error message on failure
         """
         try:
-            # Prepare inputs with safe defaults
-            processed_inputs = {
-                "name": inputs.get('name', ''),
-                "work_start_time": inputs.get('work_start_time', ''),
-                "work_end_time": inputs.get('work_end_time', ''),
-                "working_days": inputs.get('working_days', []),
-                "energy_patterns": inputs.get('energy_patterns', []),
-                "priorities": inputs.get('priorities', {}),
-                "layout_preference": inputs.get('layout_preference', {}),
-                "tasks": inputs.get('tasks', [])
-            }
+            # Process inputs with safe defaults
+            processed_inputs = self._process_schedule_inputs(inputs)
             
             # Create schedule document using centralized helper
             schedule_document = self._create_schedule_document(
@@ -136,9 +127,12 @@ class ScheduleService:
             )
             
             # Validate document before storage
-            is_valid, validation_error = validate_schedule_document(schedule_document)
+            is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
+                schedule_document, user_id, date
+            )
             if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
+                return False, {"error": error_msg}
+            schedule_document = validated_document
             
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
@@ -175,8 +169,9 @@ class ScheduleService:
         calendar_tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Create or replace calendar tasks in existing schedule.
-        Simple strategy: replace all calendar tasks, keep all manual tasks.
+        Create initial schedule from Google Calendar for first-time users.
+        This method focuses on initial schedule creation only.
+        If a schedule already exists, delegates to apply_calendar_webhook_update for proper position preservation.
         
         Args:
             user_id: User's Google ID or Firebase UID
@@ -190,133 +185,51 @@ class ScheduleService:
         try:
             formatted_date = format_schedule_date(date)
             
-            # Check if schedule exists
+            # Check if schedule exists - delegate to webhook handler if it does
             existing_schedule = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
             })
             
             if existing_schedule:
-                # Non-destructive merge strategy:
-                # - Keep non-calendar tasks untouched
-                # - If fetched calendar list is empty: preserve existing calendar tasks
-                # - Otherwise: replace calendar tasks with fetched set PLUS any existing
-                #   incomplete carry-over calendar tasks that are not in the fetched set
-                existing_tasks = existing_schedule.get('schedule', [])
-                non_calendar_tasks = [t for t in existing_tasks if not t.get('from_gcal', False)]
-                existing_calendar_tasks = [t for t in existing_tasks if t.get('from_gcal', False)]
-
-                # Normalize incoming tasks as calendar tasks with required fields
-                normalized_incoming_calendar_tasks: List[Dict[str, Any]] = []
-                for task in calendar_tasks:
-                    calendar_task = dict(task)
-                    calendar_task['from_gcal'] = True
-                    if 'type' not in calendar_task:
-                        calendar_task['type'] = 'task'
-                    normalized_incoming_calendar_tasks.append(calendar_task)
-
-                # If incoming list is empty, leave existing calendar tasks untouched
-                if len(normalized_incoming_calendar_tasks) == 0:
-                    final_tasks = existing_calendar_tasks + non_calendar_tasks
-                    # Do not update DB to avoid unnecessary writes; return current state
-                    metadata = self._calculate_schedule_metadata(final_tasks)
-                    metadata.update({
-                        "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
-                        "lastModified": existing_schedule.get('metadata', {}).get('last_modified', ''),
-                        "source": existing_schedule.get('metadata', {}).get('source', 'calendar_sync'),
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
-                    })
-                    return True, {
-                        "schedule": final_tasks,
-                        "date": date,
-                        "metadata": metadata
-                    }
-
-                # Otherwise, merge: fetched + preserve existing incomplete not present by gcal_event_id
-                fetched_ids = {t.get('gcal_event_id') for t in normalized_incoming_calendar_tasks if t.get('gcal_event_id')}
-                carry_over_incomplete = []
-                for t in existing_calendar_tasks:
-                    is_incomplete = not t.get('completed', False)
-                    gcal_id = t.get('gcal_event_id')
-                    not_in_fetched = (gcal_id not in fetched_ids) if gcal_id else True
-                    if is_incomplete and not_in_fetched:
-                        carry_over_incomplete.append(t)
-
-                merged_calendar_tasks = normalized_incoming_calendar_tasks + carry_over_incomplete
-                final_tasks = merged_calendar_tasks + non_calendar_tasks
-
-                # Update existing schedule with merged calendar tasks at top
-                existing_metadata = existing_schedule.get('metadata', {})
-                update_doc = {
-                    "schedule": final_tasks,
-                    "metadata": {
-                        **existing_metadata,
-                        "last_modified": format_timestamp(),
-                        "calendarSynced": True,
-                        "calendarEvents": len([t for t in merged_calendar_tasks if t.get('from_gcal', False)]),
-                        "source": "calendar_sync"
-                    }
-                }
-
-                # Validate before updating
-                temp_doc = {**existing_schedule, **update_doc}
-                # Ensure date is in canonical format for validation
-                temp_doc["date"] = formatted_date
-                is_valid, validation_error = validate_schedule_document(temp_doc)
-                if not is_valid:
-                    return False, {"error": f"Schedule validation failed: {validation_error}"}
-
-                # Update database (treat no-op as success to avoid false failure)
-                self.schedules_collection.update_one(
-                    {"userId": user_id, "date": formatted_date},
-                    {"$set": update_doc}
-                )
-                
-            else:
-                # Create new schedule with calendar tasks only
-                new_calendar_tasks = []
-                for task in calendar_tasks:
-                    calendar_task = dict(task)
-                    calendar_task['from_gcal'] = True
-                    # Ensure required fields for validation
-                    if 'type' not in calendar_task:
-                        calendar_task['type'] = 'task'
-                    new_calendar_tasks.append(calendar_task)
-                
-                schedule_document = self._create_schedule_document(
-                    user_id=user_id,
-                    date=date,
-                    tasks=new_calendar_tasks,
-                    source="calendar_sync"
-                )
-                
-                # Add calendar-specific metadata
-                schedule_document["metadata"].update({
-                    "calendarSynced": True,
-                    "calendarEvents": len(new_calendar_tasks)
-                })
-                
-                # Validate and insert
-                is_valid, validation_error = validate_schedule_document(schedule_document)
-                if not is_valid:
-                    return False, {"error": f"Schedule validation failed: {validation_error}"}
-                
-                result = self.schedules_collection.insert_one(schedule_document)
-                final_tasks = new_calendar_tasks
+                # Delegate to webhook method for proper position preservation
+                return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+            
+            # Create new schedule with calendar tasks only (first-time user flow)
+            new_calendar_tasks = self._normalize_calendar_tasks(calendar_tasks, date)
+            
+            schedule_document = self._create_schedule_document(
+                user_id=user_id,
+                date=date,
+                tasks=new_calendar_tasks,
+                source="calendar_sync"
+            )
+            
+            # Add calendar-specific metadata
+            schedule_document["metadata"].update({
+                "calendarSynced": True,
+                "calendarEvents": len(new_calendar_tasks)
+            })
+            
+            # Validate and insert
+            is_valid, validation_error = validate_schedule_document(schedule_document)
+            if not is_valid:
+                return False, {"error": f"Schedule validation failed: {validation_error}"}
+            
+            self.schedules_collection.insert_one(schedule_document)
             
             # Calculate metadata for response
-            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata = self._calculate_schedule_metadata(new_calendar_tasks)
             metadata.update({
                 "generatedAt": format_timestamp(),
                 "lastModified": format_timestamp(),
                 "source": "calendar_sync",
                 "calendarSynced": True,
-                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                "calendarEvents": len(new_calendar_tasks)
             })
             
             return True, {
-                "schedule": final_tasks,
+                "schedule": new_calendar_tasks,
                 "date": date,
                 "metadata": metadata
             }
@@ -325,6 +238,144 @@ class ScheduleService:
             print(f"Error in create_schedule_from_calendar_sync: {str(e)}")
             traceback.print_exc()
             return False, {"error": f"Failed to sync calendar schedule: {str(e)}"}
+
+    def apply_calendar_webhook_update(
+        self,
+        user_id: str,
+        date: str,
+        calendar_tasks: List[Dict[str, Any]]
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Merge calendar events for webhook/SSE updates with a preservation-first strategy:
+        - Keep all existing calendar tasks (completed and incomplete) unless explicitly updated by fetch
+        - Upsert fetched events by gcal_event_id, preserving local completion and ID, updating Google fields
+        - Skip fetched events lacking gcal_event_id to avoid duplication
+        - Leave schedule untouched if fetched set is empty (non-destructive)
+
+        This logic is intentionally scoped to webhook/SSE updates and differs from
+        create_schedule_from_calendar_sync which is used for other sync paths.
+        """
+        try:
+            formatted_date = format_schedule_date(date)
+
+            # Load existing schedule (required for webhook behavior)
+            existing_schedule = self.schedules_collection.find_one({
+                "userId": user_id,
+                "date": formatted_date
+            })
+
+            existing_tasks: List[Dict[str, Any]] = existing_schedule.get('schedule', []) if existing_schedule else []
+            non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
+            existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
+
+            # If incoming list is empty, return current state non-destructively
+            # Filter out tasks without gcal_event_id to avoid duplicates
+            tasks_with_gcal_id = [task for task in calendar_tasks if task.get('gcal_event_id')]
+            normalized_incoming = self._normalize_calendar_tasks(tasks_with_gcal_id, date)
+
+            # Remove problematic early return - let all cases flow through robust position preservation logic
+
+            # Use helper methods consistently for all webhook scenarios
+
+            # Use consolidated upsert logic
+            upserted_calendar = self._upsert_calendar_tasks_by_id(
+                existing_calendar_tasks,
+                normalized_incoming,
+                date
+            )
+            
+            fetched_id_set = {task.get('gcal_event_id') for task in normalized_incoming if task.get('gcal_event_id')}
+
+            # Use consolidated position preservation logic
+            rebuilt = self._rebuild_tasks_preserving_calendar_positions(
+                existing_tasks,
+                upserted_calendar,
+                fetched_id_set
+            )
+
+            # Deduplicate in-place while preserving order of the rebuilt list
+            try:
+                incoming_texts_lc = {
+                    (t.get('text') or '').strip().lower()
+                    for t in upserted_calendar
+                }
+                incoming_ids = {
+                    t.get('gcal_event_id')
+                    for t in upserted_calendar
+                    if t.get('gcal_event_id')
+                }
+
+                filtered_rebuilt: List[Dict[str, Any]] = []
+                for t in rebuilt:
+                    if not t.get('from_gcal', False):
+                        # Keep sections and any explicit section types
+                        if t.get('is_section', False) or t.get('type') == 'section':
+                            filtered_rebuilt.append(t)
+                            continue
+                        task_text_lc = (t.get('text') or '').strip().lower()
+                        task_id = t.get('id')
+                        if task_text_lc in incoming_texts_lc or (task_id and task_id in incoming_ids):
+                            # Drop manual duplicate of incoming calendar event
+                            continue
+                    filtered_rebuilt.append(t)
+
+                final_tasks = filtered_rebuilt
+            except Exception:
+                # Safety fallback: if dedup fails, keep rebuilt order
+                final_tasks = rebuilt
+
+            # Prepare update doc and validate
+            if existing_schedule:
+                existing_metadata = existing_schedule.get('metadata', {})
+                update_doc = {
+                    "schedule": final_tasks,
+                    "metadata": {
+                        **existing_metadata,
+                        "last_modified": format_timestamp(),
+                        "calendarSynced": True,
+                        "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)]),
+                        "source": "calendar_sync"
+                    }
+                }
+
+                temp_doc = {**existing_schedule, **update_doc}
+                temp_doc["date"] = formatted_date
+                is_valid, validation_error = validate_schedule_document(temp_doc)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+                self.schedules_collection.update_one(
+                    {"userId": user_id, "date": formatted_date},
+                    {"$set": update_doc}
+                )
+
+            else:
+                # No existing schedule for date → create one with calendar tasks only
+                schedule_document = self._create_schedule_document(
+                    user_id=user_id,
+                    date=date,
+                    tasks=final_tasks,
+                    source="calendar_sync"
+                )
+                is_valid, validation_error = validate_schedule_document(schedule_document)
+                if not is_valid:
+                    return False, {"error": f"Schedule validation failed: {validation_error}"}
+                self.schedules_collection.insert_one(schedule_document)
+
+            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata.update({
+                "generatedAt": format_timestamp(),
+                "lastModified": format_timestamp(),
+                "source": "calendar_sync",
+                "calendarSynced": True,
+                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+            })
+
+            return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+        except Exception as e:
+            print(f"Error in apply_calendar_webhook_update: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to apply webhook calendar update: {str(e)}"}
 
     def create_empty_schedule(
         self,
@@ -400,9 +451,12 @@ class ScheduleService:
             )
             
             # Validate document before storage
-            is_valid, validation_error = validate_schedule_document(schedule_document)
+            is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
+                schedule_document, user_id, date
+            )
             if not is_valid:
-                return False, {"error": f"Schedule validation failed: {validation_error}"}
+                return False, {"error": error_msg}
+            schedule_document = validated_document
             
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
@@ -564,7 +618,8 @@ class ScheduleService:
         self,
         user_id: str,
         date: str,
-        max_days_back: int = 30
+        max_days_back: int = 30,
+        user_timezone: Optional[str] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Autogenerate a schedule for the given date by:
@@ -613,14 +668,13 @@ class ScheduleService:
                 except Exception:
                     first_section_text = None
 
-            # Incomplete non-recurring from source (exclude calendar-origin tasks)
+            # Incomplete tasks from source (including incomplete recurring tasks)
             source_tasks = source_schedule.get('schedule', [])
             carry_over_tasks: List[Dict[str, Any]] = []
             carry_over_calendar_tasks: List[Dict[str, Any]] = []
+            carried_over_recurring_texts: set = set()  # Track carried over recurring tasks
             for task in source_tasks:
                 if task.get('is_section', False) or task.get('type') == 'section':
-                    continue
-                if task.get('is_recurring'):
                     continue
                 if task.get('completed', False):
                     continue
@@ -642,9 +696,13 @@ class ScheduleService:
                     if 'type' not in new_task:
                         new_task['type'] = 'task'
                     carry_over_tasks.append(new_task)
+                    
+                    # Track if this is a recurring task being carried over
+                    if task.get('is_recurring'):
+                        carried_over_recurring_texts.add(task.get('text', ''))
 
-            # Recurring tasks due on target date
-            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
+            # Recurring tasks due on target date (exclude ones already carried over)
+            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date, exclude_texts=carried_over_recurring_texts)
 
             # Fetch calendar tasks for target date with sub-timeout to respect 10s UX
             fetched_calendar_tasks: List[Dict[str, Any]] = []
@@ -658,7 +716,11 @@ class ScheduleService:
                 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
                 def _fetch():
-                    return calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+                    return calendar_service.get_calendar_tasks_for_user_date(
+                        user_id,
+                        date,
+                        timezone_override=user_timezone
+                    )
 
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     future = executor.submit(_fetch)
@@ -672,36 +734,88 @@ class ScheduleService:
             except Exception:
                 # Fallback to direct fetch without timeout (still protected)
                 try:
-                    fetched_calendar_tasks = calendar_service.get_calendar_tasks_for_user_date(user_id, date)
+                    fetched_calendar_tasks = calendar_service.get_calendar_tasks_for_user_date(
+                        user_id,
+                        date,
+                        timezone_override=user_timezone
+                    )
                 except Exception:
                     fetched_calendar_tasks = []
 
-            # Deduplicate by gcal_event_id (prefer fetched over carry-over)
-            fetched_ids = {t.get('gcal_event_id') for t in fetched_calendar_tasks if t.get('gcal_event_id')}
-            carry_over_unique = [t for t in carry_over_calendar_tasks if t.get('gcal_event_id') not in fetched_ids]
-            calendar_block = list(fetched_calendar_tasks) + carry_over_unique
-            # Ensure deterministic ordering within block: all-day first, then time, then text
-            calendar_block = self._sort_calendar_block(calendar_block)
+            # Preserve relative positions from source schedule when placing today's calendar events.
+            # Build map of source calendar tasks by gcal_event_id
+            source_calendar_map: Dict[str, Dict[str, Any]] = {}
+            for t in source_tasks:
+                if t.get('from_gcal', False) and t.get('gcal_event_id'):
+                    source_calendar_map[t['gcal_event_id']] = t
 
-            # Assign section for calendar events if first section exists
-            if first_section_text:
-                for t in calendar_block:
-                    t['section'] = first_section_text
+            fetched_by_id: Dict[str, Dict[str, Any]] = {t.get('gcal_event_id'): t for t in fetched_calendar_tasks if t.get('gcal_event_id')}
+            fetched_ids = set(fetched_by_id.keys())
 
-            # Position calendar block:
-            final_tasks: List[Dict[str, Any]] = []
-            if section_tasks:
-                # Insert after first section
-                final_tasks.append(section_tasks[0])
-                final_tasks.extend(calendar_block)
-                final_tasks.extend(section_tasks[1:])
-            else:
-                # No sections, calendar block at top
-                final_tasks.extend(calendar_block)
+            # Rebuild from source order: replace existing calendar items with today's updates
+            # Filter out completed tasks from the source schedule when rebuilding
+            rebuilt: List[Dict[str, Any]] = []
+            last_calendar_index = -1
+            for item in source_tasks:
+                if item.get('is_section', False) or item.get('type') == 'section':
+                    rebuilt.append(item)
+                    continue
+                # Skip completed tasks from source schedule
+                if item.get('completed', False):
+                    continue
+                # Skip recurring tasks from rebuilt (they're handled by carry-over logic)
+                if item.get('is_recurring'):
+                    continue
+                if item.get('from_gcal', False):
+                    gid = item.get('gcal_event_id')
+                    if gid and gid in fetched_by_id:
+                        updated = dict(fetched_by_id[gid])
+                        updated['from_gcal'] = True
+                        # Preserve section of the source item
+                        if item.get('section') and not updated.get('section'):
+                            updated['section'] = item.get('section')
+                        rebuilt.append(updated)
+                        last_calendar_index = len(rebuilt) - 1
+                    else:
+                        # If not fetched today and was calendar, carry-over logic already handled separately
+                        # Do not duplicate here
+                        pass
+                else:
+                    rebuilt.append(item)
 
-            # Append other groups after sections/calendars
-            final_tasks.extend(recurring_tasks)
-            final_tasks.extend(carry_over_tasks)
+            # Insert brand-new fetched calendar events after last calendar index, inheriting nearby section
+            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else (1 if section_tasks else 0)
+            inherited_section: Optional[str] = None
+            if insertion_index > 0 and insertion_index <= len(rebuilt):
+                prev = rebuilt[insertion_index - 1]
+                inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
+
+            new_ids_in_order = [gid for gid in fetched_ids if gid not in source_calendar_map]
+            new_items = []
+            for gid in new_ids_in_order:
+                ni = dict(fetched_by_id[gid])
+                ni['from_gcal'] = True
+                if inherited_section and not ni.get('section'):
+                    ni['section'] = inherited_section
+                new_items.append(ni)
+            if new_items:
+                # Sort new calendar items by time before inserting
+                sorted_new_items = self._sort_calendar_block(new_items)
+                rebuilt = rebuilt[:insertion_index] + sorted_new_items + rebuilt[insertion_index:]
+
+            # Filter carry_over_calendar_tasks to exclude events already handled in rebuilt section
+            filtered_carry_over_calendar = []
+            for carry_task in carry_over_calendar_tasks:
+                carry_gcal_id = carry_task.get('gcal_event_id')
+                # Only include if this event was not fetched for today (i.e., not in fetched_ids)
+                if carry_gcal_id and carry_gcal_id not in fetched_ids:
+                    filtered_carry_over_calendar.append(carry_task)
+
+            # After placing calendar items, append recurring and carry-over tasks at the end
+            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks + filtered_carry_over_calendar
+
+            # Deduplicate tasks to fix Bug #5: prevent duplicate tasks when generating next day schedule
+            final_tasks = self._deduplicate_tasks(final_tasks, date)
 
             # Inputs from most recent schedule with inputs
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
@@ -947,7 +1061,8 @@ class ScheduleService:
         self, 
         user_id: str, 
         target_date: str, 
-        max_days_back: int = 30
+        max_days_back: int = 30,
+        exclude_texts: set = None
     ) -> List[Dict[str, Any]]:
         """
         Find all recurring tasks that should occur on the target date.
@@ -957,6 +1072,7 @@ class ScheduleService:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format
             max_days_back: Maximum number of days to search back for recurring tasks
+            exclude_texts: Set of task texts to exclude (for tasks already carried over)
             
         Returns:
             List of recurring task objects that should occur on target date
@@ -965,6 +1081,7 @@ class ScheduleService:
             target_dt = datetime.strptime(target_date, '%Y-%m-%d')
             recurring_tasks = []
             seen_task_texts = set()  # Prevent duplicates
+            exclude_texts = exclude_texts or set()  # Default to empty set if None
             
             # Search backwards through recent schedules
             for days_back in range(1, max_days_back + 1):
@@ -981,9 +1098,11 @@ class ScheduleService:
                     
                     # Check each task for recurrence
                     for task in schedule_tasks:
+                        task_text = task.get('text', '')
                         if (task.get('is_recurring') and 
                             not task.get('is_section', False) and
-                            task.get('text') not in seen_task_texts):
+                            task_text not in seen_task_texts and
+                            task_text not in exclude_texts):
                             
                             if self._should_task_recur_on_date(task, target_dt):
                                 # Create a copy of the task for the new date
@@ -994,7 +1113,7 @@ class ScheduleService:
                                     "completed": False  # Reset completion status
                                 }
                                 recurring_tasks.append(recurring_task)
-                                seen_task_texts.add(task.get('text'))
+                                seen_task_texts.add(task_text)
                                 
             print(f"Found {len(recurring_tasks)} recurring tasks for {target_date}")
             return recurring_tasks
@@ -1075,6 +1194,107 @@ class ScheduleService:
             # Days 29-31 are considered 'last' week
             return 'last'
 
+    def _deduplicate_tasks(
+        self, 
+        tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Deduplicate tasks based on text content, applying priority rules:
+        1. Calendar events (with gcal_event_id) take priority over manual tasks
+        2. Target date instances take priority over carryover instances
+        3. Preserve section assignments from the selected version
+        
+        Args:
+            tasks: List of tasks that may contain duplicates
+            target_date: Target date string for prioritization
+            
+        Returns:
+            List of deduplicated tasks
+        """
+        try:
+            if not tasks:
+                return []
+                
+            # Group tasks by text content
+            task_groups: Dict[str, List[Dict[str, Any]]] = {}
+            for task in tasks:
+                task_text = task.get('text', '').strip()
+                if not task_text:
+                    continue  # Skip tasks without text
+                    
+                if task_text not in task_groups:
+                    task_groups[task_text] = []
+                task_groups[task_text].append(task)
+            
+            deduplicated = []
+            
+            for task_text, duplicate_tasks in task_groups.items():
+                if len(duplicate_tasks) == 1:
+                    # No duplicates, keep the single task
+                    deduplicated.append(duplicate_tasks[0])
+                    continue
+                
+                # Apply priority rules to select the best task
+                selected_task = self._select_best_duplicate_task(duplicate_tasks, target_date)
+                deduplicated.append(selected_task)
+            
+            # Add tasks without text (sections, etc.) that weren't grouped
+            for task in tasks:
+                task_text = task.get('text', '').strip()
+                if not task_text:
+                    deduplicated.append(task)
+            
+            print(f"Deduplication: {len(tasks)} tasks -> {len(deduplicated)} tasks")
+            return deduplicated
+            
+        except Exception as e:
+            print(f"Error in task deduplication: {str(e)}")
+            traceback.print_exc()
+            # Return original tasks if deduplication fails
+            return tasks
+
+    def _select_best_duplicate_task(
+        self, 
+        duplicate_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> Dict[str, Any]:
+        """
+        Select the best task from a group of duplicates based on priority rules.
+        
+        Args:
+            duplicate_tasks: List of tasks with the same text
+            target_date: Target date string for prioritization
+            
+        Returns:
+            The selected task with highest priority
+        """
+        try:
+            # Priority 1: Calendar events (with gcal_event_id) over manual tasks
+            calendar_tasks = [t for t in duplicate_tasks if t.get('gcal_event_id')]
+            manual_tasks = [t for t in duplicate_tasks if not t.get('gcal_event_id')]
+            
+            # Prefer calendar tasks if available
+            candidates = calendar_tasks if calendar_tasks else manual_tasks
+            
+            # Priority 2: Target date instances over carryover instances
+            target_date_tasks = [t for t in candidates if t.get('start_date') == target_date]
+            
+            if target_date_tasks:
+                # If multiple target date tasks, prefer calendar events
+                final_candidates = [t for t in target_date_tasks if t.get('gcal_event_id')]
+                if not final_candidates:
+                    final_candidates = target_date_tasks
+                return final_candidates[0]  # Take first if multiple remain
+            else:
+                # No target date tasks, take first candidate
+                return candidates[0]
+                
+        except Exception as e:
+            print(f"Error selecting best duplicate task: {str(e)}")
+            # Return first task as fallback
+            return duplicate_tasks[0]
+
     def _calculate_schedule_metadata(
         self, 
         tasks: List[Dict[str, Any]]
@@ -1088,7 +1308,7 @@ class ScheduleService:
         Returns:
             Dictionary containing calculated metadata
         """
-        non_section_tasks = [t for t in tasks if not t.get('is_section', False)]
+        non_section_tasks = self._filter_non_section_tasks(tasks)
         calendar_events = [t for t in tasks if t.get('gcal_event_id')]
         recurring_tasks = [t for t in tasks if t.get('is_recurring')]
 
@@ -1098,6 +1318,340 @@ class ScheduleService:
             "recurringTasks": len(recurring_tasks),
             "generatedAt": format_timestamp()
         }
+
+    def _normalize_calendar_tasks(
+        self, 
+        calendar_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Normalize calendar tasks with required fields and date alignment.
+        
+        Args:
+            calendar_tasks: List of calendar task objects to normalize
+            target_date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            List of normalized calendar task objects
+        """
+        normalized_tasks = []
+        
+        for task in calendar_tasks:
+            normalized_task = dict(task)
+            normalized_task['from_gcal'] = True
+            normalized_task['start_date'] = target_date
+            
+            # Set type if not already present
+            if 'type' not in normalized_task:
+                normalized_task['type'] = 'task'
+                
+            normalized_tasks.append(normalized_task)
+            
+        return normalized_tasks
+
+    def _filter_calendar_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter tasks that are from Google Calendar.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of calendar task objects
+        """
+        return [task for task in tasks if task.get('from_gcal', False)]
+
+    def _filter_non_calendar_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter tasks that are not from Google Calendar.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of non-calendar task objects
+        """
+        return [task for task in tasks if not task.get('from_gcal', False)]
+
+    def _filter_section_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter section tasks from task list.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of section task objects
+        """
+        return [task for task in tasks if task.get('is_section', False) or task.get('type') == 'section']
+
+    def _filter_non_section_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter non-section tasks from task list.
+        
+        Args:
+            tasks: List of task objects to filter
+            
+        Returns:
+            List of non-section task objects
+        """
+        return [task for task in tasks if not task.get('is_section', False) and task.get('type') != 'section']
+
+    def _validate_and_prepare_schedule_document(
+        self, 
+        base_document: Dict[str, Any], 
+        user_id: str, 
+        date: str
+    ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Validate schedule document and prepare for database storage.
+        
+        Consolidates validation logic used across multiple schedule creation methods.
+        
+        Args:
+            base_document: Base schedule document to validate
+            user_id: User's Google ID or Firebase UID
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Tuple of (is_valid: bool, error_message: Optional[str], prepared_document: Optional[Dict])
+        """
+        try:
+            # Create a copy for preparation
+            prepared_doc = dict(base_document)
+            
+            # Ensure date is in canonical format
+            formatted_date = format_schedule_date(date)
+            prepared_doc["date"] = formatted_date
+            prepared_doc["userId"] = user_id
+            
+            # Validate document structure
+            is_valid, validation_error = validate_schedule_document(prepared_doc)
+            if not is_valid:
+                return False, f"Schedule validation failed: {validation_error}", None
+                
+            return True, None, prepared_doc
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}", None
+
+    def _process_schedule_inputs(self, raw_inputs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Process and sanitize user inputs with safe defaults.
+        
+        Consolidates input processing logic used across schedule creation methods.
+        
+        Args:
+            raw_inputs: Raw user input data (can be None or incomplete)
+            
+        Returns:
+            Dictionary with processed inputs and safe defaults
+        """
+        if raw_inputs is None:
+            raw_inputs = {}
+            
+        # Prepare inputs with safe defaults and type checking
+        processed_inputs = {
+            "name": raw_inputs.get('name', '') if raw_inputs.get('name') is not None else '',
+            "work_start_time": raw_inputs.get('work_start_time', '') if raw_inputs.get('work_start_time') is not None else '',
+            "work_end_time": raw_inputs.get('work_end_time', '') if raw_inputs.get('work_end_time') is not None else '',
+            "working_days": raw_inputs.get('working_days', []) if isinstance(raw_inputs.get('working_days'), list) else [],
+            "energy_patterns": raw_inputs.get('energy_patterns', []) if isinstance(raw_inputs.get('energy_patterns'), list) else [],
+            "priorities": raw_inputs.get('priorities', {}) if isinstance(raw_inputs.get('priorities'), dict) else {},
+            "layout_preference": raw_inputs.get('layout_preference', {}) if isinstance(raw_inputs.get('layout_preference'), dict) else {},
+            "tasks": raw_inputs.get('tasks', []) if isinstance(raw_inputs.get('tasks'), list) else []
+        }
+        
+        return processed_inputs
+
+    def _upsert_calendar_tasks_by_id(
+        self, 
+        existing_calendar_tasks: List[Dict[str, Any]], 
+        incoming_calendar_tasks: List[Dict[str, Any]], 
+        target_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Upsert calendar tasks by gcal_event_id, preserving local state.
+        
+        Consolidates calendar task upserting logic used across multiple methods.
+        
+        Args:
+            existing_calendar_tasks: Current calendar tasks in schedule
+            incoming_calendar_tasks: Fresh calendar tasks from Google Calendar API
+            target_date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            List of merged calendar tasks with preserved local state
+        """
+        if not incoming_calendar_tasks:
+            return existing_calendar_tasks
+            
+        # Normalize incoming tasks
+        normalized_incoming = self._normalize_calendar_tasks(incoming_calendar_tasks, target_date)
+        
+        # Map existing calendar tasks by gcal_event_id
+        existing_by_id: Dict[str, Dict[str, Any]] = {}
+        existing_without_id: List[Dict[str, Any]] = []
+        for task in existing_calendar_tasks:
+            gid = task.get('gcal_event_id')
+            if gid:
+                existing_by_id[gid] = task
+            else:
+                existing_without_id.append(task)
+        
+        fetched_ids = {task.get('gcal_event_id') for task in normalized_incoming if task.get('gcal_event_id')}
+        
+        # Upsert incoming tasks
+        upserted_calendar: List[Dict[str, Any]] = []
+        for incoming in normalized_incoming:
+            gid = incoming.get('gcal_event_id')
+            if not gid:
+                continue
+                
+            if gid in existing_by_id:
+                # Update existing task while preserving local state
+                existing_task = existing_by_id[gid]
+                merged_task = {**existing_task}
+                
+                # Update Google-sourced fields
+                merged_task['text'] = incoming.get('text', merged_task.get('text'))
+                merged_task['start_time'] = incoming.get('start_time', merged_task.get('start_time'))
+                merged_task['end_time'] = incoming.get('end_time', merged_task.get('end_time'))
+                merged_task['start_date'] = target_date
+                merged_task['from_gcal'] = True
+                
+                if 'type' not in merged_task:
+                    merged_task['type'] = 'task'
+                    
+                upserted_calendar.append(merged_task)
+            else:
+                # New calendar task
+                new_task = dict(incoming)
+                new_task['from_gcal'] = True
+                new_task['start_date'] = target_date
+                if 'type' not in new_task:
+                    new_task['type'] = 'task'
+                if 'id' not in new_task:
+                    new_task['id'] = str(uuid.uuid4())
+                    
+                upserted_calendar.append(new_task)
+        
+        # Preserve existing calendar tasks not present in fetched set
+        preserved_existing = []
+        for task in existing_calendar_tasks:
+            gid = task.get('gcal_event_id')
+            if not gid or gid not in fetched_ids:
+                # Ensure preserved tasks also have correct date and required fields
+                preserved_task = dict(task)
+                preserved_task['start_date'] = target_date
+                preserved_task['from_gcal'] = True
+                if 'type' not in preserved_task:
+                    preserved_task['type'] = 'task'
+                preserved_existing.append(preserved_task)
+        
+        return upserted_calendar + preserved_existing
+
+    def _rebuild_tasks_preserving_calendar_positions(
+        self, 
+        source_tasks: List[Dict[str, Any]], 
+        upserted_calendar: List[Dict[str, Any]], 
+        fetched_calendar_ids: set
+    ) -> List[Dict[str, Any]]:
+        """
+        Rebuild task list preserving relative positions of calendar events.
+        
+        Strategy: Keep all existing items in their original positions, only insert 
+        new calendar events at the top (after sections) to avoid grouping existing events.
+        
+        Args:
+            source_tasks: Original task list with existing positions
+            upserted_calendar: Calendar tasks after upserting
+            fetched_calendar_ids: Set of gcal_event_ids that were fetched
+            
+        Returns:
+            Rebuilt task list with preserved positions
+        """
+        if not source_tasks and not upserted_calendar:
+            return []
+            
+        # Map calendar tasks by gcal_event_id for easy lookup
+        existing_calendar_map: Dict[str, Dict[str, Any]] = {}
+        for task in source_tasks:
+            if task.get('from_gcal', False):
+                gid = task.get('gcal_event_id')
+                if gid:
+                    existing_calendar_map[gid] = task
+        
+        upserted_by_id: Dict[str, Dict[str, Any]] = {}
+        new_calendar_tasks: List[Dict[str, Any]] = []
+        for task in upserted_calendar:
+            gid = task.get('gcal_event_id')
+            if gid:
+                upserted_by_id[gid] = task
+                if gid not in existing_calendar_map:
+                    # This is a brand new calendar event
+                    new_calendar_tasks.append(task)
+        
+        # Step 1: Process existing tasks in their original positions
+        # Replace existing calendar events with updated versions, keep everything else as-is
+        updated_existing: List[Dict[str, Any]] = []
+        for item in source_tasks:
+            if item.get('from_gcal', False):
+                gid = item.get('gcal_event_id')
+                if gid and gid in upserted_by_id:
+                    # Replace with updated version while preserving position and section
+                    updated_task = dict(upserted_by_id[gid])
+                    if item.get('section') and not updated_task.get('section'):
+                        updated_task['section'] = item.get('section')
+                    updated_existing.append(updated_task)
+                else:
+                    # Keep existing calendar task (not in current fetch)
+                    updated_existing.append(item)
+            else:
+                # Non-calendar task - keep as is
+                updated_existing.append(item)
+        
+        # Step 2: Insert new calendar events at the top (after sections)
+        if not new_calendar_tasks:
+            return updated_existing
+            
+        # Find insertion point: after any leading sections but before other content
+        insertion_index = 0
+        inherited_section: Optional[str] = None
+        last_section_name: Optional[str] = None
+        
+        # Skip over leading sections and determine section inheritance
+        for i, item in enumerate(updated_existing):
+            if item.get('is_section', False) or item.get('type') == 'section':
+                insertion_index = i + 1
+                last_section_name = item.get('text')  # Remember the last section we saw
+            else:
+                # Found first non-section item - check if it has a section assigned
+                item_section = item.get('section')
+                if item_section:
+                    inherited_section = item_section
+                elif last_section_name:
+                    # If item doesn't have explicit section, use the last section we passed
+                    inherited_section = last_section_name
+                break
+        
+        # Prepare new calendar items with inherited section
+        prepared_new_items: List[Dict[str, Any]] = []
+        for new_task in new_calendar_tasks:
+            new_item = dict(new_task)
+            if inherited_section and not new_item.get('section'):
+                new_item['section'] = inherited_section
+            prepared_new_items.append(new_item)
+        
+        # Sort new calendar items by time before inserting
+        sorted_new_items = self._sort_calendar_block(prepared_new_items)
+        
+        # Insert new events at the determined position
+        final_tasks = (updated_existing[:insertion_index] + 
+                      sorted_new_items + 
+                      updated_existing[insertion_index:])
+        
+        return final_tasks
 
 
 # Create singleton instance for import

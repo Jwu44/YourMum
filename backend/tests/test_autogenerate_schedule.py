@@ -136,6 +136,36 @@ class TestAutogenerateScheduleAPI:
         assert data['sourceFound'] is True
         assert isinstance(data['schedule'], list)
 
+    @patch('backend.apis.routes.get_user_from_token')
+    @patch('backend.apis.routes.schedule_service')
+    def test_autogenerate_forwards_timezone_override(self, mock_schedule_service, mock_get_user_from_token, client):
+        mock_get_user_from_token.return_value = {'googleId': 'user123'}
+        mock_schedule_service.autogenerate_schedule.return_value = (
+            True,
+            {
+                'existed': False,
+                'created': True,
+                'sourceFound': True,
+                'date': '2025-01-20',
+                'schedule': []
+            }
+        )
+        resp = client.post(
+            '/api/schedules/autogenerate',
+            data=json.dumps({"date": "2025-01-20", "timezone": "Australia/Sydney"}),
+            content_type='application/json',
+            headers={'Authorization': 'Bearer mock-token'}
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data['success'] is True
+        # Assert service was called with timezone forwarded as user_timezone kwarg
+        assert mock_schedule_service.autogenerate_schedule.call_count == 1
+        args, kwargs = mock_schedule_service.autogenerate_schedule.call_args
+        assert args[0] == 'user123'
+        assert args[1] == '2025-01-20'
+        assert kwargs.get('user_timezone') == 'Australia/Sydney'
+
 
 class TestRecentWithTasksAPI:
     @patch('backend.apis.routes.get_user_from_token')

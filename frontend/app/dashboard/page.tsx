@@ -71,6 +71,8 @@ const Dashboard: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [userCreationDate, setUserCreationDate] = useState<Date | null>(null)
   const hasInitiallyLoaded = useRef(false)
+  const hasEnsuredRefresh = useRef(false)
+  const [isEnsuringRefresh, setIsEnsuringRefresh] = useState(false)
 
   useEffect(() => {
     const date = new Date()
@@ -87,6 +89,49 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex])
 
   // Check for calendar sync status and show appropriate messages
+  useEffect(() => {
+    // One-time: ensure refresh token exists without extra user clicks
+    const ensureRefreshTokenIfMissing = async () => {
+      try {
+        if (hasEnsuredRefresh.current) return
+        hasEnsuredRefresh.current = true
+
+        // Require an authenticated user to proceed
+        const me = await userApi.getCurrentUser().catch(() => null as any)
+        if (!me) return
+
+        const calendar = (me as any).calendar || {}
+        const connected = !!calendar.connected
+        const credentials = calendar.credentials || {}
+        const hasRefresh = !!credentials.refreshToken
+
+        if (connected && !hasRefresh) {
+          try {
+            const token = await (currentUser || auth.currentUser)?.getIdToken(true)
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
+            const resp = await fetch(`${apiBase}/api/calendar/oauth/start`, {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${token}` }
+            })
+            const data = await resp.json().catch(() => ({} as any))
+            if (resp.ok && data?.success && data?.url) {
+              setIsEnsuringRefresh(true)
+              window.location.href = data.url as string
+              return
+            }
+            // If start failed, do NOT block dashboard; proceed without loader
+          } catch (e) {
+            // ignore and proceed
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    ensureRefreshTokenIfMissing()
+  }, [currentUser])
+
   useEffect(() => {
     // Check for general calendar connection errors
     const calendarError = localStorage.getItem('calendarConnectionError')
@@ -1205,10 +1250,10 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage) {
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh) {
       loadInitialSchedule()
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage])
+  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
 
   // Midnight auto-refresh (local timezone)
   useEffect(() => {
@@ -1281,13 +1326,14 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex, currentUser?.uid])
 
   // Show calendar connection loader during OAuth flow
-  if (calendarConnectionStage) {
-    return <CalendarConnectionLoader stage={calendarConnectionStage} />
+  if (calendarConnectionStage || isEnsuringRefresh) {
+    const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
+    return <CalendarConnectionLoader stage={stage} />
   }
 
   return (
     <SidebarLayout>
-      <div className="flex flex-col mobile-viewport-height bg-background">
+      <div className="flex flex-col bg-background">
 
         <DashboardHeader
           onNextDay={handleNextDay}
@@ -1299,8 +1345,7 @@ const Dashboard: React.FC = () => {
           showSidebarTrigger={true}
         />
 
-        <div className="flex-1 overflow-y-auto mt-4 sm:mt-8 mobile-scroll">
-          <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
             {isLoadingSchedule
               ? (
@@ -1356,7 +1401,6 @@ const Dashboard: React.FC = () => {
                 </p>
               </div>
                   )}
-          </div>
         </div>
 
         {isMobile && (

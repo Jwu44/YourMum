@@ -14,8 +14,10 @@ from __future__ import annotations
 
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from backend.db_config import get_database
+from backend.utils.timezone import get_reliable_user_timezone
 
 
 # NOTE: need this to avoid circular dependency with schedule_service
@@ -31,11 +33,16 @@ def fetch_google_calendar_events(access_token: str, date: str, user_timezone: st
         return []
 
 
-def _event_overlaps_date(event: Dict, date: str) -> bool:
+def _event_overlaps_date(event: Dict, date: str, timezone_str: str) -> bool:
     """
-    Return True if the event overlaps the given date.
+    Return True if the event overlaps the given date in the provided timezone.
     Supports both all-day (date/date) and timed (dateTime) events.
     """
+    try:
+        tz = ZoneInfo(timezone_str)
+    except Exception:
+        tz = ZoneInfo('UTC')
+
     start = event.get('start', {})
     end = event.get('end', {})
 
@@ -54,8 +61,17 @@ def _event_overlaps_date(event: Dict, date: str) -> bool:
             # Normalize by replacing 'Z' to be ISO8601-compatible with fromisoformat
             start_dt = datetime.fromisoformat(start_dt_raw.replace('Z', '+00:00'))
             end_dt = datetime.fromisoformat(end_dt_raw.replace('Z', '+00:00'))
-            # Check if the calendar-local date matches target date by comparing YYYY-MM-DD of start
-            return start_dt.strftime('%Y-%m-%d') == date or end_dt.strftime('%Y-%m-%d') == date
+
+            # Convert to target timezone for date-boundary overlap check
+            start_local = start_dt.astimezone(tz)
+            end_local = end_dt.astimezone(tz)
+
+            # Day window in target timezone [start_of_day, end_of_day]
+            day_start_local = datetime.fromisoformat(f"{date}T00:00:00").replace(tzinfo=tz)
+            day_end_local = datetime.fromisoformat(f"{date}T23:59:59").replace(tzinfo=tz)
+
+            # Overlap condition: event starts before day end and ends after day start
+            return (start_local <= day_end_local) and (end_local >= day_start_local)
         except Exception:
             return False
 
@@ -139,7 +155,7 @@ def convert_calendar_event_to_task(event: Dict, date: str) -> Optional[Dict]:
         return None
 
 
-def get_calendar_tasks_for_user_date(user_id: str, date: str) -> List[Dict]:
+def get_calendar_tasks_for_user_date(user_id: str, date: str, timezone_override: Optional[str] = None) -> List[Dict]:
     """
     Fetch user's calendar events for a date and convert/sort/limit to tasks.
     - Includes all-day and multi-day events overlapping the date
@@ -171,13 +187,25 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str) -> List[Dict]:
         if not access_token:
             return []
 
-        user_timezone = user.get('timezone') or 'Australia/Sydney'
+        # Use robust timezone resolution
+        candidate_timezone = timezone_override or user.get('timezone')
+        user_timezone = get_reliable_user_timezone(candidate_timezone)
 
-        # Fetch events (patched in tests)
-        events = fetch_google_calendar_events(access_token, date, user_timezone) or []
+        # Fetch events and on PermissionError attempt one refresh-and-retry using shared helper.
+        try:
+            events = fetch_google_calendar_events(access_token, date, user_timezone) or []
+        except PermissionError:
+            # Refresh token and retry once
+            refreshed = _ensure_access_token_valid_wrapper(users, user_id, credentials)
+            if not refreshed or refreshed == access_token:
+                return []
+            try:
+                events = fetch_google_calendar_events(refreshed, date, user_timezone) or []
+            except PermissionError:
+                return []
 
-        # Filter: overlapping target date
-        filtered = [ev for ev in events if _event_overlaps_date(ev, date)]
+        # Filter: overlapping target date in the correct timezone
+        filtered = [ev for ev in events if _event_overlaps_date(ev, date, user_timezone)]
 
         # Sort by all-day first, then time, then alphabetical
         filtered.sort(key=_event_sort_key)

@@ -29,6 +29,14 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
+function detectUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch (_) {
+    return 'UTC'
+  }
+}
+
 /**
  * Get the current user's Firebase ID token for API authentication
  * @returns Promise<string> - The authentication token
@@ -44,8 +52,8 @@ const getAuthToken = async (): Promise<string> => {
   if (!currentUser) {
     throw new Error('User not authenticated')
   }
-  // Force refresh token to ensure it's valid and not expired
-  return await currentUser.getIdToken(true)
+  // Avoid forcing refresh on every call; SDK auto-refreshes when needed
+  return await currentUser.getIdToken()
 }
 
 /**
@@ -479,13 +487,14 @@ export const autogenerateTodaySchedule = async (date: string): Promise<{
     }
 
     const token = await getAuthToken()
+    const timezone = detectUserTimezone()
     const response = await fetch(`${API_BASE_URL}/api/schedules/autogenerate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ date })
+      body: JSON.stringify({ date, timezone })
     })
 
     const data = await response.json().catch(() => ({}))

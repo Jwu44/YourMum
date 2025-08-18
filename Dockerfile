@@ -25,5 +25,5 @@ USER app
 # Expose the port
 EXPOSE 8000
 
-# Run the application
-CMD ["python", "application.py"]
+# Run the application with Gunicorn (multi-worker, threads) and bind to $PORT if provided
+CMD ["sh", "-c", "gunicorn -w ${GUNICORN_WORKERS:-2} -k gthread --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-60} --keep-alive 5 -b 0.0.0.0:${PORT:-8000} application:application"]
