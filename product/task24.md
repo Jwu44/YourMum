@@ -76,7 +76,7 @@ I am facing a bug where the event_bus for handling google calendar events is inc
 
 **Result**: ✅ Real-time sync works, ✅ existing calendar events maintain positions, ✅ new events appear at top with proper section context
 
-# Bug #5 - Status: To do
+# Bug #5 - ✅ Done 
 I am facing a bug where the autogenerate() function is duplicating incomplete tasks when generating the next day schedule
 
 # Steps to reproduce:
@@ -91,3 +91,20 @@ I am facing a bug where the autogenerate() function is duplicating incomplete ta
 
 # Current autogenerate response for creating next day:
 https://yourdai-production.up.railway.app/api/schedules/autogenerate - {"created":true,"date":"2025-08-16","existed":false,"metadata":{"calendarEvents":2,"generatedAt":"2025-08-15T04:44:05.799763+00:00","lastModified":"2025-08-15T04:44:05.799786+00:00","recurringTasks":2,"source":"manual","totalTasks":12},"schedule":[{"categories":[],"completed":false,"id":"20adde01-4b2c-4028-a026-18d8798ff5b8","is_section":true,"level":0,"parent_id":null,"section":null,"section_index":0,"text":"High Priority","type":"section"},{"categories":[],"completed":false,"end_time":"11:00","from_gcal":true,"gcal_event_id":"6asjk4j70u0idrh1557i0idu2g_20250815T220000Z","id":"6asjk4j70u0idrh1557i0idu2g_20250815T220000Z","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":"High Priority","section_index":0,"start_date":"2025-08-16","start_time":"08:00","text":"\ud83c\udfc3\u200d\u2642\ufe0fParkrun","type":"task"},{"categories":[],"completed":false,"end_time":"15:00","from_gcal":true,"gcal_event_id":"2qmm0chdup5aaku0vp8h4ktjj8_20250816T033000Z","id":"2qmm0chdup5aaku0vp8h4ktjj8_20250816T033000Z","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":"High Priority","section_index":0,"start_date":"2025-08-16","start_time":"13:30","text":"\ud83c\udfcb\ufe0fgym push v2","type":"task"},{"categories":["Fun"],"completed":false,"id":"6f617be0-fbd3-4ec4-b911-40c3dbb27fd9","is_section":false,"level":0,"parent_id":null,"section":"High Priority","section_index":2,"text":"read fountainhead","type":"task"},{"categories":[],"completed":false,"id":"0e5c94d1-36ac-4472-8187-d22a389b2e8e","is_section":true,"level":0,"parent_id":null,"section":null,"section_index":0,"text":"Medium Priority","type":"section"},{"categories":["Fun"],"completed":false,"id":"2oaa6k1uhi8fk1uqr2gka01t2h","is_section":false,"level":0,"parent_id":null,"section":"Medium Priority","section_index":1,"text":"haircut","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"48e435f4-fbd6-4990-983e-53672f34d0e7","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":"Medium Priority","section_index":3,"start_date":"2025-08-15","start_time":"","text":"implement rag","type":"task"},{"categories":[],"completed":false,"id":"6b811f22-1806-4694-9e39-f2f887d50caa","is_section":true,"level":0,"parent_id":null,"section":null,"section_index":0,"text":"Low Priority","type":"section"},{"categories":["Fun"],"completed":false,"id":"fdef5ed4-f3d2-4350-a532-e9279be051c1","is_section":false,"level":0,"parent_id":null,"section":"Low Priority","section_index":2,"text":"fix sim card","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"eb5526b6-33aa-4e7c-9541-b035b63f8157","is_recurring":{"dayOfWeek":"Monday","frequency":"daily"},"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":1,"start_date":"2025-08-16","start_time":"","text":"gym","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"2205b8f7-fa46-410b-8321-70832acaa407","is_recurring":{"dayOfWeek":"Monday","frequency":"daily"},"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":null,"section_index":2,"start_date":"2025-08-16","start_time":"","text":"read fountainhead","type":"task"},{"categories":["Fun"],"completed":false,"id":"33f21585-7b57-4714-9fa7-e7b236354527","is_section":false,"level":0,"parent_id":null,"section":"High Priority","section_index":2,"start_date":"2025-08-16","text":"read fountainhead","type":"task"},{"categories":["Fun"],"completed":false,"id":"73099313-7eb4-469b-aacb-734906df5bb0","is_section":false,"level":0,"parent_id":null,"section":"Medium Priority","section_index":1,"start_date":"2025-08-16","text":"haircut","type":"task"},{"categories":[],"completed":false,"end_time":"","id":"1ef18d12-55bc-471a-9b40-c76f7276084b","is_recurring":null,"is_section":false,"is_subtask":false,"level":0,"parent_id":null,"section":"Medium Priority","section_index":3,"start_date":"2025-08-16","start_time":"","text":"implement rag","type":"task"},{"categories":["Fun"],"completed":false,"id":"09d9f9c2-ea13-44a4-addd-d1e4a4bbe013","is_section":false,"level":0,"parent_id":null,"section":"Low Priority","section_index":2,"start_date":"2025-08-16","text":"fix sim card","type":"task"}],"sourceFound":true,"success":true}
+
+# Bug #6 - To do
+I am facing a bug where the event_bus is not syncing newly added calendar events
+
+# Steps to reproduce:
+1. as a signed in user, go to /dashboard for the first time today
+2. autogenerate() is called
+3. see generated schedule for today
+4. go to google calendar and add a new all day event "Task X"
+5. bug: "Task X" does not render on today's schedule, instead it gets added to the previous day schedule
+6. go to google calendar and add a new timed event "Task Y" from 9am-10am
+7. bug: "Task Y" does not render on today's schedule, even after page refresh 
+
+# Expected behaviour:
+- syncing of google calendar events for today should be real time regardless if it is an all day or timed event
+- should not have to manually refresh/reload the page to see synced tasks
+- for any synced google calendar tasks for today, preserve their most recent positon in the list so they are not grouped together with the calendar event added in real time

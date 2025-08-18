@@ -12,6 +12,7 @@ import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
 from backend.utils.auth import verify_firebase_token as utils_verify_firebase_token
+from backend.utils.timezone import validate_timezone_update, get_reliable_user_timezone
 import os
 # Import AI service functions directly
 from backend.services.ai_service import (
@@ -104,8 +105,8 @@ def events_stream():
             pass
 
         def _get_user_timezone(user_doc: Dict[str, Any]) -> str:
-            tz = user_doc.get('timezone') or 'UTC'
-            return tz
+            user_tz = user_doc.get('timezone')
+            return get_reliable_user_timezone(user_tz)
 
         def _today_in_tz(tz_str: str) -> str:
             try:
@@ -261,12 +262,10 @@ def update_user_timezone():
         if not tz_value:
             return jsonify({"success": False, "error": "Missing timezone"}), 400
 
-        # Validate timezone
-        try:
-            import pytz
-            pytz.timezone(tz_value)
-        except Exception:
-            return jsonify({"success": False, "error": f"Invalid timezone: {tz_value}"}), 400
+        # Validate timezone using robust validation
+        is_valid, error_msg = validate_timezone_update(tz_value)
+        if not is_valid:
+            return jsonify({"success": False, "error": error_msg}), 400
 
         db = get_database()
         users = db['users']

@@ -15,6 +15,7 @@ from backend.services.schedule_service import schedule_service
 from backend.services.event_bus import event_bus
 import pytz  # Add pytz for timezone handling
 from backend.utils.auth import get_user_id_from_token as auth_get_user_id_from_token
+from backend.utils.timezone import get_user_timezone_for_date_calculation, get_reliable_user_timezone
 
 calendar_bp = Blueprint("calendar", __name__)
 
@@ -440,9 +441,12 @@ def get_calendar_events():
                 "tasks": []
             }), 400
         
-        # Get user's timezone (with fallback to query timezone or UTC)
+        # Get user's timezone using robust fallback logic
         query_timezone = request.args.get('timezone')
-        user_timezone = user.get('timezone') or query_timezone or 'Australia/Sydney'
+        stored_timezone = user.get('timezone')
+        # Prefer stored timezone, then query timezone, with reliable fallback
+        candidate_timezone = stored_timezone or query_timezone
+        user_timezone = get_reliable_user_timezone(candidate_timezone)
         
         # Fetch events from Google Calendar with timezone-aware boundaries
         try:
@@ -627,12 +631,13 @@ def calendar_webhook():
         if not access_token:
             return jsonify({"status": "no-token"}), 200
 
-        # Compute today's date in user's timezone (fallback to Australia/Sydney for consistency)
-        user_timezone = user.get('timezone') or 'Australia/Sydney'
+        # Compute today's date in user's timezone using robust timezone calculation
+        user_timezone = get_user_timezone_for_date_calculation(user)
         try:
             tz = pytz.timezone(user_timezone)
         except Exception:
-            tz = pytz.UTC
+            # Fallback to Australia/Sydney, never UTC for user operations
+            tz = pytz.timezone('Australia/Sydney')
         now_local = datetime.now(tz)
         date_str = now_local.strftime('%Y-%m-%d')
 

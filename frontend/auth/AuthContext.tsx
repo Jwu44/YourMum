@@ -6,6 +6,7 @@ import { auth, provider } from './firebase';
 import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { AuthContextType, CalendarCredentials } from '@/lib/types';
 import { calendarApi } from '@/lib/api/calendar';
+import { detectBrowserTimezone, shouldUpdateUserTimezone, isValidTimezone } from '@/lib/utils/timezone';
 
 /**
  * Auth Context for managing user authentication state
@@ -200,14 +201,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []); // Empty dependency array - setup once on mount
 
-  // One-off timezone sync when user becomes available and not in OAuth flow
+  // Enhanced timezone sync when user becomes available and not in OAuth flow
   useEffect(() => {
     const syncTimezoneIfNeeded = async () => {
       if (!user || isOAuthInProgress) return
+      
       try {
-        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const browserTz = detectBrowserTimezone()
         const tzKey = 'tzSyncedFor'
         const cached = localStorage.getItem(tzKey)
+        
+        // Skip if already synced for this browser timezone
         if (cached === browserTz) return
 
         // Fetch current user to read stored timezone
@@ -218,12 +222,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
         })
         if (!res.ok) return
+        
         const data = await res.json()
         const serverTz: string | undefined = data?.user?.timezone
-        if (serverTz && serverTz === browserTz) {
+        
+        // Check if update is needed using robust detection
+        if (!shouldUpdateUserTimezone(serverTz)) {
           localStorage.setItem(tzKey, browserTz)
           return
         }
+
+        console.log(`🌍 Timezone sync needed: ${serverTz || 'none'} → ${browserTz}`)
 
         // Update timezone via API
         const updateRes = await fetch(`${apiBase}/api/user/timezone`, {
@@ -231,13 +240,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ timezone: browserTz })
         })
+        
         if (updateRes.ok) {
+          const result = await updateRes.json()
+          console.log(`✅ Timezone updated successfully to: ${result.timezone}`)
           localStorage.setItem(tzKey, browserTz)
+        } else {
+          console.warn('⚠️ Failed to update timezone:', await updateRes.text())
         }
-      } catch (_) {
-        // best-effort only
+      } catch (error) {
+        console.warn('Timezone sync failed (non-critical):', error)
       }
     }
+    
     syncTimezoneIfNeeded()
   }, [user, isOAuthInProgress])
 

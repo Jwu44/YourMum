@@ -17,6 +17,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from backend.db_config import get_database
+from backend.utils.timezone import get_reliable_user_timezone
 
 
 # NOTE: need this to avoid circular dependency with schedule_service
@@ -186,7 +187,9 @@ def get_calendar_tasks_for_user_date(user_id: str, date: str, timezone_override:
         if not access_token:
             return []
 
-        user_timezone = timezone_override or user.get('timezone') or 'Australia/Sydney'
+        # Use robust timezone resolution
+        candidate_timezone = timezone_override or user.get('timezone')
+        user_timezone = get_reliable_user_timezone(candidate_timezone)
 
         # Fetch events and on PermissionError attempt one refresh-and-retry using shared helper.
         try:

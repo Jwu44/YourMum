@@ -34,7 +34,7 @@ class FakeUsersCollection:
 def user_with_valid_calendar():
     return {
         'googleId': 'u123',
-        'timezone': 'UTC',
+        'timezone': 'Australia/Sydney',  # Use valid timezone instead of UTC
         'calendar': {
             'connected': True,
             'credentials': {
@@ -102,13 +102,13 @@ class TestCalendarService:
         users = FakeUsersCollection(user_with_valid_calendar)
         mock_get_db.return_value = {'users': users}
 
-        # Events on target date 2025-01-20 (UTC)
+        # Events on target date 2025-01-20 (UTC times that work in Australia/Sydney)
         events = [
-            # timed later
-            _make_event('e3', 'Zeta', '2025-01-20T15:00:00Z', '2025-01-20T16:00:00Z'),
+            # timed later (in Sydney timezone: 2025-01-20T23:00:00+11)
+            _make_event('e3', 'Zeta', '2025-01-20T12:00:00Z', '2025-01-20T13:00:00Z'),
             # all-day
             _make_event('e1', 'Alpha Day', start_date='2025-01-20', end_date='2025-01-21'),
-            # timed earlier
+            # timed earlier (in Sydney timezone: 2025-01-20T20:00:00+11)
             _make_event('e2', 'Beta', '2025-01-20T09:00:00Z', '2025-01-20T10:00:00Z'),
         ]
         mock_fetch.return_value = events
