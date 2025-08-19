@@ -16,7 +16,6 @@ from typing import List, Dict, Any, Tuple, Optional
 from cachetools import TTLCache, LRUCache
 from backend.models.task import Task
 from dotenv import load_dotenv
-from backend.data import schedules_rag
 
 # Load environment variables from .env file
 load_dotenv()

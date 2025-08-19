@@ -25,7 +25,7 @@ import {
   type MonthWeek,
   RECURRENCE_OPTIONS
 } from '../../lib/types'
-import { cn } from '@/lib/utils'
+import { cn, convert12HourTo24Hour, convert24HourTo12Hour } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 
 interface TaskEditDrawerProps {
@@ -74,9 +74,9 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     if (isEditMode && task) {
       return {
         ...task,
-        // Ensure all required fields are present with proper defaults
-        start_time: task.start_time || '',
-        end_time: task.end_time || '',
+        // Convert 12-hour backend format to 24-hour frontend format for time inputs
+        start_time: convert12HourTo24Hour(task.start_time),
+        end_time: convert12HourTo24Hour(task.end_time),
         categories: task.categories || [],
         start_date: task.start_date || currentDate
       }
@@ -231,16 +231,23 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
         return
       }
 
+      // Convert 24-hour frontend format back to 12-hour backend format
+      const taskForBackend = {
+        ...editedTask,
+        start_time: convert24HourTo12Hour(editedTask.start_time),
+        end_time: convert24HourTo12Hour(editedTask.end_time)
+      }
+
       if (isEditMode && onUpdateTask) {
         // Edit mode: update existing task
         await onUpdateTask({
-          ...editedTask,
+          ...taskForBackend,
           id: task?.id || editedTask.id
         })
       } else if (!isEditMode && onCreateTask) {
         // Create mode: create new task
         await onCreateTask({
-          ...editedTask,
+          ...taskForBackend,
           id: ''
         })
       }
