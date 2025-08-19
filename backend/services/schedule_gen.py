@@ -278,8 +278,8 @@ def create_ordering_prompt(
         Respond with valid JSON in this exact format:
         {{
             "placements": [
-                {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
-                {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+                {{"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"}},
+                {{"task_id": "task_id_2", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"}}
             ]
         }}"""
 
@@ -327,7 +327,15 @@ def process_ordering_response(response_text: str) -> List[Dict[str, Any]]:
         validated_placements = []
         for i, placement in enumerate(placements):
             if all(key in placement for key in ["task_id", "section", "order"]):
-                validated_placements.append(placement)
+                # Include time_allocation if present (for timeboxed patterns)
+                validated_placement = {
+                    "task_id": placement["task_id"],
+                    "section": placement["section"], 
+                    "order": placement["order"]
+                }
+                if "time_allocation" in placement:
+                    validated_placement["time_allocation"] = placement["time_allocation"]
+                validated_placements.append(validated_placement)
             else:
                 print(f"[SCHEDULE_GEN] Warning: Invalid placement {i}: {placement}")
         

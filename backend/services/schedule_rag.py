@@ -296,8 +296,8 @@ Instructions:
 Respond with valid JSON in this exact format:
 {{
     "placements": [
-        {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
-        {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+        {{"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"}},
+        {{"task_id": "task_id_2", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"}}
     ]
 }}
 </instructions>"""
@@ -359,6 +359,34 @@ def check_task_time_constraints(task_text: str) -> Dict[str, str]:
     time_pattern = r'(\d{1,2}:\d{2}(?:am|pm))\s*-\s*(\d{1,2}:\d{2}(?:am|pm)):'
     
     match = re.search(time_pattern, task_text, re.IGNORECASE)
+    if match:
+        return {
+            "start_time": match.group(1),
+            "end_time": match.group(2)
+        }
+    
+    return {}
+
+
+def parse_time_allocation(time_allocation: str) -> Dict[str, str]:
+    """
+    Parse time allocation string into start and end times.
+    
+    Args:
+        time_allocation: Time allocation string (e.g., "9:00am - 10:00am")
+        
+    Returns:
+        Dictionary with start_time and end_time if parsed successfully
+    """
+    import re
+    
+    if not time_allocation:
+        return {}
+    
+    # Pattern to match time ranges like "9:00am - 10:00am"
+    time_pattern = r'(\d{1,2}:\d{2}(?:am|pm))\s*-\s*(\d{1,2}:\d{2}(?:am|pm))'
+    
+    match = re.search(time_pattern, time_allocation, re.IGNORECASE)
     if match:
         return {
             "start_time": match.group(1),
