@@ -16,7 +16,6 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Badge } from '@/components/ui/badge'
 
 // Icons
@@ -420,7 +419,7 @@ const InputConfigurationPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Work Start Time
+                      Start Time
                     </label>
                     <div className="relative">
                       <Input
@@ -433,7 +432,7 @@ const InputConfigurationPage: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Work End Time
+                      End Time
                     </label>
                     <div className="relative">
                       <Input
@@ -539,36 +538,72 @@ const InputConfigurationPage: React.FC = () => {
               <CardContent className="space-y-6">
                 <div>
                   <label className="text-sm font-medium mb-3 block">Layout Type</label>
-                  <RadioGroup
-                    value={state.layout_preference?.layout || 'todolist-structured'}
-                    onValueChange={(value) => { handleLayoutChange('layout', value) }}
-                    className="space-y-2"
-                  >
-                    <div className="radio-card">
-                      <RadioGroupItem value="todolist-structured" id="structured" />
-                      <Grid className="h-4 w-4 text-muted-foreground" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div
+                      className={`task-ordering-card group ${
+                        (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
+                          ? 'task-ordering-card-selected'
+                          : 'task-ordering-card-unselected'
+                      }`}
+                      onClick={() => { handleLayoutChange('layout', 'todolist-structured') }}
+                    >
+                      <div className={`p-2 rounded-lg ${
+                        (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
+                          ? 'bg-primary-foreground/20'
+                          : 'bg-muted'
+                      }`}>
+                        <Grid className={`h-4 w-4 ${
+                          (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
+                            ? 'text-selection-foreground'
+                            : 'text-muted-foreground'
+                        }`} />
+                      </div>
                       <div className="flex-1">
-                        <label htmlFor="structured" className="text-sm font-medium cursor-pointer">
-                          Structured
-                        </label>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Structured</span>
+                        </div>
+                        <p className={`text-xs ${
+                          (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
+                            ? 'text-selection-foreground/80'
+                            : 'text-muted-foreground'
+                        }`}>
                           Organized with clear categories
                         </p>
                       </div>
                     </div>
-                    <div className="radio-card">
-                      <RadioGroupItem value="todolist-unstructured" id="unstructured" />
-                      <List className="h-4 w-4 text-muted-foreground" />
+                    <div
+                      className={`task-ordering-card group ${
+                        state.layout_preference?.layout === 'todolist-unstructured'
+                          ? 'task-ordering-card-selected'
+                          : 'task-ordering-card-unselected'
+                      }`}
+                      onClick={() => { handleLayoutChange('layout', 'todolist-unstructured') }}
+                    >
+                      <div className={`p-2 rounded-lg ${
+                        state.layout_preference?.layout === 'todolist-unstructured'
+                          ? 'bg-primary-foreground/20'
+                          : 'bg-muted'
+                      }`}>
+                        <List className={`h-4 w-4 ${
+                          state.layout_preference?.layout === 'todolist-unstructured'
+                            ? 'text-selection-foreground'
+                            : 'text-muted-foreground'
+                        }`} />
+                      </div>
                       <div className="flex-1">
-                        <label htmlFor="unstructured" className="text-sm font-medium cursor-pointer">
-                          Unstructured
-                        </label>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Unstructured</span>
+                        </div>
+                        <p className={`text-xs ${
+                          state.layout_preference?.layout === 'todolist-unstructured'
+                            ? 'text-selection-foreground/80'
+                            : 'text-muted-foreground'
+                        }`}>
                           Flexible, free-form layout
                         </p>
                       </div>
                     </div>
-                  </RadioGroup>
+                  </div>
                 </div>
 
                 {/* Subcategory dropdown - only show if structured is selected */}
