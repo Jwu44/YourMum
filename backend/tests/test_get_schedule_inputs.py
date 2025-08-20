@@ -36,7 +36,6 @@ class TestGetScheduleInputsReturn:
                 "name": "Test User",
                 "work_start_time": "09:00",
                 "work_end_time": "17:00", 
-                "working_days": ["Monday", "Tuesday"],
                 "energy_patterns": ["morning"],
                 "priorities": {"Work": 5, "Exercise": 3},
                 "layout_preference": {"layout": "structured"},

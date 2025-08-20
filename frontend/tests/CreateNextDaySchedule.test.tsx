@@ -413,7 +413,6 @@ describe('handleNextDay navigation and error handling', () => {
       name: 'Test User',
       work_start_time: '09:00',
       work_end_time: '17:00',
-      working_days: ['Monday', 'Tuesday'],
       priorities: { high: 'work', medium: 'personal' },
       energy_patterns: ['morning', 'afternoon'],
       layout_preference: { layout: 'structured', orderingPattern: 'timebox' },

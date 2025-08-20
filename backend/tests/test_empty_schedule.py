@@ -82,7 +82,6 @@ class TestTask22EnhancedEmptySchedule:
                 "name": "Test User",
                 "work_start_time": "09:00",
                 "work_end_time": "17:00",
-                "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
                 "energy_patterns": ["morning_person"],
                 "priorities": {
                     "health": "Exercise daily",

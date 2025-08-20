@@ -38,7 +38,6 @@ export interface FormData {
   user?: UserDocument
   work_start_time: string
   work_end_time: string
-  working_days: string[]
   tasks: Task[]
   energy_patterns: string[]
   priorities: {

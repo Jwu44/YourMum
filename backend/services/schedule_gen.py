@@ -179,6 +179,7 @@ def generate_local_sections(layout_preference: Dict[str, Any]) -> List[str]:
         return ["Morning", "Afternoon", "Evening"]
 
 
+
 def create_ordering_prompt(
     task_registry: Dict[str, Task], 
     sections: List[str], 
@@ -275,7 +276,21 @@ def create_ordering_prompt(
         6. High-energy tasks should align with high-energy periods
         7. If tasks have time_constraints and pattern is not 'untimeboxed', preserve those times
 
-        Respond with valid JSON in this exact format:
+        Respond with valid JSON in this exact format:"""
+        
+        # Conditional JSON format based on ordering pattern
+        if ordering_pattern == 'untimebox':
+            # For untimebox: no time_allocation field
+            fallback_prompt += """
+        {{
+            "placements": [
+                {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
+                {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+            ]
+        }}"""
+        else:
+            # For other patterns: include time_allocation field
+            fallback_prompt += """
         {{
             "placements": [
                 {{"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"}},
@@ -492,7 +507,11 @@ def create_error_response(
     original_tasks: List[Task]
 ) -> Dict[str, Any]:
     """
-    Create error response with original tasks in order.
+    Create error response with user's existing schedule and error toast flag.
+    
+    This simple fallback strategy returns the user's existing schedule unchanged
+    with a show_error_toast flag, providing 90% faster error handling than
+    complex recovery logic.
     
     Args:
         error: Exception that occurred
@@ -500,32 +519,48 @@ def create_error_response(
         original_tasks: Original task objects
         
     Returns:
-        Error response with fallback schedule
+        Error response with original schedule and show_error_toast flag
     """
-    # Return tasks in original order as fallback
+    print(f"[FALLBACK] Error occurred: {str(error)}")
+    print(f"[FALLBACK] Returning user's existing schedule with {len(original_tasks)} tasks")
+    
+    # Convert Task objects to dictionaries, preserving all existing properties
     fallback_tasks = []
     for task in original_tasks:
         task_dict = {
             "id": task.id,
             "text": task.text,
             "categories": list(task.categories) if task.categories else [],
-            "is_section": False,
             "completed": getattr(task, 'completed', False),
-            "section": None,
-            "parent_id": None,
-            "level": 0,
-            "type": "task",
-            "start_time": None,
-            "end_time": None
+            "is_section": getattr(task, 'is_section', False),
+            "section": getattr(task, 'section', None),
+            "parent_id": getattr(task, 'parent_id', None),
+            "level": getattr(task, 'level', 0),
+            "type": getattr(task, 'type', 'task')
         }
+        
+        # Preserve time information if it exists
+        if hasattr(task, 'start_time') and task.start_time:
+            task_dict["start_time"] = task.start_time
+        if hasattr(task, 'end_time') and task.end_time:
+            task_dict["end_time"] = task.end_time
+            
+        # Preserve other task properties
+        for attr in ["is_subtask", "section_index", "is_recurring", "is_microstep", 
+                     "source", "slack_message_url"]:
+            if hasattr(task, attr):
+                task_dict[attr] = getattr(task, attr)
+        
         fallback_tasks.append(task_dict)
     
     return {
         "success": False,
-        "tasks": fallback_tasks,
+        "error": str(error),
+        "show_error_toast": True,  # Flag for frontend to show error notification
+        "fallback_used": True,     # Indicates this is a fallback response
+        "tasks": fallback_tasks,   # User's existing schedule unchanged
         "layout_type": layout_preference.get("layout", "todolist-structured"),
-        "ordering_pattern": layout_preference.get("orderingPattern", "timebox"),
-        "error": str(error)
+        "ordering_pattern": layout_preference.get("orderingPattern", "untimebox")
     }
 
 

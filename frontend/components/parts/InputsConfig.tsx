@@ -148,16 +148,6 @@ const DraggableCard: React.FC<{ item: Priority, index: number }> = ({ item, inde
   )
 }
 
-// Working days options with the new structure
-const workingDays = [
-  { id: 'monday', label: 'Mon', fullLabel: 'Monday' },
-  { id: 'tuesday', label: 'Tue', fullLabel: 'Tuesday' },
-  { id: 'wednesday', label: 'Wed', fullLabel: 'Wednesday' },
-  { id: 'thursday', label: 'Thu', fullLabel: 'Thursday' },
-  { id: 'friday', label: 'Fri', fullLabel: 'Friday' },
-  { id: 'saturday', label: 'Sat', fullLabel: 'Saturday' },
-  { id: 'sunday', label: 'Sun', fullLabel: 'Sunday' }
-]
 
 /**
  * Input Configuration Page Component
@@ -315,15 +305,6 @@ const InputConfigurationPage: React.FC = () => {
     dispatch({ type: 'UPDATE_FIELD', field, value })
   }, [dispatch])
 
-  // Handle working days checkbox changes
-  const handleWorkingDayChange = useCallback((day: string, checked: boolean) => {
-    const currentDays = state.working_days || []
-    const updatedDays = checked
-      ? [...currentDays, day]
-      : currentDays.filter(d => d !== day)
-
-    handleFieldChange('working_days', updatedDays)
-  }, [state.working_days, handleFieldChange])
 
   // Handle energy pattern selection
   const handleEnergyChange = useCallback((value: string) => {
@@ -409,9 +390,9 @@ const InputConfigurationPage: React.FC = () => {
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Input Configuration</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Inputs</h1>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              Add your preferences to personalise your schedule.
+              Add your inputs for YourMum to personalise your schedule.
             </p>
             {/* Show loading indicator while loading tasks */}
             {isLoadingTasks && (
@@ -426,14 +407,8 @@ const InputConfigurationPage: React.FC = () => {
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
-                  <div className="icon-container">
-                    <Clock className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
                     <span>Work Schedule</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {(state.working_days || []).length} days
-                    </Badge>
                   </div>
                 </CardTitle>
                 <CardDescription>
@@ -471,33 +446,6 @@ const InputConfigurationPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Working Days */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    Working Days
-                  </label>
-                  <div className="flex gap-3">
-                    {workingDays.map((day) => {
-                      const isSelected = (state.working_days || []).includes(day.fullLabel)
-                      return (
-                        <div
-                          key={day.id}
-                          className={`working-day-bubble ${
-                            isSelected
-                              ? 'working-day-bubble-selected'
-                              : 'working-day-bubble-unselected'
-                          }`}
-                          onClick={() => { handleWorkingDayChange(day.fullLabel, !isSelected) }}
-                          title={day.fullLabel}
-                        >
-                          <span className="text-sm font-medium">
-                            {day.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -505,25 +453,16 @@ const InputConfigurationPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="icon-container">
-                    <Target className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
-                    <span>Priority Settings</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {priorities.length} categories
-                    </Badge>
+                    <span>Priorities</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Higher priority categories will be scheduled first during optimal energy periods.
+                  Higher priority categories will be scheduled first during optimal energy periods. Drag to reorder.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-3 block">
-                    Priority Order (Drag to reorder)
-                  </label>
                   <div className="space-y-2">
                     <Reorder.Group axis="y" values={priorities} onReorder={handleReorderPriorities}>
                       {priorities.map((item, index) => (
@@ -541,25 +480,16 @@ const InputConfigurationPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="icon-container">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
                     <span>Energy Patterns</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {(state.energy_patterns || []).length} selected
-                    </Badge>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Based on your selections, we&apos;ll schedule demanding tasks during your peak energy times.
+                  Select your energy pattern to determine when to schedule demanding tasks.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-3 block">
-                    Select your energy patterns
-                  </label>
                   <div className="space-y-2">
                     {energyOptions.map((option) => {
                       const isChecked = (state.energy_patterns || []).includes(option.value)
@@ -598,14 +528,8 @@ const InputConfigurationPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="icon-container">
-                    <Layout className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
-                    <span>Layout Preferences</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {state.layout_preference?.layout?.includes('structured') ? 'Structured' : 'Unstructured'}
-                    </Badge>
+                    <span>Layout</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
@@ -688,9 +612,6 @@ const InputConfigurationPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="icon-container">
-                    <CheckSquare className="h-5 w-5 text-primary" />
-                  </div>
                   <div>
                     <span>Task Ordering</span>
                   </div>

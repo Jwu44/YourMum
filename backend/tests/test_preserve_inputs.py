@@ -29,7 +29,6 @@ class TestInputsConfigPreservation:
             "name": "Test User",
             "work_start_time": "09:00",
             "work_end_time": "17:00",
-            "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             "energy_patterns": ["peak_morning", "high_all_day"],
             "priorities": {
                 "health": "1",
@@ -131,7 +130,6 @@ class TestInputsConfigPreservation:
         # Verify specific inputs config fields are preserved
         assert stored_inputs['work_start_time'] == "09:00"
         assert stored_inputs['work_end_time'] == "17:00"
-        assert stored_inputs['working_days'] == ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         assert stored_inputs['energy_patterns'] == ["peak_morning", "high_all_day"]
         assert stored_inputs['priorities']['health'] == "1"
         assert stored_inputs['layout_preference']['layout'] == "todolist-structured"
@@ -266,7 +264,6 @@ class TestInputsConfigPreservation:
             "name": "",
             "work_start_time": "",
             "work_end_time": "",
-            "working_days": [],
             "energy_patterns": [],
             "priorities": {},
             "layout_preference": {},

@@ -78,7 +78,6 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
       tasks: formData.tasks || [],
       work_start_time: formData.work_start_time,
       work_end_time: formData.work_end_time,
-      working_days: formData.working_days || [],
       priorities: formData.priorities || {},
       energy_patterns: formData.energy_patterns || [],
       layout_preference: formData.layout_preference || {}

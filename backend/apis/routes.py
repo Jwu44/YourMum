@@ -1265,7 +1265,6 @@ def submit_data():
         "tasks": List[Dict] (optional, may include calendar events as task objects),
         "work_start_time": str,
         "work_end_time": str,
-        "working_days": List[str] (optional),
         "priorities": Dict[str, str],
         "energy_patterns": List[str],
         "layout_preference": {

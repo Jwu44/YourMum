@@ -32,7 +32,6 @@ class TestScheduleServiceValidation:
                 "name": "Test User",
                 "work_start_time": "09:00",
                 "work_end_time": "17:00",
-                "working_days": ["Monday", "Tuesday"],
                 "energy_patterns": [],
                 "priorities": {},
                 "layout_preference": {},
@@ -50,7 +49,6 @@ class TestScheduleServiceValidation:
             "name": "Test User",
             "work_start_time": "09:00",
             "work_end_time": "17:00",
-            "working_days": ["Monday", "Tuesday"],
             "energy_patterns": ["morning"],
             "priorities": {"work": "high"},
             "layout_preference": {"layout": "todolist-structured"},
@@ -139,7 +137,6 @@ class TestScheduleServiceValidation:
         assert processed["name"] == "Test User"
         assert processed["work_start_time"] == "09:00"
         assert processed["work_end_time"] == "17:00"
-        assert processed["working_days"] == ["Monday", "Tuesday"]
         assert processed["energy_patterns"] == ["morning"]
         assert processed["priorities"] == {"work": "high"}
         assert processed["layout_preference"] == {"layout": "todolist-structured"}
@@ -161,7 +158,6 @@ class TestScheduleServiceValidation:
         
         # Should provide safe defaults for missing fields
         assert processed["work_end_time"] == ""
-        assert processed["working_days"] == []
         assert processed["energy_patterns"] == []
         assert processed["priorities"] == {}
         assert processed["layout_preference"] == {}
@@ -175,7 +171,6 @@ class TestScheduleServiceValidation:
         assert processed["name"] == ""
         assert processed["work_start_time"] == ""
         assert processed["work_end_time"] == ""
-        assert processed["working_days"] == []
         assert processed["energy_patterns"] == []
         assert processed["priorities"] == {}
         assert processed["layout_preference"] == {}
@@ -189,7 +184,6 @@ class TestScheduleServiceValidation:
         assert processed["name"] == ""
         assert processed["work_start_time"] == ""
         assert processed["work_end_time"] == ""
-        assert processed["working_days"] == []
         assert processed["energy_patterns"] == []
         assert processed["priorities"] == {}
         assert processed["layout_preference"] == {}
@@ -201,7 +195,7 @@ class TestScheduleServiceValidation:
         
         # Should have all expected keys
         expected_keys = {
-            "name", "work_start_time", "work_end_time", "working_days",
+            "name", "work_start_time", "work_end_time",
             "energy_patterns", "priorities", "layout_preference", "tasks"
         }
         assert set(processed.keys()) == expected_keys
@@ -211,7 +205,6 @@ class TestScheduleServiceValidation:
         dangerous_inputs = {
             "name": "Normal Name",
             "work_start_time": None,  # None value
-            "working_days": "not_a_list",  # Wrong type
             "energy_patterns": None,
             "priorities": "not_a_dict"  # Wrong type
         }
@@ -221,6 +214,5 @@ class TestScheduleServiceValidation:
         # Should sanitize dangerous values to safe defaults
         assert processed["name"] == "Normal Name"  # Good value preserved
         assert processed["work_start_time"] == ""  # None converted to empty string
-        assert isinstance(processed["working_days"], list)  # Converted to list
         assert isinstance(processed["energy_patterns"], list)  # None to list
         assert isinstance(processed["priorities"], dict)  # Wrong type to dict

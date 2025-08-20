@@ -7,7 +7,12 @@ schedule generation with concrete examples from schedule_templates.json.
 
 import json
 import os
+import threading
 from typing import Dict, List, Any, Union
+
+# Global template cache and thread safety lock
+_template_cache: Dict[str, Any] = None
+_cache_lock = threading.Lock()
 
 
 def load_schedule_templates() -> Dict[str, Any]:
@@ -44,6 +49,49 @@ def load_schedule_templates() -> Dict[str, Any]:
         return {"templates": []}
 
 
+def get_cached_templates() -> Dict[str, Any]:
+    """
+    Get schedule templates using thread-safe caching for performance optimization.
+    
+    Uses double-check locking pattern to ensure thread safety while minimizing
+    lock contention for cache hits.
+    
+    Returns:
+        Dictionary containing templates from cache or loaded from disk
+    """
+    global _template_cache
+    
+    # Fast path: check cache without lock
+    if _template_cache is not None:
+        return _template_cache
+    
+    # Slow path: acquire lock and double-check
+    with _cache_lock:
+        # Double-check: another thread might have populated cache
+        if _template_cache is not None:
+            return _template_cache
+        
+        # Cache miss: load templates and cache them
+        print("[RAG] Cache miss - loading templates from disk")
+        _template_cache = load_schedule_templates()
+        print(f"[RAG] Templates cached successfully")
+        return _template_cache
+
+
+def clear_template_cache() -> None:
+    """
+    Clear the template cache. Useful for testing and forcing cache refresh.
+    
+    This function is thread-safe and will force the next call to get_cached_templates()
+    to reload templates from disk.
+    """
+    global _template_cache
+    
+    with _cache_lock:
+        _template_cache = None
+        print("[RAG] Template cache cleared")
+
+
 def get_pattern_definitions() -> Dict[str, str]:
     """
     Get canonical definitions for all ordering patterns.
@@ -52,34 +100,17 @@ def get_pattern_definitions() -> Dict[str, str]:
         Dictionary mapping pattern names to their definitions
     """
     return {
-        "untimeboxed": "Base ordering using energy patterns and priorities (no specific times). This is the baseline pattern that other patterns build upon.",
+        "untimebox": "Order tasks using energy patterns and priorities with no set start and end time. This is the baseline pattern that other patterns build upon.",
         
-        "timeboxed": "Untimeboxed ordering + specific time allocations with strict work/non-work windows. Tasks are assigned specific start and end times.",
+        "timebox": "Untimebox ordering + specific time allocations with strict work/non-work windows. Tasks are assigned specific start and end times.",
         
         "batching": "Group similar tasks by theme/skill/activity type. Tasks of the same category or requiring similar skills are clustered together.",
         
-        "three-three-three": "1 deep focus task (~3 hours) + ≤3 medium tasks + ≤3 maintenance tasks. This creates a balanced workload structure.",
+        "three-three-three": "1 deep focus task (~3 hours) + ≤3 medium tasks + ≤3 maintenance tasks.",
         
-        "alternating": "Alternate between different theme/skill/activity types. Prevents mental fatigue by switching between different kinds of work."
+        "alternating": "Alternate tasks by theme/skill/activity type."
     }
 
-
-def normalize_ordering_pattern(pattern: Union[str, List[str]]) -> Union[str, List[str]]:
-    """
-    Normalize ordering patterns to match template format.
-    Frontend uses 'timebox'/'untimebox' but templates use 'timeboxed'/'untimeboxed'.
-    """
-    pattern_mapping = {
-        'timebox': 'timeboxed',
-        'untimebox': 'untimeboxed'
-    }
-    
-    if isinstance(pattern, str):
-        return pattern_mapping.get(pattern, pattern)
-    elif isinstance(pattern, list):
-        return [pattern_mapping.get(p, p) for p in pattern]
-    else:
-        return pattern
 
 
 def retrieve_schedule_examples(
@@ -96,12 +127,10 @@ def retrieve_schedule_examples(
     Returns:
         List of matching template dictionaries (max 5 examples)
     """
-    # Normalize pattern names to match template format
-    normalized_pattern = normalize_ordering_pattern(ordering_pattern)
-    print(f"[RAG] Searching for examples: subcategory='{subcategory}', pattern='{ordering_pattern}' -> normalized='{normalized_pattern}'")
+    print(f"[RAG] Searching for examples: subcategory='{subcategory}', pattern='{ordering_pattern}'")
     
     try:
-        templates_data = load_schedule_templates()
+        templates_data = get_cached_templates()
         
         if not templates_data or "templates" not in templates_data:
             print(f"[RAG] No templates data available")
@@ -129,20 +158,20 @@ def retrieve_schedule_examples(
                 subcategory_mismatches += 1
                 continue
             
-            # Check ordering pattern exact match using normalized pattern
+            # Check ordering pattern exact match
             template_pattern = template["ordering_pattern"]
             
-            if isinstance(normalized_pattern, str):
+            if isinstance(ordering_pattern, str):
                 # Single pattern matching
-                if template_pattern == normalized_pattern:
+                if template_pattern == ordering_pattern:
                     matching_examples.append(template)
                     print(f"[RAG] Found matching template: {template.get('id', 'unknown')}")
                 else:
                     pattern_mismatches += 1
-            elif isinstance(normalized_pattern, list):
+            elif isinstance(ordering_pattern, list):
                 # Compound pattern matching - must be exact match including order
                 if (isinstance(template_pattern, list) and 
-                    template_pattern == normalized_pattern):
+                    template_pattern == ordering_pattern):
                     matching_examples.append(template)
                     print(f"[RAG] Found matching compound template: {template.get('id', 'unknown')}")
                 else:
@@ -166,6 +195,8 @@ def format_examples_for_prompt(examples: List[Dict[str, Any]]) -> str:
     """
     Format retrieved examples for inclusion in the LLM prompt.
     
+    Limits to max 3 examples with 5 lines each for token optimization.
+    
     Args:
         examples: List of template dictionaries
         
@@ -175,10 +206,16 @@ def format_examples_for_prompt(examples: List[Dict[str, Any]]) -> str:
     if not examples:
         return ""
     
+    # Limit to max 3 examples for token optimization
+    examples = examples[:3]
+    
     formatted_examples = []
     
     for i, example in enumerate(examples, 1):
         example_lines = example.get("example", [])
+        
+        # Limit to max 5 lines per example for token optimization
+        example_lines = example_lines[:5]
         
         # Format the example
         formatted_example = f"Example {i}:\n"
@@ -216,11 +253,8 @@ def create_enhanced_ordering_prompt_content(
     pattern_definitions = get_pattern_definitions()
     print(f"[RAG] Loaded {len(pattern_definitions)} pattern definitions")
     
-    # Normalize the ordering pattern for template matching
-    normalized_pattern = normalize_ordering_pattern(ordering_pattern)
-    
-    # Retrieve relevant examples using normalized pattern
-    examples = retrieve_schedule_examples(subcategory, normalized_pattern)
+    # Retrieve relevant examples using ordering pattern directly
+    examples = retrieve_schedule_examples(subcategory, ordering_pattern)
     formatted_examples = format_examples_for_prompt(examples)
     print(f"[RAG] Formatted examples length: {len(formatted_examples)} characters")
     
@@ -230,9 +264,6 @@ def create_enhanced_ordering_prompt_content(
     priorities = user_data.get('priorities', {})
     priority_text = ", ".join([f"{k}: {v}" for k, v in priorities.items()])
     
-    # Determine primary pattern for definition - use normalized pattern
-    primary_pattern = normalized_pattern if isinstance(normalized_pattern, str) else normalized_pattern[0]
-    
     # Build enhanced prompt
     prompt = f"""You are a productivity expert. Place the following tasks into the most optimal sections and order based on user preferences and the provided examples.
 
@@ -240,14 +271,14 @@ def create_enhanced_ordering_prompt_content(
 Pattern Definitions:
 """
     
-    # Include relevant pattern definitions using normalized patterns
+    # Include relevant pattern definitions
     pattern_count = 0
-    if isinstance(normalized_pattern, str):
-        if normalized_pattern in pattern_definitions:
-            prompt += f"- {normalized_pattern}: {pattern_definitions[normalized_pattern]}\n"
+    if isinstance(ordering_pattern, str):
+        if ordering_pattern in pattern_definitions:
+            prompt += f"- {ordering_pattern}: {pattern_definitions[ordering_pattern]}\n"
             pattern_count += 1
     else:
-        for pattern in normalized_pattern:
+        for pattern in ordering_pattern:
             if pattern in pattern_definitions:
                 prompt += f"- {pattern}: {pattern_definitions[pattern]}\n"
                 pattern_count += 1
@@ -255,7 +286,7 @@ Pattern Definitions:
     print(f"[RAG] Added {pattern_count} pattern definitions to prompt")
     
     prompt += """
-Note: 'untimeboxed' is the baseline pattern. Other patterns build upon it by adding specific constraints or structures.
+Note: 'untimebox' is the baseline pattern. Other patterns build upon it by adding specific constraints or structures.
 </definitions>
 
 """
@@ -276,7 +307,7 @@ Note: 'untimeboxed' is the baseline pattern. Other patterns build upon it by add
 - Work Schedule: {work_schedule}
 - Energy Patterns: {energy_patterns}
 - Priorities: {priority_text}
-- Selected Pattern: {ordering_pattern} (normalized: {normalized_pattern})
+- Selected Pattern: {ordering_pattern}
 - Available Sections: {', '.join(sections)}
 </user_context>
 
@@ -285,15 +316,31 @@ Tasks to place:
 {json.dumps(task_summaries, indent=2)}
 
 Instructions:
-1. Follow the selected ordering pattern: {normalized_pattern}
+1. Follow the selected ordering pattern: {ordering_pattern}
 2. Assign each task to the most appropriate section
 3. Determine the optimal order within each section based on the pattern
 4. Consider energy patterns, work schedule, and priorities
 5. Work tasks should be placed during work hours when possible
 6. High-energy tasks should align with high-energy periods
-7. If tasks have existing time constraints, preserve those times when ordering pattern is not 'untimeboxed'
+7. If tasks have existing time constraints, preserve those times when ordering pattern is not 'untimebox'
 
 Respond with valid JSON in this exact format:
+"""
+    
+    # Conditional JSON format based on ordering pattern
+    if ordering_pattern == 'untimebox':
+        # For untimebox: no time_allocation field
+        prompt += """
+{{
+    "placements": [
+        {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
+        {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+    ]
+}}
+</instructions>"""
+    else:
+        # For other patterns: include time_allocation field
+        prompt += """
 {{
     "placements": [
         {{"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"}},

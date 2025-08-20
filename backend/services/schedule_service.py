@@ -891,7 +891,6 @@ class ScheduleService:
             "name": "",
             "work_start_time": "",
             "work_end_time": "",
-            "working_days": [],
             "energy_patterns": [],
             "priorities": {},
             "layout_preference": {},
@@ -951,7 +950,6 @@ class ScheduleService:
                     if inputs and any([
                         inputs.get('name'),
                         inputs.get('work_start_time'),
-                        inputs.get('working_days'),
                         inputs.get('layout_preference', {}).get('layout')
                     ]):
                         print(f"Found recent schedule with inputs from {search_date.strftime('%Y-%m-%d')}")
@@ -1455,7 +1453,6 @@ class ScheduleService:
             "name": raw_inputs.get('name', '') if raw_inputs.get('name') is not None else '',
             "work_start_time": raw_inputs.get('work_start_time', '') if raw_inputs.get('work_start_time') is not None else '',
             "work_end_time": raw_inputs.get('work_end_time', '') if raw_inputs.get('work_end_time') is not None else '',
-            "working_days": raw_inputs.get('working_days', []) if isinstance(raw_inputs.get('working_days'), list) else [],
             "energy_patterns": raw_inputs.get('energy_patterns', []) if isinstance(raw_inputs.get('energy_patterns'), list) else [],
             "priorities": raw_inputs.get('priorities', {}) if isinstance(raw_inputs.get('priorities'), dict) else {},
             "layout_preference": raw_inputs.get('layout_preference', {}) if isinstance(raw_inputs.get('layout_preference'), dict) else {},

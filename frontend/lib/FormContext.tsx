@@ -18,7 +18,6 @@ const initialState: FormData = {
   age: '',
   work_start_time: '9:00 AM',
   work_end_time: '5:00 PM',
-  working_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
   tasks: [],
   energy_patterns: [],
   priorities: { health: '', relationships: '', fun_activities: '', ambitions: '' },

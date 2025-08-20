@@ -9,7 +9,6 @@ import pytest
 import uuid
 from backend.models.task import Task
 from backend.services.schedule_gen import (
-    create_simple_fallback_schedule,
     create_error_response,
     generate_local_sections
 )
@@ -189,7 +188,7 @@ class TestErrorResponseWithFallback:
     """Test error response creation with fallback strategy"""
     
     def test_create_error_response_basic(self):
-        """Test basic error response with fallback"""
+        """Test basic error response with simplified fallback"""
         error = ValueError("Test error")
         layout_preference = {
             "layout": "todolist-structured",
@@ -207,29 +206,26 @@ class TestErrorResponseWithFallback:
         # Check error response structure
         assert result["success"] is False
         assert result["error"] == "Test error"
+        assert result["show_error_toast"] is True  # New flag for frontend
+        assert result["fallback_used"] is True     # Indicates fallback was used
         assert result["layout_type"] == "todolist-structured"
         assert result["ordering_pattern"] == "timeboxed"
         assert "tasks" in result
         
-        # Should use structured fallback with sections
+        # Should return original tasks unchanged (simple fallback)
         task_list = result["tasks"]
         
-        # Extract regular tasks (non-section)
-        regular_tasks = [t for t in task_list if not t.get("is_section")]
-        section_headers = [t for t in task_list if t.get("is_section")]
-        
-        # Should have original tasks preserved
-        assert len(regular_tasks) == 2
-        assert len(section_headers) == 3  # Morning, Afternoon, Evening
+        # Should have original tasks preserved exactly
+        assert len(task_list) == 2
         
         # Find the original tasks
-        task_ids = {t["id"] for t in regular_tasks}
+        task_ids = {t["id"] for t in task_list}
         assert "1" in task_ids
         assert "2" in task_ids
         
-        # Verify tasks have proper structure
-        task_1 = next(t for t in regular_tasks if t["id"] == "1")
-        task_2 = next(t for t in regular_tasks if t["id"] == "2")
+        # Verify tasks have proper structure and properties preserved
+        task_1 = next(t for t in task_list if t["id"] == "1")
+        task_2 = next(t for t in task_list if t["id"] == "2")
         
         assert task_1["text"] == "Task 1"
         assert task_1["categories"] == ["Work"]
@@ -238,7 +234,6 @@ class TestErrorResponseWithFallback:
     
     def test_error_response_with_show_toast_flag(self):
         """Test error response includes show_error_toast flag"""
-        # This test assumes we'll add the toast flag to error responses
         error = Exception("Connection timeout")
         layout_preference = {}
         original_tasks = []
@@ -247,11 +242,13 @@ class TestErrorResponseWithFallback:
         
         # Should indicate this is an error that needs a toast
         assert result["success"] is False
-        assert "error" in result
-        # Note: We may want to add show_error_toast flag later
+        assert result["error"] == "Connection timeout"
+        assert result["show_error_toast"] is True  # Flag for frontend toast notification
+        assert result["fallback_used"] is True     # Indicates fallback strategy was used
+        assert len(result["tasks"]) == 0           # No tasks in this example
     
     def test_error_response_preserves_task_order(self):
-        """Test that error response preserves exact task order"""
+        """Test that error response preserves exact task order and properties"""
         original_tasks = []
         for i in range(5):
             task = Task.from_dict({
@@ -265,27 +262,18 @@ class TestErrorResponseWithFallback:
         error = RuntimeError("LLM failure")
         result = create_error_response(error, {}, original_tasks)
         
-        # Verify task preservation in structured format
+        # Verify task preservation in exact order (simple fallback)
         task_list = result["tasks"]
         
-        # Extract regular tasks (non-section)
-        regular_tasks = [t for t in task_list if not t.get("is_section")]
-        section_headers = [t for t in task_list if t.get("is_section")]
+        # Should have all original tasks in exact order
+        assert len(task_list) == 5
         
-        # Should have all original tasks
-        assert len(regular_tasks) == 5
-        assert len(section_headers) == 3  # Morning, Afternoon, Evening
-        
-        # Verify all task IDs are present
-        task_ids = {t["id"] for t in regular_tasks}
-        expected_ids = {f"task-{i}" for i in range(5)}
-        assert task_ids == expected_ids
-        
-        # Verify task properties are preserved
-        for task in regular_tasks:
-            task_idx = int(task["id"].split("-")[1])
-            assert task["text"] == f"Task {task_idx}"
-            assert task["completed"] == (task_idx % 2 == 0)
+        # Verify all task IDs are present in correct order
+        for i, task in enumerate(task_list):
+            expected_id = f"task-{i}"
+            assert task["id"] == expected_id
+            assert task["text"] == f"Task {i}"
+            assert task["completed"] == (i % 2 == 0)
             assert task["categories"] == ["Work"]
 
 
