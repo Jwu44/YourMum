@@ -24,7 +24,8 @@ const initialState: FormData = {
   layout_preference: {
     layout: 'todolist-structured',
     subcategory: 'day-sections',
-    orderingPattern: 'timebox'
+    timing: 'untimebox', // NEW: Default to untimebox as specified in tests
+    orderingPattern: undefined // NEW: Default to no ordering pattern (optional)
   }
 }
 
@@ -112,12 +113,16 @@ const validateLayoutPreference = (layoutPreference: Partial<LayoutPreference>): 
     }
   }
 
-  // Ensure we have valid ordering pattern
+  // Ensure we have valid timing (required field)
+  const timing = layoutPreference.timing || initialState.layout_preference.timing
+
+  // Ensure we have valid ordering pattern (optional field)
   const orderingPattern = layoutPreference.orderingPattern || initialState.layout_preference.orderingPattern
 
   return {
     layout,
     subcategory,
+    timing,
     orderingPattern
   }
 }

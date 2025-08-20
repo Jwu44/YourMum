@@ -27,7 +27,7 @@ import { useForm } from '@/lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
 
 // Types and Utils
-import { type LayoutPreference, type Priority } from '@/lib/types'
+import { type LayoutPreference, type Priority, type TaskOrderingPattern } from '@/lib/types'
 
 import { generateSchedule, loadSchedule } from '@/lib/ScheduleHelper'
 import { formatDateToString } from '@/lib/helper'
@@ -71,8 +71,8 @@ const energyOptions = [
   }
 ]
 
-// Define task ordering options for card selection
-const taskOrderingOptions = [
+// Define timing options for Step 1 (required selection)
+const timingOptions = [
   {
     value: 'timebox',
     label: 'Timeboxed',
@@ -88,7 +88,11 @@ const taskOrderingOptions = [
     icon: Layers,
     color: 'theme-green',
     bgColor: 'theme-green-bg'
-  },
+  }
+]
+
+// Define ordering pattern options for Step 2 (optional selection)
+const orderingPatternOptions = [
   {
     value: 'batching',
     label: 'Batching',
@@ -106,7 +110,7 @@ const taskOrderingOptions = [
     bgColor: 'theme-orange-bg'
   },
   {
-    value: 'three-three-three',
+    value: '3-3-3',
     label: '3-3-3',
     description: '3 hours focus, 3 medium tasks, 3 maintenance tasks',
     icon: Target,
@@ -316,24 +320,32 @@ const InputConfigurationPage: React.FC = () => {
   }, [state.energy_patterns, handleFieldChange])
 
   // Handle layout preference changes
-  const handleLayoutChange = useCallback((field: keyof LayoutPreference, value: string) => {
+  const handleLayoutChange = useCallback((field: keyof LayoutPreference, value: string | undefined) => {
     const updatedPreference = {
       ...state.layout_preference,
       [field]: value
     }
 
     // Clear subcategory if switching to unstructured
-    if (field === 'layout' && value.includes('unstructured')) {
+    if (field === 'layout' && value && value.includes('unstructured')) {
       updatedPreference.subcategory = ''
     }
 
     handleFieldChange('layout_preference', updatedPreference)
   }, [state.layout_preference, handleFieldChange])
 
-  // Handle task ordering selection
-  const handleTaskOrderingChange = useCallback((value: string) => {
-    handleLayoutChange('orderingPattern', value)
+  // Handle timing selection (Step 1 - Required)
+  const handleTimingChange = useCallback((value: string) => {
+    handleLayoutChange('timing', value)
   }, [handleLayoutChange])
+
+  // Handle ordering pattern selection (Step 2 - Optional)
+  const handleOrderingPatternChange = useCallback((value: string) => {
+    const currentPattern = state.layout_preference?.orderingPattern
+    // Toggle selection: if clicking the same pattern, deselect it (since it's optional)
+    const newPattern = currentPattern === value ? undefined : (value as TaskOrderingPattern)
+    handleLayoutChange('orderingPattern', newPattern)
+  }, [handleLayoutChange, state.layout_preference?.orderingPattern])
 
   // Handle priority reordering
   const handleReorderPriorities = useCallback((newPriorities: Priority[]) => {
@@ -643,52 +655,91 @@ const InputConfigurationPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* 5. Task Ordering Section */}
+            {/* 5. Step 1: Time Management Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
                   <div>
-                    <span>Task Ordering</span>
+                    <span>Time Management</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Configure how tasks are sorted and organized in your lists
+                  Choose how you want to manage time for your tasks
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-3 block">
-                    Select task ordering pattern
-                  </label>
-                  <div className="space-y-2">
-                    {taskOrderingOptions.map((option) => {
-                      const isSelected = state.layout_preference?.orderingPattern === option.value
-                      return (
-                        <div
-                          key={option.value}
-                          className={`task-ordering-card group ${
-                            isSelected
-                              ? 'task-ordering-card-selected'
-                              : 'task-ordering-card-unselected'
-                          }`}
-                          onClick={() => { handleTaskOrderingChange(option.value) }}
-                        >
-                          <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
-                            <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">{option.label}</span>
-                              {isSelected}
-                            </div>
-                            <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                              {option.description}
-                            </p>
-                          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {timingOptions.map((option) => {
+                    const isSelected = state.layout_preference?.timing === option.value
+                    return (
+                      <div
+                        key={option.value}
+                        className={`timing-card group cursor-pointer ${
+                          isSelected
+                            ? 'timing-card-selected'
+                            : 'timing-card-unselected'
+                        }`}
+                        onClick={() => { handleTimingChange(option.value) }}
+                      >
+                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
+                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
                         </div>
-                      )
-                    })}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{option.label}</span>
+                          </div>
+                          <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                            {option.description}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 6. Step 2: Task Ordering Pattern Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div>
+                    <span>Task Ordering Pattern</span>
+                    <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
                   </div>
+                </CardTitle>
+                <CardDescription>
+                  Optionally choose how to organize and sequence your tasks
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {orderingPatternOptions.map((option) => {
+                    const isSelected = state.layout_preference?.orderingPattern === option.value
+                    return (
+                      <div
+                        key={option.value}
+                        className={`ordering-card group cursor-pointer ${
+                          isSelected
+                            ? 'ordering-card-selected'
+                            : 'ordering-card-unselected'
+                        }`}
+                        onClick={() => { handleOrderingPatternChange(option.value) }}
+                      >
+                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
+                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{option.label}</span>
+                          </div>
+                          <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                            {option.description}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>

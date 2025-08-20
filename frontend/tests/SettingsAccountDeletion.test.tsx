@@ -49,7 +49,9 @@ describe('Settings Page - Account Deletion', () => {
       loading: false,
       error: null,
       signIn: jest.fn(),
-      currentUser: mockUser
+      currentUser: mockUser,
+      reconnectCalendar: jest.fn(),
+      calendarConnectionStage: null
     });
 
     mockUseToast.mockReturnValue({

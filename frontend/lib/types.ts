@@ -160,13 +160,16 @@ export type TimelineSubcategory =
 export type ScheduleLayoutType =
   | `${BaseLayoutType}-${LayoutStructure}`
 
-// Task ordering patterns
+// Task ordering patterns (separated from timing)
 export type TaskOrderingPattern =
-  | 'timebox'
-  | 'untimebox'
   | 'batching'
   | 'alternating'
-  | 'three-three-three'
+  | '3-3-3'
+
+// Timing patterns (separated from ordering)
+export type TimingPattern =
+  | 'timebox'
+  | 'untimebox'
 
 // Mapping of layout types to their valid subcategories
 export interface LayoutSubcategoryMap {
@@ -180,11 +183,12 @@ export interface LayoutSubcategoryMap {
   'timeline-unstructured': never
 }
 
-// Enhanced layout preference interface with improved typing
+// Enhanced layout preference interface with improved typing and timing/ordering separation
 export interface LayoutPreference {
   layout: ScheduleLayoutType
   subcategory: string // Using string for backward compatibility, but should be one of the subcategory types
-  orderingPattern: TaskOrderingPattern
+  timing: TimingPattern // NEW FIELD: Separate timing preference
+  orderingPattern?: TaskOrderingPattern // UPDATED: Now optional, no timing patterns
 }
 
 // Helper function type to get valid subcategories for a layout type
@@ -434,7 +438,7 @@ export interface ScheduleMetadata {
 export interface ScheduleData {
   tasks: Task[]
   layout: ScheduleLayoutType
-  orderingPattern: TaskOrderingPattern
+  orderingPattern?: TaskOrderingPattern
   scheduleId?: string
   metadata: {
     generatedAt: string

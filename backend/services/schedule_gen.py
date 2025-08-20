@@ -223,10 +223,41 @@ def create_ordering_prompt(
         
         task_summaries.append(task_summary)
     
-    # Extract layout preferences
+    # Extract layout preferences and handle new timing/ordering schema
     layout_preference = user_data.get('layout_preference', {})
     subcategory = layout_preference.get('subcategory', 'day-sections')
-    ordering_pattern = layout_preference.get('orderingPattern', 'untimeboxed')
+    
+    # SCHEMA CONVERSION: Handle separate timing and orderingPattern fields
+    timing = layout_preference.get('timing')
+    ordering_pattern_raw = layout_preference.get('orderingPattern')
+    
+    # Convert schema to pattern_for_matching format
+    if timing and ordering_pattern_raw and ordering_pattern_raw != 'null':
+        # New schema: both timing and ordering pattern specified
+        # Normalize "three-three-three" to "3-3-3" for consistency
+        normalized_pattern = '3-3-3' if ordering_pattern_raw == 'three-three-three' else ordering_pattern_raw
+        pattern_for_matching = [normalized_pattern, timing]
+        print(f"[SCHEMA_CONVERSION] Combined pattern: {pattern_for_matching}")
+    elif timing:
+        # New schema: only timing specified (no ordering pattern)
+        pattern_for_matching = timing
+        print(f"[SCHEMA_CONVERSION] Timing only: {pattern_for_matching}")
+    elif ordering_pattern_raw and not timing:
+        # DEPRECATED: Legacy single orderingPattern field without timing
+        # This path supports old data but should be migrated to new schema
+        print(f"[DEPRECATED] Legacy orderingPattern detected: '{ordering_pattern_raw}'. "
+              f"Please migrate to new schema with separate 'timing' and 'orderingPattern' fields.")
+        # Normalize legacy patterns
+        normalized_old = '3-3-3' if ordering_pattern_raw == 'three-three-three' else ordering_pattern_raw
+        pattern_for_matching = normalized_old
+        print(f"[SCHEMA_CONVERSION] Legacy compatibility: {pattern_for_matching}")
+    else:
+        # Default fallback when no timing or ordering pattern specified
+        pattern_for_matching = 'untimebox'
+        print(f"[SCHEMA_CONVERSION] Default fallback: {pattern_for_matching}")
+    
+    # Use pattern_for_matching for template matching (this is what RAG system expects)
+    ordering_pattern = pattern_for_matching
     
     # Use the enhanced RAG prompt creation
     print(f"[SCHEDULE_GEN] Attempting to create enhanced prompt with RAG system")
@@ -279,7 +310,10 @@ def create_ordering_prompt(
         Respond with valid JSON in this exact format:"""
         
         # Conditional JSON format based on ordering pattern
-        if ordering_pattern == 'untimebox':
+        # Check if 'untimebox' is present in the pattern (works for both single patterns and combined patterns)
+        is_untimebox = 'untimebox' in (ordering_pattern if isinstance(ordering_pattern, list) else [ordering_pattern])
+        
+        if is_untimebox:
             # For untimebox: no time_allocation field
             fallback_prompt += """
         {{

@@ -374,6 +374,40 @@ All colors MUST be HSL.
   .task-ordering-card-unselected {
     @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
   }
+
+  /* Timing selection cards */
+  .timing-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all duration-200;
+  }
+  
+  .timing-card.group {
+    /* group class should be added directly in HTML */
+  }
+  
+  .timing-card-selected {
+    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+  }
+  
+  .timing-card-unselected {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+  }
+
+  /* Ordering pattern selection cards */
+  .ordering-card {
+    @apply flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all duration-200;
+  }
+  
+  .ordering-card.group {
+    /* group class should be added directly in HTML */
+  }
+  
+  .ordering-card-selected {
+    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+  }
+  
+  .ordering-card-unselected {
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+  }
   
   /* Working day bubble cards */
   .working-day-bubble {

@@ -94,21 +94,26 @@ def clear_template_cache() -> None:
 
 def get_pattern_definitions() -> Dict[str, str]:
     """
-    Get canonical definitions for all ordering patterns.
+    Get canonical definitions for timing and ordering patterns.
     
     Returns:
         Dictionary mapping pattern names to their definitions
     """
     return {
+        # TIMING PATTERNS (how time is managed)
         "untimebox": "Order tasks using energy patterns and priorities with no set start and end time. This is the baseline pattern that other patterns build upon.",
         
         "timebox": "Untimebox ordering + specific time allocations with strict work/non-work windows. Tasks are assigned specific start and end times.",
         
+        # ORDERING PATTERNS (how tasks are sequenced/organized)
         "batching": "Group similar tasks by theme/skill/activity type. Tasks of the same category or requiring similar skills are clustered together.",
         
-        "three-three-three": "1 deep focus task (~3 hours) + ≤3 medium tasks + ≤3 maintenance tasks.",
+        "alternating": "Alternate tasks by theme/skill/activity type.",
         
-        "alternating": "Alternate tasks by theme/skill/activity type."
+        "3-3-3": "1 deep focus task (~3 hours) + ≤3 medium tasks + ≤3 maintenance tasks.",
+        
+        # BACKWARD COMPATIBILITY - old naming
+        "three-three-three": "1 deep focus task (~3 hours) + ≤3 medium tasks + ≤3 maintenance tasks."
     }
 
 
@@ -328,7 +333,10 @@ Respond with valid JSON in this exact format:
 """
     
     # Conditional JSON format based on ordering pattern
-    if ordering_pattern == 'untimebox':
+    # Check if 'untimebox' is present in the pattern (works for both single patterns and combined patterns)
+    is_untimebox = 'untimebox' in (ordering_pattern if isinstance(ordering_pattern, list) else [ordering_pattern])
+    
+    if is_untimebox:
         # For untimebox: no time_allocation field
         prompt += """
 {{

@@ -108,7 +108,7 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
     return {
       tasks: result.schedule || [],
       layout: formData.layout_preference?.layout || 'todolist-structured',
-      orderingPattern: formData.layout_preference?.orderingPattern || 'timebox',
+      orderingPattern: formData.layout_preference?.orderingPattern || undefined,
       scheduleId: result.scheduleId,
       metadata: {
         generatedAt: result.metadata?.generatedAt || new Date().toISOString(),
