@@ -635,10 +635,21 @@ class ScheduleService:
 
         Returns tuple (success, result_dict)
         """
+        # Start timing
+        import time
+        total_start_time = time.time()
+        print(f"[TIMING] autogenerate_schedule started for date: {date}")
+        
         try:
-            # If schedule already exists, no-op
+            # Step 1: Check if schedule already exists
+            existing_check_start = time.time()
             exists, existing = self.get_schedule_by_date(user_id, date)
+            existing_check_duration = time.time() - existing_check_start
+            print(f"[TIMING] Existing schedule check: {existing_check_duration:.3f}s")
+            
             if exists:
+                total_duration = time.time() - total_start_time
+                print(f"[TIMING] autogenerate_schedule (existing found): {total_duration:.3f}s")
                 return True, {
                     "existed": True,
                     "created": False,
@@ -647,9 +658,15 @@ class ScheduleService:
                     "schedule": existing.get('schedule', [])
                 }
 
-            # Find source schedule
+            # Step 2: Find source schedule (this searches up to 30 days back)
+            source_lookup_start = time.time()
             source_schedule = self.get_most_recent_schedule_with_tasks(user_id, date, max_days_back)
+            source_lookup_duration = time.time() - source_lookup_start
+            print(f"[TIMING] Source schedule lookup (up to {max_days_back} days): {source_lookup_duration:.3f}s")
+            
             if not source_schedule:
+                total_duration = time.time() - total_start_time
+                print(f"[TIMING] autogenerate_schedule (no source found): {total_duration:.3f}s")
                 return True, {
                     "existed": False,
                     "created": False,
@@ -658,8 +675,15 @@ class ScheduleService:
                     "schedule": []
                 }
 
-            # Build new tasks
+            # Step 3: Build new tasks from source schedule
+            task_processing_start = time.time()
+            
+            # Copy sections from source schedule
+            section_copy_start = time.time()
             section_tasks = self._copy_sections_from_schedule(source_schedule)
+            section_copy_duration = time.time() - section_copy_start
+            print(f"[TIMING] Section copying: {section_copy_duration:.3f}s")
+            
             first_section_text: Optional[str] = None
             if section_tasks:
                 try:
@@ -668,7 +692,8 @@ class ScheduleService:
                 except Exception:
                     first_section_text = None
 
-            # Incomplete tasks from source (including incomplete recurring tasks)
+            # Process incomplete tasks from source (including incomplete recurring tasks)
+            carry_over_start = time.time()
             source_tasks = source_schedule.get('schedule', [])
             carry_over_tasks: List[Dict[str, Any]] = []
             carry_over_calendar_tasks: List[Dict[str, Any]] = []
@@ -700,11 +725,17 @@ class ScheduleService:
                     # Track if this is a recurring task being carried over
                     if task.get('is_recurring'):
                         carried_over_recurring_texts.add(task.get('text', ''))
+            carry_over_duration = time.time() - carry_over_start
+            print(f"[TIMING] Task carry-over processing: {carry_over_duration:.3f}s")
 
-            # Recurring tasks due on target date (exclude ones already carried over)
+            # Find recurring tasks due on target date (exclude ones already carried over)
+            recurring_start = time.time()
             recurring_tasks = self._get_recurring_tasks_for_date(user_id, date, exclude_texts=carried_over_recurring_texts)
+            recurring_duration = time.time() - recurring_start
+            print(f"[TIMING] Recurring tasks lookup: {recurring_duration:.3f}s")
 
-            # Fetch calendar tasks for target date with sub-timeout to respect 10s UX
+            # Step 4: Fetch calendar tasks for target date with sub-timeout to respect 10s UX
+            calendar_fetch_start = time.time()
             fetched_calendar_tasks: List[Dict[str, Any]] = []
             try:
                 # Allow tests to override fetch timeout via method
@@ -712,6 +743,8 @@ class ScheduleService:
             except Exception:
                 timeout_seconds = 8.0
 
+            print(f"[TIMING] Starting calendar fetch with {timeout_seconds}s timeout")
+            
             try:
                 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
@@ -729,8 +762,10 @@ class ScheduleService:
                     except FuturesTimeout:
                         # Proceed without calendar on timeout
                         fetched_calendar_tasks = []
-                    except Exception:
+                        print(f"[TIMING] Calendar fetch timed out after {timeout_seconds}s")
+                    except Exception as e:
                         fetched_calendar_tasks = []
+                        print(f"[TIMING] Calendar fetch failed: {str(e)}")
             except Exception:
                 # Fallback to direct fetch without timeout (still protected)
                 try:
@@ -739,10 +774,16 @@ class ScheduleService:
                         date,
                         timezone_override=user_timezone
                     )
-                except Exception:
+                except Exception as e:
                     fetched_calendar_tasks = []
+                    print(f"[TIMING] Calendar fetch fallback failed: {str(e)}")
+            
+            calendar_fetch_duration = time.time() - calendar_fetch_start
+            print(f"[TIMING] Calendar fetch: {calendar_fetch_duration:.3f}s (fetched {len(fetched_calendar_tasks)} events)")
 
-            # Preserve relative positions from source schedule when placing today's calendar events.
+            # Step 5: Preserve relative positions from source schedule when placing today's calendar events
+            position_preservation_start = time.time()
+            
             # Build map of source calendar tasks by gcal_event_id
             source_calendar_map: Dict[str, Dict[str, Any]] = {}
             for t in source_tasks:
@@ -813,15 +854,28 @@ class ScheduleService:
 
             # After placing calendar items, append recurring and carry-over tasks at the end
             final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks + filtered_carry_over_calendar
+            
+            position_preservation_duration = time.time() - position_preservation_start
+            print(f"[TIMING] Calendar position preservation: {position_preservation_duration:.3f}s")
 
-            # Deduplicate tasks to fix Bug #5: prevent duplicate tasks when generating next day schedule
+            # Step 6: Deduplicate tasks to fix Bug #5: prevent duplicate tasks when generating next day schedule
+            dedup_start = time.time()
             final_tasks = self._deduplicate_tasks(final_tasks, date)
+            dedup_duration = time.time() - dedup_start
+            print(f"[TIMING] Task deduplication: {dedup_duration:.3f}s")
+            
+            task_processing_duration = time.time() - task_processing_start
+            print(f"[TIMING] Total task processing (steps 3-6): {task_processing_duration:.3f}s")
 
-            # Inputs from most recent schedule with inputs
+            # Step 7: Get inputs from most recent schedule with inputs
+            inputs_lookup_start = time.time()
             recent_with_inputs = self._get_most_recent_schedule_with_inputs(user_id, date)
             inputs = recent_with_inputs.get('inputs', {}) if recent_with_inputs else {}
+            inputs_lookup_duration = time.time() - inputs_lookup_start
+            print(f"[TIMING] Inputs lookup: {inputs_lookup_duration:.3f}s")
 
-            # Create and upsert document (use source='manual' to satisfy schema)
+            # Step 8: Create and save schedule document
+            save_start = time.time()
             schedule_document = self._create_schedule_document(
                 user_id=user_id,
                 date=date,
@@ -832,6 +886,8 @@ class ScheduleService:
 
             is_valid, validation_error = validate_schedule_document(schedule_document)
             if not is_valid:
+                total_duration = time.time() - total_start_time
+                print(f"[TIMING] autogenerate_schedule failed (validation): {total_duration:.3f}s")
                 return False, {"error": f"Schedule validation failed: {validation_error}"}
 
             formatted_date = format_schedule_date(date)
@@ -840,13 +896,22 @@ class ScheduleService:
                 schedule_document,
                 upsert=True
             )
+            save_duration = time.time() - save_start
+            print(f"[TIMING] Document creation and save: {save_duration:.3f}s")
 
+            # Step 9: Calculate final metadata
+            metadata_start = time.time()
             metadata = self._calculate_schedule_metadata(final_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
                 "source": "manual"
             })
+            metadata_duration = time.time() - metadata_start
+            print(f"[TIMING] Metadata calculation: {metadata_duration:.3f}s")
+            
+            total_duration = time.time() - total_start_time
+            print(f"[TIMING] autogenerate_schedule SUCCESS: {total_duration:.3f}s")
 
             return True, {
                 "existed": False,
@@ -857,6 +922,8 @@ class ScheduleService:
                 "metadata": metadata
             }
         except Exception as e:
+            total_duration = time.time() - total_start_time
+            print(f"[TIMING] autogenerate_schedule FAILED after: {total_duration:.3f}s")
             print(f"Error in autogenerate_schedule: {str(e)}")
             traceback.print_exc()
             return False, {"error": f"Failed to autogenerate schedule: {str(e)}"}

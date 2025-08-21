@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 // Icons
-import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Calendar, GripVertical, Users, Gamepad2, Zap, RotateCcw, TrendingUp, Layout, Grid, List, Layers, Shuffle } from 'lucide-react'
+import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Calendar, GripVertical, Users, Gamepad2, Zap, BatteryLow, Layout, Grid, List, Layers, Shuffle } from 'lucide-react'
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
@@ -65,7 +65,7 @@ const energyOptions = [
   {
     value: 'low_energy',
     label: 'Low energy, need help increasing',
-    icon: RotateCcw,
+    icon: BatteryLow,
     color: 'theme-gray',
     bgColor: 'theme-gray-bg'
   }
