@@ -9,10 +9,10 @@
 import React from 'react'
 
 // UI Components
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Icons
-import { Plug, Slack, Calendar } from 'lucide-react'
+import { Slack, Calendar } from 'lucide-react'
 
 // Components
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
@@ -50,7 +50,7 @@ const integrationServices: IntegrationService[] = [
     icon: Slack,
     status: 'available',
     component: SlackIntegrationCard
-  }
+  },
   // Future integrations can be added here
 ]
 
@@ -86,11 +86,11 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
 export default function DashboardIntegrationsPage() {
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe mobile-scroll">
+      <div className="flex-1 overflow-y-auto mobile-scroll">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
         {/* Page Header */}
         <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
           <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <Plug className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Integrations</h1>
           </div>
           <p className="text-muted-foreground text-sm sm:text-base">
@@ -99,7 +99,7 @@ export default function DashboardIntegrationsPage() {
         </div>
 
         {/* Integrations Grid */}
-        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 xl:grid-cols-3 justify-items-stretch sm:justify-items-center px-2 sm:px-4 max-w-none">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 xl:grid-cols-3 justify-items-stretch max-w-none">
           {integrationServices.map((service) => {
             if (service.status === 'available' && service.component) {
               const ServiceComponent = service.component
@@ -108,6 +108,7 @@ export default function DashboardIntegrationsPage() {
               return <ComingSoonCard key={service.id} service={service} />
             }
           })}
+        </div>
         </div>
       </div>
     </SidebarLayout>
