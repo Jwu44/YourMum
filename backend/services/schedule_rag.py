@@ -132,10 +132,16 @@ def retrieve_schedule_examples(
     Returns:
         List of matching template dictionaries (max 5 examples)
     """
+    import time
+    start_time = time.time()
+    print(f"[TIMING] retrieve_schedule_examples started")
     print(f"[RAG] Searching for examples: subcategory='{subcategory}', pattern='{ordering_pattern}'")
     
     try:
+        cache_start_time = time.time()
         templates_data = get_cached_templates()
+        cache_duration = time.time() - cache_start_time
+        print(f"[TIMING] Template cache access: {cache_duration:.3f}s")
         
         if not templates_data or "templates" not in templates_data:
             print(f"[RAG] No templates data available")
@@ -189,9 +195,14 @@ def retrieve_schedule_examples(
         print(f"[RAG] Search results: {len(matching_examples)} matches found")
         print(f"[RAG] Stats: {templates_checked} checked, {invalid_templates} invalid, {subcategory_mismatches} subcategory mismatches, {pattern_mismatches} pattern mismatches")
         
+        duration = time.time() - start_time
+        print(f"[TIMING] retrieve_schedule_examples: {duration:.3f}s")
+        
         return matching_examples
         
     except Exception as e:
+        duration = time.time() - start_time
+        print(f"[TIMING] retrieve_schedule_examples failed after: {duration:.3f}s")
         print(f"[RAG] ERROR: Exception retrieving examples: {str(e)}")
         return []
 
@@ -252,15 +263,29 @@ def create_enhanced_ordering_prompt_content(
     Returns:
         Enhanced prompt string with definitions and examples
     """
+    # Start timing
+    import time
+    total_start_time = time.time()
+    print(f"[TIMING] create_enhanced_ordering_prompt_content started")
     print(f"[RAG] Creating enhanced prompt for subcategory='{subcategory}', pattern='{ordering_pattern}'")
     
     # Get pattern definitions
+    definitions_start_time = time.time()
     pattern_definitions = get_pattern_definitions()
+    definitions_duration = time.time() - definitions_start_time
+    print(f"[TIMING] Pattern definitions loading: {definitions_duration:.3f}s")
     print(f"[RAG] Loaded {len(pattern_definitions)} pattern definitions")
     
     # Retrieve relevant examples using ordering pattern directly
+    examples_start_time = time.time()
     examples = retrieve_schedule_examples(subcategory, ordering_pattern)
+    examples_duration = time.time() - examples_start_time
+    print(f"[TIMING] Schedule examples retrieval: {examples_duration:.3f}s")
+    
+    formatting_start_time = time.time()
     formatted_examples = format_examples_for_prompt(examples)
+    formatting_duration = time.time() - formatting_start_time
+    print(f"[TIMING] Examples formatting: {formatting_duration:.3f}s")
     print(f"[RAG] Formatted examples length: {len(formatted_examples)} characters")
     
     # Extract user preferences
@@ -394,6 +419,9 @@ Respond with valid JSON in this exact format:
     
     elif prompt_length > 8000:
         print(f"[RAG] WARNING: Prompt is long ({prompt_length} chars), monitor for issues")
+    
+    total_duration = time.time() - total_start_time
+    print(f"[TIMING] Total create_enhanced_ordering_prompt_content: {total_duration:.3f}s")
     
     return prompt
 

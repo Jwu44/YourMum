@@ -252,9 +252,9 @@ def categorize_task(task_text: str) -> List[str]:
         
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-3-5-haiku-latest",
             max_tokens=100,
-            temperature=0.2,
+            temperature=0.3,
             messages=[
                 {"role": "user", "content": prompt}
             ]

@@ -67,11 +67,19 @@ const getAuthToken = async (): Promise<string> => {
  * @throws Error if generation fails or user is not authenticated
  */
 export const generateSchedule = async (formData: FormData): Promise<ScheduleData> => {
+  // Start timing
+  const startTime = performance.now()
+  console.log('[TIMING] Schedule generation started')
+  
   try {
     // Get authentication token
+    const authStartTime = performance.now()
     const token = await getAuthToken()
+    const authDuration = performance.now() - authStartTime
+    console.log(`[TIMING] Authentication: ${authDuration.toFixed(3)}ms`)
 
     // Prepare request payload
+    const prepStartTime = performance.now()
     const payload = {
       date: formData.date,
       name: formData.name,
@@ -82,8 +90,11 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
       energy_patterns: formData.energy_patterns || [],
       layout_preference: formData.layout_preference || {}
     }
+    const prepDuration = performance.now() - prepStartTime
+    console.log(`[TIMING] Payload preparation: ${prepDuration.toFixed(3)}ms`)
 
     // Call backend API
+    const apiStartTime = performance.now()
     const response = await fetch(`${API_BASE_URL}/api/submit_data`, {
       method: 'POST',
       headers: {
@@ -92,20 +103,26 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
       },
       body: JSON.stringify(payload)
     })
+    const apiDuration = performance.now() - apiStartTime
+    console.log(`[TIMING] Backend API call: ${apiDuration.toFixed(3)}ms`)
 
     if (!response.ok) {
       const error = await response.json()
       throw new Error(error.error || `Failed to generate schedule (${response.status})`)
     }
 
+    const parseStartTime = performance.now()
     const result = await response.json()
+    const parseDuration = performance.now() - parseStartTime
+    console.log(`[TIMING] Response parsing: ${parseDuration.toFixed(3)}ms`)
 
     if (!result.success) {
       throw new Error(result.error || 'Schedule generation failed')
     }
 
     // Return structured schedule data
-    return {
+    const assemblyStartTime = performance.now()
+    const scheduleData = {
       tasks: result.schedule || [],
       layout: formData.layout_preference?.layout || 'todolist-structured',
       orderingPattern: formData.layout_preference?.orderingPattern || undefined,
@@ -117,7 +134,16 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
         recurringTasks: result.metadata?.recurringTasks || 0
       }
     }
+    const assemblyDuration = performance.now() - assemblyStartTime
+    console.log(`[TIMING] Result assembly: ${assemblyDuration.toFixed(3)}ms`)
+
+    const totalDuration = performance.now() - startTime
+    console.log(`[TIMING] Total frontend schedule generation: ${totalDuration.toFixed(3)}ms`)
+    
+    return scheduleData
   } catch (error) {
+    const totalDuration = performance.now() - startTime
+    console.log(`[TIMING] Schedule generation failed after: ${totalDuration.toFixed(3)}ms`)
     console.error('Error generating schedule:', error)
     throw error instanceof Error ? error : new Error('Failed to generate schedule')
   }

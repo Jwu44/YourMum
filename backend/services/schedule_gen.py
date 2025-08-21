@@ -166,6 +166,13 @@ def generate_local_sections(layout_preference: Dict[str, Any]) -> List[str]:
     Returns:
         List of section names
     """
+    layout = layout_preference.get("layout", "todolist-structured")
+    
+    # Handle unstructured layouts first
+    if layout == "todolist-unstructured":
+        return []  # No sections for unstructured layout - flat task list
+    
+    # Handle structured layouts by subcategory
     subcategory = layout_preference.get("subcategory", "day-sections")
     
     if subcategory == "day-sections":
@@ -175,7 +182,7 @@ def generate_local_sections(layout_preference: Dict[str, Any]) -> List[str]:
     elif subcategory == "category":
         return ["Work", "Exercise", "Relationships", "Fun", "Ambition"]
     else:
-        # Default fallback
+        # Default fallback for structured layouts
         return ["Morning", "Afternoon", "Evening"]
 
 
@@ -442,6 +449,48 @@ def assemble_final_schedule(
         # Build final task list
         final_tasks = []
         
+        # Handle unstructured layout (no sections)
+        if not sections:
+            # Add all tasks directly without section headers
+            all_task_placements = []
+            for placement in placements:
+                task_id = placement["task_id"]
+                order = placement.get("order", 999)
+                time_allocation = placement.get("time_allocation")
+                
+                if task_id in task_registry:
+                    placement_data = {"time_allocation": time_allocation} if time_allocation else {}
+                    all_task_placements.append((order, task_registry[task_id], placement_data))
+                    placed_task_ids.add(task_id)
+            
+            # Sort by order and add tasks
+            all_task_placements.sort(key=lambda x: x[0])
+            for order, task, placement_data in all_task_placements:
+                start_time = None
+                end_time = None
+                if placement_data.get("time_allocation"):
+                    time_allocation = placement_data["time_allocation"]
+                    time_data = parse_time_allocation(time_allocation)
+                    if time_data:
+                        start_time = time_data.get("start_time")
+                        end_time = time_data.get("end_time")
+                
+                task_dict = {
+                    "id": task.id,
+                    "text": task.text,
+                    "categories": list(task.categories) if task.categories else [],
+                    "is_section": False,
+                    "completed": getattr(task, 'completed', False),
+                    "section": None,
+                    "parent_id": None,
+                    "level": 0,
+                    "type": "task",
+                    "start_time": start_time,
+                    "end_time": end_time
+                }
+                final_tasks.append(task_dict)
+        
+        # Handle structured layout (with sections)
         for section in sections:
             # Add section header
             section_task = {
@@ -612,10 +661,18 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary containing the generated schedule with structured data
     """
+    # Start timing
+    import time
+    total_start_time = time.time()
+    print(f"[TIMING] generate_schedule started")
+    
     try:
         # Step 1: Create task registry and identify uncategorized tasks
+        registry_start_time = time.time()
         input_tasks = user_data.get('tasks', [])
         task_registry, uncategorized_tasks = create_task_registry(input_tasks)
+        registry_duration = time.time() - registry_start_time
+        print(f"[TIMING] Task registry creation: {registry_duration:.3f}s")
         
         if not task_registry:
             # Handle empty task list
@@ -627,32 +684,48 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
             }
         
         # Step 2: Categorize uncategorized tasks (single LLM call)
+        categorization_start_time = time.time()
         categorization_success = categorize_uncategorized_tasks(uncategorized_tasks, task_registry)
+        categorization_duration = time.time() - categorization_start_time
+        print(f"[TIMING] Task categorization (LLM call): {categorization_duration:.3f}s")
+        
         if not categorization_success:
             print("Warning: Categorization failed, using default categories")
         
         # Step 3: Generate sections locally based on layout preferences
+        sections_start_time = time.time()
         layout_preference = user_data.get('layout_preference', {})
         sections = generate_local_sections(layout_preference)
+        sections_duration = time.time() - sections_start_time
+        print(f"[TIMING] Local section generation: {sections_duration:.3f}s")
         
         # Step 4: Create ordering prompt and call LLM (single LLM call)
+        prompt_start_time = time.time()
         print(f"[SCHEDULE_GEN] Creating ordering prompt for {len(task_registry)} tasks")
         ordering_prompt = create_ordering_prompt(task_registry, sections, user_data)
+        prompt_duration = time.time() - prompt_start_time
+        print(f"[TIMING] Ordering prompt creation: {prompt_duration:.3f}s")
         
+        llm_start_time = time.time()
         print(f"[SCHEDULE_GEN] Calling LLM with prompt length: {len(ordering_prompt)} characters")
         ordering_response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-haiku-latest",
             max_tokens=1024,
-            temperature=0.7,
+            temperature=0.3,
             messages=[{"role": "user", "content": ordering_prompt}]
         )
+        llm_duration = time.time() - llm_start_time
+        print(f"[TIMING] LLM ordering call: {llm_duration:.3f}s")
         
         # Step 5: Process ordering response
+        processing_start_time = time.time()
         response_text = ordering_response.content[0].text
         print(f"[SCHEDULE_GEN] Received LLM response length: {len(response_text)} characters")
         print(f"[SCHEDULE_GEN] Response preview: {response_text[:200]}...")
         
         placements = process_ordering_response(response_text)
+        processing_duration = time.time() - processing_start_time
+        print(f"[TIMING] Response processing: {processing_duration:.3f}s")
         
         if not placements:
             print("Warning: Ordering failed, using original task order")
@@ -667,11 +740,19 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 })
         
         # Step 6: Assemble final schedule
+        assembly_start_time = time.time()
         result = assemble_final_schedule(placements, task_registry, sections, layout_preference)
+        assembly_duration = time.time() - assembly_start_time
+        print(f"[TIMING] Final schedule assembly: {assembly_duration:.3f}s")
+        
+        total_duration = time.time() - total_start_time
+        print(f"[TIMING] Total generate_schedule: {total_duration:.3f}s")
         
         return result
         
     except Exception as e:
+        total_duration = time.time() - total_start_time
+        print(f"[TIMING] generate_schedule failed after: {total_duration:.3f}s")
         print(f"Error in optimized schedule generation: {str(e)}")
         # Handle case where task_registry might not be defined
         original_tasks = []

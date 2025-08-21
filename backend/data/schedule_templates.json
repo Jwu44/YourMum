@@ -544,9 +544,9 @@
         ]
       }, 
       {
-        "id": "day-sections-three-three-three-1",
+        "id": "day-sections-3-3-3-1",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Morning 🌞",
           "□ 7:30am - 8:00am: Quick breakfast + hydrate",
@@ -564,9 +564,9 @@
         ]
       },
       {
-        "id": "day-sections-three-three-three-2",
+        "id": "day-sections-3-3-3-2",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Morning 🌞",
           "□ 8:00am - 11:00am: Write product strategy doc for upcoming launch",
@@ -583,9 +583,9 @@
         ]
       },
       {
-        "id": "day-sections-three-three-three-3",
+        "id": "day-sections-3-3-3-3",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "Morning 🌞",
           "□ Finalize hi-fi mockups for checkout flow",
@@ -602,9 +602,9 @@
         ]
       },
       {
-        "id": "day-sections-three-three-three-4",
+        "id": "day-sections-3-3-3-4",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Morning 🌞",
           "□ 8:00am - 11:00am: Train and evaluate churn prediction model",
@@ -621,9 +621,9 @@
         ]
       },
       {
-        "id": "day-sections-three-three-three-5",
+        "id": "day-sections-3-3-3-5",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "Morning 🌞",
           "□ Write long-form captions for brand spotlight series",
@@ -640,9 +640,9 @@
         ]
       },
       {
-        "id": "day-sections-three-three-three-6",
+        "id": "day-sections-3-3-3-6",
         "subcategory": "day-sections",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Morning 🌞",
           "□ 9:00am - 12:00pm: Draft compliance review report for new partnership",
@@ -1115,9 +1115,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-1",
+        "id": "priority-3-3-3-1",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "High",
           "□ 9:00am - 12:00pm: Deep dive on 2025 product vision doc and roadmap draft",
@@ -1134,9 +1134,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-2",
+        "id": "priority-3-3-3-2",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "High",
           "□ 9:30am - 12:30pm: Synthesize insights from 10 user interviews for onboarding revamp",
@@ -1153,9 +1153,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-3",
+        "id": "priority-3-3-3-3",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "High",
           "□ Build out monthly engagement metrics dashboard and configure alerts",
@@ -1172,9 +1172,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-4",
+        "id": "priority-3-3-3-4",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "High",
           "□ 10:00am - 1:00pm: Refactor async processing pipeline for reliability + scalability",
@@ -1191,9 +1191,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-5",
+        "id": "priority-3-3-3-5",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "High",
           "□ Draft and polish GTM strategy doc for product relaunch",
@@ -1210,9 +1210,9 @@
         ]
       },
       {
-        "id": "priority-three-three-three-6",
+        "id": "priority-3-3-3-6",
         "subcategory": "priority",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "High",
           "□ 9:00am - 12:00pm: Finalize pitch deck, record demo walkthrough, and send investor updates",
@@ -1869,9 +1869,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-1",
+        "id": "category-3-3-3-1",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Work",
           "□ 9:00am - 12:00pm: Draft product vision brief for Q1 growth (high-focus)",
@@ -1896,9 +1896,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-2",
+        "id": "category-3-3-3-2",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Work",
           "□ 9:00am - 12:00pm: Analyze transcripts and code emerging user themes (high-focus)",
@@ -1917,9 +1917,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-3",
+        "id": "category-3-3-3-3",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "Work",
           "□ Deep refactor of auth service logic to reduce duplication (high-focus)",
@@ -1943,9 +1943,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-4",
+        "id": "category-3-3-3-4",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Work",
           "□ 12:00pm - 3:00pm: Finalize Q2 roadmap with prioritization framework (high-focus)",
@@ -1959,9 +1959,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-5",
+        "id": "category-3-3-3-5",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "Work",
           "□ Write long-form blog on SEO and hiring trends (high-focus)",
@@ -1980,9 +1980,9 @@
         ]
       },
       {
-        "id": "category-three-three-three-6",
+        "id": "category-3-3-3-6",
         "subcategory": "category",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "Work",
           "□ 10:00am - 1:00pm: Audit inconsistencies in sales forecast model (high-focus)",
@@ -2322,9 +2322,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-01",
+        "id": "unstructured-3-3-3-01",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "□ 9:00am - 12:00pm: Finalize product strategy doc for H2 with stakeholder alignment",
       
@@ -2338,9 +2338,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-02",
+        "id": "unstructured-3-3-3-02",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "□ Redesign profile settings flow based on recent usability test results",
       
@@ -2354,9 +2354,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-03",
+        "id": "unstructured-3-3-3-03",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "□ 9:00am - 12:00pm: Build out notifications system for team dashboard",
       
@@ -2369,9 +2369,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-04",
+        "id": "unstructured-3-3-3-04",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "timebox"],
+        "ordering_pattern": ["3-3-3", "timebox"],
         "example": [
           "□ 8:30am - 11:30am: Write and refine pitch deck for investor meeting",
       
@@ -2383,9 +2383,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-05",
+        "id": "unstructured-3-3-3-05",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "□ Model team hiring costs for FY26 and consolidate into headcount plan",
       
@@ -2398,9 +2398,9 @@
         ]
       },
       {
-        "id": "unstructured-three-three-three-06",
+        "id": "unstructured-3-3-3-06",
         "subcategory": "unstructured",
-        "ordering_pattern": ["three-three-three", "untimebox"],
+        "ordering_pattern": ["3-3-3", "untimebox"],
         "example": [
           "□ Design homepage banners and hero graphics for spring campaign",
       
