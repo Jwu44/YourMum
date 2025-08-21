@@ -10,7 +10,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { FormProvider } from '@/lib/FormContext'
-import InputsConfig from '@/components/parts/InputsConfig'
+import InputsConfig from '@/app/dashboard/inputs/page'
 
 // Mock the router and navigation
 jest.mock('next/navigation', () => ({

@@ -252,16 +252,8 @@ const ArchivePage: React.FC = () => {
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="icon-container">
-                  <Archive className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Archive</h1>
               </div>
-              {!isLoading && (
-                <Badge variant="secondary" className="self-start sm:ml-2">
-                  {archivedTasks.length} {archivedTasks.length === 1 ? 'task' : 'tasks'}
-                </Badge>
-              )}
             </div>
             <p className="text-muted-foreground text-sm sm:text-base">
               Manage your archived tasks. Move them back to today's schedule or delete them permanently.
