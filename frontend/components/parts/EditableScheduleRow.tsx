@@ -241,6 +241,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
   const [showMicrosteps, setShowMicrosteps] = useState(false)
+  
+  // State to track dropdown menu visibility
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Hooks
   const { state: formData } = useForm()
@@ -567,10 +570,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
-    <div className={cn(
-      "flex items-center gap-2 transition-opacity duration-200",
-      isDraggingAny ? "opacity-0" : "opacity-0 group-hover:opacity-100" // Suppress hover when any task is dragging
-    )}>
+    <div 
+      className={cn(
+        "flex items-center gap-2 transition-opacity duration-200",
+        isDraggingAny ? "opacity-0" : "opacity-0 group-hover:opacity-100",
+        isDropdownOpen && "opacity-100" // Keep visible when dropdown is open
+      )}
+    >
       {/* Slack "View" link - only for top-level Slack tasks */}
       {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
         (() => {
@@ -611,7 +617,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )}
 
       {/* Ellipses dropdown menu - new functionality */}
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
