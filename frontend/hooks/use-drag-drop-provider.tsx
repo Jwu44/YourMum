@@ -17,6 +17,7 @@ import {
   SortingStrategy
 } from '@dnd-kit/sortable'
 import { type Task } from '../lib/types'
+import { useDragState } from '../contexts/DragStateContext'
 
 /**
  * Provider hook for drag and drop context
@@ -96,6 +97,9 @@ export const useDragDropProvider = ({
   moveTask
 }: UseDragDropProviderProps): DragDropProviderReturn => {
   
+  // Global drag state context for suppressing hover states
+  const { setIsDraggingAny } = useDragState()
+  
   // 🔧 FIX: Replace PointerSensor with MouseSensor + TouchSensor for better performance
   // PointerSensor has known issues with horizontal dragging smoothness on desktop
   // This eliminates the sticky/resistant behavior and jumping to catch up
@@ -123,11 +127,12 @@ export const useDragDropProvider = ({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     try {
       const { active } = event
-      // Could add additional drag start logic here if needed
+      // Set global drag state to suppress hover effects on all rows
+      setIsDraggingAny(true)
     } catch (error) {
       console.error('Error handling drag start:', error)
     }
-  }, [])
+  }, [setIsDraggingAny])
 
   /**
    * Handle drag over - collision detection
@@ -213,6 +218,9 @@ export const useDragDropProvider = ({
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     try {
       const { active, over } = event
+      
+      // Clear global drag state to restore hover effects
+      setIsDraggingAny(false)
 
       if (!over || active.id === over.id) {
         return
@@ -253,7 +261,7 @@ export const useDragDropProvider = ({
       console.error('Error handling drag end:', error)
       // Gracefully handle errors without breaking the UI
     }
-  }, [tasks, onReorderTasks])
+  }, [tasks, onReorderTasks, setIsDraggingAny])
 
   return {
     // DndContext configuration

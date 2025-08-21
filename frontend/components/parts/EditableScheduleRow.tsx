@@ -24,6 +24,7 @@ import {
 
 // Import our new drag drop hook
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
+import { useDragState } from '../../contexts/DragStateContext'
 
 interface CustomDropdownItem {
   label: string
@@ -229,6 +230,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     allTasks,
     moveTask
   })
+  
+  // Global drag state for suppressing hover effects
+  const { isDraggingAny } = useDragState()
 
   // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
@@ -563,7 +567,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
-    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+    <div className={cn(
+      "flex items-center gap-2 transition-opacity duration-200",
+      isDraggingAny ? "opacity-0" : "opacity-0 group-hover:opacity-100" // Suppress hover when any task is dragging
+    )}>
       {/* Slack "View" link - only for top-level Slack tasks */}
       {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
         (() => {
@@ -687,8 +694,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         {!isSection && (
           <div
             className={cn(
-              dragDropHook.getGripClassName(),
-              "absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" // Position grip 24px to the left
+              // Use hook's grip classes only when no task is being dragged
+              !isDraggingAny && dragDropHook.getGripClassName(),
+              // When any task is dragging, use static classes without hover states
+              isDraggingAny && "opacity-0 cursor-grab transition-opacity duration-200 mr-2",
+              "absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10" // Position grip 24px to the left
             )}
             {...dragDropHook.listeners}
           >
@@ -706,7 +716,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             isSection ? 'cursor-default' : '',
             isDecomposing && 'animate-pulse',
             // Section styling - removed px-4 to align with task content
-            isSection ? 'mt-6 mb-4 w-full'
+            isSection ? 'mt-2.5 mb-2.5 w-full'
             // Task card styling - no negative margin needed, grip is positioned absolutely
               : 'gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
           )}
