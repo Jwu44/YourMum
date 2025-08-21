@@ -232,7 +232,13 @@ def create_ordering_prompt(
     
     # Extract layout preferences and handle new timing/ordering schema
     layout_preference = user_data.get('layout_preference', {})
-    subcategory = layout_preference.get('subcategory', 'day-sections')
+    layout = layout_preference.get('layout', 'todolist-structured')
+    
+    # Set subcategory based on layout type
+    if layout == 'todolist-unstructured':
+        subcategory = 'unstructured'
+    else:
+        subcategory = layout_preference.get('subcategory', 'day-sections')
     
     # SCHEMA CONVERSION: Handle separate timing and orderingPattern fields
     timing = layout_preference.get('timing')
