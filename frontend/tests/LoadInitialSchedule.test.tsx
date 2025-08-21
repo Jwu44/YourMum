@@ -13,12 +13,16 @@ const mockLoadSchedule = jest.fn() as jest.MockedFunction<any>;
 const mockUpdateSchedule = jest.fn() as jest.MockedFunction<any>;
 const mockGetUserCreationDate = jest.fn() as jest.MockedFunction<any>;
 
+const mockGenerateSchedule = jest.fn() as jest.MockedFunction<any>;
+const mockDeleteTask = jest.fn() as jest.MockedFunction<any>;
+const mockAutogenerateTodaySchedule = jest.fn() as jest.MockedFunction<any>;
+
 jest.mock('@/lib/ScheduleHelper', () => ({
   loadSchedule: mockLoadSchedule,
   updateSchedule: mockUpdateSchedule,
-  generateSchedule: jest.fn(),
-  deleteTask: jest.fn(),
-  autogenerateTodaySchedule: jest.fn()
+  generateSchedule: mockGenerateSchedule,
+  deleteTask: mockDeleteTask,
+  autogenerateTodaySchedule: mockAutogenerateTodaySchedule
 }));
 
 // No direct calendar API usage in the new flow
@@ -62,6 +66,11 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
     
     // Mock successful user creation date fetch
     mockGetUserCreationDate.mockResolvedValue(new Date('2024-01-01'));
+    
+    // Set default mock return values
+    mockAutogenerateTodaySchedule.mockResolvedValue({ success: true, schedule: [] });
+    mockGenerateSchedule.mockResolvedValue({ success: true, tasks: [] });
+    mockDeleteTask.mockResolvedValue({ success: true });
   });
 
   it('should show empty state when no existing schedule and no source found during autogeneration', async () => {
@@ -74,6 +83,7 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
     });
 
     // Mock backend autogeneration finding no source schedule
+    // @ts-ignore - Mock return value typing issue
     (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({
       success: true,
       sourceFound: false,
@@ -108,6 +118,7 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
     mockLoadSchedule.mockResolvedValue({ success: false, error: 'No schedule found for this date' });
 
     // Backend returns schedule (e.g., from calendar events)
+    // @ts-ignore - Mock return value typing issue
     (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({
       success: true,
       created: true,
@@ -207,6 +218,7 @@ describe('Task 4: loadInitialSchedule Empty Schedule Creation', () => {
 
     // Mock autogeneration failing
     const { autogenerateTodaySchedule } = require('@/lib/ScheduleHelper');
+    // @ts-ignore - Mock return value typing issue
     (autogenerateTodaySchedule as jest.Mock).mockResolvedValue({ success: false, error: 'Autogenerate failed' });
 
     // Render the Dashboard component

@@ -44,7 +44,23 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
   const [isDisconnecting, setIsDisconnecting] = useState(false)
 
   /**
-    * Fetch current calendar connection status
+    * Test if calendar API is actually working
+    */
+  const testCalendarHealth = async (): Promise<boolean> => {
+    if (!currentUser) return false
+
+    try {
+      const testDate = new Date().toISOString().split('T')[0] // Today's date
+      const result = await calendarApi.fetchEvents(testDate)
+      return result.success // Return true only if calendar API call succeeded
+    } catch (error) {
+      console.log('Calendar health check failed:', error)
+      return false
+    }
+  }
+
+  /**
+    * Fetch current calendar connection status with health validation
     */
   const fetchConnectionStatus = async () => {
     if (!currentUser) return
@@ -52,10 +68,17 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
     try {
       setIsCheckingStatus(true)
       const status = await calendarApi.getCalendarStatus(currentUser.uid)
-      // Map backend response to expected format
+      
+      // Enhanced status validation - test actual API functionality
+      let actuallyWorking = false
+      if (status.connected) {
+        actuallyWorking = await testCalendarHealth()
+      }
+      
+      // Map backend response to expected format with health check
       setConnectionStatus({
-        connected: status.connected || false,
-        syncStatus: status.syncStatus || 'never',
+        connected: status.connected && actuallyWorking,
+        syncStatus: actuallyWorking ? status.syncStatus || 'completed' : 'failed',
         lastSyncTime: status.lastSyncTime || null,
         hasCredentials: Boolean((status as any).hasCredentials || status.credentials)
       })

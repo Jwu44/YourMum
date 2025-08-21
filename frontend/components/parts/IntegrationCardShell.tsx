@@ -67,7 +67,7 @@ const IntegrationCardShell: React.FC<IntegrationCardShellProps> = ({
     <Card
       className={cn(
         // Responsive width: full on mobile, flexible on larger screens
-        'w-full max-w-[400px] h-[250px] transition-shadow hover:shadow-lg hover:shadow-black/10',
+        'w-full h-[250px] transition-shadow hover:shadow-lg hover:shadow-black/10',
         'flex flex-col',
         className
       )}

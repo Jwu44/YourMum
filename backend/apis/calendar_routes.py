@@ -684,7 +684,10 @@ def _parse_expiration_ms(expiration_value: str) -> Optional[datetime]:
 
 
 def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, any]) -> Optional[str]:
-    """Ensure access token is valid; refresh if needed. Returns access_token or None."""
+    """
+    Ensure access token is valid; refresh if needed. Returns access_token or None.
+    Enhanced to gracefully handle missing refresh tokens when access token might still be valid.
+    """
     access_token = credentials_data.get('accessToken')
     if not access_token:
         return None
@@ -703,7 +706,19 @@ def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, 
     except Exception:
         expires_dt = None
 
-    if expires_dt and expires_dt < datetime.now(timezone.utc) and refresh_token:
+    # If we have no expiry info but have access token, give it a chance to work
+    # This handles cases where tokens might still be valid despite missing metadata
+    if not expires_dt and access_token:
+        print(f"DEBUG: No expiry info for access token, allowing API call to test validity")
+        return access_token
+
+    # Only attempt refresh if token is actually expired and we have refresh token
+    if expires_dt and expires_dt < datetime.now(timezone.utc):
+        if not refresh_token:
+            print(f"DEBUG: Access token expired but no refresh token available for user {user_id}")
+            # Return None to trigger 401 and let frontend handle re-auth
+            return None
+        
         try:
             client_id = os.getenv('GOOGLE_CLIENT_ID')
             client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
@@ -732,9 +747,12 @@ def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, 
                             }
                         }}
                     )
+                    print(f"DEBUG: Successfully refreshed access token for user {user_id}")
             else:
+                print(f"DEBUG: Token refresh failed with status {token_resp.status_code} for user {user_id}")
                 return None
-        except Exception:
+        except Exception as e:
+            print(f"DEBUG: Token refresh exception for user {user_id}: {str(e)}")
             return None
 
     return access_token

@@ -1,84 +1,128 @@
 graph TD
     subgraph "Frontend (Next.js)"
         A1[Authentication] --> A2[Firebase Auth]
-        A3[User Routes] --- A4[Pages/Components]
+        A3[App Routes] --- A4[Pages/Components]
+        
+        subgraph "Pages"
+            A4 --> A17[Home Page]
+            A4 --> A18[Dashboard]
+            A4 --> A19[Archive Page]
+            A4 --> A20[Integrations Page]
+            A4 --> A21[Settings Page]
+            A4 --> A22[Inputs Config Page]
+            A4 --> A23[Slack Callback Pages]
+        end
         
         subgraph "Components"
-            A4 --> A5[UI Components - Radix/shadcn]
+            A4 --> A5[UI Components - shadcn/ui]
             A4 --> A6[Task Management]
             A4 --> A7[Schedule Visualization]
             A4 --> A11[Integration Management]
-            A6 --> A8[Editable Schedule]
-            A6 --> A9[Task Editing]
-            A6 --> A10[AI Suggestions]
+            A6 --> A8[EditableSchedule]
+            A6 --> A9[TaskEditDrawer]
+            A6 --> A10[AISuggestionsList]
             A6 --> A15[Drag & Drop System]
-            A6 --> A16[Archive Management]
-            A11 --> A12[Slack Integration Card]
-            A11 --> A13[Integrations Layout]
-            A11 --> A14[Floating Action Button]
+            A6 --> A16[ArchivedTaskItem]
+            A6 --> A24[MicrostepSuggestions]
+            A11 --> A12[SlackIntegrationCard]
+            A11 --> A25[GoogleCalendarIntegrationCard]
+            A11 --> A13[IntegrationsLayout]
+            A11 --> A14[FloatingActionButton]
+            A7 --> A26[EditableScheduleRow]
+            A7 --> A27[TaskItem]
+        end
+        
+        subgraph "Context & State"
+            A28[AuthContext]
+            A29[FormContext]
+            A30[RouteGuard]
+        end
+        
+        subgraph "Hooks"
+            A31[use-drag-drop-provider]
+            A32[use-drag-drop-task]
+            A33[use-timezone-detection]
+            A34[use-mobile]
         end
         
         subgraph "API Services"
             B1[API Clients]
-            B1 --> B2[Tasks API]
-            B1 --> B3[Users API]
-            B1 --> B4[Calendar API]
-            B1 --> B5[Integration API]
-            B1 --> B6[Archive API]
+            B1 --> B2[tasks.ts]
+            B1 --> B3[users.ts]
+            B1 --> B4[calendar.ts]
+            B1 --> B5[slack.ts]
+            B1 --> B6[archive.ts]
+            B1 --> B7[settings.ts]
         end
         
         A4 --> B1
+        A4 --> A28
+        A4 --> A29
+        A6 --> A31
+        A6 --> A32
     end
     
     subgraph "Backend (Flask)"
-        C1[API Routes] --> C2[Task Routes]
-        C1 --> C3[User Routes]
-        C1 --> C4[Calendar Routes]
-        C1 --> C5[Integration Routes]
+        C1[API Blueprint Routes] --> C2[routes.py - Main Routes]
+        C1 --> C4[calendar_routes.py]
+        C1 --> C35[slack_routes.py]
         
         subgraph "Services"
             D1[AI Service]
-            D1 --> D2[Schedule Generation]
-            D1 --> D3[Task Categorization]
-            D1 --> D4[Task Decomposition]
-            D1 --> D5[Schedule Suggestions]
+            D1 --> D2[Task Categorization]
+            D1 --> D3[Task Decomposition]
+            D1 --> D4[Schedule Suggestions]
             
             D6[Calendar Service]
-            D7[User Service]
+            D7[User Service - via db_config]
             D8[Slack Service]
+            D8 --> D36[Slack Message Processor]
             D9[Schedule Service]
             D9 --> D10[Multiple Ordering Patterns]
             D9 --> D11[JSON Structure Generation]
             D12[Archive Service]
             D13[Schedule Gen Service]
+            D37[Schedule RAG Service]
+            D38[Event Bus Service]
+        end
+        
+        subgraph "Utilities"
+            D39[Auth Utils]
+            D40[Timezone Utils]
+            D41[Encryption Utils]
         end
         
         C2 --> D1
-        C3 --> D7
+        C2 --> D7
         C4 --> D6
-        C5 --> D8
+        C35 --> D8
         C2 --> D9
         C2 --> D12
         C2 --> D13
+        D13 --> D37
+        C2 --> D38
+        C2 --> D39
     end
     
     subgraph "Database (MongoDB)"
         E1[UserSchedules]
-        E2[Users]
-        E3[CalendarEvents]
+        E2[users]
+        E3[calendar_events]
         E4[AISuggestions]
         E5[MicrostepFeedback]
         E6[DecompositionPatterns]
         E7[ProcessedSlackMessages]
         E8[ArchivedTasks]
+        E9[schedule_templates - JSON file]
     end
     
     subgraph "External Services"
         F1[Google Calendar API]
         F2[Anthropic Claude API]
         F3[Slack API]
-        F4[Klavis AI MCP Server]
+        F4[Context7 MCP Server]
         F5[Firebase Admin Auth]
+        F6[Firebase Client Auth]
     end
     
     subgraph "Deployment"
@@ -89,11 +133,13 @@ graph TD
         G2 --> G4
     end
     
+    %% External Service Connections
     D1 --> F2
     D6 --> F1
     D8 --> F3
-    D8 --> F4
+    D37 --> E9
     
+    %% Database Connections
     D1 --> E1
     D1 --> E4
     D1 --> E5
@@ -104,11 +150,22 @@ graph TD
     D9 --> E1
     D12 --> E8
     D13 --> E1
+    D37 --> E9
     
-    A2 -. Auth Token .-> C3
+    %% Frontend-Backend Connections
+    A2 -. Firebase ID Token .-> C2
+    A2 --> F6
     B1 -. API Requests .-> C1
     
-    F3 -. OAuth .-> D8
-    F4 -. Message Processing .-> D8
-    F5 -. Token Verification .-> C3
-    D7 --> F5
+    %% Auth Flow
+    F6 -. Client Auth .-> A2
+    F5 -. Token Verification .-> C2
+    D39 --> F5
+    
+    %% Integration Flows
+    F3 -. OAuth & Webhooks .-> D8
+    D36 -. Process Messages .-> D8
+    D8 -. Store Tasks .-> E1
+    
+    %% Real-time Events
+    D38 -. SSE Events .-> B1

@@ -50,7 +50,6 @@ class TestEmptyScheduleCreation:
             "name": "Test User",
             "work_start_time": "09:00",
             "work_end_time": "17:00",
-            "working_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             "energy_patterns": ["morning_person"],
             "priorities": {
                 "health": "Exercise daily",
@@ -250,7 +249,6 @@ class TestEmptyScheduleCreation:
         assert 'name' in inputs
         assert 'work_start_time' in inputs
         assert 'work_end_time' in inputs
-        assert 'working_days' in inputs
         assert 'energy_patterns' in inputs
         assert 'priorities' in inputs
         assert 'layout_preference' in inputs

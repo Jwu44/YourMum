@@ -7,7 +7,7 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, Archive, Plug } from 'lucide-react'
+import { ClipboardPen, Archive, Blocks } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -46,14 +46,14 @@ const getNavigationItems = (pathname: string): NavigationItem[] => [
   {
     id: 'inputs',
     title: 'Inputs',
-    icon: Plus,
+    icon: ClipboardPen,
     href: '/dashboard/inputs',
     isActive: pathname.startsWith('/dashboard/inputs')
   },
   {
     id: 'integrations',
     title: 'Integrations',
-    icon: Plug,
+    icon: Blocks,
     href: '/dashboard/integrations',
     isActive: pathname.startsWith('/dashboard/integrations')
   },

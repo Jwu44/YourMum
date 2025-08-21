@@ -5,7 +5,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { jest } from '@jest/globals';
-import InputConfigurationPage from '@/components/parts/InputsConfig';
+import InputConfigurationPage from '@/app/dashboard/inputs/page';
 import { FormProvider } from '@/lib/FormContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -50,7 +50,6 @@ const sampleInputsConfig = {
   name: "Test User",
   work_start_time: "09:00",
   work_end_time: "17:00",
-  working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
   energy_patterns: ["peak_morning", "high_all_day"],
   priorities: {
     health: "1",
@@ -170,8 +169,7 @@ describe('InputsConfigPreservation', () => {
         expect.objectContaining({
           work_start_time: "09:00",
           work_end_time: "17:00",
-          working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-          energy_patterns: ["peak_morning", "high_all_day"],
+                  energy_patterns: ["peak_morning", "high_all_day"],
           priorities: {
             health: "1",
             relationships: "2", 

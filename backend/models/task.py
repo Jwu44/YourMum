@@ -84,6 +84,9 @@ class Task:
                  type: str = "task",
                  is_recurring: Optional[Union[Dict, RecurrenceType]] = None,
                  start_date: Optional[str] = None,
+                 # Time fields for scheduling
+                 start_time: Optional[str] = None,
+                 end_time: Optional[str] = None,
                 # New microstep fields
                  rationale: Optional[str] = None,
                  estimated_time: Optional[str] = None,
@@ -108,6 +111,10 @@ class Task:
         self.level = level
         self.section_index = section_index
         self.type = type
+        
+        # Add time fields
+        self.start_time = start_time
+        self.end_time = end_time
         
         # Add microstep fields
         self.rationale = rationale
@@ -144,6 +151,8 @@ class Task:
             "level": self.level,
             "section_index": self.section_index,
             "type": self.type,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
             "is_recurring": self.is_recurring.to_dict() if self.is_recurring else None,
             "start_date": self.start_date,
         }
@@ -192,6 +201,8 @@ class Task:
             type=data.get("type", "task"),
             is_recurring=data.get("is_recurring"),
             start_date=data.get("start_date"),
+            start_time=data.get("start_time"),
+            end_time=data.get("end_time"),
             rationale=data.get("rationale"),
             estimated_time=data.get("estimated_time"),
             energy_level_required=data.get("energy_level_required"),

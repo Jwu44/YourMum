@@ -1265,7 +1265,6 @@ def submit_data():
         "tasks": List[Dict] (optional, may include calendar events as task objects),
         "work_start_time": str,
         "work_end_time": str,
-        "working_days": List[str] (optional),
         "priorities": Dict[str, str],
         "energy_patterns": List[str],
         "layout_preference": {
@@ -1281,8 +1280,14 @@ def submit_data():
         401: Authentication required
         500: Internal server error (with existing schedule if available)
     """
+    # Start timing
+    import time
+    request_start_time = time.time()
+    print(f"[TIMING] submit_data request started")
+    
     try:
         # Validate request data
+        validation_start_time = time.time()
         data = request.json
         if not data:
             return jsonify({
@@ -1314,8 +1319,12 @@ def submit_data():
                 "success": False,
                 "error": "Invalid date format. Use YYYY-MM-DD"
             }), 400
+        
+        validation_duration = time.time() - validation_start_time
+        print(f"[TIMING] Validation and authentication: {validation_duration:.3f}s")
 
         # Get existing schedule for fallback error handling
+        fallback_start_time = time.time()
         existing_schedule = None
         try:
             success, result = schedule_service.get_schedule_by_date(user_id, date)
@@ -1324,8 +1333,11 @@ def submit_data():
         except Exception:
             # Continue if we can't get existing schedule
             pass
+        fallback_duration = time.time() - fallback_start_time
+        print(f"[TIMING] Existing schedule lookup: {fallback_duration:.3f}s")
 
         # Call schedule_gen.py directly - bypass schedule service
+        generation_start_time = time.time()
         try:
             schedule_result = generate_schedule(data)
             
@@ -1337,6 +1349,8 @@ def submit_data():
                 raise Exception('No tasks generated')
 
         except Exception as gen_error:
+            generation_duration = time.time() - generation_start_time
+            print(f"[TIMING] Schedule generation failed after: {generation_duration:.3f}s")
             print(f"Schedule generation failed: {str(gen_error)}")
             # Return existing schedule with error message
             return jsonify({
@@ -1346,7 +1360,11 @@ def submit_data():
                 "fallback": True
             }), 500
 
+        generation_duration = time.time() - generation_start_time
+        print(f"[TIMING] Schedule generation: {generation_duration:.3f}s")
+
         # Store the generated schedule using centralized service
+        storage_start_time = time.time()
         try:
             success, result = schedule_service.create_schedule_from_ai_generation(
                 user_id=user_id,
@@ -1354,6 +1372,9 @@ def submit_data():
                 generated_tasks=generated_tasks,
                 inputs=data
             )
+            
+            storage_duration = time.time() - storage_start_time
+            print(f"[TIMING] Schedule storage: {storage_duration:.3f}s")
             
             if not success:
                 print(f"Error storing AI-generated schedule: {result.get('error', 'Unknown error')}")
@@ -1363,12 +1384,17 @@ def submit_data():
                     **result
                 })
 
+            request_duration = time.time() - request_start_time
+            print(f"[TIMING] Total submit_data request: {request_duration:.3f}s")
+            
             return jsonify({
                 "success": True,
                 **result
             })
 
         except Exception as store_error:
+            storage_duration = time.time() - storage_start_time
+            print(f"[TIMING] Schedule storage failed after: {storage_duration:.3f}s")
             print(f"Error storing schedule: {str(store_error)}")
             # Return generated schedule even if storage fails
             return jsonify({
@@ -1379,6 +1405,8 @@ def submit_data():
             })
 
     except Exception as e:
+        request_duration = time.time() - request_start_time
+        print(f"[TIMING] submit_data request failed after: {request_duration:.3f}s")
         print(f"Error in submit_data: {str(e)}")
         traceback.print_exc()
         return jsonify({

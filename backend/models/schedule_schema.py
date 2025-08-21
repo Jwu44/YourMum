@@ -50,10 +50,6 @@ schedule_schema_validation = {
                     "name": { "bsonType": "string" },
                     "work_start_time": { "bsonType": "string" },
                     "work_end_time": { "bsonType": "string" },
-                    "working_days": {
-                        "bsonType": "array",
-                        "items": { "bsonType": "string" }
-                    },
                     "energy_patterns": {
                         "bsonType": "array",
                         "items": { "bsonType": "string" }
