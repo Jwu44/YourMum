@@ -672,53 +672,69 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       transition={{ duration: 0.2 }}
       className="relative"
     >
+      {/* Container with grip positioned outside task row */}
       <div
-        ref={dragDropHook.setNodeRef}
-        {...dragDropHook.attributes}
-        data-sortable-id={task.id}
         className={cn(
-          dragDropHook.getRowClassName(),
-          isSection ? 'cursor-default' : '',
-          isDecomposing && 'animate-pulse',
-          // Section styling
-          isSection ? 'mt-6 mb-4'
-          // Task card styling following TaskList.tsx reference
-            : 'group gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft'
+          "relative", // Use relative positioning for proper layout
+          // Move group class to container so grip hover works
+          !isSection && "group"
         )}
         style={{
           marginLeft: (task.level && task.level > 0) ? `${task.level * 30}px` : 0,
-          minHeight: isSection ? '48px' : 'auto',
-          transform: dragDropHook.transform, // Only applies to actively dragged items
-          // 🔧 FIX: Prevent shuffling - only dragged items get transform optimization
-          willChange: dragDropHook.isDragging ? 'transform' : 'auto',
-          // Only disable transitions for the actively dragged item
-          transition: dragDropHook.isDragging ? 'none' : undefined
-        }}
-        onMouseEnter={(e) => {
-          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
-          // This ensures we track position relative to the TARGET task, not dragged task
-          if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
-          }
-        }}
-        onMouseMove={(e) => {
-          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
-          // This enables real-time drag type updates relative to the TARGET task
-          if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
-          }
         }}
       >
-        {/* Task/Section Content */}
+        {/* Drag Handle - positioned absolutely outside task row */}
         {!isSection && (
-          <>
-            {/* Drag Handle - only visible on hover */}
-            <div
-              className={dragDropHook.getGripClassName()}
-              {...dragDropHook.listeners}
-            >
-              <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-            </div>
+          <div
+            className={cn(
+              dragDropHook.getGripClassName(),
+              "absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" // Position grip 24px to the left
+            )}
+            {...dragDropHook.listeners}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+          </div>
+        )}
+
+        {/* Main task row - now without internal grip */}
+        <div
+          ref={dragDropHook.setNodeRef}
+          {...dragDropHook.attributes}
+          data-sortable-id={task.id}
+          className={cn(
+            dragDropHook.getRowClassName(),
+            isSection ? 'cursor-default' : '',
+            isDecomposing && 'animate-pulse',
+            // Section styling - removed px-4 to align with task content
+            isSection ? 'mt-6 mb-4 w-full'
+            // Task card styling - no negative margin needed, grip is positioned absolutely
+              : 'gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
+          )}
+          style={{
+            minHeight: isSection ? '48px' : 'auto',
+            transform: dragDropHook.transform, // Only applies to actively dragged items
+            // 🔧 FIX: Prevent shuffling - only dragged items get transform optimization
+            willChange: dragDropHook.isDragging ? 'transform' : 'auto',
+            // Only disable transitions for the actively dragged item
+            transition: dragDropHook.isDragging ? 'none' : undefined
+          }}
+          onMouseEnter={(e) => {
+            // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
+            // This ensures we track position relative to the TARGET task, not dragged task
+            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+              dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
+            }
+          }}
+          onMouseMove={(e) => {
+            // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
+            // This enables real-time drag type updates relative to the TARGET task
+            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+              dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
+            }
+          }}
+        >
+          {/* Task/Section Content */}
+          {!isSection && (
             <div ref={checkboxRef} className="flex items-center">
               <Checkbox
                 checked={task.completed}
@@ -726,38 +742,38 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
               />
             </div>
-          </>
-        )}
+          )}
 
-        {isSection
-          ? (
-          <div className="flex items-center gap-3 px-4 py-3">
-            {getSectionIcon(task.text, handleEmojiChange)}
-            <TypographyH4 className="text-foreground font-semibold mb-0">
+          {isSection
+            ? (
+            <div className="flex items-center gap-3 py-3">
+              {getSectionIcon(task.text, handleEmojiChange)}
+              <TypographyH4 className="text-foreground font-semibold mb-0">
+                {task.text}
+              </TypographyH4>
+            </div>
+              )
+            : (
+            <span
+              className={cn(
+                'flex-1 text-foreground transition-all duration-200',
+                task.completed && 'line-through text-muted-foreground'
+              )}
+              data-task-content="true"
+            >
+              {task.start_time && task.end_time
+                ? `${task.start_time} - ${task.end_time}: `
+                : ''}
               {task.text}
-            </TypographyH4>
-          </div>
-            )
-          : (
-          <span
-            className={cn(
-              'flex-1 text-foreground transition-all duration-200',
-              task.completed && 'line-through text-muted-foreground'
-            )}
-            data-task-content="true"
-          >
-            {task.start_time && task.end_time
-              ? `${task.start_time} - ${task.end_time}: `
-              : ''}
-            {task.text}
-          </span>
-            )}
+            </span>
+              )}
 
-        {/* Task Actions - only show for non-section tasks */}
-        {!isSection && renderTaskActions()}
+          {/* Task Actions - only show for non-section tasks */}
+          {!isSection && renderTaskActions()}
 
-        {/* Enhanced Drag Indicators */}
-        {getDragIndicators()}
+          {/* Enhanced Drag Indicators */}
+          {getDragIndicators()}
+        </div>
       </div>
 
       {/* Microstep Suggestions */}

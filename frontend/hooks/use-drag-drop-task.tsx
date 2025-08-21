@@ -268,7 +268,8 @@ export const useDragDropTask = ({
       const baseClasses = 'opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-2'
       
       if (isDragging) {
-        return `${baseClasses} opacity-100 cursor-grabbing text-purple-600`
+        // Hide grip during drag operations instead of showing it
+        return `${baseClasses} opacity-0 cursor-grabbing text-purple-600`
       }
       
       return `${baseClasses} cursor-grab hover:text-purple-600`
