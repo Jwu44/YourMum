@@ -364,22 +364,22 @@ Respond with valid JSON in this exact format:
     if is_untimebox:
         # For untimebox: no time_allocation field
         prompt += """
-{{
+{
     "placements": [
-        {{"task_id": "task_id_1", "section": "Morning", "order": 1}},
-        {{"task_id": "task_id_2", "section": "Afternoon", "order": 1}}
+        {"task_id": "task_id_1", "section": "Morning", "order": 1},
+        {"task_id": "task_id_2", "section": "Afternoon", "order": 1}
     ]
-}}
+}
 </instructions>"""
     else:
         # For other patterns: include time_allocation field
         prompt += """
-{{
+{
     "placements": [
-        {{"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"}},
-        {{"task_id": "task_id_2", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"}}
+        {"task_id": "task_id_1", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"},
+        {"task_id": "task_id_2", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"}
     ]
-}}
+}
 </instructions>"""
     
     prompt_length = len(prompt)
