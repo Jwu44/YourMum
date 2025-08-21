@@ -90,8 +90,8 @@ const Dashboard: React.FC = () => {
 
   // Check for calendar sync status and show appropriate messages
   useEffect(() => {
-    // One-time: ensure refresh token exists without extra user clicks
-    const ensureRefreshTokenIfMissing = async () => {
+    // One-time: validate calendar health and only re-authenticate if actually broken
+    const validateCalendarHealth = async () => {
       try {
         if (hasEnsuredRefresh.current) return
         hasEnsuredRefresh.current = true
@@ -105,10 +105,32 @@ const Dashboard: React.FC = () => {
         const credentials = calendar.credentials || {}
         const hasRefresh = !!credentials.refreshToken
 
-        if (connected && !hasRefresh) {
-          try {
-            const token = await (currentUser || auth.currentUser)?.getIdToken(true)
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
+        // Only proceed if calendar is marked as connected
+        if (!connected) return
+
+        // If we have refresh token, assume calendar is healthy
+        if (hasRefresh) return
+
+        // Test if calendar API actually works before forcing re-auth
+        try {
+          const token = await (currentUser || auth.currentUser)?.getIdToken(true)
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
+          const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          
+          // Test calendar API call - if this succeeds, calendar is working fine
+          const testResp = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+
+          // If calendar API works, don't force re-auth even without refresh token
+          if (testResp.ok) {
+            console.log('Calendar API working fine, no re-auth needed')
+            return
+          }
+
+          // Only if calendar API fails, attempt OAuth redirect
+          if (testResp.status === 401 || testResp.status === 400) {
             const resp = await fetch(`${apiBase}/api/calendar/oauth/start`, {
               method: 'GET',
               headers: { Authorization: `Bearer ${token}` }
@@ -119,17 +141,18 @@ const Dashboard: React.FC = () => {
               window.location.href = data.url as string
               return
             }
-            // If start failed, do NOT block dashboard; proceed without loader
-          } catch (e) {
-            // ignore and proceed
           }
+          // If start failed, do NOT block dashboard; proceed without loader
+        } catch (e) {
+          // Calendar test failed, but don't block dashboard - user can manually reconnect via Integrations
+          console.log('Calendar health check failed, user can reconnect via Integrations:', e)
         }
       } catch (_) {
         // ignore
       }
     }
 
-    ensureRefreshTokenIfMissing()
+    validateCalendarHealth()
   }, [currentUser])
 
   useEffect(() => {
