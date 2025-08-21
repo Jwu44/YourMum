@@ -1348,8 +1348,12 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, currentUser?.uid])
 
-  // Show calendar connection loader during OAuth flow
-  if (calendarConnectionStage || isEnsuringRefresh) {
+  // Show calendar connection loader only during active OAuth flows
+  // Don't show if user is just navigating between pages with existing calendar connection
+  const shouldShowLoader = (calendarConnectionStage && calendarConnectionStage !== 'complete') || 
+                          (isEnsuringRefresh && hasEnsuredRefresh.current)
+  
+  if (shouldShowLoader) {
     const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
     return <CalendarConnectionLoader stage={stage} />
   }

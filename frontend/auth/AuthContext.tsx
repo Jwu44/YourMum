@@ -83,14 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Small delay to ensure all async operations complete before resetting OAuth state
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Success - reset OAuth state and set localStorage flag
+        // Success - reset OAuth state without localStorage flag  
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
         
-        // Set localStorage flag to let RouteGuard redirect to /connecting page
-        localStorage.setItem('calendarConnectionProgress', 'complete');
-        
-        // Don't redirect here - let RouteGuard handle navigation to /connecting
+        // Calendar connection is complete - no need to show connecting page
+        // The dashboard will handle calendar integration naturally
         
       } else {
         // No calendar access, reset OAuth state - let RouteGuard handle navigation

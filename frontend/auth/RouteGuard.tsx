@@ -30,9 +30,36 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const isPublicPath = publicPaths.includes(pathname);
       const inAuthFlow = isAuthRedirect();
       
-      // Check for calendar connection in progress
-      const calendarConnectionInProgress = typeof window !== 'undefined' && 
+      // Check for calendar connection in progress with stale flag cleanup
+      const calendarConnectionRaw = typeof window !== 'undefined' && 
         localStorage.getItem('calendarConnectionProgress');
+      
+      let calendarConnectionInProgress = false;
+      
+      // Defensive cleanup: Remove stale calendar connection flags
+      if (calendarConnectionRaw) {
+        // Check if there's a timestamp for the connection progress
+        const connectionTimestamp = typeof window !== 'undefined' && 
+          localStorage.getItem('calendarConnectionTimestamp');
+        
+        if (connectionTimestamp) {
+          const timeDiff = Date.now() - parseInt(connectionTimestamp, 10);
+          // If flag is older than 30 seconds, consider it stale and clean up
+          if (timeDiff > 30000) {
+            console.log("Cleaning up stale calendar connection flag");
+            localStorage.removeItem('calendarConnectionProgress');
+            localStorage.removeItem('calendarConnectionTimestamp');
+            calendarConnectionInProgress = false;
+          } else {
+            calendarConnectionInProgress = true;
+          }
+        } else {
+          // No timestamp means it's an old flag, clean it up
+          console.log("Cleaning up calendar connection flag without timestamp");
+          localStorage.removeItem('calendarConnectionProgress');
+          calendarConnectionInProgress = false;
+        }
+      }
       
       console.log("RouteGuard State:", {
         user: user ? `${user.displayName} (${user.email})` : null,
