@@ -121,7 +121,7 @@ const orderingPatternOptions = [
 
 // Define priority options for draggable cards
 const defaultPriorities: Priority[] = [
-  { id: 'health', name: 'Health & Exercise', icon: Heart, color: 'theme-red', bgColor: 'theme-red-bg' },
+  { id: 'health', name: 'Health', icon: Heart, color: 'theme-red', bgColor: 'theme-red-bg' },
   { id: 'relationships', name: 'Relationships', icon: Users, color: 'theme-blue', bgColor: 'theme-blue-bg' },
   { id: 'fun_activities', name: 'Fun Activities', icon: Gamepad2, color: 'theme-green', bgColor: 'theme-green-bg' },
   { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'theme-yellow', bgColor: 'theme-yellow-bg' }
@@ -566,7 +566,7 @@ const InputConfigurationPage: React.FC = () => {
                       }`}>
                         <Grid className={`h-4 w-4 ${
                           (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
-                            ? 'text-selection-foreground'
+                            ? 'text-primary'
                             : 'text-muted-foreground'
                         }`} />
                       </div>
@@ -576,7 +576,7 @@ const InputConfigurationPage: React.FC = () => {
                         </div>
                         <p className={`text-xs ${
                           (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
-                            ? 'text-selection-foreground/80'
+                            ? 'text-foreground/80'
                             : 'text-muted-foreground'
                         }`}>
                           Organized with clear categories
@@ -598,7 +598,7 @@ const InputConfigurationPage: React.FC = () => {
                       }`}>
                         <List className={`h-4 w-4 ${
                           state.layout_preference?.layout === 'todolist-unstructured'
-                            ? 'text-selection-foreground'
+                            ? 'text-primary'
                             : 'text-muted-foreground'
                         }`} />
                       </div>
@@ -608,7 +608,7 @@ const InputConfigurationPage: React.FC = () => {
                         </div>
                         <p className={`text-xs ${
                           state.layout_preference?.layout === 'todolist-unstructured'
-                            ? 'text-selection-foreground/80'
+                            ? 'text-foreground/80'
                             : 'text-muted-foreground'
                         }`}>
                           Flexible, free-form layout
@@ -682,13 +682,13 @@ const InputConfigurationPage: React.FC = () => {
                         onClick={() => { handleTimingChange(option.value) }}
                       >
                         <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
-                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
+                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary' : option.color}`} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium text-sm">{option.label}</span>
                           </div>
-                          <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                          <p className={`text-xs ${isSelected ? 'text-foreground/80' : 'text-muted-foreground'}`}>
                             {option.description}
                           </p>
                         </div>
@@ -727,13 +727,13 @@ const InputConfigurationPage: React.FC = () => {
                         onClick={() => { handleOrderingPatternChange(option.value) }}
                       >
                         <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-foreground/20' : option.bgColor}`}>
-                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary-foreground' : option.color}`} />
+                          <option.icon className={`h-4 w-4 ${isSelected ? 'text-primary' : option.color}`} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium text-sm">{option.label}</span>
                           </div>
-                          <p className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                          <p className={`text-xs ${isSelected ? 'text-foreground/80' : 'text-muted-foreground'}`}>
                             {option.description}
                           </p>
                         </div>

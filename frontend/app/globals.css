@@ -350,7 +350,7 @@ All colors MUST be HSL.
   }
   
   .energy-pattern-card-unchecked {
-    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30;
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-border;
   }
   
   /* Radio group cards */
@@ -368,11 +368,11 @@ All colors MUST be HSL.
   }
   
   .task-ordering-card-selected {
-    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+    @apply bg-selection/10 border-selection/30 shadow-sm;
   }
   
   .task-ordering-card-unselected {
-    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-border hover:shadow-sm;
   }
 
   /* Timing selection cards */
@@ -385,11 +385,11 @@ All colors MUST be HSL.
   }
   
   .timing-card-selected {
-    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+    @apply bg-selection/10 border-selection/30 shadow-sm;
   }
   
   .timing-card-unselected {
-    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-border hover:shadow-sm;
   }
 
   /* Ordering pattern selection cards */
@@ -402,11 +402,11 @@ All colors MUST be HSL.
   }
   
   .ordering-card-selected {
-    @apply bg-selection text-selection-foreground border-selection shadow-sm;
+    @apply bg-selection/10 border-selection/30 shadow-sm;
   }
   
   .ordering-card-unselected {
-    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-primary/30 hover:shadow-sm;
+    @apply bg-card hover:bg-hover hover:text-hover-foreground border-border hover:border-border hover:shadow-sm;
   }
   
   /* Working day bubble cards */
