@@ -143,6 +143,39 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
 }
 
 /**
+ * Get the appropriate logo for a task based on its source
+ * Returns the logo element or null if no logo should be displayed
+ */
+const getTaskSourceLogo = (task: Task): React.ReactNode => {
+  // Only show logos for non-section tasks
+  if (task.is_section) return null
+
+  // Check for Slack source
+  if (task.source === 'slack') {
+    return (
+      <img
+        src="/images/integrations/slack_logo.webp"
+        alt="Slack"
+        className="w-4 h-4 flex-shrink-0"
+      />
+    )
+  }
+
+  // Check for Google Calendar source (identified by gcal_event_id)
+  if (task.gcal_event_id || task.source === 'calendar') {
+    return (
+      <img
+        src="/images/integrations/google_calendar_logo.png"
+        alt="Google Calendar"
+        className="w-4 h-4 flex-shrink-0"
+      />
+    )
+  }
+
+  return null
+}
+
+/**
  * Get the appropriate emoji for a section based on its name
  * First checks for custom emojis, then falls back to hardcoded mapping
  */
@@ -757,6 +790,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 onCheckedChange={handleToggleComplete}
                 className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
               />
+            </div>
+          )}
+
+          {/* Task Source Logo - positioned 16px from checkbox, 8px from text */}
+          {!isSection && getTaskSourceLogo(task) && (
+            <div className="ml-4 mr-2 flex items-center">
+              {getTaskSourceLogo(task)}
             </div>
           )}
 
