@@ -760,8 +760,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             isDecomposing && 'animate-pulse',
             // Section styling - removed px-4 to align with task content
             isSection ? 'mt-2.5 mb-2.5 w-full'
-            // Task card styling - no negative margin needed, grip is positioned absolutely
-              : 'gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
+            // Task card styling - no gap-4 to control spacing manually, grip is positioned absolutely
+              : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
           )}
           style={{
             minHeight: isSection ? '48px' : 'auto',
@@ -817,7 +817,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             <span
               className={cn(
                 'flex-1 text-foreground transition-all duration-200',
-                task.completed && 'line-through text-muted-foreground'
+                task.completed && 'line-through text-muted-foreground',
+                // Add 16px left margin only when no logo is present
+                !getTaskSourceLogo(task) && 'ml-4'
               )}
               data-task-content="true"
             >
