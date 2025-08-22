@@ -154,9 +154,11 @@ const getTaskSourceLogo = (task: Task): React.ReactNode => {
   if (task.source === 'slack') {
     return (
       <img
-        src="/images/integrations/slack_logo.webp"
+        src="/images/integrations/slack_logo_task.svg"
         alt="Slack"
-        className="w-4 h-4 flex-shrink-0"
+        className="flex-shrink-0"
+        width={16}
+        height={16}
       />
     )
   }
@@ -165,9 +167,11 @@ const getTaskSourceLogo = (task: Task): React.ReactNode => {
   if (task.gcal_event_id || task.source === 'calendar') {
     return (
       <img
-        src="/images/integrations/google_calendar_logo.png"
+        src="/images/integrations/gcal_logo_task.svg"
         alt="Google Calendar"
-        className="w-4 h-4 flex-shrink-0"
+        className="flex-shrink-0"
+        width={16}
+        height={16}
       />
     )
   }
