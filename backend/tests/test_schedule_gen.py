@@ -259,6 +259,90 @@ class TestScheduleAssembly:
         assert result["success"] is True
         regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
         assert len(regular_tasks) == 2
+    
+    def test_unplaced_tasks_go_to_last_section_instead_of_other_tasks_section(self):
+        """Test that unplaced tasks are placed in the last section instead of creating 'Other Tasks' section"""
+        task1 = Task(id="1", text="workout", categories=["Exercise"])
+        task2 = Task(id="2", text="meeting", categories=["Work"])
+        task3 = Task(id="3", text="shopping", categories=["Fun"])
+        registry = {"1": task1, "2": task2, "3": task3}
+        
+        # Only place two tasks, leaving one unplaced
+        placements = [
+            {"task_id": "1", "section": "Morning", "order": 1},
+            {"task_id": "2", "section": "Afternoon", "order": 1}
+            # task3 is intentionally unplaced
+        ]
+        
+        sections = ["Morning", "Afternoon", "Evening"]
+        layout_preference = {
+            "layout": "todolist-structured",
+            "orderingPattern": "timebox"
+        }
+        
+        result = assemble_final_schedule(placements, registry, sections, layout_preference)
+        
+        # Should be successful
+        assert result["success"] is True
+        
+        # Extract sections and tasks
+        section_tasks = [t for t in result["tasks"] if t.get("is_section")]
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        
+        # Should have exactly 3 sections (no "Other Tasks" section)
+        assert len(section_tasks) == 3
+        section_names = [s["text"] for s in section_tasks]
+        assert "Morning" in section_names
+        assert "Afternoon" in section_names  
+        assert "Evening" in section_names
+        assert "Other Tasks" not in section_names  # Should NOT create "Other Tasks"
+        
+        # Should have all 3 tasks
+        assert len(regular_tasks) == 3
+        
+        # The unplaced task (task3) should be in the Evening section (last section)
+        # and placed at the bottom of that section
+        task3_result = next(t for t in regular_tasks if t["id"] == "3")
+        assert task3_result["section"] == "Evening"
+        
+        # Verify task3 appears after any other Evening section tasks
+        evening_tasks = [t for t in regular_tasks if t["section"] == "Evening"]
+        # In this test, task3 should be the only Evening task, so it should be there
+        assert len(evening_tasks) == 1
+        assert evening_tasks[0]["id"] == "3"
+    
+    def test_unplaced_tasks_with_no_sections_unstructured_layout(self):
+        """Test unplaced tasks behavior with unstructured layout (no sections)"""
+        task1 = Task(id="1", text="workout", categories=["Exercise"])
+        task2 = Task(id="2", text="meeting", categories=["Work"])
+        registry = {"1": task1, "2": task2}
+        
+        # Only place one task
+        placements = [
+            {"task_id": "1", "section": "", "order": 1}  # No section for unstructured
+        ]
+        
+        sections = []  # Empty sections for unstructured layout
+        layout_preference = {
+            "layout": "todolist-unstructured",
+            "orderingPattern": "alternating"
+        }
+        
+        result = assemble_final_schedule(placements, registry, sections, layout_preference)
+        
+        # Should be successful
+        assert result["success"] is True
+        
+        # No sections should be created
+        section_tasks = [t for t in result["tasks"] if t.get("is_section")]
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        
+        assert len(section_tasks) == 0  # No sections for unstructured
+        assert len(regular_tasks) == 2  # Both tasks should be included
+        
+        # All tasks should have section = None
+        for task in regular_tasks:
+            assert task["section"] is None
 
 
 class TestIntegration:
