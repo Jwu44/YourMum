@@ -19,6 +19,13 @@ import {
   DrawerTitle
 } from '@/components/ui/drawer'
 import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
+import {
   type Task,
   type RecurrenceType,
   type WeekDay,
@@ -27,6 +34,7 @@ import {
 } from '../../lib/types'
 import { cn, convert12HourTo24Hour, convert24HourTo12Hour } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
 
 interface TaskEditDrawerProps {
   isOpen: boolean
@@ -49,6 +57,9 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 }) => {
   // Determine mode based on presence of task prop
   const isEditMode = Boolean(task)
+  
+  // Check if we're on desktop to use Sheet instead of Drawer
+  const isDesktop = useIsDesktop()
 
   // Initialize task state with all required fields
   const getEmptyTask = useCallback((): Task => ({
@@ -281,10 +292,197 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     }
   }, [handleClose])
 
+  // Extract form content to avoid duplication
+  const formContent = (
+    <>
+      {/* Task Name */}
+      <div>
+        <label htmlFor="text" className="block text-sm font-medium text-foreground mb-2">
+          Task Name
+        </label>
+        <Input
+          id="text"
+          name="text"
+          value={editedTask.text}
+          onChange={handleInputChange}
+          onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
+          className="mobile-form-input"
+        />
+      </div>
+
+      {/* Categories */}
+      <div>
+        <label className="block text-sm font-medium mb-2 text-foreground">
+          Categories
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((category) => {
+            const isSelected = editedTask.categories?.includes(category)
+            return (
+              <Badge
+                key={category}
+                variant={isSelected ? 'default' : 'outline'}
+                className={cn(
+                  'cursor-pointer mobile-touch-target px-3 py-2 text-sm font-normal',
+                  isSelected && getCategoryVariant(category) === 'work' && 'bg-info btn-hover-primary',
+                  isSelected && getCategoryVariant(category) === 'fun' && 'bg-warning btn-hover-primary',
+                  isSelected && getCategoryVariant(category) === 'relationships' && 'bg-primary btn-hover-primary',
+                  isSelected && getCategoryVariant(category) === 'ambition' && 'bg-warning btn-hover-primary',
+                  isSelected && getCategoryVariant(category) === 'exercise' && 'bg-success btn-hover-primary',
+                  !isSelected && 'bg-secondary text-secondary-foreground btn-hover-secondary'
+                )}
+                onClick={() => { handleCategorySelect(category) }}
+              >
+                {category}
+                {isSelected && (
+                  <X className="ml-1 h-3 w-3" />
+                )}
+              </Badge>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Time Fields */}
+      <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
+        <div>
+          <label htmlFor="start_time" className="block text-sm font-medium text-foreground mb-2">
+            Start Time
+          </label>
+          <div
+            className="relative"
+            onPointerDown={(e) => {
+              // Prevent drawer from closing when interacting with time input
+              e.stopPropagation()
+            }}
+          >
+            <Input
+              id="start_time"
+              name="start_time"
+              type="time"
+              value={editedTask.start_time || ''}
+              onChange={handleInputChange}
+              onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
+              onClick={(e) => {
+                // Try to trigger time picker on click
+                e.currentTarget.showPicker?.()
+              }}
+              className="mobile-form-input font-mono text-center time-input-custom"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="end_time" className="block text-sm font-medium text-foreground mb-2">
+            End Time
+          </label>
+          <div
+            className="relative"
+            onPointerDown={(e) => {
+              // Prevent drawer from closing when interacting with time input
+              e.stopPropagation()
+            }}
+          >
+            <Input
+              id="end_time"
+              name="end_time"
+              type="time"
+              value={editedTask.end_time || ''}
+              onChange={handleInputChange}
+              onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
+              onClick={(e) => {
+                // Try to trigger time picker on click
+                e.currentTarget.showPicker?.()
+              }}
+              className="mobile-form-input font-mono text-center time-input-custom"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Recurrence Selection */}
+      <div>
+        <label className="block text-sm font-medium mb-2 text-foreground">
+          Repeat every...
+        </label>
+        <Select
+          value={
+            editedTask.is_recurring?.frequency ?? 'none'
+          }
+          onValueChange={handleRecurrenceChange}
+        >
+          <SelectTrigger className="w-full mobile-form-input">
+            <SelectValue placeholder="Select recurrence" />
+          </SelectTrigger>
+          <SelectContent className="select-content bg-background">
+            {RECURRENCE_OPTIONS.map((option) => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+              >
+                {getRecurrenceLabel(option)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  )
+
+  // Desktop: Use Sheet (slides from right)
+  if (isDesktop) {
+    return (
+      <Sheet open={isOpen} onOpenChange={handleOpenChange} modal={true}>
+        <SheetContent
+          side="right"
+          className="w-[400px] sm:w-[540px] flex flex-col"
+          onPointerDownOutside={(e) => {
+            // Allow time picker interactions - check if click is on time input or its picker
+            const target = e.target as HTMLElement
+
+            // Don't close sheet if clicking on time inputs, their pickers, or select dropdowns
+            if (target?.closest('input[type="time"]') ||
+                target?.closest('.time-input-custom') ||
+                target?.closest('[data-radix-popper-content-wrapper]') ||
+                target?.closest('[data-radix-select-content]')) {
+              return
+            }
+
+            // Only prevent closing if user has unsaved changes
+            const hasUnsavedChanges = editedTask.text !== (task?.text || '')
+            if (hasUnsavedChanges) {
+              e.preventDefault()
+              return
+            }
+            handleClose()
+          }}
+        >
+          <SheetHeader className="flex-shrink-0">
+            <SheetTitle>
+              {isEditMode ? 'Edit Task' : 'Create Task'}
+            </SheetTitle>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {formContent}
+          </div>
+
+          <SheetFooter className="flex-shrink-0 px-4 pb-4">
+            <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground w-full">
+              {isEditMode ? 'Save Changes' : 'Create'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    )
+  }
+
+  // Mobile: Use Drawer (slides from bottom)
   return (
     <Drawer
       open={isOpen}
-      onOpenChange={handleOpenChange} // 🔧 FIXED: Single source of truth for close
+      onOpenChange={handleOpenChange}
       modal={true}
     >
       <DrawerContent
@@ -316,142 +514,11 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
+          
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Task Name */}
-            <div>
-              <label htmlFor="text" className="block text-sm font-medium text-foreground mb-2">
-                Task Name
-              </label>
-              <Input
-                id="text"
-                name="text"
-                value={editedTask.text}
-                onChange={handleInputChange}
-                onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                className="mobile-form-input"
-              />
-            </div>
-
-            {/* Categories */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-foreground">
-                Categories
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => {
-                  const isSelected = editedTask.categories?.includes(category)
-                  return (
-                    <Badge
-                      key={category}
-                      variant={isSelected ? 'default' : 'outline'}
-                      className={cn(
-                        'cursor-pointer mobile-touch-target px-3 py-2 text-sm font-normal',
-                        isSelected && getCategoryVariant(category) === 'work' && 'bg-info btn-hover-primary',
-                        isSelected && getCategoryVariant(category) === 'fun' && 'bg-warning btn-hover-primary',
-                        isSelected && getCategoryVariant(category) === 'relationships' && 'bg-primary btn-hover-primary',
-                        isSelected && getCategoryVariant(category) === 'ambition' && 'bg-warning btn-hover-primary',
-                        isSelected && getCategoryVariant(category) === 'exercise' && 'bg-success btn-hover-primary',
-                        !isSelected && 'bg-secondary text-secondary-foreground btn-hover-secondary'
-                      )}
-                      onClick={() => { handleCategorySelect(category) }}
-                    >
-                      {category}
-                      {isSelected && (
-                        <X className="ml-1 h-3 w-3" />
-                      )}
-                    </Badge>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Time Fields */}
-            <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
-              <div>
-                <label htmlFor="start_time" className="block text-sm font-medium text-foreground mb-2">
-                  Start Time
-                </label>
-                <div
-                  className="relative"
-                  onPointerDown={(e) => {
-                    // Prevent drawer from closing when interacting with time input
-                    e.stopPropagation()
-                  }}
-                >
-                  <Input
-                    id="start_time"
-                    name="start_time"
-                    type="time"
-                    value={editedTask.start_time || ''}
-                    onChange={handleInputChange}
-                    onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                    onClick={(e) => {
-                      // Try to trigger time picker on click
-                      e.currentTarget.showPicker?.()
-                    }}
-                    className="mobile-form-input font-mono text-center time-input-custom"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="end_time" className="block text-sm font-medium text-foreground mb-2">
-                  End Time
-                </label>
-                <div
-                  className="relative"
-                  onPointerDown={(e) => {
-                    // Prevent drawer from closing when interacting with time input
-                    e.stopPropagation()
-                  }}
-                >
-                  <Input
-                    id="end_time"
-                    name="end_time"
-                    type="time"
-                    value={editedTask.end_time || ''}
-                    onChange={handleInputChange}
-                    onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
-                    onClick={(e) => {
-                      // Try to trigger time picker on click
-                      e.currentTarget.showPicker?.()
-                    }}
-                    className="mobile-form-input font-mono text-center time-input-custom"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Recurrence Selection */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-foreground">
-                Repeat every...
-              </label>
-              <Select
-                value={
-                  editedTask.is_recurring?.frequency ?? 'none'
-                }
-                onValueChange={handleRecurrenceChange}
-              >
-                <SelectTrigger className="w-full mobile-form-input">
-                  <SelectValue placeholder="Select recurrence" />
-                </SelectTrigger>
-                <SelectContent className="select-content bg-background">
-                  {RECURRENCE_OPTIONS.map((option) => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                    >
-                      {getRecurrenceLabel(option)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {formContent}
           </div>
 
-          {/* Footer with improved save button */}
           <DrawerFooter className="flex-shrink-0 px-4">
             <Button onClick={handleSave} className="gradient-accent hover:opacity-90 text-primary-foreground mobile-form-button">
               {isEditMode ? 'Save Changes' : 'Create'}
