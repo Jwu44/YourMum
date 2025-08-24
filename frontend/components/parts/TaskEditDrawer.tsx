@@ -80,20 +80,35 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
     start_date: currentDate
   }), [currentDate])
 
+  // Helper function to handle time conversion - handles both 12-hour and 24-hour formats
+  const convertTimeForInput = useCallback((timeValue: string | null | undefined): string => {
+    if (!timeValue) return ''
+    
+    // Check if already in 24-hour format (e.g., "09:00", "15:00")
+    if (/^\d{1,2}:\d{2}$/.test(timeValue)) {
+      // Already 24-hour format, pad hour if needed
+      const [hour, minute] = timeValue.split(':')
+      return `${hour.padStart(2, '0')}:${minute}`
+    }
+    
+    // Otherwise assume 12-hour format and convert
+    return convert12HourTo24Hour(timeValue)
+  }, [])
+
   // Initialize with task data in edit mode, empty task in create mode
   const getInitialTask = useCallback((): Task => {
     if (isEditMode && task) {
       return {
         ...task,
-        // Convert 12-hour backend format to 24-hour frontend format for time inputs
-        start_time: convert12HourTo24Hour(task.start_time),
-        end_time: convert12HourTo24Hour(task.end_time),
+        // Handle both 12-hour backend format and 24-hour Google Calendar format
+        start_time: convertTimeForInput(task.start_time),
+        end_time: convertTimeForInput(task.end_time),
         categories: task.categories || [],
         start_date: task.start_date || currentDate
       }
     }
     return getEmptyTask()
-  }, [isEditMode, task, getEmptyTask, currentDate])
+  }, [isEditMode, task, getEmptyTask, currentDate, convertTimeForInput])
 
   const [editedTask, setEditedTask] = useState<Task>(() => getInitialTask())
 
