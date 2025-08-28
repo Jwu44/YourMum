@@ -19,8 +19,8 @@ This document outlines external services that need manual configuration updates 
 - **Required**: Register `yourmum.app`
 - **Action**:
   ✅ Purchase domain `yourmum.app`
-  - Update DNS settings
-  - Configure SSL certificates
+  ✅ Update DNS settings
+  ✅ Configure SSL certificates
   - Update Firebase Hosting custom domain
 
 ### 3. Railway Deployment
@@ -35,14 +35,14 @@ This document outlines external services that need manual configuration updates 
 - **Current**: OAuth redirect URIs pointing to `yourdai.app`
 - **Required**: Update to `yourmum.app`
 - **Action**:
-  - Update OAuth 2.0 redirect URIs
-  - Update authorized JavaScript origins
+  ✅ Update OAuth 2.0 redirect URIs
+  ✅ Update authorized JavaScript origins
   - Update Calendar API settings
 
 ### 5. Environment Variables
 Update in production deployment:
 - `APP_BASE_URL`: `https://yourdai.app` → `https://yourmum.app`
-- `CORS_ALLOWED_ORIGINS`: Update domain references
+✅ `CORS_ALLOWED_ORIGINS`: Update domain references
 - Firebase config values (API keys, auth domain, etc.)
 
 ### 6. GitHub Repository
@@ -51,15 +51,15 @@ Update in production deployment:
 - **Action**: Rename repository if desired
 
 ## Migration Checklist
-- [ ] Register `yourmum.app` domain
-- [ ] Create new Firebase project `yourmum`
+- [✅] Register `yourmum.app` domain
+- [✅] Create new Firebase project `yourmum`
 - [ ] Update GitHub secrets
-- [ ] Update Railway deployment settings
-- [ ] Update Google Console OAuth settings
+- [✅] Update Railway deployment settings
+- [✅] Update Google Console OAuth settings
 - [ ] Update production environment variables
 - [ ] Test all integrations
-- [ ] Update DNS settings
-- [ ] Setup SSL certificates
+- [✅] Update DNS settings
+- [✅] Setup SSL certificates
 - [ ] Verify all authentication flows work
 
 ## Notes
