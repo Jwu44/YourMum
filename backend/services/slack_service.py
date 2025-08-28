@@ -52,7 +52,7 @@ class SlackService:
         Format: base64(user_id:timestamp:uuid)
         
         Args:
-            user_id: YourdAI user ID to embed in state
+            user_id: YourMum user ID to embed in state
             
         Returns:
             Base64 encoded secure state token
@@ -117,7 +117,7 @@ class SlackService:
         Generate OAuth URL for Slack workspace connection with secure state token
         
         Args:
-            user_id: YourdAI user ID to embed in state token
+            user_id: YourMum user ID to embed in state token
             redirect_uri: Optional custom redirect URI
             
         Returns:
@@ -159,7 +159,7 @@ class SlackService:
         Args:
             code: OAuth authorization code from Slack
             state: State token for CSRF protection
-            user_id: YourdAI user ID
+            user_id: YourMum user ID
             
         Returns:
             Dictionary with success status and integration data
@@ -335,7 +335,7 @@ class SlackService:
         
         Args:
             event_data: Slack event data
-            user_id: YourdAI user ID
+            user_id: YourMum user ID
             
         Returns:
             Task object if message is actionable, None otherwise
@@ -529,7 +529,7 @@ class SlackService:
         Disconnect Slack integration for a user
         
         Args:
-            user_id: YourdAI user ID
+            user_id: YourMum user ID
             
         Returns:
             Dictionary with success status
@@ -559,7 +559,7 @@ class SlackService:
         Get Slack integration status for a user
         
         Args:
-            user_id: YourdAI user ID
+            user_id: YourMum user ID
             
         Returns:
             Dictionary with integration status

@@ -15,7 +15,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
           <div className="flex items-center">
             <Image
               src="/favicon-96x96.png"
-              alt="yourdai logo"
+              alt="YourMum logo"
               width={124}
               height={32}
               className="h-8 w-auto"

@@ -84,8 +84,8 @@ export default {
 					DEFAULT: 'hsl(var(--info))',
 					foreground: 'hsl(var(--info-foreground))'
 				},
-				'yourdai-purple': 'hsl(var(--primary))',
-				'yourdai-blue': 'hsl(var(--primary-blue))'
+				'yourmum-purple': 'hsl(var(--primary)),',
+				'yourmum-blue': 'hsl(var(--primary-blue))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

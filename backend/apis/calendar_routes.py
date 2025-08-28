@@ -894,9 +894,9 @@ def calendar_oauth_callback():
         accept_header = request.headers.get('Accept', '')
         if 'text/html' in accept_header:
             try:
-                app_base = os.getenv('APP_BASE_URL') or 'https://yourdai.app'
+                app_base = os.getenv('APP_BASE_URL') or 'https://yourmum.app'
             except Exception:
-                app_base = 'https://yourdai.app'
+                app_base = 'https://yourmum.app'
             # Minimal HTML redirect fallback
             return (
                 f"<html><head><meta http-equiv='refresh' content='0;url={app_base}/dashboard' /></head>"

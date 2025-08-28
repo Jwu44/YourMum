@@ -325,7 +325,7 @@ async def process_slash_command(event_data: Dict[str, Any]):
         event_data: Slack slash command data
     """
     # TODO: Implement slash command processing
-    # This could be used for commands like /yourdai add task "Complete project"
+    # This could be used for commands like /yourmum add task "Complete project"
     pass
 
 

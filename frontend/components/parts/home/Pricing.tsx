@@ -16,7 +16,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
         'Mobile app access',
         'Email support'
       ],
-      cta: 'Start yourdai',
+      cta: 'Start YourMum',
       popular: false
     },
     {

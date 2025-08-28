@@ -179,7 +179,7 @@ export function AppSidebar (): JSX.Element {
           <div className="flex items-center h-12 px-3 py-2 rounded-lg hover-selection transition-all duration-200">
             <Image
               src="/favicon-96x96.png"
-              alt="yourdai logo"
+              alt="YourMum logo"
               width={126}
               height={48}
               className="h-10 w-auto"

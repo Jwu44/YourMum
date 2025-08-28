@@ -14,7 +14,7 @@ const CTA = ({ handleGetStarted }: WithHandleGetStarted) => {
             ))}
           </div>
           <p className="text-primary-foreground/80 text-lg">
-            &ldquo;yourdai has completely transformed how I manage my daily tasks.
+            &ldquo;YourMum has completely transformed how I manage my daily tasks.
             The AI suggestions are spot-on and I&apos;m more productive than ever!&rdquo;
           </p>
           <p className="text-primary-foreground/70 mt-2">- Sarah Johnson, Product Manager</p>
@@ -24,7 +24,7 @@ const CTA = ({ handleGetStarted }: WithHandleGetStarted) => {
           Ready to supercharge your productivity?
         </h2>
         <p className="text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
-          Join thousands of users who have already transformed their daily planning with yourdai&apos;s AI-powered approach.
+          Join thousands of users who have already transformed their daily planning with YourMum&apos;s AI-powered approach.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

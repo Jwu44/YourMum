@@ -9,7 +9,7 @@ const Footer = () => {
             <div className="flex items-center mb-4">
               <Image
                 src="/favicon-96x96.png"
-                alt="yourdai logo"
+                alt="YourMum logo"
                 width={124}
                 height={32}
                 className="h-8 w-auto"
@@ -26,7 +26,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
-          <p>&copy; 2025 yourdai. All rights reserved.</p>
+          <p>&copy; 2025 YourMum. All rights reserved.</p>
         </div>
       </div>
     </footer>

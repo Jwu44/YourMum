@@ -19,7 +19,7 @@ export const hasValidCalendarConnection = async (userId: string): Promise<boolea
 }
 
 /**
- * Convert a Google Calendar event to a yourdai Task
+ * Convert a Google Calendar event to a YourMum Task
  * This is a client-side helper for manual event processing
  * @param event - Calendar event data
  * @param targetDate - Target date for the task

@@ -89,7 +89,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-yourdai-dark">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
