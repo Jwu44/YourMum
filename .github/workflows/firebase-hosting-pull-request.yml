@@ -21,6 +21,6 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_YOURMUM }}
-          projectId: yourmum
+          projectId: yourmum-cc74b
           entryPoint: ./frontend
           channelId: pr-${{ github.event.number }}

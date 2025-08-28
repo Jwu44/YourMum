@@ -10,9 +10,9 @@ This document outlines external services that need manual configuration updates 
 - **Required**: Create new Firebase project with ID `yourmum`
 - **Action**: 
   ✅ Create new Firebase project in console
-  - Update environment variables with new Firebase config
+  ✅ Update environment variables with new Firebase config
   - Migrate data if needed
-  - Update GitHub Secrets: `FIREBASE_SERVICE_ACCOUNT_YOURMUM`
+  ✅ Update GitHub Secrets: `FIREBASE_SERVICE_ACCOUNT_YOURMUM`
 
 ### 2. Domain Registration
 - **Current**: `yourdai.app`
@@ -27,9 +27,9 @@ This document outlines external services that need manual configuration updates 
 - **Current**: `yourdai-production.up.railway.app`
 - **Required**: `yourmum-production.up.railway.app`
 - **Action**:
-  - Update Railway project name/domain
-  - Update environment variables
-  - Update CORS configuration
+  ✅ Update Railway project name/domain
+  ✅ Update environment variables
+  ✅ Update CORS configuration
 
 ### 4. Google Console (OAuth & APIs)
 - **Current**: OAuth redirect URIs pointing to `yourdai.app`
@@ -41,7 +41,7 @@ This document outlines external services that need manual configuration updates 
 
 ### 5. Environment Variables
 Update in production deployment:
-- `APP_BASE_URL`: `https://yourdai.app` → `https://yourmum.app`
+✅ `APP_BASE_URL`: `https://yourdai.app` → `https://yourmum.app`
 ✅ `CORS_ALLOWED_ORIGINS`: Update domain references
 - Firebase config values (API keys, auth domain, etc.)
 
@@ -56,7 +56,7 @@ Update in production deployment:
 - [ ] Update GitHub secrets
 - [✅] Update Railway deployment settings
 - [✅] Update Google Console OAuth settings
-- [ ] Update production environment variables
+- [✅] Update production environment variables
 - [ ] Test all integrations
 - [✅] Update DNS settings
 - [✅] Setup SSL certificates
