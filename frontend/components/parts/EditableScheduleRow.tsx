@@ -24,6 +24,7 @@ import {
 
 // Import our new drag drop hook
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
+import { useDragState } from '../../contexts/DragStateContext'
 
 interface CustomDropdownItem {
   label: string
@@ -142,6 +143,43 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
 }
 
 /**
+ * Get the appropriate logo for a task based on its source
+ * Returns the logo element or null if no logo should be displayed
+ */
+const getTaskSourceLogo = (task: Task): React.ReactNode => {
+  // Only show logos for non-section tasks
+  if (task.is_section) return null
+
+  // Check for Slack source
+  if (task.source === 'slack') {
+    return (
+      <img
+        src="/images/integrations/slack_logo_task.svg"
+        alt="Slack"
+        className="flex-shrink-0"
+        width={16}
+        height={16}
+      />
+    )
+  }
+
+  // Check for Google Calendar source (identified by gcal_event_id)
+  if (task.gcal_event_id || task.source === 'calendar') {
+    return (
+      <img
+        src="/images/integrations/gcal_logo_task.svg"
+        alt="Google Calendar"
+        className="flex-shrink-0"
+        width={16}
+        height={16}
+      />
+    )
+  }
+
+  return null
+}
+
+/**
  * Get the appropriate emoji for a section based on its name
  * First checks for custom emojis, then falls back to hardcoded mapping
  */
@@ -229,6 +267,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     allTasks,
     moveTask
   })
+  
+  // Global drag state for suppressing hover effects
+  const { isDraggingAny } = useDragState()
 
   // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
@@ -237,6 +278,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
   const [showMicrosteps, setShowMicrosteps] = useState(false)
+  
+  // State to track dropdown menu visibility
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Hooks
   const { state: formData } = useForm()
@@ -563,7 +607,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
-    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+    <div 
+      className={cn(
+        "flex items-center gap-2 transition-opacity duration-200",
+        isDraggingAny ? "opacity-0" : "opacity-0 group-hover:opacity-100",
+        isDropdownOpen && "opacity-100" // Keep visible when dropdown is open
+      )}
+    >
       {/* Slack "View" link - only for top-level Slack tasks */}
       {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
         (() => {
@@ -604,7 +654,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )}
 
       {/* Ellipses dropdown menu - new functionality */}
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -672,53 +722,72 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       transition={{ duration: 0.2 }}
       className="relative"
     >
+      {/* Container with grip positioned outside task row */}
       <div
-        ref={dragDropHook.setNodeRef}
-        {...dragDropHook.attributes}
-        data-sortable-id={task.id}
         className={cn(
-          dragDropHook.getRowClassName(),
-          isSection ? 'cursor-default' : '',
-          isDecomposing && 'animate-pulse',
-          // Section styling
-          isSection ? 'mt-6 mb-4'
-          // Task card styling following TaskList.tsx reference
-            : 'group gap-4 p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft'
+          "relative", // Use relative positioning for proper layout
+          // Move group class to container so grip hover works
+          !isSection && "group"
         )}
         style={{
           marginLeft: (task.level && task.level > 0) ? `${task.level * 30}px` : 0,
-          minHeight: isSection ? '48px' : 'auto',
-          transform: dragDropHook.transform, // Only applies to actively dragged items
-          // 🔧 FIX: Prevent shuffling - only dragged items get transform optimization
-          willChange: dragDropHook.isDragging ? 'transform' : 'auto',
-          // Only disable transitions for the actively dragged item
-          transition: dragDropHook.isDragging ? 'none' : undefined
-        }}
-        onMouseEnter={(e) => {
-          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
-          // This ensures we track position relative to the TARGET task, not dragged task
-          if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
-          }
-        }}
-        onMouseMove={(e) => {
-          // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
-          // This enables real-time drag type updates relative to the TARGET task
-          if (dragDropHook.isOver && !dragDropHook.isDragging) {
-            dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
-          }
         }}
       >
-        {/* Task/Section Content */}
+        {/* Drag Handle - positioned absolutely outside task row */}
         {!isSection && (
-          <>
-            {/* Drag Handle - only visible on hover */}
-            <div
-              className={dragDropHook.getGripClassName()}
-              {...dragDropHook.listeners}
-            >
-              <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-            </div>
+          <div
+            className={cn(
+              // Use hook's grip classes only when no task is being dragged
+              !isDraggingAny && dragDropHook.getGripClassName(),
+              // When any task is dragging, use static classes without hover states
+              isDraggingAny && "opacity-0 cursor-grab transition-opacity duration-200 mr-2",
+              "absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10" // Position grip 24px to the left
+            )}
+            {...dragDropHook.listeners}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+          </div>
+        )}
+
+        {/* Main task row - now without internal grip */}
+        <div
+          ref={dragDropHook.setNodeRef}
+          {...dragDropHook.attributes}
+          data-sortable-id={task.id}
+          className={cn(
+            dragDropHook.getRowClassName(),
+            isSection ? 'cursor-default' : '',
+            isDecomposing && 'animate-pulse',
+            // Section styling - removed px-4 to align with task content
+            isSection ? 'mt-2.5 mb-2.5 w-full'
+            // Task card styling - no gap-4 to control spacing manually, grip is positioned absolutely
+              : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
+          )}
+          style={{
+            minHeight: isSection ? '48px' : 'auto',
+            transform: dragDropHook.transform, // Only applies to actively dragged items
+            // 🔧 FIX: Prevent shuffling - only dragged items get transform optimization
+            willChange: dragDropHook.isDragging ? 'transform' : 'auto',
+            // Only disable transitions for the actively dragged item
+            transition: dragDropHook.isDragging ? 'none' : undefined
+          }}
+          onMouseEnter={(e) => {
+            // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
+            // This ensures we track position relative to the TARGET task, not dragged task
+            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+              dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
+            }
+          }}
+          onMouseMove={(e) => {
+            // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
+            // This enables real-time drag type updates relative to the TARGET task
+            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+              dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
+            }
+          }}
+        >
+          {/* Task/Section Content */}
+          {!isSection && (
             <div ref={checkboxRef} className="flex items-center">
               <Checkbox
                 checked={task.completed}
@@ -726,38 +795,47 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
               />
             </div>
-          </>
-        )}
+          )}
 
-        {isSection
-          ? (
-          <div className="flex items-center gap-3 px-4 py-3">
-            {getSectionIcon(task.text, handleEmojiChange)}
-            <TypographyH4 className="text-foreground font-semibold mb-0">
+          {/* Task Source Logo - positioned 16px from checkbox, 8px from text */}
+          {!isSection && getTaskSourceLogo(task) && (
+            <div className="ml-4 mr-2 flex items-center">
+              {getTaskSourceLogo(task)}
+            </div>
+          )}
+
+          {isSection
+            ? (
+            <div className="flex items-center gap-3 py-3">
+              {getSectionIcon(task.text, handleEmojiChange)}
+              <TypographyH4 className="text-foreground font-semibold mb-0">
+                {task.text}
+              </TypographyH4>
+            </div>
+              )
+            : (
+            <span
+              className={cn(
+                'flex-1 text-foreground transition-all duration-200',
+                task.completed && 'line-through text-muted-foreground',
+                // Add 16px left margin only when no logo is present
+                !getTaskSourceLogo(task) && 'ml-4'
+              )}
+              data-task-content="true"
+            >
+              {task.start_time && task.end_time
+                ? `${task.start_time} - ${task.end_time}: `
+                : ''}
               {task.text}
-            </TypographyH4>
-          </div>
-            )
-          : (
-          <span
-            className={cn(
-              'flex-1 text-foreground transition-all duration-200',
-              task.completed && 'line-through text-muted-foreground'
-            )}
-            data-task-content="true"
-          >
-            {task.start_time && task.end_time
-              ? `${task.start_time} - ${task.end_time}: `
-              : ''}
-            {task.text}
-          </span>
-            )}
+            </span>
+              )}
 
-        {/* Task Actions - only show for non-section tasks */}
-        {!isSection && renderTaskActions()}
+          {/* Task Actions - only show for non-section tasks */}
+          {!isSection && renderTaskActions()}
 
-        {/* Enhanced Drag Indicators */}
-        {getDragIndicators()}
+          {/* Enhanced Drag Indicators */}
+          {getDragIndicators()}
+        </div>
       </div>
 
       {/* Microstep Suggestions */}

@@ -31,7 +31,7 @@ def create_app(testing=False):
     # Single CORS configuration for all routes
     CORS(app, resources={
         r"/*": {
-            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourdai.app,https://yourdai-production.up.railway.app,http://localhost:3000,http://localhost:8000").split(","),
+            "origins": os.getenv("CORS_ALLOWED_ORIGINS", "https://yourmum.app,https://yourmum-production.up.railway.app,http://localhost:3000,http://localhost:8000").split(","),
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-CSRFToken"],
             "supports_credentials": True,

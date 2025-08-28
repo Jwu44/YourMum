@@ -20,7 +20,7 @@ def client():
 
 @patch.dict(os.environ, {
     'GOOGLE_CLIENT_ID': 'cid-123',
-    'GOOGLE_CALENDAR_REDIRECT_URI': 'https://yourdai.app/api/calendar/oauth/callback'
+    'GOOGLE_CALENDAR_REDIRECT_URI': 'https://yourmum.app/api/calendar/oauth/callback'
 }, clear=False)
 @patch('backend.apis.calendar_routes.get_user_id_from_token', return_value='u-123')
 def test_oauth_start_builds_offline_access_url(mock_get_uid, client):
@@ -42,7 +42,7 @@ def test_oauth_start_builds_offline_access_url(mock_get_uid, client):
 @patch.dict(os.environ, {
     'GOOGLE_CLIENT_ID': 'cid-123',
     'GOOGLE_CLIENT_SECRET': 'csecret-xyz',
-    'GOOGLE_CALENDAR_REDIRECT_URI': 'https://yourdai.app/api/calendar/oauth/callback'
+    'GOOGLE_CALENDAR_REDIRECT_URI': 'https://yourmum.app/api/calendar/oauth/callback'
 }, clear=False)
 @patch('backend.apis.calendar_routes.requests.post')
 @patch('backend.apis.calendar_routes.ensure_calendar_watch_for_user', return_value=(True, {}))

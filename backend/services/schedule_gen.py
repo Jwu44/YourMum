@@ -548,35 +548,42 @@ def assemble_final_schedule(
         ]
         
         if unplaced_tasks:
-            # Add "Other Tasks" section if needed
-            other_section = {
-                "id": str(uuid.uuid4()),
-                "text": "Other Tasks",
-                "categories": [],
-                "is_section": True,
-                "completed": False,
-                "section": None,
-                "parent_id": None,
-                "level": 0,
-                "type": "section"
-            }
-            final_tasks.append(other_section)
-            
-            for task in unplaced_tasks:
-                task_dict = {
-                    "id": task.id,
-                    "text": task.text,
-                    "categories": list(task.categories) if task.categories else [],
-                    "is_section": False,
-                    "completed": getattr(task, 'completed', False),
-                    "section": "Other Tasks",
-                    "parent_id": None,
-                    "level": 0,
-                    "type": "task",
-                    "start_time": None,
-                    "end_time": None
-                }
-                final_tasks.append(task_dict)
+            if sections:
+                # For structured layouts: add to the last section at the bottom
+                last_section = sections[-1]
+                
+                for task in unplaced_tasks:
+                    task_dict = {
+                        "id": task.id,
+                        "text": task.text,
+                        "categories": list(task.categories) if task.categories else [],
+                        "is_section": False,
+                        "completed": getattr(task, 'completed', False),
+                        "section": last_section,
+                        "parent_id": None,
+                        "level": 0,
+                        "type": "task",
+                        "start_time": None,
+                        "end_time": None
+                    }
+                    final_tasks.append(task_dict)
+            else:
+                # For unstructured layouts: add directly to final_tasks
+                for task in unplaced_tasks:
+                    task_dict = {
+                        "id": task.id,
+                        "text": task.text,
+                        "categories": list(task.categories) if task.categories else [],
+                        "is_section": False,
+                        "completed": getattr(task, 'completed', False),
+                        "section": None,
+                        "parent_id": None,
+                        "level": 0,
+                        "type": "task",
+                        "start_time": None,
+                        "end_time": None
+                    }
+                    final_tasks.append(task_dict)
         
         return {
             "success": True,

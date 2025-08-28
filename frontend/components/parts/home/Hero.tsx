@@ -11,7 +11,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
           <div className="flex items-center justify-center lg:justify-start mb-6">
             <Image
               src="/favicon-96x96.png"
-              alt="yourdai logo"
+              alt="YourMum logo"
               width={152}
               height={40}
               className="h-10 w-auto"
@@ -33,7 +33,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
             <Button variant="premium" size="lg" className="px-8 py-4 text-lg" onClick={handleGetStarted}>
-              Start yourdai
+              Start YourMum
             </Button>
           </div>
 

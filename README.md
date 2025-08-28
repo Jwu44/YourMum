@@ -1,10 +1,10 @@
-# yourdAI 🤖📅
-🔗 https://yourdai.app/ 
+# YourMum 🤖📅
+🔗 https://yourmum.app/ 
 [currently gated behind Vercel for beta testing]
 
-yourdAI transforms how knowledge workers manage their day to day by creating an AI-powered to do list that eliminates the friction between intention and execution. 
+YourMum transforms how knowledge workers manage their day to day by creating an AI-powered to do list that eliminates the friction between intention and execution. 
 
-yourdai learns your unique energy patterns, automatically captures tasks from your scattered digital workspace, and generates intelligent daily schedules that align your most important work with your peak performance windows—giving you back time to focus on what truly matters while reducing the mental overhead of constant task management.
+YourMum learns your unique energy patterns, automatically captures tasks from your scattered digital workspace, and generates intelligent daily schedules that align your most important work with your peak performance windows—giving you back time to focus on what truly matters while reducing the mental overhead of constant task management.
 
 <img width="1920" height="965" alt="dashboard" src="https://github.com/user-attachments/assets/7e27e3d5-eb8f-4034-897f-ead699569f3f" />
 
@@ -19,7 +19,7 @@ yourdai learns your unique energy patterns, automatically captures tasks from yo
 
 
 ### 🦾 Automation
-- **Google Calendar Sync**: Auto syncs your events and tasks from google calendar to yourdai
+- **Google Calendar Sync**: Auto syncs your events and tasks from google calendar to YourMum
 <img width="1282" height="789" alt="Screenshot 2025-07-14 at 11 19 50 am" src="https://github.com/user-attachments/assets/0db83202-e3bc-4041-9084-0d88dd3b6bf0" />
 
 - **Categorise your tasks** Auto categorises your tasks for the day based on configured life priorities

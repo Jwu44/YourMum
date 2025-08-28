@@ -204,7 +204,7 @@ export default function SettingsPage () {
       // Step 2: Call backend logout API to clear session
       const token = await user?.getIdToken()
       if (token) {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://yourdai.be'
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
         const response = await fetch(`${apiBaseUrl}/api/auth/logout`, {
           method: 'DELETE',

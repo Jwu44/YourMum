@@ -27,8 +27,8 @@ export interface Task {
   estimated_time?: string
   energy_level_required?: 'low' | 'medium' | 'high'
   gcal_event_id?: string
-  // New Slack integration fields
-  source?: 'slack'
+  // New integration fields
+  source?: 'slack' | 'calendar' | 'manual'
   slack_message_url?: string
   // Preferred container for Slack message links; UI will prefer deep_link, then message_url
   slack_metadata?: SlackMetadata

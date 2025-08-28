@@ -22,7 +22,7 @@ if not uri:
 client = MongoClient(uri)
 
 # Connect to your database
-db_name = "YourDaiSchedule"
+db_name = "YourMumSchedule"
 db = client[db_name]
 
 # Add this flag near the top of the file

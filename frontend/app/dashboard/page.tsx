@@ -13,6 +13,7 @@ import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
 import CalendarConnectionLoader from '@/components/parts/CalendarConnectionLoader'
+import { DragStateProvider } from '@/contexts/DragStateContext'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
@@ -1394,17 +1395,18 @@ const Dashboard: React.FC = () => {
               : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0
                 ? (
               <>
-                <EditableSchedule
-                  tasks={scheduleDays[Math.abs(currentDayIndex)] || []}
-                  onUpdateTask={handleScheduleTaskUpdate}
-                  onReorderTasks={handleReorderTasks}
-                  onRequestSuggestions={handleRequestSuggestions}
-                  isLoadingSuggestions={isLoadingSuggestions}
-                  suggestionsMap={suggestionsMap}
-                  onAcceptSuggestion={handleAcceptSuggestion}
-                  onRejectSuggestion={handleRejectSuggestion}
-                  onEditTask={handleEditTask}
-                  onDeleteTask={handleDeleteTask}
+                <DragStateProvider>
+                  <EditableSchedule
+                    tasks={scheduleDays[Math.abs(currentDayIndex)] || []}
+                    onUpdateTask={handleScheduleTaskUpdate}
+                    onReorderTasks={handleReorderTasks}
+                    onRequestSuggestions={handleRequestSuggestions}
+                    isLoadingSuggestions={isLoadingSuggestions}
+                    suggestionsMap={suggestionsMap}
+                    onAcceptSuggestion={handleAcceptSuggestion}
+                    onRejectSuggestion={handleRejectSuggestion}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
                   onArchiveTask={handleArchiveTask}
                 />
 
@@ -1416,6 +1418,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                 )}
+                </DragStateProvider>
               </>
                   )
                 : (

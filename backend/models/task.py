@@ -276,7 +276,7 @@ class Task:
         Args:
             event: Slack event data
             task_text: AI-processed actionable task text
-            user_id: yourdai user ID
+            user_id: YourMum user ID
             
         Returns:
             Task object with Slack metadata

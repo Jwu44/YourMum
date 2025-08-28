@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 // Components
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import EditableScheduleRow from '@/components/parts/EditableScheduleRow'
+import { DragStateProvider } from '@/contexts/DragStateContext'
 
 // Hooks and Services
 import { useToast } from '@/hooks/use-toast'
@@ -245,7 +246,8 @@ const ArchivePage: React.FC = () => {
   }, [])
 
   return (
-    <SidebarLayout>
+    <DragStateProvider>
+      <SidebarLayout>
       <div className="flex-1 overflow-y-auto mobile-scroll">
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
           {/* Page Header */}
@@ -348,7 +350,8 @@ const ArchivePage: React.FC = () => {
           <div className="h-16" />
         </div>
       </div>
-    </SidebarLayout>
+      </SidebarLayout>
+    </DragStateProvider>
   )
 }
 

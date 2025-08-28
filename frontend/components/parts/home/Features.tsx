@@ -5,7 +5,7 @@ const Features = () => {
     {
       icon: Sparkles,
       title: 'Personalisation',
-      description: 'Configure your work schedule, life priorities, and energy patterns. yourdai learns how you work best.',
+      description: 'Configure your work schedule, life priorities, and energy patterns. YourMum learns how you work best.',
       highlight: 'Smart personalization'
     },
     {
@@ -30,7 +30,7 @@ const Features = () => {
           Everything you need to master your day
         </h2>
         <p className="text-xl text-muted-foreground leading-8">
-          Three core pillars that make yourdai the smartest way to plan your day
+          Three core pillars that make YourMum the smartest way to plan your day
         </p>
       </div>
 

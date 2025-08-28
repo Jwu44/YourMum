@@ -5,7 +5,7 @@ const HowItWorks = () => {
     {
       icon: Plus,
       title: 'Add Your Tasks',
-      description: 'Simply input your tasks, deadlines, and preferences. yourdai understands natural language.'
+      description: 'Simply input your tasks, deadlines, and preferences. YourMum understands natural language.'
     },
     {
       icon: Brain,
@@ -24,7 +24,7 @@ const HowItWorks = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
-            How yourdai works
+            How YourMum works
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Get started in minutes with our simple three-step process

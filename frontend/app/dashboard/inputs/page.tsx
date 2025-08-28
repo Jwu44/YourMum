@@ -405,12 +405,6 @@ export default function InputsPage() {
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
               Add your inputs for YourMum to personalise your schedule.
             </p>
-            {/* Show loading indicator while loading tasks */}
-            {isLoadingTasks && (
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                Loading current schedule tasks...
-              </p>
-            )}
           </div>
 
           <div className="grid gap-4 sm:gap-6">
