@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, Response, stream_with_context
-from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
+from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 
 from bson import ObjectId
@@ -1191,38 +1191,6 @@ class MongoJSONEncoder(json.JSONEncoder):
             return str(obj)
         return super().default(obj)
 
-def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) -> List[Dict]:
-    """Store generated suggestions in MongoDB."""
-    try:
-        suggestions_collection = get_ai_suggestions_collection()
-        
-        # Prepare suggestions for storage
-        suggestions_to_store = []
-        for suggestion in suggestions:
-            suggestion_doc = {
-                "user_id": user_id,
-                "date": date,
-                **suggestion,
-               "created_at": datetime.now(timezone.utc).isoformat() 
-            }
-            suggestions_to_store.append(suggestion_doc)
-        
-        # Store suggestions
-        if suggestions_to_store:
-            result = suggestions_collection.insert_many(suggestions_to_store)
-            
-            # Update suggestions with generated IDs - convert ObjectId to string
-            for suggestion, inserted_id in zip(suggestions_to_store, result.inserted_ids):
-                suggestion['id'] = str(inserted_id)  # Convert ObjectId to string
-        
-        # Use custom encoder when returning
-        return json.loads(json.dumps(suggestions_to_store, cls=MongoJSONEncoder))
-        
-    except Exception as e:
-        print(f"Error storing suggestions: {e}")
-        # Return original suggestions if storage fails
-        return suggestions
-
 # Helper function for extracting user ID from request (reusable across routes)
 def extract_user_id_from_request() -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
@@ -1925,7 +1893,6 @@ def delete_user_account():
         # Collections to clean up - delete all user-related data
         collections_to_clean = [
             'UserSchedules',           # User's daily schedules
-            'AIsuggestions',           # AI-generated suggestions
             'MicrostepFeedback',       # User's task feedback
             'DecompositionPatterns',   # User's task decomposition patterns
             'calendar_events',         # User's synced calendar events

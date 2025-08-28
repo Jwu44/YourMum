@@ -154,26 +154,6 @@ const SlackIntegrationCard: React.FC = () => {
             }
           }, 1000)
           
-          // If we haven't received a success message, assume window was closed before completion
-          // But wait a bit longer to allow for the status refresh
-          setTimeout(() => {
-            // Only show cancelled message if still not connected
-            checkSlackStatus().then(() => {
-              if (!status.connected) {
-                toast({
-                  title: 'OAuth window closed',
-                  description: 'The OAuth window was closed before completion.',
-                  variant: 'destructive'
-                })
-              }
-            }).catch(() => {
-              toast({
-                title: 'OAuth window closed',
-                description: 'The OAuth window was closed before completion.',
-                variant: 'destructive'
-              })
-            })
-          }, 2000)
         }
       }, 1000)
     } catch (error) {
