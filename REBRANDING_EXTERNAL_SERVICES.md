@@ -11,7 +11,7 @@ This document outlines external services that need manual configuration updates 
 - **Action**: 
   ✅ Create new Firebase project in console
   ✅ Update environment variables with new Firebase config
-  - Migrate data if needed
+  ✅ Migrate data if needed
   ✅ Update GitHub Secrets: `FIREBASE_SERVICE_ACCOUNT_YOURMUM`
 
 ### 2. Domain Registration
@@ -21,7 +21,7 @@ This document outlines external services that need manual configuration updates 
   ✅ Purchase domain `yourmum.app`
   ✅ Update DNS settings
   ✅ Configure SSL certificates
-  - Update Firebase Hosting custom domain
+  ✅ Update Firebase Hosting custom domain
 
 ### 3. Railway Deployment
 - **Current**: `yourdai-production.up.railway.app`
@@ -37,7 +37,7 @@ This document outlines external services that need manual configuration updates 
 - **Action**:
   ✅ Update OAuth 2.0 redirect URIs
   ✅ Update authorized JavaScript origins
-  - Update Calendar API settings
+  ✅ Update Calendar API settings
 
 ### 5. Environment Variables
 Update in production deployment:
@@ -53,7 +53,7 @@ Update in production deployment:
 ## Migration Checklist
 - [✅] Register `yourmum.app` domain
 - [✅] Create new Firebase project `yourmum`
-- [ ] Update GitHub secrets
+- [✅ ] Update GitHub secrets
 - [✅] Update Railway deployment settings
 - [✅] Update Google Console OAuth settings
 - [✅] Update production environment variables
