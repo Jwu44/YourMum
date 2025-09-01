@@ -25,8 +25,26 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
+        <div className="border-t border-border mt-8 pt-8 flex justify-between items-center text-muted-foreground">
           <p>&copy; 2025 YourMum. All rights reserved.</p>
+          <div className="flex gap-6">
+            <a 
+              href="https://www.notion.so/Terms-and-Conditions-25fe0fd13b638040a916cf37434cb6b0?source=copy_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              Terms and Conditions
+            </a>
+            <a 
+              href="https://www.notion.so/Privacy-Policy-25fe0fd13b6380198c4ad8ff003dda8a?source=copy_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              Privacy Policy
+            </a>
+          </div>
         </div>
       </div>
     </footer>
