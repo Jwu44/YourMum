@@ -453,6 +453,7 @@ export function AppSidebar (): JSX.Element {
                       : ''
                   }`}
                   data-testid={`nav-item-${item.id}`}
+                  data-onboarding-target={item.id === 'inputs' ? 'inputs-nav' : item.id === 'integrations' ? 'integrations-nav' : undefined}
                   onClick={() => { handleNavigation(item) }}
                 >
                   <div className="flex items-center gap-3">

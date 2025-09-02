@@ -14,6 +14,7 @@ import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
 import CalendarConnectionLoader from '@/components/parts/CalendarConnectionLoader'
 import { DragStateProvider } from '@/contexts/DragStateContext'
+import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
@@ -1361,6 +1362,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <SidebarLayout>
+      <OnboardingTour />
       <div className="flex flex-col bg-background">
 
         <DashboardHeader

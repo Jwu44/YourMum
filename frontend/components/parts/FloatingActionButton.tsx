@@ -10,6 +10,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onClick }) 
       onClick={onClick}
       className="fixed bottom-6 right-6 w-14 h-14 gradient-accent rounded-full flex items-center justify-center shadow-lg z-50"
       aria-label="Add task"
+      data-testid="create-task-fab"
     >
       <svg
         width="24"

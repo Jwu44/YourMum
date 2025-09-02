@@ -5,76 +5,62 @@ I want to be guided through the main features using a step-by-step interactive t
 So that I can quickly understand how to use key functions and feel confident navigating YourMum.
 
 ## Acceptance Criteria:
-- The tour launches automatically on first use and can be skipped at any time.
+- The tour launches automatically on first use and can be closed at any time.
 - Each step highlights a relevant UI element with a callout and concise explanation.
 - Navigation buttons ("Next", "Close") are clearly visible and accessible.
 - My position in the tour (e.g., "1 of 3") is always visible so I know how many steps remain.
-- Theoverlay does not block essential functionality, allowing me to see and understand the interface beneath.
+- The overlay does not block essential functionality, allowing me to see and understand the interface beneath.
 - All instructions use clear, jargon-free language and are easy to follow.
-- The tour exits gracefully, allowing me to begin working.
-- Once the tour is dismissed or closed, user should not be able to bring it back up
+- Once the tour is closed, user should not be able to bring it back up
 
 ## Components Breakdown
 - Highlight/Overlay: A translucent overlay that dims the background, focusing the user’s attention on the active step.
-- Callout Tooltip/Modal:
-    - Central content box with a short title (“Pick the right tool for the job”) and message text.
-    Tooltip positioned contextually near the highlighted UI element (using an arrow/pointer) to visually link the instructions to the feature being taught.
+- Callout content box:
+    - title
+    - divider
+    - body text descriptive text (clear, concise, emphasizes action or learning).
+    - step counter (e.g. 1 of 3)
+    - CTA 1: Next 
+- Content box is positioned contextually near the highlighted UI element using an pointed arrow to visually link the instructions to the feature being taught.
 
-Pointer/Arrow Indicator: An arrow or pointer graphic that connects the callout box directly to the feature or button in question for extra clarity.
+## Content for each step:
+### Step 1
+- page: /dashboard
+- title: Add your first task
+- divider:
+- body text: Click the button to add your first task. Simply add the task name. YourMum can auto-categorise this task later and even assign times.
+- step counter: 1 of 3
+- CTA 1: Next
+    - onClick should show step 2
+- CTA 2: Back
+    - onClick should show step 1
+- close: dismisses entire interactive tour 
+- position:
+    - ignore auto layout
+    - positioned below "+ Create Task button" 
 
-Step Indicator: A progress counter within the callout/modal (“3 of 5”), showing the user’s current step in the tour.
-
-Navigation Controls:
-
-Next Button: Distinct primary button (prominent color, e.g., orange) to move forward in the tour.
-
-Close Button: Subdued secondary button to exit/cancel the tour at any time.
-
-Exit Control (X Icon): Clickable close (‘X’) icon at the top right of the callout/modal to dismiss the tour immediately.
-
-Content Area:
-
-Title (simple, bold for emphasis).
-
-Descriptive text (clear, concise, emphasizes action or learning).
-
-Optional asset/thumbnail preview when explaining tool-specific features.
-
-Sample UI Structure (Pseudocode)
-jsx
-<TourOverlay>
-  <HighlightElement targetSelector=".toolbar-icon-prototype" />
-  <CalloutBox>
-    <Title>Pick the right tool for the job</Title>
-    <Pointer targetSelector=".toolbar-icon-prototype" />
-    <Description>
-      Along with simple slide tools, you can run a poll, embed a prototype, and add assets for some extra oomph.
-    </Description>
-    <StepIndicator>3 of 5</StepIndicator>
-    <CloseIcon />
-    <Actions>
-      <Button variant="secondary">Close</Button>
-      <Button variant="primary">Next</Button>
-    </Actions>
-  </CalloutBox>
-</TourOverlay>
-TourOverlay: Provides background dimming and modal container.
-
-HighlightElement: Highlights or outlines the feature/button being explained.
-
-CalloutBox: Contains instruction text, step controls, and navigation.
-
-Pointer: Visually links the callout to the relevant UI component.
-
-StepIndicator: Shows progress.
-
-Actions: Next and Close buttons, clearly styled for visibility and accessibility.
-
-Implementation Tips
-Ensure that the overlay and callout/modal are focus-trapped and keyboard-navigable for accessibility.
-
-Callout positioning should dynamically adjust to avoid overflowing screen edges and should anchor to the feature being explained.
-
-Use a component-based approach (React/Vue/etc.) for reuse and easy tour step management.
-
-Step data (text, target selectors, titles) can be stored as JSON or in code for flexibility.
+### Step 2
+- title: Fill out your preferences
+- divider:
+- body text: Provide details about your lifestyle and how you like to operate so YourMum can generate a personalised schedule for you.
+- step counter: 2 of 3
+- CTA 1: Next
+    - onClick should open step 3
+- CTA 2: Back
+    - onClick should show step 2
+- close: dismisses entire interactive tour 
+- position:
+    - ignore auto layout
+    - positioned to the right of "Inputs" outside the Appsidebar
+  
+### Step 3
+- title: Integrate with 3rd party apps
+- divider:
+- body text: Connect with other apps to allow YourMum to auto create tasks from those sources.
+- step counter: 3 of 3
+- CTA: Finish
+    - dismisses interactive tour
+- close: dismisses entire interactive tour 
+- position:
+    - ignore auto layout
+    - positioned to the right of "Integrations" outside the Appsidebar  

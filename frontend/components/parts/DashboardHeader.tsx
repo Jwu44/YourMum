@@ -387,6 +387,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 size="sm"
                 onClick={onAddTask}
                 className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
+                data-testid="create-task-button"
               >
                 <Plus size={16} />
                 Create Task

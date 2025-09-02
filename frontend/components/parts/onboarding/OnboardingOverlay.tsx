@@ -1,0 +1,102 @@
+/**
+ * @file OnboardingOverlay.tsx
+ * @description Overlay component for the onboarding tour that dims the background and highlights target elements
+ */
+
+'use client'
+
+import React from 'react'
+import { createPortal } from 'react-dom'
+
+interface OnboardingOverlayProps {
+  targetElement: Element | null
+  children: React.ReactNode
+  onClose: () => void
+  showSpotlight?: boolean
+}
+
+export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
+  targetElement,
+  children,
+  onClose,
+  showSpotlight = true
+}) => {
+  const overlayRef = React.useRef<HTMLDivElement>(null)
+
+  // Handle clicks on the overlay (but not the callout) to close the tour
+  const handleOverlayClick = React.useCallback((e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) {
+      onClose()
+    }
+  }, [onClose])
+
+  // Handle escape key to close tour
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose])
+
+  // Get spotlight position and size based on target element
+  const getSpotlightStyles = React.useCallback(() => {
+    if (!targetElement || !showSpotlight) {
+      return {}
+    }
+
+    const rect = targetElement.getBoundingClientRect()
+    const padding = 8 // No padding - just the element itself
+    
+    return {
+      '--spotlight-x': `${rect.left - padding}px`,
+      '--spotlight-y': `${rect.top - padding}px`,
+      '--spotlight-width': `${rect.width + padding * 2}px`,
+      '--spotlight-height': `${rect.height + padding * 2}px`,
+    } as React.CSSProperties
+  }, [targetElement, showSpotlight])
+
+  const overlayContent = (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={getSpotlightStyles()}
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Onboarding tour"
+    >
+      {/* Spotlight effect - dims everything except the target area */}
+      {targetElement && showSpotlight && (
+        <div
+          className="absolute bg-transparent rounded-lg pointer-events-none"
+          style={{
+            left: 'var(--spotlight-x)',
+            top: 'var(--spotlight-y)',
+            width: 'var(--spotlight-width)',
+            height: 'var(--spotlight-height)',
+            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)'
+          }}
+        />
+      )}
+      
+      {/* Fallback overlay when no spotlight */}
+      {(!targetElement || !showSpotlight) && (
+        <div className="absolute inset-0 bg-black/60" />
+      )}
+      
+      {/* Note: Removed the highlighted border element to show clean spotlight effect */}
+
+      {/* Tour content */}
+      {children}
+    </div>
+  )
+
+  // Render in portal to ensure proper z-index
+  return typeof window !== 'undefined' 
+    ? createPortal(overlayContent, document.body)
+    : null
+}
