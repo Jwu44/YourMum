@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/auth/AuthContext'
 import { type ProfileFormData, type UserDocument } from '@/lib/types'
+import { useRouter } from 'next/navigation'
 import { fetchUserProfile, updateUserProfile, deleteUserAccount } from '@/lib/api/settings'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
@@ -24,6 +25,7 @@ import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
 export default function SettingsPage () {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   // User profile data from backend
   const [userProfile, setUserProfile] = useState<UserDocument | null>(null)
@@ -219,8 +221,8 @@ export default function SettingsPage () {
         }
       }
 
-      // Step 3: Redirect to home page immediately after successful logout
-      window.location.assign('/')
+      // Step 3: Client-side navigate to home to avoid full reload
+      router.replace('/')
     } catch (error) {
       console.error('Logout error:', error)
       setIsLoggingOut(false)
@@ -260,9 +262,9 @@ export default function SettingsPage () {
       // Close dialog
       setIsDeletionDialogOpen(false)
 
-      // Sign out from Firebase and redirect immediately
+      // Sign out from Firebase and client-side navigate immediately
       await signOut()
-      window.location.assign('/')
+      router.replace('/')
     } catch (error) {
       console.error('Account deletion error:', error)
       setIsDeleting(false)
