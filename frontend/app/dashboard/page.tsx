@@ -13,7 +13,6 @@ import TaskEditDrawer from '@/components/parts/TaskEditDrawer'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
-import { LoadingPage } from '@/components/parts/LoadingPage'
 import { DragStateProvider } from '@/contexts/DragStateContext'
 import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 
@@ -38,7 +37,7 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
@@ -77,7 +76,6 @@ const Dashboard: React.FC = () => {
   const hasInitiallyLoaded = useRef(false)
   const hasEnsuredRefresh = useRef(false)
   const [isEnsuringRefresh, setIsEnsuringRefresh] = useState(false)
-  const [isAutogenerating, setIsAutogenerating] = useState(false)
 
   useEffect(() => {
     const date = new Date()
@@ -725,33 +723,16 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - centralize to backend autogeneration
-      console.log('Next day is in the future and no schedule exists, autogenerating via backend')
-
-      // Set loading state to show LoadingPage component
-      setIsAutogenerating(true)
-
-      try {
-        const auto = await autogenerateTodaySchedule(nextDayDate)
-        if (auto.success && (auto.created || auto.existed) && Array.isArray(auto.schedule)) {
-          setScheduleDays(prevDays => {
-            const newDays = [...prevDays]
-            const targetIndex = currentDayIndex + 1
-            while (newDays.length <= targetIndex) newDays.push([])
-            newDays[targetIndex] = auto.schedule!
-            return newDays
-          })
-          setScheduleCache(prev => {
-            const map = new Map(prev)
-            map.set(nextDayDate, auto.schedule!)
-            return map
-          })
-        } else {
-          throw new Error(auto.error || 'Autogenerate failed')
-        }
-      } finally {
-        setIsAutogenerating(false)
-      }
+      // Step 4: Future date with no existing schedule - redirect to loading page for autogeneration
+      console.log('Next day is in the future and no schedule exists, redirecting to loading page for autogeneration')
+      
+      // Store navigation info for loading page to handle
+      sessionStorage.setItem('pendingNavigationDate', nextDayDate)
+      sessionStorage.setItem('pendingNavigationIndex', (currentDayIndex + 1).toString())
+      
+      // Redirect to loading page - it will handle autogeneration and return to dashboard
+      router.push('/loading?reason=schedule')
+      return
     } catch (error) {
       console.error('Error in handleNextDay:', error)
 
@@ -1366,15 +1347,6 @@ const Dashboard: React.FC = () => {
   }, [currentDayIndex, currentUser?.uid])
 
 
-  // Show LoadingPage during autogeneration
-  if (isAutogenerating) {
-    return (
-      <LoadingPage 
-        reason="schedule"
-        message="Creating your schedule for tomorrow..."
-      />
-    )
-  }
 
   return (
     <SidebarLayout>
