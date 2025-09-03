@@ -113,5 +113,3 @@ const IntegrationCardShell: React.FC<IntegrationCardShellProps> = ({
 }
 
 export default IntegrationCardShell
-
-

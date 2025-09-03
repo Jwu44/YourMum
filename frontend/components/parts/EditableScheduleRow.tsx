@@ -267,7 +267,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     allTasks,
     moveTask
   })
-  
+
   // Global drag state for suppressing hover effects
   const { isDraggingAny } = useDragState()
 
@@ -278,7 +278,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
   const [showMicrosteps, setShowMicrosteps] = useState(false)
-  
+
   // State to track dropdown menu visibility
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
@@ -378,7 +378,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
 
-
   // Progressive visual feedback system for indentation levels
   // Shows increasingly complex purple lines based on target indentation depth
   const getDragIndicators = useCallback(() => {
@@ -394,7 +393,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     const { dragType, targetIndentLevel } = dragDropHook.indentationState
     const currentDragType = dragType || 'reorder'
-
 
     // Progressive opacity system based on requirements
     const renderProgressiveIndentLine = (levels: number) => {
@@ -607,11 +605,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
-    <div 
+    <div
       className={cn(
-        "flex items-center gap-2 transition-opacity duration-200",
-        isDraggingAny ? "opacity-0" : "opacity-0 group-hover:opacity-100",
-        isDropdownOpen && "opacity-100" // Keep visible when dropdown is open
+        'flex items-center gap-2 transition-opacity duration-200',
+        isDraggingAny ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
+        isDropdownOpen && 'opacity-100' // Keep visible when dropdown is open
       )}
     >
       {/* Slack "View" link - only for top-level Slack tasks */}
@@ -725,12 +723,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       {/* Container with grip positioned outside task row */}
       <div
         className={cn(
-          "relative", // Use relative positioning for proper layout
+          'relative', // Use relative positioning for proper layout
           // Move group class to container so grip hover works
-          !isSection && "group"
+          !isSection && 'group'
         )}
         style={{
-          marginLeft: (task.level && task.level > 0) ? `${task.level * 30}px` : 0,
+          marginLeft: (task.level && task.level > 0) ? `${task.level * 30}px` : 0
         }}
       >
         {/* Drag Handle - positioned absolutely outside task row */}
@@ -740,8 +738,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               // Use hook's grip classes only when no task is being dragged
               !isDraggingAny && dragDropHook.getGripClassName(),
               // When any task is dragging, use static classes without hover states
-              isDraggingAny && "opacity-0 cursor-grab transition-opacity duration-200 mr-2",
-              "absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10" // Position grip 24px to the left
+              isDraggingAny && 'opacity-0 cursor-grab transition-opacity duration-200 mr-2',
+              'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10' // Position grip 24px to the left
             )}
             {...dragDropHook.listeners}
           >

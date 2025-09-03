@@ -102,7 +102,7 @@ const Dashboard: React.FC = () => {
         const me = await userApi.getCurrentUser().catch(() => null as any)
         if (!me) return
 
-        const calendar = (me as any).calendar || {}
+        const calendar = (me).calendar || {}
         const connected = !!calendar.connected
         const credentials = calendar.credentials || {}
         const hasRefresh = !!credentials.refreshToken
@@ -118,7 +118,7 @@ const Dashboard: React.FC = () => {
           const token = await (currentUser || auth.currentUser)?.getIdToken(true)
           const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
           const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-          
+
           // Test calendar API call - if this succeeds, calendar is working fine
           const testResp = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
             method: 'GET',
@@ -141,7 +141,6 @@ const Dashboard: React.FC = () => {
             if (resp.ok && data?.success && data?.url) {
               setIsEnsuringRefresh(true)
               window.location.href = data.url as string
-              return
             }
           }
           // If start failed, do NOT block dashboard; proceed without loader
@@ -802,7 +801,6 @@ const Dashboard: React.FC = () => {
         )
 
         setCurrentDayIndex(dayOffset)
-
       } else {
         throw new Error(loadResult.error || 'Failed to load schedule')
       }
@@ -1289,7 +1287,7 @@ const Dashboard: React.FC = () => {
     const timer = setTimeout(() => {
       try { window.location.reload() } catch (_) {}
     }, Math.max(0, delay))
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer) }
   }, [])
 
   useEffect(() => {
@@ -1352,9 +1350,9 @@ const Dashboard: React.FC = () => {
 
   // Show calendar connection loader only during active OAuth flows
   // Don't show if user is just navigating between pages with existing calendar connection
-  const shouldShowLoader = (calendarConnectionStage && calendarConnectionStage !== 'complete') || 
+  const shouldShowLoader = (calendarConnectionStage && calendarConnectionStage !== 'complete') ||
                           (isEnsuringRefresh && hasEnsuredRefresh.current)
-  
+
   if (shouldShowLoader) {
     const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
     return <CalendarConnectionLoader stage={stage} />

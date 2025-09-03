@@ -23,7 +23,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
 
           <h2 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
             Your AI-Powered
-            <span className="text-primary block bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Daily Planner</span>
+            <span className="text-primary block bg-gradient-to-r from-primary to-primary/80 bg-clip-text">Daily Planner</span>
           </h2>
 
           <p className="text-xl text-muted-foreground mb-8 leading-relaxed">

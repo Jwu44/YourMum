@@ -14,6 +14,8 @@ import { OnboardingCallout } from './OnboardingCallout'
 // Hooks
 import { useOnboardingTour } from '@/hooks/useOnboardingTour'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useSidebar } from '@/components/ui/sidebar'
+import { useOnboarding } from '@/contexts/OnboardingContext'
 
 interface OnboardingTourProps {
   /** Whether to auto-start the tour for first-time users */
@@ -29,7 +31,7 @@ const TOUR_STEPS = [
   {
     id: 'add-first-task',
     title: 'Add your first task',
-    body: 'Click the button to add your first task. Simply add the task name. YourMum can auto-categorise this task later and even assign times.',
+    body: 'Click the button and simply add the task name. YourMum can auto-categorise tasks later and even assign times.',
     targetSelector: '[data-testid="create-task-button"], [data-testid="create-task-fab"]',
     position: 'below' as const
   },
@@ -67,7 +69,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
   storageKey = 'onboarding-tour-completed'
 }) => {
   const isMobile = useIsMobile()
-  
+  const { setOpenMobile } = useSidebar()
+  const { setIsOnboardingActive } = useOnboarding()
+
   const {
     isActive,
     targetElement,
@@ -80,6 +84,25 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     autoStart,
     storageKey
   })
+
+  // Update onboarding context when tour state changes
+  React.useEffect(() => {
+    setIsOnboardingActive(isActive)
+  }, [isActive, setIsOnboardingActive])
+
+  // Enhanced next step handler with mobile sidebar behavior
+  const handleNextStep = React.useCallback(() => {
+    // If Step 1 and mobile, open sidebar for Steps 2 & 3 visibility
+    if (currentStepData?.stepCounter.includes('1 of 3') && isMobile) {
+      setOpenMobile(true)
+      // Small delay to ensure Sheet portal is rendered
+      setTimeout(() => {
+        nextStep()
+      }, 150)
+    } else {
+      nextStep()
+    }
+  }, [currentStepData, isMobile, setOpenMobile, nextStep])
 
   // Don't render if tour is not active or no current step
   if (!isActive || !currentStepData) {
@@ -101,7 +124,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         targetElement={targetElement}
         showBackButton={canGoBack}
         nextButtonText={nextButtonText}
-        onNext={nextStep}
+        onNext={handleNextStep}
         onBack={canGoBack ? previousStep : undefined}
         onClose={closeTour}
       />

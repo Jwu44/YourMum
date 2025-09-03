@@ -145,7 +145,6 @@ export const handleMicrostepSelection = async (
   }
 }
 
-
 export const fetchAISuggestions = async (
   userId: string,
   date: string,

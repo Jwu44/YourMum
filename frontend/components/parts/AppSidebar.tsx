@@ -279,14 +279,14 @@ export function AppSidebar (): JSX.Element {
       item.onClick()
       return
     }
-    
+
     // For navigation items, ensure we maintain collapsed state
     // Don't modify shouldKeepCollapsedRef.current if it's already true
     if (!shouldKeepCollapsedRef.current) {
       shouldKeepCollapsedRef.current = true
       localStorage.setItem('thin-sidebar-navigation', 'true')
     }
-    
+
     // Handle navigation items
     if (item.id === 'inputs') {
       handleInputsNavigation()
@@ -310,7 +310,7 @@ export function AppSidebar (): JSX.Element {
                 <TooltipTrigger asChild>
                   <button
                     className={`h-8 w-8 flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors duration-200 ${
-                      item.isActive 
+                      item.isActive
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                         : 'text-sidebar-foreground'
                     } ${
@@ -328,7 +328,8 @@ export function AppSidebar (): JSX.Element {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  {item.id === 'menu' ? (
+                  {item.id === 'menu'
+                    ? (
                     <div className="flex items-center gap-2">
                       <span>{item.title}</span>
                       <div className="flex items-center gap-1">
@@ -336,15 +337,16 @@ export function AppSidebar (): JSX.Element {
                         <kbd className="px-1.5 py-0.5 text-xs font-mono bg-gray-700 rounded border border-gray-600">/</kbd>
                       </div>
                     </div>
-                  ) : (
+                      )
+                    : (
                     <span>{item.title}</span>
-                  )}
+                      )}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           ))}
         </div>
-        
+
         {/* Settings Icon at Bottom */}
         <div className="px-2 pb-3">
           <TooltipProvider>
@@ -399,14 +401,14 @@ export function AppSidebar (): JSX.Element {
                 quality={100}
                 style={{ imageRendering: 'crisp-edges' }}
               />
-              <span 
+              <span
                 className="ml-2.5 text-lg font-semibold text-foreground truncate sm:text-xl h-10 flex items-center"
               >
                 YourMum
               </span>
             </div>
           </Link>
-          
+
           {/* Collapse Sidebar Button */}
           <TooltipProvider>
             <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
@@ -448,7 +450,7 @@ export function AppSidebar (): JSX.Element {
                 <SidebarMenuButton
                   size="lg"
                   className={`h-12 hover-selection cursor-pointer transition-all duration-200 ${
-                    item.isActive 
+                    item.isActive
                       ? 'bg-sidebar-accent/100 text-sidebar-accent-foreground'
                       : ''
                   }`}

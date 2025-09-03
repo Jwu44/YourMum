@@ -60,7 +60,7 @@ const getHeaders = async (): Promise<HeadersInit> => {
   const token = await getAuthToken()
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    Authorization: `Bearer ${token}`
   }
 }
 
@@ -71,7 +71,7 @@ export const slackApi = {
   /**
    * Get current Slack integration status
    */
-  async getStatus(): Promise<SlackIntegrationStatus> {
+  async getStatus (): Promise<SlackIntegrationStatus> {
     const headers = await getHeaders()
     const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
       method: 'GET',
@@ -89,7 +89,7 @@ export const slackApi = {
   /**
    * Generate OAuth URL for Slack workspace connection
    */
-  async getOAuthUrl(): Promise<SlackOAuthResponse> {
+  async getOAuthUrl (): Promise<SlackOAuthResponse> {
     const headers = await getHeaders()
     const response = await fetch(`${API_BASE_URL}/api/integrations/slack/auth/connect`, {
       method: 'GET',
@@ -107,7 +107,7 @@ export const slackApi = {
   /**
    * Disconnect Slack integration
    */
-  async disconnect(): Promise<SlackDisconnectResponse> {
+  async disconnect (): Promise<SlackDisconnectResponse> {
     const headers = await getHeaders()
     const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
       method: 'DELETE',
@@ -126,7 +126,7 @@ export const slackApi = {
    * Check if OAuth flow is completed by polling the status
    * This is used during the OAuth callback process
    */
-  async checkOAuthCompletion(): Promise<boolean> {
+  async checkOAuthCompletion (): Promise<boolean> {
     try {
       const status = await this.getStatus()
       return status.connected

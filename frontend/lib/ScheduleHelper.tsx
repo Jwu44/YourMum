@@ -29,7 +29,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
-function detectUserTimezone(): string {
+function detectUserTimezone (): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone
   } catch (_) {
@@ -70,7 +70,7 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
   // Start timing
   const startTime = performance.now()
   console.log('[TIMING] Schedule generation started')
-  
+
   try {
     // Get authentication token
     const authStartTime = performance.now()
@@ -139,7 +139,7 @@ export const generateSchedule = async (formData: FormData): Promise<ScheduleData
 
     const totalDuration = performance.now() - startTime
     console.log(`[TIMING] Total frontend schedule generation: ${totalDuration.toFixed(3)}ms`)
-    
+
     return scheduleData
   } catch (error) {
     const totalDuration = performance.now() - startTime

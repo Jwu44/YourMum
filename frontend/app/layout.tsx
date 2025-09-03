@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/auth/AuthContext'
 import { RouteGuard } from '@/auth/RouteGuard'
 import { FormProvider } from '@/lib/FormContext'
+import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { ToasterClient } from '@/components/ui/toaster-client'
 
 export const metadata: Metadata = {
@@ -41,11 +42,13 @@ export default function RootLayout ({
       </head>
       <body>
         <AuthProvider>
-          <FormProvider>
-            <RouteGuard>
-                {children}
-            </RouteGuard>
-          </FormProvider>
+          <OnboardingProvider>
+            <FormProvider>
+              <RouteGuard>
+                  {children}
+              </RouteGuard>
+            </FormProvider>
+          </OnboardingProvider>
         </AuthProvider>
         <ToasterClient />
       </body>

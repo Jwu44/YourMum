@@ -62,13 +62,41 @@ export const useOnboardingTour = (
 
     let element: Element | null = null
 
-    // Try different selectors based on step configuration
-    if (step.targetAttribute) {
-      element = document.querySelector(`[${step.targetAttribute}]`)
+    // Build selector string
+    const selector = step.targetAttribute 
+      ? `[${step.targetAttribute}]` 
+      : step.targetSelector
+
+    if (!selector) return null
+
+    // Check if we're on mobile
+    const isMobile = window.innerWidth < 768
+    
+    if (isMobile) {
+      // On mobile, prioritize mobile sidebar Sheet portal
+      const mobileSheetContent = document.querySelector('[data-sidebar="sidebar"][data-mobile="true"]')
+      if (mobileSheetContent) {
+        element = mobileSheetContent.querySelector(selector)
+        if (element) {
+          console.log('Found element in mobile sidebar:', element)
+          return element
+        }
+      }
     }
     
-    if (!element && step.targetSelector) {
-      element = document.querySelector(step.targetSelector)
+    // Try standard DOM query (desktop or fallback)
+    const allElements = document.querySelectorAll(selector)
+    
+    // Find the visible element (not hidden)
+    for (const el of allElements) {
+      const rect = el.getBoundingClientRect()
+      const style = window.getComputedStyle(el)
+      
+      if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
+        console.log('Found visible element:', el, 'Size:', rect.width, 'x', rect.height)
+        element = el
+        break
+      }
     }
 
     return element

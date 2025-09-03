@@ -39,7 +39,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     }
 
     document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
+    return () => { document.removeEventListener('keydown', handleEscape) }
   }, [onClose])
 
   // Get spotlight position and size based on target element
@@ -49,20 +49,34 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     }
 
     const rect = targetElement.getBoundingClientRect()
-    const padding = 8 // No padding - just the element itself
-    
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+    // Use more generous padding for mobile touch targets  
+    const padding = isMobile ? 30 : 12
+
+    // Debug: log target element info
+    console.log('Spotlight target element:')
+    console.log('- Element:', targetElement)
+    console.log('- Tag:', targetElement.tagName)
+    console.log('- Class:', targetElement.className)
+    console.log('- Rect:', rect.left, rect.top, rect.width, rect.height)
+    console.log('- Data attributes:', [...targetElement.attributes]
+      .filter(attr => attr.name.startsWith('data-'))
+      .map(attr => `${attr.name}="${attr.value}"`)
+      .join(' '))
+
     return {
       '--spotlight-x': `${rect.left - padding}px`,
       '--spotlight-y': `${rect.top - padding}px`,
       '--spotlight-width': `${rect.width + padding * 2}px`,
-      '--spotlight-height': `${rect.height + padding * 2}px`,
+      '--spotlight-height': `${rect.height + padding * 2}px`
     } as React.CSSProperties
   }, [targetElement, showSpotlight])
 
   const overlayContent = (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[60]"
       style={getSpotlightStyles()}
       onClick={handleOverlayClick}
       role="dialog"
@@ -82,21 +96,19 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
           }}
         />
       )}
-      
+
       {/* Fallback overlay when no spotlight */}
       {(!targetElement || !showSpotlight) && (
         <div className="absolute inset-0 bg-black/60" />
       )}
-      
-      {/* Note: Removed the highlighted border element to show clean spotlight effect */}
 
-      {/* Tour content */}
+      {/* Radix Popover will handle its own Portal and positioning */}
       {children}
     </div>
   )
 
   // Render in portal to ensure proper z-index
-  return typeof window !== 'undefined' 
+  return typeof window !== 'undefined'
     ? createPortal(overlayContent, document.body)
     : null
 }

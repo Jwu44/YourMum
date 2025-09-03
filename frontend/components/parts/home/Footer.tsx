@@ -20,17 +20,17 @@ const Footer = () => {
             <p>&copy; 2025 YourMum. All rights reserved.</p>
           </div>
           <div className="flex gap-6">
-            <Link 
+            <Link
+                href="/privacy"
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </Link>
+            <Link
               href="/terms"
               className="hover:text-foreground transition-colors"
             >
               Terms of Service
-            </Link>
-            <Link 
-              href="/privacy"
-              className="hover:text-foreground transition-colors"
-            >
-              Privacy Policy
             </Link>
           </div>
         </div>

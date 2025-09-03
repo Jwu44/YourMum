@@ -68,13 +68,13 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
     try {
       setIsCheckingStatus(true)
       const status = await calendarApi.getCalendarStatus(currentUser.uid)
-      
+
       // Enhanced status validation - test actual API functionality
       let actuallyWorking = false
       if (status.connected) {
         actuallyWorking = await testCalendarHealth()
       }
-      
+
       // Map backend response to expected format with health check
       setConnectionStatus({
         connected: status.connected && actuallyWorking,

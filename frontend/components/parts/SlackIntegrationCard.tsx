@@ -63,7 +63,7 @@ const SlackIntegrationCard: React.FC = () => {
   const checkOAuthStatus = useCallback(async (): Promise<boolean> => {
     try {
       const isCompleted = await slackApi.checkOAuthCompletion()
-      
+
       if (isCompleted) {
         // OAuth is complete and user is connected
         toast({
@@ -114,12 +114,12 @@ const SlackIntegrationCard: React.FC = () => {
         if (event.data.type === 'slack_oauth_success') {
           // OAuth completed successfully
           window.removeEventListener('message', messageHandler)
-          
+
           toast({
             title: 'Success',
             description: `Slack integration connected successfully to ${event.data.data.workspace_name}!`
           })
-          
+
           // Refresh status to update UI
           setTimeout(() => {
             checkSlackStatus()
@@ -127,7 +127,7 @@ const SlackIntegrationCard: React.FC = () => {
         } else if (event.data.type === 'slack_oauth_error') {
           // OAuth failed
           window.removeEventListener('message', messageHandler)
-          
+
           toast({
             title: 'OAuth Failed',
             description: event.data.error || 'OAuth process failed. Please try again.',
@@ -143,7 +143,7 @@ const SlackIntegrationCard: React.FC = () => {
         if (oauthWindow.closed) {
           clearInterval(checkWindowClosed)
           window.removeEventListener('message', messageHandler)
-          
+
           // Add fallback: refresh status after window closes
           // This ensures UI updates even if postMessage fails
           setTimeout(async () => {
@@ -153,7 +153,6 @@ const SlackIntegrationCard: React.FC = () => {
               console.error('Error refreshing status after OAuth window closed:', error)
             }
           }, 1000)
-          
         }
       }, 1000)
     } catch (error) {
@@ -214,7 +213,7 @@ const SlackIntegrationCard: React.FC = () => {
       }
     }
     window.addEventListener('focus', handleWindowFocus)
-    return () => window.removeEventListener('focus', handleWindowFocus)
+    return () => { window.removeEventListener('focus', handleWindowFocus) }
   }, [status.connected, isCheckingStatus, checkSlackStatus])
 
   // Map current state to shell props

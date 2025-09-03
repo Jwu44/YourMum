@@ -151,11 +151,10 @@ const DraggableCard: React.FC<{ item: Priority, index: number }> = ({ item, inde
   )
 }
 
-
 /**
  * Input Configuration Page Component
  */
-export default function InputsPage() {
+export default function InputsPage () {
   const { state, dispatch } = useForm()
   const { toast } = useToast()
   const router = useRouter()
@@ -307,7 +306,6 @@ export default function InputsPage() {
   const handleFieldChange = useCallback((field: string, value: any) => {
     dispatch({ type: 'UPDATE_FIELD', field, value })
   }, [dispatch])
-
 
   // Handle energy pattern selection
   const handleEnergyChange = useCallback((value: string) => {
