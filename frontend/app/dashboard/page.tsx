@@ -198,7 +198,44 @@ const Dashboard: React.FC = () => {
         start_date: currentDate
       }
 
-      const updatedSchedule = [...currentSchedule, taskWithId]
+      // Insert logic:
+      // 1) If sections exist, insert directly under the first (top) section
+      // 2) If no sections, insert at the very top of the list
+      const updatedSchedule = [...currentSchedule]
+
+      const firstSectionIndex = currentSchedule.findIndex(t => t.is_section === true)
+      if (firstSectionIndex !== -1) {
+        // Place as the first task within the top section
+        const topSection = currentSchedule[firstSectionIndex]
+        const taskForInsert: Task = {
+          ...taskWithId,
+          is_section: false,
+          is_subtask: false,
+          level: 0,
+          section: topSection.text || topSection.section || null
+        }
+        updatedSchedule.splice(firstSectionIndex + 1, 0, taskForInsert)
+      } else {
+        // No sections -> add to top of list
+        updatedSchedule.unshift({
+          ...taskWithId,
+          is_section: false,
+          is_subtask: false,
+          level: 0
+        })
+      }
+
+      // Recompute section_index for non-section tasks based on nearest preceding section
+      let sectionStartIndex = 0
+      for (let i = 0; i < updatedSchedule.length; i++) {
+        const t = updatedSchedule[i]
+        if (t.is_section) {
+          sectionStartIndex = i
+          updatedSchedule[i] = { ...t, section_index: 0 }
+        } else {
+          updatedSchedule[i] = { ...t, section_index: i - sectionStartIndex }
+        }
+      }
 
       // Use updateSchedule which implements upsert behavior:
       // - First tries PUT (update existing schedule)
