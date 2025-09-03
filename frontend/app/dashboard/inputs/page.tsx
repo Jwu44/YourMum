@@ -23,6 +23,7 @@ import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Ca
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import { LoadingPage } from '@/components/parts/LoadingPage'
 import { useForm } from '@/lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
 
@@ -392,6 +393,11 @@ export default function InputsPage () {
       setIsLoading(false)
     }
   }, [state, toast, router, getTargetDate])
+
+  // Show loading page during schedule generation
+  if (isLoading) {
+    return <LoadingPage reason="schedule" />
+  }
 
   return (
     <SidebarLayout>
