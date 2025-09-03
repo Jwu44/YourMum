@@ -1,10 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
-import { Loader2 } from 'lucide-react'
-
-// Lazy load Lottie to reduce initial bundle size
-const Lottie = React.lazy(() => import('lottie-react'))
+import React, { useState, useEffect } from 'react'
+import { Computer, Loader2 } from 'lucide-react'
+import Lottie from 'lottie-react'
 
 // Available loading animations configuration
 const LOADING_ANIMATIONS = [
@@ -13,16 +11,32 @@ const LOADING_ANIMATIONS = [
     name: 'Boy working on laptop'
   },
   {
-    path: '/animations/Tired Woman.json',
-    name: 'Tired Woman'
-  },
-  {
     path: '/animations/Man with task list.json',
     name: 'Man with task list'
   },
   {
     path: '/animations/Sandy Loading.json',
     name: 'Sandy Loading'
+  },
+  {
+    path: '/animations/Tired Woman.json',
+    name: 'Tired Woman'
+  },
+  {
+    path: '/animations/BusinessEnterprise Solutions.json',
+    name: 'Business Enterprise Solutions'
+  },
+  {
+    path: '/animations/Company employees sharing thoughts and ideas.json', 
+    name: 'Company employee'
+  },
+  {
+    path: '/animations/Computer Editing.json',
+    name: 'Computer Editing'
+  },
+  {
+    path: '/animations/Man with task list.json',
+    name: 'Man with task list'
   }
 ]
 
@@ -126,17 +140,15 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
     }
 
     return (
-      <Suspense fallback={<FallbackSpinner />}>
-        <div className="w-[300px] h-[300px] flex items-center justify-center">
-          <Lottie
-            animationData={animationData}
-            loop={true}
-            autoplay={true}
-            style={{ width: '100%', height: '100%' }}
-            onError={() => { setLoadingError(true) }}
-          />
-        </div>
-      </Suspense>
+      <div className="w-full h-full max-w-[400px] max-h-[300px] flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
+        <Lottie
+          animationData={animationData}
+          loop={true}
+          autoplay={true}
+          style={{ width: '100%', height: '100%', opacity: animationData ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
+          onError={() => { setLoadingError(true) }}
+        />
+      </div>
     )
   }
 
@@ -153,13 +165,13 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
       <div 
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-[500px] h-[500px] mx-4 flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-[500px] min-h-[500px] mx-4 flex flex-col"
         role="status" 
         aria-live="polite"
         aria-label="Loading page"
       >
         {/* Animation Section */}
-        <div className="h-[300px] flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center min-h-[320px]">
           <LottieAnimation />
         </div>
 
