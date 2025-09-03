@@ -88,7 +88,7 @@ export const useOnboardingTour = (
     const allElements = document.querySelectorAll(selector)
     
     // Find the visible element (not hidden)
-    for (const el of allElements) {
+    for (const el of Array.from(allElements)) {
       const rect = el.getBoundingClientRect()
       const style = window.getComputedStyle(el)
       
