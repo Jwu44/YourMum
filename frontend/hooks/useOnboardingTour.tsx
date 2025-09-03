@@ -39,9 +39,9 @@ export const useOnboardingTour = (
   const isTourCompleted = React.useCallback(() => {
     if (typeof window === 'undefined') return true
     
-    // if (process.env.NODE_ENV === 'development') {
-    //   return false
-    // }
+    if (process.env.NODE_ENV === 'development') {
+      return false
+    }
     
     // Check localStorage for completion flag
     // Returns true only if explicitly marked as completed

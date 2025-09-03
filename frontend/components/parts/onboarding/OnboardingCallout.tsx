@@ -49,6 +49,10 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
 
   const side = getSide()
 
+  // Simple 8px offset for mobile, 16px for desktop
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const sideOffset = isMobile ? 8 : 16
+
   // Handle keyboard navigation
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,7 +92,7 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
       <Popover.Portal>
         <Popover.Content
           side={side}
-          sideOffset={16}
+          sideOffset={sideOffset}
           avoidCollisions={true}
           collisionBoundary={undefined}
           className={cn(

@@ -38,7 +38,7 @@ image.png
 - ensure it only shows once
 
 ## bug 2:
-- spotlight should be 75x75 for step 1
+- spotlight dynamic sizing should be smaller for step 1
 - triangle arrow should be pointing to the spotlight without being on top of it
 
 ## bug 3:

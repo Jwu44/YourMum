@@ -13,13 +13,15 @@ interface OnboardingOverlayProps {
   children: React.ReactNode
   onClose: () => void
   showSpotlight?: boolean
+  stepCounter?: string
 }
 
 export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
   targetElement,
   children,
   onClose,
-  showSpotlight = true
+  showSpotlight = true,
+  stepCounter
 }) => {
   const overlayRef = React.useRef<HTMLDivElement>(null)
 
@@ -50,9 +52,18 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
 
     const rect = targetElement.getBoundingClientRect()
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    const isStep1 = stepCounter?.includes('1 of 3')
 
-    // Use more generous padding for mobile touch targets  
-    const padding = isMobile ? 30 : 12
+    // Use minimal padding for step 1 FAB on mobile to avoid oversized spotlight
+    // Step 1 targets a 56x56px FAB button - minimal padding is sufficient
+    let padding: number
+    if (isMobile && isStep1) {
+      padding = 8  // Minimal padding for FAB button on mobile
+    } else if (isMobile) {
+      padding = 30 // Generous padding for other mobile targets
+    } else {
+      padding = 12 // Standard desktop padding
+    }
 
     // Debug: log target element info
     console.log('Spotlight target element:')
@@ -67,7 +78,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
       '--spotlight-width': `${rect.width + padding * 2}px`,
       '--spotlight-height': `${rect.height + padding * 2}px`
     } as React.CSSProperties
-  }, [targetElement, showSpotlight])
+  }, [targetElement, showSpotlight, stepCounter])
 
   const overlayContent = (
     <div

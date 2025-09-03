@@ -116,6 +116,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     <OnboardingOverlay
       targetElement={targetElement}
       onClose={closeTour}
+      stepCounter={currentStepData.stepCounter}
     >
       <OnboardingCallout
         title={currentStepData.title}
