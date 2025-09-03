@@ -12,7 +12,7 @@ Shown during:
 
 - Auto-generating the daily schedule
 
-Behavior: Navigates to a full /loading page that replaces the entire app view.
+Behavior: Navigates to a full loading page that replaces the entire app view.
 
 Dismissal: Auto-navigates back to the target page only when:
 
