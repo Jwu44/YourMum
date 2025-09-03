@@ -60,10 +60,6 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     console.log('- Tag:', targetElement.tagName)
     console.log('- Class:', targetElement.className)
     console.log('- Rect:', rect.left, rect.top, rect.width, rect.height)
-    console.log('- Data attributes:', [...targetElement.attributes]
-      .filter(attr => attr.name.startsWith('data-'))
-      .map(attr => `${attr.name}="${attr.value}"`)
-      .join(' '))
 
     return {
       '--spotlight-x': `${rect.left - padding}px`,
