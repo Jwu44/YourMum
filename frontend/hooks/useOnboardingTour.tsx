@@ -39,11 +39,13 @@ export const useOnboardingTour = (
   const isTourCompleted = React.useCallback(() => {
     if (typeof window === 'undefined') return true
     
-    // DEV ONLY: Force show tour in development mode
-    if (process.env.NODE_ENV === 'development') {
-      return false
-    }
+    // if (process.env.NODE_ENV === 'development') {
+    //   return false
+    // }
     
+    // Check localStorage for completion flag
+    // Returns true only if explicitly marked as completed
+    // New users (no flag) will see the tour
     return localStorage.getItem(storageKey) === 'true'
   }, [storageKey])
 
