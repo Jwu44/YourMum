@@ -39,9 +39,9 @@ export const useOnboardingTour = (
   const isTourCompleted = React.useCallback(() => {
     if (typeof window === 'undefined') return true
     
-    if (process.env.NODE_ENV === 'development') {
-      return false
-    }
+    // if (process.env.NODE_ENV === 'development') {
+    //   return false
+    // }
     
     // Check localStorage for completion flag
     // Returns true only if explicitly marked as completed
@@ -73,15 +73,31 @@ export const useOnboardingTour = (
 
     // Check if we're on mobile
     const isMobile = window.innerWidth < 768
+    const isSidebarStep = step.id === 'fill-preferences' || step.id === 'integrate-apps'
     
-    if (isMobile) {
-      // On mobile, prioritize mobile sidebar Sheet portal
-      const mobileSheetContent = document.querySelector('[data-sidebar="sidebar"][data-mobile="true"]')
-      if (mobileSheetContent) {
-        element = mobileSheetContent.querySelector(selector)
-        if (element) {
-          console.log('Found element in mobile sidebar:', element)
-          return element
+    if (isMobile && isSidebarStep) {
+      // Enhanced mobile sidebar detection - try multiple selectors
+      const mobileSelectors = [
+        '[data-sidebar="sidebar"][data-mobile="true"]', // Primary mobile sheet
+        '[data-sidebar="sidebar"][data-state="open"]',   // Open sidebar state
+        '[data-vaul-drawer-wrapper] [data-sidebar="sidebar"]', // Vaul drawer wrapper
+        '.sheet-content [data-sidebar="sidebar"]',       // Generic sheet content
+        '[role="dialog"] [data-sidebar="sidebar"]'       // Dialog-based sheet
+      ]
+      
+      for (const mobileSelector of mobileSelectors) {
+        const mobileSheetContent = document.querySelector(mobileSelector)
+        if (mobileSheetContent) {
+          element = mobileSheetContent.querySelector(selector)
+          if (element) {
+            const rect = element.getBoundingClientRect()
+            const style = window.getComputedStyle(element)
+            
+            if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
+              console.log('Found element in mobile sidebar:', element, 'Via selector:', mobileSelector)
+              return element
+            }
+          }
         }
       }
     }
@@ -89,39 +105,92 @@ export const useOnboardingTour = (
     // Try standard DOM query (desktop or fallback)
     const allElements = document.querySelectorAll(selector)
     
-    // For sidebar navigation elements (steps 2 & 3), prioritize visible sidebar elements
-    const isSidebarStep = step.id === 'fill-preferences' || step.id === 'integrate-apps'
-    
     if (isSidebarStep) {
-      // First try to find element in the main sidebar
-      const sidebarElement = document.querySelector('[data-sidebar="sidebar"]')
-      if (sidebarElement) {
-        const sidebarNavElement = sidebarElement.querySelector(selector)
-        if (sidebarNavElement) {
-          const rect = sidebarNavElement.getBoundingClientRect()
-          const style = window.getComputedStyle(sidebarNavElement)
-          
-          if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
-            console.log('Found sidebar navigation element:', sidebarNavElement, 'Size:', rect.width, 'x', rect.height)
-            return sidebarNavElement
+      // Enhanced sidebar element detection
+      const sidebarSelectors = [
+        '[data-sidebar="sidebar"]',                    // Primary sidebar
+        '[data-sidebar="sidebar"][data-state="open"]', // Open sidebar
+        '.sidebar',                                    // Generic sidebar class
+        '[data-state="open"][data-sidebar="sidebar"]'  // Specific open state
+      ]
+      
+      for (const sidebarSelector of sidebarSelectors) {
+        const sidebarElement = document.querySelector(sidebarSelector)
+        if (sidebarElement) {
+          const sidebarNavElement = sidebarElement.querySelector(selector)
+          if (sidebarNavElement) {
+            const rect = sidebarNavElement.getBoundingClientRect()
+            const style = window.getComputedStyle(sidebarNavElement)
+            
+            if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
+              console.log('Found sidebar navigation element:', sidebarNavElement, 'Size:', rect.width, 'x', rect.height, 'Via:', sidebarSelector)
+              return sidebarNavElement
+            }
           }
         }
       }
     }
     
-    // Find the visible element (not hidden)
-    for (const el of Array.from(allElements)) {
+    // Enhanced visibility checking with better heuristics
+    const isElementVisible = (el: Element): boolean => {
       const rect = el.getBoundingClientRect()
       const style = window.getComputedStyle(el)
       
-      if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
-        console.log('Found visible element:', el, 'Size:', rect.width, 'x', rect.height)
-        element = el
-        break
+      // Basic visibility checks
+      if (rect.width <= 0 || rect.height <= 0) return false
+      if (style.visibility === 'hidden' || style.display === 'none') return false
+      if (style.opacity === '0') return false
+      
+      // Check if element is within viewport (with some tolerance)
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+      
+      // Allow elements slightly outside viewport (common for mobile sheets)
+      const tolerance = 50
+      const isInViewport = (
+        rect.left >= -tolerance &&
+        rect.top >= -tolerance &&
+        rect.right <= viewportWidth + tolerance &&
+        rect.bottom <= viewportHeight + tolerance
+      )
+      
+      return isInViewport
+    }
+    
+    // Find the most visible element
+    let bestElement: Element | null = null
+    let bestScore = -1
+    
+    for (const el of Array.from(allElements)) {
+      if (isElementVisible(el)) {
+        const rect = el.getBoundingClientRect()
+        // Score based on size and position (larger, more centered elements score higher)
+        const size = rect.width * rect.height
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const viewportCenterX = window.innerWidth / 2
+        const viewportCenterY = window.innerHeight / 2
+        
+        const distanceFromCenter = Math.sqrt(
+          Math.pow(centerX - viewportCenterX, 2) + 
+          Math.pow(centerY - viewportCenterY, 2)
+        )
+        
+        const score = size - distanceFromCenter * 0.1 // Prefer larger elements closer to center
+        
+        if (score > bestScore) {
+          bestScore = score
+          bestElement = el
+        }
       }
     }
+    
+    if (bestElement) {
+      console.log('Found best visible element:', bestElement, 'Score:', bestScore)
+      return bestElement
+    }
 
-    return element
+    return null
   }, [steps, currentStep])
 
   // Update target element when step changes
@@ -131,45 +200,106 @@ export const useOnboardingTour = (
     const updateTargetElement = async () => {
       const element = findTargetElement()
       
-      // If no element found on mobile, retry a few times with delays
-      if (!element && window.innerWidth < 768) {
-        for (let i = 0; i < 3; i++) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+      // Enhanced retry logic for mobile and complex DOM scenarios
+      if (!element) {
+        const isMobile = window.innerWidth < 768
+        const maxRetries = isMobile ? 5 : 3
+        const initialDelay = isMobile ? 150 : 100
+        
+        for (let i = 0; i < maxRetries; i++) {
+          // Progressive delay - longer delays for later retries
+          const delay = initialDelay + (i * 50)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          
           const retryElement = findTargetElement()
           if (retryElement) {
+            console.log(`Found element on retry ${i + 1} with delay ${delay}ms`)
             setTargetElement(retryElement)
             return
           }
         }
+        
+        // If still no element, log for debugging
+        console.warn('Failed to find target element after', maxRetries, 'retries')
       }
       
       setTargetElement(element)
     }
 
-    // Initial update
-    updateTargetElement()
+    // Initial update with slight delay to ensure DOM is ready
+    const initialTimer = setTimeout(updateTargetElement, 50)
 
-    // Update on resize or scroll
-    const handleUpdate = () => {
-      if (isActive) {
-        updateTargetElement()
+    // Debounced update function for event handlers
+    const debouncedUpdate = (() => {
+      let timeoutId: NodeJS.Timeout
+      return () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          if (isActive) {
+            updateTargetElement()
+          }
+        }, 100)
       }
-    }
+    })()
 
-    window.addEventListener('resize', handleUpdate)
-    window.addEventListener('scroll', handleUpdate)
+    // Enhanced event listeners for mobile responsiveness
+    const events = ['resize', 'scroll', 'orientationchange']
+    events.forEach(event => window.addEventListener(event, debouncedUpdate, { passive: true }))
     
-    // Use mutation observer to detect DOM changes
-    const observer = new MutationObserver(handleUpdate)
+    // Visual viewport events for mobile keyboard handling
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', debouncedUpdate)
+      window.visualViewport.addEventListener('scroll', debouncedUpdate)
+    }
+    
+    // Enhanced mutation observer with better filtering
+    const observer = new MutationObserver((mutations) => {
+      // Only trigger updates for meaningful changes
+      const hasRelevantChanges = mutations.some(mutation => {
+        // Check if the mutation affects sidebar, sheet, or dialog elements
+        const isRelevantTarget = (node: Node): boolean => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return false
+          const element = node as Element
+          
+          return (
+            element.matches?.('[data-sidebar]') ||
+            element.matches?.('[data-sheet]') ||
+            element.matches?.('[role="dialog"]') ||
+            element.matches?.('[data-state]') ||
+            element.querySelector?.('[data-sidebar], [data-sheet], [role="dialog"]') !== null
+          )
+        }
+        
+        return (
+          mutation.type === 'childList' && 
+          (Array.from(mutation.addedNodes).some(isRelevantTarget) ||
+           Array.from(mutation.removedNodes).some(isRelevantTarget))
+        ) || (
+          mutation.type === 'attributes' &&
+          mutation.target &&
+          isRelevantTarget(mutation.target)
+        )
+      })
+      
+      if (hasRelevantChanges) {
+        debouncedUpdate()
+      }
+    })
+    
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: true
+      attributes: true,
+      attributeFilter: ['data-state', 'data-sidebar', 'data-sheet', 'data-mobile', 'class', 'style']
     })
 
     return () => {
-      window.removeEventListener('resize', handleUpdate)
-      window.removeEventListener('scroll', handleUpdate)
+      clearTimeout(initialTimer)
+      events.forEach(event => window.removeEventListener(event, debouncedUpdate))
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', debouncedUpdate)
+        window.visualViewport.removeEventListener('scroll', debouncedUpdate)
+      }
       observer.disconnect()
     }
   }, [isActive, currentStep, findTargetElement])

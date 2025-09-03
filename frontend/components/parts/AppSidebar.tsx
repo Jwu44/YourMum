@@ -31,6 +31,7 @@ import { useAuth } from '@/auth/AuthContext'
 
 // Hooks
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useOnboarding } from '@/contexts/OnboardingContext'
 
 /**
  * Type definition for navigation menu items
@@ -138,6 +139,16 @@ export function AppSidebar (): JSX.Element {
   const [showTooltip, setShowTooltip] = React.useState(false)
   const isMobile = useIsMobile()
   const shouldKeepCollapsedRef = React.useRef(false)
+  
+  // Use onboarding context, but handle case where provider isn't available
+  let isOnboardingActive = false
+  try {
+    const { isOnboardingActive: active } = useOnboarding()
+    isOnboardingActive = active
+  } catch {
+    // OnboardingProvider not available, use default
+    isOnboardingActive = false
+  }
   let user: any
   try {
     user = useAuth().user
@@ -420,7 +431,9 @@ export function AppSidebar (): JSX.Element {
                     setShowTooltip(false)
                     toggleSidebar()
                   }}
-                  className="h-8 w-8 p-0 text-foreground hover:text-foreground transition-colors duration-200"
+                  className={`h-8 w-8 p-0 text-foreground hover:text-foreground transition-colors duration-200 ${
+                    isOnboardingActive ? 'focus-visible:ring-0 focus-visible:ring-offset-0' : ''
+                  }`}
                   aria-label="Collapse sidebar"
                   data-testid="collapse-sidebar-button"
                 >

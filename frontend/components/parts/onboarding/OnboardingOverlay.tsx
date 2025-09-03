@@ -24,6 +24,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
   stepCounter
 }) => {
   const overlayRef = React.useRef<HTMLDivElement>(null)
+  const [forceUpdate, setForceUpdate] = React.useState(false)
 
   // Handle clicks on the overlay (but not the callout) to close the tour
   const handleOverlayClick = React.useCallback((e: React.MouseEvent) => {
@@ -44,14 +45,46 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     return () => { document.removeEventListener('keydown', handleEscape) }
   }, [onClose])
 
-  // Get spotlight position and size based on target element
-  const getSpotlightStyles = React.useCallback(() => {
+  // Add viewport change listeners to update spotlight positioning
+  React.useEffect(() => {
+    const updatePositioning = () => {
+      setForceUpdate(prev => !prev)
+    }
+
+    const debouncedUpdate = (() => {
+      let timeoutId: NodeJS.Timeout
+      return () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(updatePositioning, 10)
+      }
+    })()
+
+    const events = ['resize', 'orientationchange']
+    events.forEach(event => window.addEventListener(event, debouncedUpdate, { passive: true }))
+
+    // Also listen for visual viewport changes (mobile keyboard)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', debouncedUpdate)
+      window.visualViewport.addEventListener('scroll', debouncedUpdate)
+    }
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, debouncedUpdate))
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', debouncedUpdate)
+        window.visualViewport.removeEventListener('scroll', debouncedUpdate)
+      }
+    }
+  }, [])
+
+  // Get spotlight position and size based on target element - memoized to respond to updates
+  const spotlightStyles = React.useMemo(() => {
     if (!targetElement || !showSpotlight) {
       return {}
     }
 
     const rect = targetElement.getBoundingClientRect()
-    const padding = 12
+    const padding = 8
 
     // Debug logging for step 2 positioning
     if (stepCounter?.includes('2 of 3')) {
@@ -106,13 +139,13 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
       '--spotlight-width': `${rect.width + padding * 2}px`,
       '--spotlight-height': `${rect.height + padding * 2}px`
     } as React.CSSProperties
-  }, [targetElement, showSpotlight, stepCounter])
+  }, [targetElement, showSpotlight, stepCounter, forceUpdate])
 
   const overlayContent = (
     <div
       ref={overlayRef}
       className="fixed inset-0 z-[60] pointer-events-auto"
-      style={getSpotlightStyles()}
+      style={spotlightStyles}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"

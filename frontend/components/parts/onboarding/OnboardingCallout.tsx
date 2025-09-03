@@ -36,16 +36,68 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
   onBack,
   onClose
 }) => {
+  // Dynamic anchor positioning state
+  const [anchorStyle, setAnchorStyle] = React.useState<React.CSSProperties>({})
+
   // Simple position preference based on step - Radix handles collision detection
   const getSide = React.useCallback((): "top" | "bottom" | "left" | "right" => {
     const isStep1 = stepCounter.includes('1 of 3')
     const isStep2or3 = stepCounter.includes('2 of 3') || stepCounter.includes('3 of 3')
+    const isMobile = window.innerWidth < 768 // Tailwind's md breakpoint
     
     // Step-based positioning preferences (Radix will handle fallbacks)
-    if (isStep1) return 'left'   // FAB positioning
+    if (isStep1) return isMobile ? 'left' : 'bottom'   // FAB positioning: left on mobile, bottom on web
     if (isStep2or3) return 'bottom' // Sidebar nav positioning  
     return 'bottom' // Default
   }, [stepCounter])
+
+  // Update anchor positioning dynamically
+  const updateAnchor = React.useCallback(() => {
+    if (!targetElement) {
+      setAnchorStyle({})
+      return
+    }
+
+    const rect = targetElement.getBoundingClientRect()
+    setAnchorStyle({
+      position: 'fixed',
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      pointerEvents: 'none'
+    })
+  }, [targetElement])
+
+  // Add event listeners for viewport changes
+  React.useEffect(() => {
+    updateAnchor()
+
+    const events = ['resize', 'scroll', 'orientationchange']
+    const debouncedUpdate = (() => {
+      let timeoutId: NodeJS.Timeout
+      return () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(updateAnchor, 10)
+      }
+    })()
+
+    events.forEach(event => window.addEventListener(event, debouncedUpdate, { passive: true }))
+
+    // Also listen for visual viewport changes (mobile keyboard)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', debouncedUpdate)
+      window.visualViewport.addEventListener('scroll', debouncedUpdate)
+    }
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, debouncedUpdate))
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', debouncedUpdate)
+        window.visualViewport.removeEventListener('scroll', debouncedUpdate)
+      }
+    }
+  }, [updateAnchor])
 
   const side = getSide()
 
@@ -76,19 +128,11 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
 
   return (
     <Popover.Root open={true}>
-      <Popover.Anchor
-        style={{
-          position: 'fixed',
-          top: targetElement.getBoundingClientRect().top,
-          left: targetElement.getBoundingClientRect().left,
-          width: targetElement.getBoundingClientRect().width,
-          height: targetElement.getBoundingClientRect().height,
-        }}
-      />
+      <Popover.Anchor style={anchorStyle} />
       <Popover.Portal>
         <Popover.Content
           side={side}
-          sideOffset={16}
+          sideOffset={8}
           avoidCollisions={true}
           collisionBoundary={undefined}
           className={cn(
@@ -109,8 +153,10 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
               fill: 'hsl(var(--card))', 
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
               display: 'block',
-              // Center the arrow for sidebar navigation steps (2 & 3)
-              ...(stepCounter?.includes('2 of 3') || stepCounter?.includes('3 of 3') ? {
+              // Center the arrow for bottom-positioned steps
+              // For step 1: only center when on desktop (bottom), not on mobile (left)
+              // For steps 2 & 3: always center since they're always bottom
+              ...((side === 'bottom' && (stepCounter?.includes('1 of 3') || stepCounter?.includes('2 of 3') || stepCounter?.includes('3 of 3'))) ? {
                 left: '50%',
                 transform: 'translateX(-50%)'
               } : {})
