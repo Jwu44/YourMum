@@ -27,51 +27,74 @@ export default function LoadingRoute (): React.ReactElement {
   // Handle actual content generation/loading based on reason
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
+    let hasStarted = false
 
-    if (reason === 'calendar') {
-      // For calendar connections, simulate the connection process
-      timeoutId = setTimeout(() => {
-        console.log('Calendar connection simulation complete, marking content ready')
-        loadingManager.markContentReady()
-      }, 2000) // 2 seconds to simulate calendar connection
-    } else if (reason === 'schedule') {
-      // For schedule generation, perform actual autogeneration
-      const performScheduleGeneration = async (): Promise<void> => {
-        try {
-          const { autogenerateTodaySchedule } = await import('@/lib/ScheduleHelper')
-          
-          // Check if this is for a specific date from navigation
-          const pendingDate = sessionStorage.getItem('pendingNavigationDate')
-          const targetDate = pendingDate ?? new Date().toISOString().split('T')[0]
-          console.log('Performing schedule autogeneration for date:', targetDate)
-          const result = await autogenerateTodaySchedule(targetDate)
-          
-          if (result.success) {
-            console.log('Schedule generation successful, marking content ready')
-            // Clean up session storage
-            sessionStorage.removeItem('pendingNavigationDate')
-            sessionStorage.removeItem('pendingNavigationIndex')
-            loadingManager.markContentReady()
-          } else {
-            console.error('Schedule generation failed:', result.error)
+    const startGeneration = () => {
+      if (hasStarted) return
+      hasStarted = true
+
+      if (reason === 'calendar') {
+        // For calendar connections, simulate the connection process
+        console.log('Starting calendar connection simulation...')
+        timeoutId = setTimeout(() => {
+          console.log('Calendar connection simulation complete, marking content ready')
+          loadingManager.markContentReady()
+        }, 2000) // 2 seconds to simulate calendar connection
+      } else if (reason === 'schedule') {
+        console.log('Setting up schedule generation timeout...')
+        // For schedule generation, perform actual autogeneration
+        const performScheduleGeneration = async (): Promise<void> => {
+          try {
+            console.log('Starting schedule autogeneration process...')
+            const { autogenerateTodaySchedule } = await import('@/lib/ScheduleHelper')
+            
+            // Check if this is for a specific date from navigation
+            const pendingDate = sessionStorage.getItem('pendingNavigationDate')
+            const targetDate = pendingDate ?? new Date().toISOString().split('T')[0]
+            console.log('Performing schedule autogeneration for date:', targetDate)
+            console.log('Calling autogenerateTodaySchedule with targetDate:', targetDate)
+            
+            const result = await autogenerateTodaySchedule(targetDate)
+            console.log('autogenerateTodaySchedule result:', result)
+            
+            if (result.success) {
+              console.log('Schedule generation successful, marking content ready')
+              
+              // Don't clean up session storage here - let dashboard handle navigation
+              // The dashboard will read pendingNavigationDate/Index and navigate to correct day
+              console.log('Keeping session storage for dashboard navigation')
+              loadingManager.markContentReady()
+            } else {
+              console.error('Schedule generation failed:', result.error)
+              // Still mark as ready to prevent infinite loading
+              setTimeout(() => { loadingManager.markContentReady() }, 1000)
+            }
+          } catch (error) {
+            console.error('Error during schedule generation:', error)
+            console.error('Stack trace:', error)
             // Still mark as ready to prevent infinite loading
             setTimeout(() => { loadingManager.markContentReady() }, 1000)
           }
-        } catch (error) {
-          console.error('Error during schedule generation:', error)
-          // Still mark as ready to prevent infinite loading
-          setTimeout(() => { loadingManager.markContentReady() }, 1000)
         }
-      }
 
-      // Add a small delay to show the animation before starting generation
-      timeoutId = setTimeout(performScheduleGeneration, 800)
+        // Add a small delay to show the animation before starting generation
+        timeoutId = setTimeout(() => {
+          console.log('Schedule generation timeout triggered')
+          performScheduleGeneration()
+        }, 800)
+      }
     }
+
+    // Start generation immediately
+    startGeneration()
 
     return () => {
-      clearTimeout(timeoutId)
+      if (timeoutId) {
+        console.log('Cleaning up timeout...')
+        clearTimeout(timeoutId)
+      }
     }
-  }, [reason, loadingManager])
+  }, [reason]) // Remove loadingManager from dependencies to prevent re-renders
 
   return (
     <LoadingPage
