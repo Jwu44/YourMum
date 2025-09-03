@@ -176,21 +176,8 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
         {/* Footer */}
         <div className="mt-8 text-center space-y-3">
-          {loadingManager && (
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-              <div
-                className="bg-purple-600 h-1.5 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${loadingManager.progress}%` }}
-              />
-            </div>
-          )}
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Hold tight asnee!
-            {loadingManager && loadingManager.timeRemaining > 0 && (
-              <span className="block mt-1">
-                {Math.ceil(loadingManager.timeRemaining / 1000)}s remaining
-              </span>
-            )}
           </p>
         </div>
       </div>
