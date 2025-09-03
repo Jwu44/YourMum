@@ -1262,6 +1262,11 @@ const Dashboard: React.FC = () => {
 
         // 2) No existing schedule → redirect to loading page for autogeneration
         console.log('No existing schedule found, redirecting to loading page for autogeneration')
+        
+        // Set pending navigation info to prevent redirect loop when returning from loading page
+        sessionStorage.setItem('pendingNavigationDate', today)
+        sessionStorage.setItem('pendingNavigationIndex', '0')
+        
         router.push('/loading?reason=schedule')
         return
       } catch (error) {
