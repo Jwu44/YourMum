@@ -89,6 +89,26 @@ export const useOnboardingTour = (
     // Try standard DOM query (desktop or fallback)
     const allElements = document.querySelectorAll(selector)
     
+    // For sidebar navigation elements (steps 2 & 3), prioritize visible sidebar elements
+    const isSidebarStep = step.id === 'fill-preferences' || step.id === 'integrate-apps'
+    
+    if (isSidebarStep) {
+      // First try to find element in the main sidebar
+      const sidebarElement = document.querySelector('[data-sidebar="sidebar"]')
+      if (sidebarElement) {
+        const sidebarNavElement = sidebarElement.querySelector(selector)
+        if (sidebarNavElement) {
+          const rect = sidebarNavElement.getBoundingClientRect()
+          const style = window.getComputedStyle(sidebarNavElement)
+          
+          if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
+            console.log('Found sidebar navigation element:', sidebarNavElement, 'Size:', rect.width, 'x', rect.height)
+            return sidebarNavElement
+          }
+        }
+      }
+    }
+    
     // Find the visible element (not hidden)
     for (const el of Array.from(allElements)) {
       const rect = el.getBoundingClientRect()
@@ -108,8 +128,21 @@ export const useOnboardingTour = (
   React.useEffect(() => {
     if (!isActive) return
 
-    const updateTargetElement = () => {
+    const updateTargetElement = async () => {
       const element = findTargetElement()
+      
+      // If no element found on mobile, retry a few times with delays
+      if (!element && window.innerWidth < 768) {
+        for (let i = 0; i < 3; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+          const retryElement = findTargetElement()
+          if (retryElement) {
+            setTargetElement(retryElement)
+            return
+          }
+        }
+      }
+      
       setTargetElement(element)
     }
 

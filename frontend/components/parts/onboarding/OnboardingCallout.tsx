@@ -49,10 +49,6 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
 
   const side = getSide()
 
-  // Simple 8px offset for mobile, 16px for desktop
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-  const sideOffset = isMobile ? 8 : 16
-
   // Handle keyboard navigation
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -92,7 +88,7 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
       <Popover.Portal>
         <Popover.Content
           side={side}
-          sideOffset={sideOffset}
+          sideOffset={16}
           avoidCollisions={true}
           collisionBoundary={undefined}
           className={cn(
@@ -105,10 +101,19 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
           aria-describedby="onboarding-body"
         >
           <Popover.Arrow 
-            className="fill-card drop-shadow-sm" 
+            className="fill-card" 
             width={20} 
             height={10}
-            style={{ fill: 'hsl(var(--card))', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+            style={{ 
+              fill: 'hsl(var(--card))', 
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+              display: 'block',
+              // Center the arrow for sidebar navigation steps (2 & 3)
+              ...(stepCounter?.includes('2 of 3') || stepCounter?.includes('3 of 3') ? {
+                left: '50%',
+                transform: 'translateX(-50%)'
+              } : {})
+            }}
           />
           
           <div className="space-y-1.5 md:space-y-3">
@@ -150,7 +155,10 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onBack}
+                    onClick={() => {
+                      console.log('Back button clicked, onBack function:', onBack)
+                      onBack()
+                    }}
                     className="h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px]"
                   >
                     Back
@@ -160,7 +168,10 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
                 {onNext && (
                   <Button
                     size="sm"
-                    onClick={onNext}
+                    onClick={() => {
+                      console.log('Next button clicked, onNext function:', onNext)
+                      onNext()
+                    }}
                     className="gradient-accent hover:opacity-90 text-primary-foreground h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px]"
                   >
                     {nextButtonText}

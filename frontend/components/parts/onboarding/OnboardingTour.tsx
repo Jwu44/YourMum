@@ -95,10 +95,10 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     // If Step 1 and mobile, open sidebar for Steps 2 & 3 visibility
     if (currentStepData?.stepCounter.includes('1 of 3') && isMobile) {
       setOpenMobile(true)
-      // Small delay to ensure Sheet portal is rendered
+      // Increased delay to ensure Sheet portal is fully rendered
       setTimeout(() => {
         nextStep()
-      }, 150)
+      }, 300)
     } else {
       nextStep()
     }

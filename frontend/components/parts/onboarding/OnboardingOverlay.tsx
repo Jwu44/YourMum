@@ -51,29 +51,57 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     }
 
     const rect = targetElement.getBoundingClientRect()
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-    const isStep1 = stepCounter?.includes('1 of 3')
+    const padding = 12
 
-    // Use minimal padding for step 1 FAB on mobile to avoid oversized spotlight
-    // Step 1 targets a 56x56px FAB button - minimal padding is sufficient
-    let padding: number
-    if (isMobile && isStep1) {
-      padding = 8  // Minimal padding for FAB button on mobile
-    } else if (isMobile) {
-      padding = 30 // Generous padding for other mobile targets
-    } else {
-      padding = 12 // Standard desktop padding
+    // Debug logging for step 2 positioning
+    if (stepCounter?.includes('2 of 3')) {
+      console.log('Step 2 spotlight positioning:', {
+        stepCounter,
+        element: targetElement,
+        rect: {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height
+        },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        sidebarState: document.querySelector('[data-sidebar="sidebar"]')?.getAttribute('data-state'),
+        isSidebarElement: !!targetElement.closest('[data-sidebar="sidebar"]'),
+        sidebarRect: targetElement.closest('[data-sidebar="sidebar"]')?.getBoundingClientRect()
+      })
     }
 
-    // Debug: log target element info
-    console.log('Spotlight target element:')
-    console.log('- Element:', targetElement)
-    console.log('- Tag:', targetElement.tagName)
-    console.log('- Class:', targetElement.className)
-    console.log('- Rect:', rect.left, rect.top, rect.width, rect.height)
+    // Check if this is a sidebar navigation element
+    const isSidebarElement = targetElement.closest('[data-sidebar="sidebar"]')
+    
+    let adjustedX = rect.left - padding
+    
+    // Step 1 (FAB button) - keep centered positioning
+    if (stepCounter?.includes('1 of 3')) {
+      adjustedX = rect.left - padding
+    }
+    // Steps 2-3 (sidebar navigation) - use boundary-aware positioning
+    else if (isSidebarElement) {
+      // For sidebar elements, ensure we don't cut off the left side
+      const sidebarRect = isSidebarElement.getBoundingClientRect()
+      const minX = Math.max(0, sidebarRect.left)
+      adjustedX = Math.max(minX, rect.left - padding)
+      
+      // Also ensure we don't go off the right side of the viewport
+      const maxX = window.innerWidth - rect.width - padding
+      adjustedX = Math.min(maxX, adjustedX)
+    } else {
+      // For other elements, use standard boundary checking
+      const minX = Math.max(0, rect.left - padding)
+      const maxX = Math.min(window.innerWidth - rect.width - padding, rect.left)
+      adjustedX = Math.max(minX, maxX)
+    }
 
     return {
-      '--spotlight-x': `${rect.left - padding}px`,
+      '--spotlight-x': `${adjustedX}px`,
       '--spotlight-y': `${rect.top - padding}px`,
       '--spotlight-width': `${rect.width + padding * 2}px`,
       '--spotlight-height': `${rect.height + padding * 2}px`
@@ -101,6 +129,12 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
             height: 'var(--spotlight-height)',
             boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)'
           }}
+          data-debug="spotlight"
+          data-step={stepCounter}
+          data-x="var(--spotlight-x)"
+          data-y="var(--spotlight-y)"
+          data-width="var(--spotlight-width)"
+          data-height="var(--spotlight-height)"
         />
       )}
 
