@@ -111,7 +111,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
   const overlayContent = (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[60]"
+      className="fixed inset-0 z-[60] pointer-events-auto"
       style={getSpotlightStyles()}
       onClick={handleOverlayClick}
       role="dialog"

@@ -92,6 +92,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
   // Enhanced next step handler with mobile sidebar behavior
   const handleNextStep = React.useCallback(() => {
+    console.log('handleNextStep called', { currentStep: currentStepData?.stepCounter, isMobile })
+    
     // If Step 1 and mobile, open sidebar for Steps 2 & 3 visibility
     if (currentStepData?.stepCounter.includes('1 of 3') && isMobile) {
       setOpenMobile(true)
@@ -99,10 +101,30 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
       setTimeout(() => {
         nextStep()
       }, 300)
+    } else if (currentStepData?.stepCounter.includes('3 of 3') && isMobile) {
+      // If Step 3 (last step) and mobile, close sidebar when finishing
+      setOpenMobile(false)
+      nextStep()
     } else {
       nextStep()
     }
   }, [currentStepData, isMobile, setOpenMobile, nextStep])
+
+  // Enhanced previous step handler with mobile sidebar behavior
+  const handlePreviousStep = React.useCallback(() => {
+    console.log('handlePreviousStep called', { currentStep: currentStepData?.stepCounter, isMobile })
+    
+    // If going back to Step 1 and mobile, we might want to close the sidebar
+    if (currentStepData?.stepCounter.includes('2 of 3') && isMobile) {
+      previousStep()
+      // Small delay then close sidebar to return to Step 1 view
+      setTimeout(() => {
+        setOpenMobile(false)
+      }, 100)
+    } else {
+      previousStep()
+    }
+  }, [currentStepData, isMobile, setOpenMobile, previousStep])
 
   // Don't render if tour is not active or no current step
   if (!isActive || !currentStepData) {
@@ -126,7 +148,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         showBackButton={canGoBack}
         nextButtonText={nextButtonText}
         onNext={handleNextStep}
-        onBack={canGoBack ? previousStep : undefined}
+        onBack={canGoBack ? handlePreviousStep : undefined}
         onClose={closeTour}
       />
     </OnboardingOverlay>

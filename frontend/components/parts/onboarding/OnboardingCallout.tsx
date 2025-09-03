@@ -92,9 +92,10 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
           avoidCollisions={true}
           collisionBoundary={undefined}
           className={cn(
-            "bg-card border shadow-xl rounded-lg z-[70]",
+            "bg-card border shadow-xl rounded-lg z-[80]",
             "w-[min(280px,calc(100vw-2rem))] md:w-[360px]",
-            "p-2.5 md:p-4"
+            "p-2.5 md:p-4",
+            "pointer-events-auto"
           )}
           role="dialog"
           aria-labelledby="onboarding-title"
@@ -155,11 +156,19 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       console.log('Back button clicked, onBack function:', onBack)
                       onBack()
                     }}
-                    className="h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px]"
+                    onTouchEnd={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      console.log('Back button touched, onBack function:', onBack)
+                      onBack()
+                    }}
+                    className="h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px] pointer-events-auto touch-manipulation"
                   >
                     Back
                   </Button>
@@ -168,11 +177,19 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
                 {onNext && (
                   <Button
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       console.log('Next button clicked, onNext function:', onNext)
                       onNext()
                     }}
-                    className="gradient-accent hover:opacity-90 text-primary-foreground h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px]"
+                    onTouchEnd={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      console.log('Next button touched, onNext function:', onNext)
+                      onNext()
+                    }}
+                    className="gradient-accent hover:opacity-90 text-primary-foreground h-9 md:h-10 px-3 md:px-4 text-sm font-medium min-w-[60px] pointer-events-auto touch-manipulation"
                   >
                     {nextButtonText}
                   </Button>
