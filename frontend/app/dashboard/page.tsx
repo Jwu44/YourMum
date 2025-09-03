@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { v4 as uuidv4 } from 'uuid'
 
 // UI Components
@@ -12,7 +13,6 @@ import TaskEditDrawer from '@/components/parts/TaskEditDrawer'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
-import CalendarConnectionLoader from '@/components/parts/CalendarConnectionLoader'
 import { DragStateProvider } from '@/contexts/DragStateContext'
 import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 
@@ -43,6 +43,7 @@ import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
 
 const Dashboard: React.FC = () => {
+  const router = useRouter()
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([])
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
   const { state } = useForm()
@@ -685,26 +686,15 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - centralize to backend autogeneration
-      console.log('Next day is in the future and no schedule exists, autogenerating via backend')
-
-      const auto = await autogenerateTodaySchedule(nextDayDate)
-      if (auto.success && (auto.created || auto.existed) && Array.isArray(auto.schedule)) {
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays]
-          const targetIndex = currentDayIndex + 1
-          while (newDays.length <= targetIndex) newDays.push([])
-          newDays[targetIndex] = auto.schedule!
-          return newDays
-        })
-        setScheduleCache(prev => {
-          const map = new Map(prev)
-          map.set(nextDayDate, auto.schedule!)
-          return map
-        })
-      } else {
-        throw new Error(auto.error || 'Autogenerate failed')
-      }
+      // Step 4: Future date with no existing schedule - redirect to loading page
+      console.log('Next day is in the future and no schedule exists, redirecting to loading for autogeneration')
+      
+      // Store the target date and day index for when we return from loading
+      sessionStorage.setItem('pendingNavigationDate', nextDayDate)
+      sessionStorage.setItem('pendingNavigationIndex', String(currentDayIndex + 1))
+      
+      router.push('/loading?reason=schedule')
+      return
     } catch (error) {
       console.error('Error in handleNextDay:', error)
 
@@ -1187,6 +1177,39 @@ const Dashboard: React.FC = () => {
       hasInitiallyLoaded.current = true
       setIsLoadingSchedule(true)
 
+      // Check if we're returning from a loading page navigation
+      const pendingIndex = sessionStorage.getItem('pendingNavigationIndex')
+      const pendingDate = sessionStorage.getItem('pendingNavigationDate')
+      
+      if (pendingIndex && pendingDate) {
+        console.log('Returning from loading page, navigating to pending date:', pendingDate)
+        const targetIndex = parseInt(pendingIndex, 10)
+        setCurrentDayIndex(targetIndex)
+        
+        // Clean up session storage
+        sessionStorage.removeItem('pendingNavigationDate')
+        sessionStorage.removeItem('pendingNavigationIndex')
+        
+        // Load the schedule for the target date
+        try {
+          const result = await loadSchedule(pendingDate)
+          if (result.success && result.schedule) {
+            setScheduleDays(prevDays => {
+              const newDays = [...prevDays]
+              while (newDays.length <= targetIndex) newDays.push([])
+              newDays[targetIndex] = result.schedule!
+              return newDays
+            })
+            setScheduleCache(prev => new Map(prev).set(pendingDate, result.schedule!))
+          }
+        } catch (error) {
+          console.error('Error loading pending navigation schedule:', error)
+        }
+        
+        setIsLoadingSchedule(false)
+        return
+      }
+
       const today = getDateString(0)
 
       try {
@@ -1199,73 +1222,10 @@ const Dashboard: React.FC = () => {
           return
         }
 
-        // 2) No existing schedule → trigger backend autogeneration with 10s timeout and single retry
-        let timeoutReached = false
-        const timeoutId = setTimeout(() => {
-          timeoutReached = true
-          setIsLoadingSchedule(false) // stop skeleton after 10s
-        }, 10000)
-
-        // First attempt
-        const auto1 = await autogenerateTodaySchedule(today)
-        if (auto1.success) {
-          if (auto1.sourceFound === false) {
-            // Immediate empty state when no source schedule exists
-            clearTimeout(timeoutId)
-            setIsLoadingSchedule(false)
-            setScheduleDays([[]])
-            return
-          }
-
-          if ((auto1.created || auto1.existed) && Array.isArray(auto1.schedule)) {
-            clearTimeout(timeoutId)
-            setScheduleDays([auto1.schedule])
-            setScheduleCache(new Map([[today, auto1.schedule]]))
-            setIsLoadingSchedule(false)
-            return
-          }
-        } else {
-          // First failure → show toast immediately and retry once
-          toast({
-            title: 'Autogenerate failed',
-            description: auto1.error || 'Failed to autogenerate schedule',
-            variant: 'destructive'
-          })
-
-          autogenerateTodaySchedule(today)
-            .then((auto2) => {
-              clearTimeout(timeoutId)
-              if (auto2.success && (auto2.created || auto2.existed) && Array.isArray(auto2.schedule)) {
-                setScheduleDays([auto2.schedule])
-                setScheduleCache(prev => new Map(prev).set(today, auto2.schedule!))
-                if (timeoutReached) {
-                  toast({
-                    title: 'Schedule ready',
-                    description: 'Your schedule has been created',
-                    variant: 'default'
-                  })
-                }
-                setIsLoadingSchedule(false)
-              } else {
-                // Retry failed → show empty state + toast (already shown above)
-                setIsLoadingSchedule(false)
-                setScheduleDays([[]])
-              }
-            })
-            .catch(() => {
-              clearTimeout(timeoutId)
-              setIsLoadingSchedule(false)
-              setScheduleDays([[]])
-            })
-
-          // Keep skeleton until timeout or until retry resolves
-          return
-        }
-
-        // If reached here without success, end loading and show empty
-        clearTimeout(timeoutId)
-        setIsLoadingSchedule(false)
-        setScheduleDays([[]])
+        // 2) No existing schedule → redirect to loading page for autogeneration
+        console.log('No existing schedule found, redirecting to loading page for autogeneration')
+        router.push('/loading?reason=schedule')
+        return
       } catch (error) {
         console.error('Error loading initial schedule:', error)
         setIsLoadingSchedule(false)
@@ -1348,15 +1308,6 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, currentUser?.uid])
 
-  // Show calendar connection loader only during active OAuth flows
-  // Don't show if user is just navigating between pages with existing calendar connection
-  const shouldShowLoader = (calendarConnectionStage && calendarConnectionStage !== 'complete') ||
-                          (isEnsuringRefresh && hasEnsuredRefresh.current)
-
-  if (shouldShowLoader) {
-    const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
-    return <CalendarConnectionLoader stage={stage} />
-  }
 
   return (
     <SidebarLayout>

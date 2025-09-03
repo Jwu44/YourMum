@@ -6,9 +6,43 @@ import { Loader2 } from 'lucide-react'
 // Lazy load Lottie to reduce initial bundle size
 const Lottie = React.lazy(() => import('lottie-react'))
 
+// Available loading animations configuration
+const LOADING_ANIMATIONS = [
+  {
+    path: '/animations/Boy working on laptop lottie animation.json',
+    name: 'Boy working on laptop'
+  },
+  {
+    path: '/animations/Tired Woman.json',
+    name: 'Tired Woman'
+  },
+  {
+    path: '/animations/Man with task list.json',
+    name: 'Man with task list'
+  },
+  {
+    path: '/animations/Sandy Loading.json',
+    name: 'Sandy Loading'
+  }
+]
+
+// Function to randomly select an animation
+const getRandomAnimation = (): { path: string; name: string } => {
+  const randomIndex = Math.floor(Math.random() * LOADING_ANIMATIONS.length)
+  return LOADING_ANIMATIONS[randomIndex]
+}
+
 export interface LoadingPageProps {
   reason?: 'calendar' | 'schedule'
   message?: string
+  loadingManager?: {
+    isLoading: boolean
+    canNavigate: boolean
+    timeRemaining: number
+    reason: 'calendar' | 'schedule'
+    markContentReady: () => void
+    progress: number
+  }
 }
 
 /**
@@ -19,10 +53,12 @@ export interface LoadingPageProps {
  */
 export const LoadingPage: React.FC<LoadingPageProps> = ({ 
   reason = 'calendar',
-  message 
+  message,
+  loadingManager
 }) => {
-  const [animationData, setAnimationData] = useState(null)
+  const [animationData, setAnimationData] = useState<any>(null)
   const [loadingError, setLoadingError] = useState(false)
+  const [selectedAnimation] = useState(() => getRandomAnimation())
 
   // Load Lottie animation data
   useEffect(() => {
@@ -30,8 +66,8 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
     const loadAnimation = async () => {
       try {
-        const response = await fetch('/animations/Boy working on laptop lottie animation.json')
-        if (!response.ok) throw new Error('Failed to load animation')
+        const response = await fetch(selectedAnimation.path)
+        if (!response.ok) throw new Error(`Failed to load animation: ${selectedAnimation.name}`)
         
         const data = await response.json()
         if (isMounted) {
@@ -45,12 +81,12 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       }
     }
 
-    loadAnimation()
+    void loadAnimation()
 
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [selectedAnimation.path])
 
   // Dynamic messages based on loading reason
   const getMessages = () => {
@@ -68,13 +104,13 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       default:
         return {
           title: 'Loading',
-          description: 'Please wait while we prepare your experience'
+          description: 'Please wait while we prepare your schedule'
         }
     }
   }
 
   const messages = getMessages()
-  const displayMessage = message || messages.description
+  const displayMessage = message ?? messages.description
 
   // Fallback spinner component
   const FallbackSpinner = () => (
@@ -97,7 +133,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
             loop={true}
             autoplay={true}
             style={{ width: '100%', height: '100%' }}
-            onError={() => setLoadingError(true)}
+            onError={() => { setLoadingError(true) }}
           />
         </div>
       </Suspense>
@@ -139,9 +175,22 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-y-3">
+          {loadingManager && (
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div
+                className="bg-purple-600 h-1.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${loadingManager.progress}%` }}
+              />
+            </div>
+          )}
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Hold tight asnee!
+            {loadingManager && loadingManager.timeRemaining > 0 && (
+              <span className="block mt-1">
+                {Math.ceil(loadingManager.timeRemaining / 1000)}s remaining
+              </span>
+            )}
           </p>
         </div>
       </div>
