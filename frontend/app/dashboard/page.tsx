@@ -1384,6 +1384,13 @@ const Dashboard: React.FC = () => {
     return <LoadingPage reason="calendar" message="Setting up your account..." />
   }
 
+  // Mark dashboard as fully loaded for future PostOAuth detection
+  useEffect(() => {
+    if (!isLoadingSchedule && scheduleDays.length > 0) {
+      sessionStorage.setItem('dashboardFullyLoaded', 'true')
+    }
+  }, [isLoadingSchedule, scheduleDays.length])
+
   return (
     <SidebarLayout>
       <OnboardingTour />

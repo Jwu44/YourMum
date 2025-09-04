@@ -217,6 +217,236 @@ Implemented dashboard deferral pattern to prevent race condition:
 3. PostOAuthHandler orchestrates: Calendar connection → Schedule generation
 4. Dashboard renders normally after PostOAuthHandler completes
 
+## Enhanced Fix: Improved PostOAuthHandler Detection
+After console log analysis revealed that the dashboard was still briefly rendering before PostOAuthHandler could take control, implemented enhanced detection mechanism:
+
+### Additional Root Cause
+The original detection logic missed cases where:
+1. Dashboard renders immediately upon navigation to `/dashboard`
+2. Dashboard calls `loadInitialSchedule` → makes API calls → shows skeleton
+3. AuthContext sets `showPostOAuthHandler` **after** Dashboard already started
+
+### Enhanced Detection Logic
+```javascript
+// CRITICAL: Check for fresh navigation to dashboard with authRedirectDestination
+// This catches the case where user just completed OAuth and was redirected to dashboard
+const justRedirectedFromAuth = localStorage.getItem('authRedirectDestination') === '/dashboard' &&
+                               !sessionStorage.getItem('dashboardFullyLoaded')
+```
+
+### Additional Implementation Details:
+4. **Immediate Detection**: Enhanced `isPostOAuthActive()` to catch fresh OAuth redirects:
+   - Checks `authRedirectDestination === '/dashboard'` (set during OAuth flow)
+   - Checks `!dashboardFullyLoaded` (prevents false positives on return visits)
+
+5. **Dashboard State Tracking**: Added marker when dashboard fully loads:
+   - Sets `sessionStorage.setItem('dashboardFullyLoaded', 'true')` after successful load
+   - Prevents future false positives for regular dashboard visits
+
+6. **Enhanced Cleanup**: PostOAuthHandler now cleans up detection indicators:
+   - Removes `authRedirectDestination` from localStorage
+   - Removes `oauth-in-progress` from sessionStorage
+   - Ensures no false positives for future navigation
+
+### Final Flow:
+1. User completes Google SSO → `authRedirectDestination` set to `/dashboard`
+2. **Dashboard immediately detects fresh OAuth redirect** → shows LoadingPage
+3. PostOAuthHandler orchestrates full flow → cleans up indicators
+4. Dashboard renders normally with no skeleton flash
+
 ## Status
-- ✅ **Issue 3 RESOLVED**: Eliminated dashboard loading skeleton flash during post-OAuth flow
+- ✅ **Issue 3 RESOLVED**: Enhanced detection eliminates dashboard loading skeleton flash
 - ✅ **Testing**: Development servers running successfully, code compiles without errors
+- ✅ **Enhanced Fix**: Addresses timing gap identified through console log analysis
+
+
+# Issue 4: To do
+I am facing a bug where autogenerate is being called twice and I see 2 loading pages after google sso
+
+# Preconditions before reproducing:
+- Existing user who is logged out
+- No google calendar connection
+- No schedule for today
+
+# Steps to reproduce:
+1. Complete google sso and grant gcal access 
+2. User sees loading page with autogenerate() triggered. But it doesn't look like it gets fully called as the payload is: {"date":"2025-09-04","timezone":"Australia/Sydney"}
+3. Another loading page is triggered now with the autogenerate() successfully running 
+
+# Console logs:
+Calendar access status: true
+ API Base URL: https://yourmum-production.up.railway.app
+ User creation date: Thu Aug 28 2025 06:56:25 GMT+1000 (Australian Eastern Standard Time)
+  GET https://yourmum-production.up.railway.app/api/schedules/2025-09-04 404 (Not Found)
+d @ 139-a2e1ae1154ef8a4e.js:1
+await in d
+t @ page-f880212c78889cab.js:1
+e @ page-f880212c78889cab.js:1
+aW @ fd9d1056-d01e9804f4c81514.js:1
+oe @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+or @ fd9d1056-d01e9804f4c81514.js:1
+ol @ fd9d1056-d01e9804f4c81514.js:1
+id @ fd9d1056-d01e9804f4c81514.js:1
+nb @ fd9d1056-d01e9804f4c81514.js:1
+(anonymous) @ fd9d1056-d01e9804f4c81514.js:1
+is @ fd9d1056-d01e9804f4c81514.js:1
+o1 @ fd9d1056-d01e9804f4c81514.js:1
+oZ @ fd9d1056-d01e9804f4c81514.js:1
+T @ 117-a2e30b74bbda5457.js:1
+ No existing schedule found, redirecting to loading page for autogeneration
+ Setting up schedule generation timeout...
+ RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/loading', isPublicPath: false, inAuthFlow: false, …}
+ User stored in backend successfully with calendar access: false
+ Authentication completed successfully
+ Schedule generation timeout triggered
+ Starting schedule autogeneration process...
+ Performing schedule autogeneration for date: 2025-09-04
+ Calling autogenerateTodaySchedule with targetDate: 2025-09-04
+ User stored in backend successfully with calendar access: true
+ Starting calendar connection process...
+ Waiting for auth state to stabilize before connecting to Google Calendar...
+ Connecting to Google Calendar...
+ Connected to Google Calendar successfully
+Navigated to https://yourmum.app/dashboard
+564-62b56f461eb9c5dc.js:1 Setting up auth state listener
+564-62b56f461eb9c5dc.js:1 Checking redirect result...
+564-62b56f461eb9c5dc.js:1 Auth state changed. User: Justin Wu (justin.wu4444@gmail.com)
+564-62b56f461eb9c5dc.js:1 OAuth in progress: false
+564-62b56f461eb9c5dc.js:1 Storing user from auth state change (non-OAuth)
+564-62b56f461eb9c5dc.js:1 Redirect result: null
+564-62b56f461eb9c5dc.js:1 No redirect result found
+page-f880212c78889cab.js:1 Setting currentDate: Thu Sep 04 2025 16:03:51 GMT+1000 (Australian Eastern Standard Time)
+layout-bedf8094edd4259f.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
+page-22f10e8b96cecb3d.js:1 Setting up schedule generation timeout...
+layout-bedf8094edd4259f.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/loading', isPublicPath: false, inAuthFlow: false, …}
+564-62b56f461eb9c5dc.js:1 Got fresh ID token for backend storage
+564-62b56f461eb9c5dc.js:1 Calendar access status: false
+564-62b56f461eb9c5dc.js:1 API Base URL: https://yourmum-production.up.railway.app
+page-22f10e8b96cecb3d.js:1 Schedule generation timeout triggered
+page-22f10e8b96cecb3d.js:1 Starting schedule autogeneration process...
+page-22f10e8b96cecb3d.js:1 Performing schedule autogeneration for date: 2025-09-04
+page-22f10e8b96cecb3d.js:1 Calling autogenerateTodaySchedule with targetDate: 2025-09-04
+page-f880212c78889cab.js:1 User creation date: Thu Aug 28 2025 06:56:25 GMT+1000 (Australian Eastern Standard Time)
+564-62b56f461eb9c5dc.js:1 User stored in backend successfully with calendar access: false
+564-62b56f461eb9c5dc.js:1 Authentication completed successfully
+page-22f10e8b96cecb3d.js:1 autogenerateTodaySchedule result: {success: true, created: false, date: '2025-09-04', existed: true, schedule: Array(10), …}
+page-22f10e8b96cecb3d.js:1 Schedule generation successful, marking content ready
+page-22f10e8b96cecb3d.js:1 Keeping session storage for dashboard navigation
+page-22f10e8b96cecb3d.js:1 Cleaning up timeout...
+page-f880212c78889cab.js:1 Setting currentDate: Thu Sep 04 2025 16:03:53 GMT+1000 (Australian Eastern Standard Time)
+page-f880212c78889cab.js:1 Returning from loading page, navigating to pending date: 2025-09-04
+layout-bedf8094edd4259f.js:1 RouteGuard State: {user: 'Justin Wu (justin.wu4444@gmail.com)', loading: false, pathname: '/dashboard', isPublicPath: false, inAuthFlow: false, …}
+page-f880212c78889cab.js:1 ✅ Rendering optimized backend structure
+page-f880212c78889cab.js:1 User creation date: Thu Aug 28 2025 06:56:25 GMT+1000 (Australian Eastern Standard Time)
+2page-f880212c78889cab.js:1 Calendar API working fine, no re-auth needed
