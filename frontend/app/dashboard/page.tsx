@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
 
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map())
-  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false)
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(true)
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [shownSuggestionIds] = useState<Set<string>>(new Set())
@@ -1213,7 +1213,7 @@ const Dashboard: React.FC = () => {
     const loadInitialSchedule = async () => {
       // Set flag immediately to prevent race conditions in React Strict Mode
       hasInitiallyLoaded.current = true
-      setIsLoadingSchedule(true)
+      // isLoadingSchedule already starts as true, no need to set it again
 
       // Check if we're returning from a loading page navigation
       const pendingIndex = sessionStorage.getItem('pendingNavigationIndex')
@@ -1278,6 +1278,9 @@ const Dashboard: React.FC = () => {
 
     if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh) {
       loadInitialSchedule()
+    } else if (hasInitiallyLoaded.current || calendarConnectionStage || isEnsuringRefresh) {
+      // If we're not loading initial schedule, ensure loading state is false
+      setIsLoadingSchedule(false)
     }
   }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
 
@@ -1370,21 +1373,22 @@ const Dashboard: React.FC = () => {
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
-            {isLoadingSchedule
-              ? (
-              <div className="space-y-4" data-testid="dashboard-skeleton">
-                <Skeleton className="h-6 w-1/3" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-1/4" />
-                  {[...Array(6)].map((_, idx) => (
-                    <Skeleton key={idx} className="h-10 w-full" />
-                  ))}
-                </div>
+            {isLoadingSchedule ? (
+              <div className="space-y-3 mt-5" data-testid="dashboard-skeleton">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3"
+                  >
+                    {/* Checkbox placeholder */}
+                    <Skeleton className="h-5 w-5 rounded-md" />
+
+                    {/* Task text placeholder */}
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-9/10" />
+                    </div>
+                  </div>
+                ))}
               </div>
                 )
               : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0

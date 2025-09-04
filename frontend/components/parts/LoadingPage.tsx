@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Computer, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import Lottie from 'lottie-react'
 
 // Available loading animations configuration
