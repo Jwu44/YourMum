@@ -11,10 +11,6 @@ const LOADING_ANIMATIONS = [
     name: 'Boy working on laptop'
   },
   {
-    path: '/animations/Man with task list.json',
-    name: 'Man with task list'
-  },
-  {
     path: '/animations/Sandy Loading.json',
     name: 'Sandy Loading'
   },
@@ -27,7 +23,7 @@ const LOADING_ANIMATIONS = [
     name: 'Business Enterprise Solutions'
   },
   {
-    path: '/animations/Company employees sharing thoughts and ideas.json', 
+    path: '/animations/Company employees sharing thoughts and ideas.json',
     name: 'Company employee'
   },
   {
@@ -61,11 +57,11 @@ export interface LoadingPageProps {
 
 /**
  * Loading page component with Lottie animation
- * 
+ *
  * Shows during long operations like calendar connection and schedule generation.
  * Includes accessibility features, fallback spinner, and dynamic messaging.
  */
-export const LoadingPage: React.FC<LoadingPageProps> = ({ 
+export const LoadingPage: React.FC<LoadingPageProps> = ({
   reason = 'calendar',
   message,
   loadingManager
@@ -82,7 +78,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       try {
         const response = await fetch(selectedAnimation.path)
         if (!response.ok) throw new Error(`Failed to load animation: ${selectedAnimation.name}`)
-        
+
         const data = await response.json()
         if (isMounted) {
           setAnimationData(data)
@@ -128,7 +124,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
   // Fallback spinner component
   const FallbackSpinner = () => (
-    <div className="flex items-center justify-center">
+    <div className="w-full h-full max-w-[400px] max-h-[300px] flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
       <Loader2 className="w-16 h-16 animate-spin text-purple-600" />
     </div>
   )
@@ -145,7 +141,8 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           animationData={animationData}
           loop={true}
           autoplay={true}
-          style={{ width: '100%', height: '100%', opacity: animationData ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
+          style={{ width: '100%', height: '100%' }}
+          className={animationData ? 'opacity-100' : 'opacity-0'}
           onError={() => { setLoadingError(true) }}
         />
       </div>
@@ -164,9 +161,9 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
-      <div 
+      <div
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-[500px] min-h-[500px] mx-4 flex flex-col"
-        role="status" 
+        role="status"
         aria-live="polite"
         aria-label="Loading page"
       >
@@ -180,7 +177,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {messages.title}
           </h1>
-          
+
           <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
             {displayMessage}
           </p>
