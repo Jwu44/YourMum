@@ -17,6 +17,24 @@ interface PostOAuthHandlerProps {
 type OrchestratorStage = 'connecting' | 'generating' | 'complete' | 'error'
 
 /**
+ * Utility to detect if PostOAuthHandler should be active
+ * Used by components to defer their logic while PostOAuthHandler is running
+ */
+export const isPostOAuthActive = (): boolean => {
+  // Check if we're in browser environment
+  if (typeof window === 'undefined') return false
+  
+  // Check for various indicators that post-OAuth flow is active
+  const hasOAuthRedirect = window.location.pathname === '/dashboard' && 
+                          (window.location.search.includes('code=') || 
+                           window.location.search.includes('state='))
+  
+  const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
+  
+  return hasOAuthRedirect || hasSessionIndicator
+}
+
+/**
  * PostOAuthHandler - Single orchestrator for post-OAuth flow
  * 
  * Eliminates race conditions by coordinating:
@@ -132,12 +150,19 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
 
   // Start orchestration on mount
   useEffect(() => {
+    // Mark OAuth as in progress in session storage
+    sessionStorage.setItem('oauth-in-progress', 'true')
+    
     // Small delay to ensure component is fully mounted
     const timeoutId = setTimeout(() => {
       orchestratePostOAuthFlow()
     }, 100)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+      // Clean up session storage when component unmounts
+      sessionStorage.removeItem('oauth-in-progress')
+    }
   }, [orchestratePostOAuthFlow])
 
   // Determine loading message based on stage
