@@ -50,11 +50,15 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   // Be resilient in test environments where AuthProvider may be mocked
-  const { calendarConnectionStage, currentUser } = (() => {
+  const { calendarConnectionStage, currentUser, refreshCalendarCredentials } = (() => {
     try {
       return useAuth()
     } catch (e) {
-      return { calendarConnectionStage: null as any, currentUser: auth.currentUser }
+      return { 
+        calendarConnectionStage: null as any, 
+        currentUser: auth.currentUser,
+        refreshCalendarCredentials: async () => {} // No-op fallback for tests
+      }
     }
   })()
 
@@ -132,16 +136,27 @@ const Dashboard: React.FC = () => {
             return
           }
 
-          // Only if calendar API fails, attempt OAuth redirect
+          // Only if calendar API fails, attempt Firebase credential refresh
           if (testResp.status === 401 || testResp.status === 400) {
-            const resp = await fetch(`${apiBase}/api/calendar/oauth/start`, {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${token}` }
-            })
-            const data = await resp.json().catch(() => ({} as any))
-            if (resp.ok && data?.success && data?.url) {
+            try {
+              console.log('Calendar API failed, refreshing Firebase credentials...')
               setIsEnsuringRefresh(true)
-              window.location.href = data.url as string
+              
+              // Use Firebase to refresh credentials instead of backend OAuth redirect
+              await refreshCalendarCredentials()
+              
+              console.log('Calendar credentials refreshed successfully')
+              setIsEnsuringRefresh(false)
+            } catch (refreshError) {
+              console.error('Failed to refresh calendar credentials:', refreshError)
+              setIsEnsuringRefresh(false)
+              
+              // Show user-friendly message instead of crashing
+              toast({
+                title: 'Calendar Connection Issue',
+                description: 'Please reconnect your Google Calendar in the Integrations page.',
+                variant: 'default'
+              })
             }
           }
           // If start failed, do NOT block dashboard; proceed without loader

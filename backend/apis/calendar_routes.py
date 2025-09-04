@@ -7,7 +7,7 @@ import requests
 import os
 import json
 from typing import List, Dict, Optional, Tuple
-from urllib.parse import urlencode, quote
+# urllib.parse imports removed - no longer needed after OAuth route cleanup
 from firebase_admin import credentials, get_app
 import firebase_admin
 from backend.services.calendar_service import convert_calendar_event_to_task
@@ -758,157 +758,9 @@ def _ensure_access_token_valid(users, user_id: str, credentials_data: Dict[str, 
     return access_token
 
 
-@calendar_bp.route("/oauth/start", methods=["GET"])
-def start_calendar_oauth():
-    """Build Google OAuth URL for offline access (server-side code flow) without extra clicks.
-
-    Returns { success: true, url: <google_auth_url> }
-    """
-    try:
-        auth_header = request.headers.get('Authorization', '')
-        token = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
-        user_id = get_user_id_from_token(token)
-        if not user_id:
-            return jsonify({"success": False, "error": "Invalid or missing authentication token"}), 401
-
-        client_id = os.getenv('GOOGLE_CLIENT_ID')
-        redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
-        if not client_id or not redirect_uri:
-            # Try to derive redirect URI from request if missing
-            try:
-                scheme = request.headers.get('X-Forwarded-Proto') or request.scheme
-                host = request.headers.get('X-Forwarded-Host') or request.host
-                derived = f"{scheme}://{host}/api/calendar/oauth/callback"
-                if client_id and derived:
-                    redirect_uri = derived
-                else:
-                    missing = []
-                    if not client_id:
-                        missing.append('GOOGLE_CLIENT_ID')
-                    if not os.getenv('GOOGLE_CALENDAR_REDIRECT_URI'):
-                        missing.append('GOOGLE_CALENDAR_REDIRECT_URI')
-                    return jsonify({"success": False, "error": f"OAuth not configured: missing {' & '.join(missing)}"}), 500
-            except Exception:
-                return jsonify({"success": False, "error": "OAuth not configured"}), 500
-
-        scope = urlencode({
-            'scope': 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly'
-        })
-        base = 'https://accounts.google.com/o/oauth2/v2/auth'
-        params = {
-            'client_id': client_id,
-            'redirect_uri': redirect_uri,
-            'response_type': 'code',
-            'access_type': 'offline',
-            'prompt': 'consent',
-            'state': user_id
-        }
-        # Manually compose to ensure proper encoding
-        url = f"{base}?client_id={params['client_id']}&redirect_uri={quote(params['redirect_uri'])}&response_type=code&access_type=offline&prompt=consent&state={quote(params['state'])}&scope={quote('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly')}"
-        # Lightweight log to diagnose future 500s without leaking secrets
-        try:
-            print(f"OAuth start URL composed for user {user_id}; using redirect_uri={params['redirect_uri']}")
-        except Exception:
-            pass
-        return jsonify({"success": True, "url": url})
-    except Exception as e:
-        print(f"Error starting calendar OAuth: {e}")
-        traceback.print_exc()
-        return jsonify({"success": False, "error": "Failed to start OAuth"}), 500
-
-
-@calendar_bp.route("/oauth/callback", methods=["GET"])
-def calendar_oauth_callback():
-    """Handle Google OAuth code exchange, persist refresh token and ensure watch."""
-    try:
-        code = request.args.get('code')
-        user_id = request.args.get('state')
-        if not code or not user_id:
-            return jsonify({"success": False, "error": "Missing code or state"}), 400
-
-        client_id = os.getenv('GOOGLE_CLIENT_ID')
-        client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-        redirect_uri = os.getenv('GOOGLE_CALENDAR_REDIRECT_URI')
-        if not client_id or not client_secret:
-            missing = []
-            if not client_id:
-                missing.append('GOOGLE_CLIENT_ID')
-            if not client_secret:
-                missing.append('GOOGLE_CLIENT_SECRET')
-            return jsonify({"success": False, "error": f"OAuth not configured: missing {' & '.join(missing)}"}), 500
-        if not redirect_uri:
-            # Derive redirect URI from incoming request headers (must match 'start' URL)
-            try:
-                scheme = request.headers.get('X-Forwarded-Proto') or request.scheme
-                host = request.headers.get('X-Forwarded-Host') or request.host
-                redirect_uri = f"{scheme}://{host}/api/calendar/oauth/callback"
-            except Exception:
-                return jsonify({"success": False, "error": "OAuth not configured: missing GOOGLE_CALENDAR_REDIRECT_URI"}), 500
-
-        token_url = 'https://oauth2.googleapis.com/token'
-        payload = {
-            'code': code,
-            'client_id': client_id,
-            'client_secret': client_secret,
-            'redirect_uri': redirect_uri,
-            'grant_type': 'authorization_code'
-        }
-        token_resp = requests.post(token_url, data=payload)
-        if token_resp.status_code != 200:
-            return jsonify({"success": False, "error": f"Token exchange failed: {token_resp.text}"}), 400
-
-        token_json = token_resp.json()
-        access_token = token_json.get('access_token')
-        refresh_token = token_json.get('refresh_token')
-        expires_in = token_json.get('expires_in', 3600)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-
-        db = get_database()
-        users = db['users']
-        users.update_one(
-            filter={"googleId": user_id},
-            update={"$set": {
-                "calendar.connected": True,
-                "calendar.credentials": {
-                    "accessToken": access_token,
-                    "refreshToken": refresh_token,
-                    "expiresAt": expires_at,
-                    "scopes": [
-                        "https://www.googleapis.com/auth/calendar.events.readonly",
-                        "https://www.googleapis.com/auth/calendar.readonly"
-                    ]
-                },
-                "calendar.syncStatus": "completed",
-                "calendar.lastSyncTime": datetime.now(timezone.utc),
-                "metadata.lastModified": datetime.now(timezone.utc)
-            }}
-        )
-
-        # Best-effort ensure push watch is configured
-        try:
-            ensure_calendar_watch_for_user(user_id)
-        except Exception:
-            pass
-
-        # For UX: after successful callback, redirect back to app dashboard if Accept is text/html
-        accept_header = request.headers.get('Accept', '')
-        if 'text/html' in accept_header:
-            try:
-                app_base = os.getenv('APP_BASE_URL') or 'https://yourmum.app'
-            except Exception:
-                app_base = 'https://yourmum.app'
-            # Minimal HTML redirect fallback
-            return (
-                f"<html><head><meta http-equiv='refresh' content='0;url={app_base}/dashboard' /></head>"
-                f"<body><script>window.location.href='{app_base}/dashboard'</script></body></html>",
-                200,
-                {"Content-Type": "text/html"}
-            )
-        return jsonify({"success": True})
-    except Exception as e:
-        print(f"Error in calendar OAuth callback: {e}")
-        traceback.print_exc()
-        return jsonify({"success": False, "error": "Callback error"}), 500
+# Backend OAuth routes removed - authentication now handled entirely through Firebase
+# The /connect endpoint below accepts Google credentials extracted from Firebase Auth
+# This eliminates the double SSO issue where users were redirected to Railway domain
 
 
 def ensure_calendar_watch_for_user(user_id: str) -> Tuple[bool, Dict[str, any]]:

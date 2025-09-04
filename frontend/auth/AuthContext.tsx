@@ -440,6 +440,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Refresh calendar credentials using Firebase OAuth without redirecting to backend
+   * This replaces the backend OAuth flow for token refresh scenarios
+   */
+  const refreshCalendarCredentials = async () => {
+    try {
+      setError(null);
+      console.log("Starting calendar credential refresh process");
+      
+      if (!user) {
+        throw new Error('User must be authenticated to refresh calendar credentials');
+      }
+      
+      // Configure provider for calendar access with offline access
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+      provider.setCustomParameters({
+        prompt: 'consent',      // Force consent to get fresh tokens
+        access_type: 'offline', // Request refresh tokens
+        include_granted_scopes: 'true'
+      });
+      
+      console.log("Refreshing Firebase credentials with popup");
+      
+      // Use popup to refresh credentials
+      const result = await signInWithPopup(auth, provider);
+      console.log("Firebase credential refresh successful");
+      
+      // Extract Google OAuth credentials from Firebase result
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error('No access token received from Firebase refresh');
+      }
+      
+      // Get scopes and validate calendar access
+      const scopes = await getScopes(credential.accessToken);
+      const hasCalendarAccess = scopes.some(scope => 
+        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+      );
+      
+      if (!hasCalendarAccess) {
+        throw new Error('Calendar access not granted in refreshed credentials');
+      }
+      
+      // Create credentials object with both access and refresh tokens
+      const credentials: CalendarCredentials = {
+        accessToken: credential.accessToken,
+        refreshToken: (credential as any).refreshToken, // Firebase may not expose this in types
+        expiresAt: Date.now() + 3600000, // 1 hour expiry as fallback
+        scopes: scopes
+      };
+      
+      // Update backend with refreshed credentials
+      await calendarApi.connectCalendar(credentials);
+      console.log("Calendar credentials refreshed and updated in backend");
+      
+    } catch (error) {
+      console.error('Calendar credential refresh error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh calendar credentials';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
   const value: AuthContextType = {
     user,                // Add this to satisfy AuthState
     currentUser: user,   // This is your renamed property
@@ -449,6 +513,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     reconnectCalendar,
+    refreshCalendarCredentials,
   };
 
   return (
