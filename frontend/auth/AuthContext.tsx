@@ -85,10 +85,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Success - reset OAuth state without localStorage flag  
         setIsOAuthInProgress(false);
-        setCalendarConnectionStage(null);
         
-        // Calendar connection is complete - no need to show connecting page
-        // The dashboard will handle calendar integration naturally
+        // Redirect to loading page for schedule generation instead of dashboard
+        // This prevents skeleton loading states in dashboard
+        window.location.href = '/loading?reason=schedule&from=calendar';
+        return;
         
       } else {
         // No calendar access, reset OAuth state - let RouteGuard handle navigation

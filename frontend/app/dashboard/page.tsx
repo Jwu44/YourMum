@@ -1373,7 +1373,7 @@ const Dashboard: React.FC = () => {
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
-            {isLoadingSchedule ? (
+            {isLoadingSchedule && calendarConnectionStage !== 'complete' ? (
               <div className="space-y-3 mt-5" data-testid="dashboard-skeleton">
                 {[...Array(5)].map((_, i) => (
                   <div
