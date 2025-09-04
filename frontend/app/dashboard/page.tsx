@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { v4 as uuidv4 } from 'uuid'
 
 // UI Components
@@ -12,8 +13,10 @@ import TaskEditDrawer from '@/components/parts/TaskEditDrawer'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import DashboardHeader from '@/components/parts/DashboardHeader'
 import EditableSchedule from '@/components/parts/EditableSchedule'
-import CalendarConnectionLoader from '@/components/parts/CalendarConnectionLoader'
 import { DragStateProvider } from '@/contexts/DragStateContext'
+import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
+import { LoadingPage } from '@/components/parts/LoadingPage'
+import { isPostOAuthActive } from '@/components/parts/PostOAuthHandler'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
@@ -36,35 +39,43 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
 
 const Dashboard: React.FC = () => {
+  const router = useRouter()
   const [scheduleDays, setScheduleDays] = useState<Task[][]>([])
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
   const { state } = useForm()
   const { toast } = useToast()
   const isMobile = useIsMobile()
   // Be resilient in test environments where AuthProvider may be mocked
-  const { calendarConnectionStage, currentUser } = (() => {
+  const { calendarConnectionStage, currentUser, refreshCalendarCredentials } = (() => {
     try {
       return useAuth()
     } catch (e) {
-      return { calendarConnectionStage: null as any, currentUser: auth.currentUser }
+      return { 
+        calendarConnectionStage: null as any, 
+        currentUser: auth.currentUser,
+        refreshCalendarCredentials: async () => {} // No-op fallback for tests
+      }
     }
   })()
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
+  
+  // Check if PostOAuthHandler is active to prevent race conditions
+  const [isPostOAuthHandlerActive, setIsPostOAuthHandlerActive] = useState(() => isPostOAuthActive())
 
   // Edit task drawer state - following dev-guide.md simplicity principle
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
 
   const [scheduleCache, setScheduleCache] = useState<Map<string, Task[]>>(new Map())
-  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false)
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(true)
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [shownSuggestionIds] = useState<Set<string>>(new Set())
@@ -101,7 +112,7 @@ const Dashboard: React.FC = () => {
         const me = await userApi.getCurrentUser().catch(() => null as any)
         if (!me) return
 
-        const calendar = (me as any).calendar || {}
+        const calendar = (me).calendar || {}
         const connected = !!calendar.connected
         const credentials = calendar.credentials || {}
         const hasRefresh = !!credentials.refreshToken
@@ -117,7 +128,7 @@ const Dashboard: React.FC = () => {
           const token = await (currentUser || auth.currentUser)?.getIdToken(true)
           const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
           const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-          
+
           // Test calendar API call - if this succeeds, calendar is working fine
           const testResp = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
             method: 'GET',
@@ -130,17 +141,27 @@ const Dashboard: React.FC = () => {
             return
           }
 
-          // Only if calendar API fails, attempt OAuth redirect
+          // Only if calendar API fails, attempt Firebase credential refresh
           if (testResp.status === 401 || testResp.status === 400) {
-            const resp = await fetch(`${apiBase}/api/calendar/oauth/start`, {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${token}` }
-            })
-            const data = await resp.json().catch(() => ({} as any))
-            if (resp.ok && data?.success && data?.url) {
+            try {
+              console.log('Calendar API failed, refreshing Firebase credentials...')
               setIsEnsuringRefresh(true)
-              window.location.href = data.url as string
-              return
+              
+              // Use Firebase to refresh credentials instead of backend OAuth redirect
+              await refreshCalendarCredentials()
+              
+              console.log('Calendar credentials refreshed successfully')
+              setIsEnsuringRefresh(false)
+            } catch (refreshError) {
+              console.error('Failed to refresh calendar credentials:', refreshError)
+              setIsEnsuringRefresh(false)
+              
+              // Show user-friendly message instead of crashing
+              toast({
+                title: 'Calendar Connection Issue',
+                description: 'Please reconnect your Google Calendar in the Integrations page.',
+                variant: 'default'
+              })
             }
           }
           // If start failed, do NOT block dashboard; proceed without loader
@@ -197,7 +218,44 @@ const Dashboard: React.FC = () => {
         start_date: currentDate
       }
 
-      const updatedSchedule = [...currentSchedule, taskWithId]
+      // Insert logic:
+      // 1) If sections exist, insert directly under the first (top) section
+      // 2) If no sections, insert at the very top of the list
+      const updatedSchedule = [...currentSchedule]
+
+      const firstSectionIndex = currentSchedule.findIndex(t => t.is_section === true)
+      if (firstSectionIndex !== -1) {
+        // Place as the first task within the top section
+        const topSection = currentSchedule[firstSectionIndex]
+        const taskForInsert: Task = {
+          ...taskWithId,
+          is_section: false,
+          is_subtask: false,
+          level: 0,
+          section: topSection.text || topSection.section || null
+        }
+        updatedSchedule.splice(firstSectionIndex + 1, 0, taskForInsert)
+      } else {
+        // No sections -> add to top of list
+        updatedSchedule.unshift({
+          ...taskWithId,
+          is_section: false,
+          is_subtask: false,
+          level: 0
+        })
+      }
+
+      // Recompute section_index for non-section tasks based on nearest preceding section
+      let sectionStartIndex = 0
+      for (let i = 0; i < updatedSchedule.length; i++) {
+        const t = updatedSchedule[i]
+        if (t.is_section) {
+          sectionStartIndex = i
+          updatedSchedule[i] = { ...t, section_index: 0 }
+        } else {
+          updatedSchedule[i] = { ...t, section_index: i - sectionStartIndex }
+        }
+      }
 
       // Use updateSchedule which implements upsert behavior:
       // - First tries PUT (update existing schedule)
@@ -685,26 +743,28 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - centralize to backend autogeneration
-      console.log('Next day is in the future and no schedule exists, autogenerating via backend')
-
-      const auto = await autogenerateTodaySchedule(nextDayDate)
-      if (auto.success && (auto.created || auto.existed) && Array.isArray(auto.schedule)) {
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays]
-          const targetIndex = currentDayIndex + 1
-          while (newDays.length <= targetIndex) newDays.push([])
-          newDays[targetIndex] = auto.schedule!
-          return newDays
-        })
-        setScheduleCache(prev => {
-          const map = new Map(prev)
-          map.set(nextDayDate, auto.schedule!)
-          return map
-        })
-      } else {
-        throw new Error(auto.error || 'Autogenerate failed')
-      }
+      // Step 4: Future date with no existing schedule - show empty state
+      console.log('Next day is in the future and no schedule exists, showing empty state')
+      
+      // Show empty schedule for future date - user can manually add tasks or trigger autogeneration
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        const targetIndex = currentDayIndex + 1
+        while (newDays.length <= targetIndex) newDays.push([])
+        newDays[targetIndex] = []
+        return newDays
+      })
+      
+      // Cache the empty schedule
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache)
+        newCache.set(nextDayDate, [])
+        return newCache
+      })
+      
+      // Navigate to next day
+      setCurrentDayIndex(prevIndex => prevIndex + 1)
+      return
     } catch (error) {
       console.error('Error in handleNextDay:', error)
 
@@ -801,7 +861,6 @@ const Dashboard: React.FC = () => {
         )
 
         setCurrentDayIndex(dayOffset)
-
       } else {
         throw new Error(loadResult.error || 'Failed to load schedule')
       }
@@ -1186,98 +1245,66 @@ const Dashboard: React.FC = () => {
     const loadInitialSchedule = async () => {
       // Set flag immediately to prevent race conditions in React Strict Mode
       hasInitiallyLoaded.current = true
-      setIsLoadingSchedule(true)
+      console.log('📋 Dashboard: Starting simplified loadInitialSchedule...')
 
       const today = getDateString(0)
 
       try {
-        // 1) Try loading existing schedule
+        // Simple approach: just try to load existing schedule
+        console.log('📅 Dashboard: Attempting to load existing schedule for:', today)
         const existingSchedule = await loadSchedule(today)
+        
         if (existingSchedule.success && existingSchedule.schedule) {
+          console.log('✅ Dashboard: Found existing schedule with', existingSchedule.schedule.length, 'tasks')
           setScheduleDays([existingSchedule.schedule])
           setScheduleCache(new Map([[today, existingSchedule.schedule]]))
-          setIsLoadingSchedule(false)
-          return
-        }
-
-        // 2) No existing schedule → trigger backend autogeneration with 10s timeout and single retry
-        let timeoutReached = false
-        const timeoutId = setTimeout(() => {
-          timeoutReached = true
-          setIsLoadingSchedule(false) // stop skeleton after 10s
-        }, 10000)
-
-        // First attempt
-        const auto1 = await autogenerateTodaySchedule(today)
-        if (auto1.success) {
-          if (auto1.sourceFound === false) {
-            // Immediate empty state when no source schedule exists
-            clearTimeout(timeoutId)
-            setIsLoadingSchedule(false)
-            setScheduleDays([[]])
-            return
-          }
-
-          if ((auto1.created || auto1.existed) && Array.isArray(auto1.schedule)) {
-            clearTimeout(timeoutId)
-            setScheduleDays([auto1.schedule])
-            setScheduleCache(new Map([[today, auto1.schedule]]))
-            setIsLoadingSchedule(false)
-            return
-          }
         } else {
-          // First failure → show toast immediately and retry once
-          toast({
-            title: 'Autogenerate failed',
-            description: auto1.error || 'Failed to autogenerate schedule',
-            variant: 'destructive'
-          })
-
-          autogenerateTodaySchedule(today)
-            .then((auto2) => {
-              clearTimeout(timeoutId)
-              if (auto2.success && (auto2.created || auto2.existed) && Array.isArray(auto2.schedule)) {
-                setScheduleDays([auto2.schedule])
-                setScheduleCache(prev => new Map(prev).set(today, auto2.schedule!))
-                if (timeoutReached) {
-                  toast({
-                    title: 'Schedule ready',
-                    description: 'Your schedule has been created',
-                    variant: 'default'
-                  })
-                }
-                setIsLoadingSchedule(false)
-              } else {
-                // Retry failed → show empty state + toast (already shown above)
-                setIsLoadingSchedule(false)
-                setScheduleDays([[]])
-              }
-            })
-            .catch(() => {
-              clearTimeout(timeoutId)
-              setIsLoadingSchedule(false)
-              setScheduleDays([[]])
-            })
-
-          // Keep skeleton until timeout or until retry resolves
-          return
+          console.log('📝 Dashboard: No existing schedule found, showing empty state')
+          // Show empty state instead of redirecting to loading page
+          // PostOAuthHandler already handled schedule generation during OAuth flow
+          setScheduleDays([[]])
+          setScheduleCache(new Map([[today, []]]))
         }
-
-        // If reached here without success, end loading and show empty
-        clearTimeout(timeoutId)
-        setIsLoadingSchedule(false)
-        setScheduleDays([[]])
       } catch (error) {
-        console.error('Error loading initial schedule:', error)
-        setIsLoadingSchedule(false)
+        console.error('❌ Dashboard: Error loading initial schedule:', error)
+        // Show empty state on error
         setScheduleDays([[]])
+        setScheduleCache(new Map([[today, []]]))
+      } finally {
+        setIsLoadingSchedule(false)
       }
     }
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh) {
+    // Simplified condition: only check if we're not in an OAuth flow and haven't loaded yet
+    const isInOAuthFlow = calendarConnectionStage !== null || isEnsuringRefresh || isPostOAuthHandlerActive
+
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !isInOAuthFlow) {
+      console.log('🚀 Dashboard: Conditions met, loading initial schedule...')
       loadInitialSchedule()
+    } else if (hasInitiallyLoaded.current || isInOAuthFlow) {
+      console.log('⏭️ Dashboard: Skipping load - already loaded or in OAuth flow')
+      setIsLoadingSchedule(false)
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
+  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh, isPostOAuthHandlerActive])
+
+  // Monitor PostOAuthHandler status changes
+  useEffect(() => {
+    const checkPostOAuthStatus = () => {
+      const currentStatus = isPostOAuthActive()
+      if (currentStatus !== isPostOAuthHandlerActive) {
+        console.log('🔄 Dashboard: PostOAuthHandler status changed:', currentStatus)
+        setIsPostOAuthHandlerActive(currentStatus)
+      }
+    }
+
+    // Check immediately
+    checkPostOAuthStatus()
+    
+    // Set up interval to check periodically
+    const interval = setInterval(checkPostOAuthStatus, 500)
+    
+    return () => clearInterval(interval)
+  }, [isPostOAuthHandlerActive])
 
   // Midnight auto-refresh (local timezone)
   useEffect(() => {
@@ -1288,7 +1315,7 @@ const Dashboard: React.FC = () => {
     const timer = setTimeout(() => {
       try { window.location.reload() } catch (_) {}
     }, Math.max(0, delay))
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer) }
   }, [])
 
   useEffect(() => {
@@ -1349,18 +1376,17 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex, currentUser?.uid])
 
-  // Show calendar connection loader only during active OAuth flows
-  // Don't show if user is just navigating between pages with existing calendar connection
-  const shouldShowLoader = (calendarConnectionStage && calendarConnectionStage !== 'complete') || 
-                          (isEnsuringRefresh && hasEnsuredRefresh.current)
-  
-  if (shouldShowLoader) {
-    const stage = (calendarConnectionStage || 'verifying') as 'connecting' | 'verifying' | 'fetching-events' | 'complete'
-    return <CalendarConnectionLoader stage={stage} />
+
+
+  // Show LoadingPage if PostOAuthHandler is active
+  if (isPostOAuthHandlerActive) {
+    console.log('📱 Dashboard: PostOAuthHandler is active, showing LoadingPage')
+    return <LoadingPage reason="calendar" message="Setting up your account..." />
   }
 
   return (
     <SidebarLayout>
+      <OnboardingTour />
       <div className="flex flex-col bg-background">
 
         <DashboardHeader
@@ -1375,21 +1401,22 @@ const Dashboard: React.FC = () => {
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
-            {isLoadingSchedule
-              ? (
-              <div className="space-y-4" data-testid="dashboard-skeleton">
-                <Skeleton className="h-6 w-1/3" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-1/4" />
-                  {[...Array(6)].map((_, idx) => (
-                    <Skeleton key={idx} className="h-10 w-full" />
-                  ))}
-                </div>
+            {isLoadingSchedule && calendarConnectionStage !== 'complete' ? (
+              <div className="space-y-3 mt-5" data-testid="dashboard-skeleton">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3"
+                  >
+                    {/* Checkbox placeholder */}
+                    <Skeleton className="h-5 w-5 rounded-md" />
+
+                    {/* Task text placeholder */}
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-9/10" />
+                    </div>
+                  </div>
+                ))}
               </div>
                 )
               : scheduleDays.length > 0 && scheduleDays[Math.abs(currentDayIndex)]?.length > 0

@@ -66,10 +66,6 @@ def get_decomposition_patterns_collection() -> Collection:
     """Get collection for storing successful decomposition patterns."""
     return get_collection('DecompositionPatterns')
 
-def get_ai_suggestions_collection() -> Collection:
-    """Get collection for storing AI suggestions."""
-    return get_collection('AIsuggestions')
-
 def get_calendar_events_collection():
     """
     Get the calendar_events collection from the database
@@ -89,23 +85,6 @@ def get_archive_collection():
     """
     db = get_database()
     return db['Archive']
-
-# Initialization functions - grouped together
-def initialize_ai_collections():
-    """Initialize collections and indexes for AI suggestions feature."""
-    try:
-        # Get suggestions collection
-        suggestions_collection = get_ai_suggestions_collection()
-
-        # Create indexes for suggestions collection
-        for index in AI_SUGGESTION_INDEXES:
-            suggestions_collection.create_index(index)
-
-        print("AI suggestions collection initialized successfully")
-        
-    except Exception as e:
-        print(f"Error initializing AI suggestions collection: {e}")
-        raise
 
 def initialize_user_collection():
     """Initialize the users collection with required indexes."""
@@ -238,7 +217,6 @@ def initialize_db():
         print("Successfully connected to MongoDB")
 
         # Initialize all collections
-        initialize_ai_collections()
         initialize_user_collection()
         initialize_calendar_collections()
         initialize_slack_collections()

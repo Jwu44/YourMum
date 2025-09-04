@@ -356,6 +356,7 @@ export interface AuthContextType extends AuthState {
   signIn: (redirectTo?: string) => Promise<void> // Updated to accept optional parameter
   signOut: () => Promise<void>
   reconnectCalendar: () => Promise<void> // New method for calendar reconnection
+  refreshCalendarCredentials: () => Promise<void> // New method for refreshing calendar credentials
 }
 
 // Python backend response types

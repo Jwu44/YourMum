@@ -165,9 +165,8 @@ export const calendarApi = {
 
       if (!response.ok || !result.success) {
         // Check for specific calendar not connected error
-        const isNotConnected = result.error && 
-          result.error.includes('Google Calendar not connected')
-        
+        const isNotConnected = result.error?.includes('Google Calendar not connected')
+
         return {
           success: false,
           tasks: [],

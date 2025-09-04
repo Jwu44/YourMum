@@ -4,6 +4,7 @@ import { type VariantProps, cva } from 'class-variance-authority'
 import { PanelLeft } from 'lucide-react'
 
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useOnboarding } from '@/contexts/OnboardingContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,7 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = '16rem'
 const SIDEBAR_WIDTH_MOBILE = '18rem'
 const SIDEBAR_WIDTH_ICON = '3rem'
-const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
+const SIDEBAR_KEYBOARD_SHORTCUT = '/'
 
 interface SidebarContextProps {
   state: 'expanded' | 'collapsed'
@@ -181,6 +182,16 @@ React.ComponentProps<'div'> & {
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
+    // Use onboarding context, but handle case where provider isn't available
+    let isOnboardingActive = false
+    try {
+      const { isOnboardingActive: active } = useOnboarding()
+      isOnboardingActive = active
+    } catch {
+      // OnboardingProvider not available, use default
+      isOnboardingActive = false
+    }
+
     if (collapsible === 'none') {
       return (
         <div
@@ -197,6 +208,9 @@ React.ComponentProps<'div'> & {
     }
 
     if (isMobile) {
+      // Use lower z-index during onboarding so sidebar appears beneath overlay
+      const sidebarZIndex = isOnboardingActive ? 'z-[55]' : undefined
+
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
@@ -209,6 +223,7 @@ React.ComponentProps<'div'> & {
               } as React.CSSProperties
             }
             side={side}
+            zIndex={sidebarZIndex}
           >
             <SheetHeader className="sr-only">
               <SheetTitle>Sidebar</SheetTitle>

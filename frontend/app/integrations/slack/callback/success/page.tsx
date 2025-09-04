@@ -9,7 +9,7 @@ import { CheckCircle } from 'lucide-react'
  * Displays success confirmation after successful Slack integration
  * Communicates with parent window and auto-closes popup
  */
-export default function SlackOAuthSuccessPage() {
+export default function SlackOAuthSuccessPage () {
   const searchParams = useSearchParams()
   const [countdown, setCountdown] = useState(5)
 

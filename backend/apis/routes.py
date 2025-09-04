@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, Response, stream_with_context
-from backend.db_config import get_database, store_microstep_feedback, get_ai_suggestions_collection, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
+from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 
 from bson import ObjectId
@@ -1116,113 +1116,6 @@ def api_store_microstep_feedback():
             "colab_status": "error"
         }), 500
 
-@api_bp.route("/schedule/suggestions", methods=["POST"])
-def api_generate_suggestions():
-    """
-    Handle schedule suggestions generation requests.
-    
-    Expected request body:
-    {
-        "userId": str,
-        "currentSchedule": List[Dict],
-        "historicalSchedules": List[List[Dict]],
-        "priorities": Dict[str, str],
-        "energyPatterns": List[str],
-        "workStartTime": str,
-        "workEndTime": str
-    }
-    """
-    try:
-        # Validate request data
-        data = request.json
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        required_fields = [
-            'userId', 'currentSchedule', 'historicalSchedules',
-            'priorities', 'energyPatterns'
-        ]
-        
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
-        
-        print(data)
-        try:
-            # Call AI service directly
-            suggestions = generate_schedule_suggestions(
-                user_id=data['userId'],
-                current_schedule=data['currentSchedule'],
-                historical_schedules=data['historicalSchedules'],
-                priorities=data['priorities'],
-                energy_patterns=data['energyPatterns'],
-                work_start_time=data.get('workStartTime', '9:00 AM'),
-                work_end_time=data.get('workEndTime', '10:00 PM')
-            )
-            
-            # Store suggestions in database
-            stored_suggestions = store_suggestions_in_db(
-                user_id=data['userId'],
-                date=datetime.now().strftime('%Y-%m-%d'),
-                suggestions=suggestions
-            )
-            
-            return jsonify({
-                "suggestions": stored_suggestions,
-                "metadata": {
-                    "generated_at": datetime.now().isoformat(),
-                    "count": len(stored_suggestions)
-                }
-            })
-            
-        except Exception as e:
-            print(f"Error generating suggestions: {e}")
-            return jsonify({
-                "error": f"Failed to generate suggestions: {str(e)}"
-            }), 500
-            
-    except Exception as e:
-        print(f"Error in api_generate_suggestions: {str(e)}")
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-class MongoJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, ObjectId):
-            return str(obj)
-        return super().default(obj)
-
-def store_suggestions_in_db(user_id: str, date: str, suggestions: List[Dict]) -> List[Dict]:
-    """Store generated suggestions in MongoDB."""
-    try:
-        suggestions_collection = get_ai_suggestions_collection()
-        
-        # Prepare suggestions for storage
-        suggestions_to_store = []
-        for suggestion in suggestions:
-            suggestion_doc = {
-                "user_id": user_id,
-                "date": date,
-                **suggestion,
-               "created_at": datetime.now(timezone.utc).isoformat() 
-            }
-            suggestions_to_store.append(suggestion_doc)
-        
-        # Store suggestions
-        if suggestions_to_store:
-            result = suggestions_collection.insert_many(suggestions_to_store)
-            
-            # Update suggestions with generated IDs - convert ObjectId to string
-            for suggestion, inserted_id in zip(suggestions_to_store, result.inserted_ids):
-                suggestion['id'] = str(inserted_id)  # Convert ObjectId to string
-        
-        # Use custom encoder when returning
-        return json.loads(json.dumps(suggestions_to_store, cls=MongoJSONEncoder))
-        
-    except Exception as e:
-        print(f"Error storing suggestions: {e}")
-        # Return original suggestions if storage fails
-        return suggestions
-
 # Helper function for extracting user ID from request (reusable across routes)
 def extract_user_id_from_request() -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
@@ -1925,7 +1818,6 @@ def delete_user_account():
         # Collections to clean up - delete all user-related data
         collections_to_clean = [
             'UserSchedules',           # User's daily schedules
-            'AIsuggestions',           # AI-generated suggestions
             'MicrostepFeedback',       # User's task feedback
             'DecompositionPatterns',   # User's task decomposition patterns
             'calendar_events',         # User's synced calendar events

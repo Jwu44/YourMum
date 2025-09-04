@@ -84,8 +84,10 @@ export const CalendarConnectionLoader: React.FC<CalendarConnectionLoaderProps> =
               className={`bg-purple-600 h-2 rounded-full transition-all duration-500 ${
                 stage === 'connecting'
                   ? 'w-1/4'
-                  : stage === 'verifying' ? 'w-1/2' 
-                  : stage === 'fetching-events' ? 'w-3/4' 
+                  : stage === 'verifying'
+? 'w-1/2'
+                  : stage === 'fetching-events'
+? 'w-3/4'
                   : 'w-full'
               }`}
             />

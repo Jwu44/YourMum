@@ -4,12 +4,13 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useCallback } from 'react';
 
 // Add paths that don't require authentication
-const publicPaths = ['/', '/home'];
+const publicPaths = ['/', '/home', '/privacy', '/terms'];
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicPath = publicPaths.includes(pathname);
 
   const isAuthRedirect = useCallback(() => {
     if (typeof window === 'undefined') return false;
@@ -27,7 +28,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     if (!loading) {
-      const isPublicPath = publicPaths.includes(pathname);
       const inAuthFlow = isAuthRedirect();
       
       // Check for calendar connection in progress with stale flag cleanup
@@ -87,7 +87,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   }, [user, loading, pathname, router, isAuthRedirect]);
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (loading && !isPublicPath) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">

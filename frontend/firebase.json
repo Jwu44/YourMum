@@ -8,10 +8,6 @@
     ],
     "rewrites": [
       {
-        "source": "/__/auth/**",
-        "function": "auth"
-      },
-      {
         "source": "/api/**",
         "destination": "https://yourmum-production.up.railway.app/"
       },

@@ -11,7 +11,7 @@ export const isBrowser = () => typeof window !== 'undefined'
  * Convert 12-hour time format (e.g., "7:00am", "2:30pm") to 24-hour format (e.g., "07:00", "14:30")
  * for use with HTML time inputs
  */
-export function convert12HourTo24Hour(time12h: string | null | undefined): string {
+export function convert12HourTo24Hour (time12h: string | null | undefined): string {
   if (!time12h || typeof time12h !== 'string') {
     return ''
   }
@@ -23,7 +23,7 @@ export function convert12HourTo24Hour(time12h: string | null | undefined): strin
       return ''
     }
 
-    let [, hourStr, minute, period] = match
+    const [, hourStr, minute, period] = match
     let hour = parseInt(hourStr, 10)
 
     // Handle AM/PM conversion
@@ -50,7 +50,7 @@ export function convert12HourTo24Hour(time12h: string | null | undefined): strin
  * Convert 24-hour time format (e.g., "07:00", "14:30") to 12-hour format (e.g., "7:00am", "2:30pm")
  * for storage in backend
  */
-export function convert24HourTo12Hour(time24h: string | null | undefined): string | null {
+export function convert24HourTo12Hour (time24h: string | null | undefined): string | null {
   if (!time24h || typeof time24h !== 'string') {
     return null
   }
@@ -62,7 +62,7 @@ export function convert24HourTo12Hour(time24h: string | null | undefined): strin
       return null
     }
 
-    let [, hourStr, minute] = match
+    const [, hourStr, minute] = match
     let hour = parseInt(hourStr, 10)
 
     // Determine AM/PM and convert hour

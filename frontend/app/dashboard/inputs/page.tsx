@@ -23,6 +23,7 @@ import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Ca
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import { LoadingPage } from '@/components/parts/LoadingPage'
 import { useForm } from '@/lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
 
@@ -151,11 +152,10 @@ const DraggableCard: React.FC<{ item: Priority, index: number }> = ({ item, inde
   )
 }
 
-
 /**
  * Input Configuration Page Component
  */
-export default function InputsPage() {
+export default function InputsPage () {
   const { state, dispatch } = useForm()
   const { toast } = useToast()
   const router = useRouter()
@@ -308,7 +308,6 @@ export default function InputsPage() {
     dispatch({ type: 'UPDATE_FIELD', field, value })
   }, [dispatch])
 
-
   // Handle energy pattern selection
   const handleEnergyChange = useCallback((value: string) => {
     const currentPatterns = state.energy_patterns || []
@@ -394,6 +393,11 @@ export default function InputsPage() {
       setIsLoading(false)
     }
   }, [state, toast, router, getTargetDate])
+
+  // Show loading page during schedule generation
+  if (isLoading) {
+    return <LoadingPage reason="schedule" />
+  }
 
   return (
     <SidebarLayout>

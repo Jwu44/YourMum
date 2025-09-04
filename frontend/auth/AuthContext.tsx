@@ -7,6 +7,7 @@ import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase
 import { AuthContextType, CalendarCredentials } from '@/lib/types';
 import { calendarApi } from '@/lib/api/calendar';
 import { detectBrowserTimezone, shouldUpdateUserTimezone, isValidTimezone } from '@/lib/utils/timezone';
+import { PostOAuthHandler } from '@/components/parts/PostOAuthHandler';
 
 /**
  * Auth Context for managing user authentication state
@@ -35,14 +36,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isOAuthInProgress, setIsOAuthInProgress] = useState(false);
   const [calendarConnectionStage, setCalendarConnectionStage] = useState<'connecting' | 'verifying' | 'complete' | null>(null);
+  const [showPostOAuthHandler, setShowPostOAuthHandler] = useState(false);
+  const [postOAuthCredential, setPostOAuthCredential] = useState<any>(null);
 
   /**
-   * Process calendar access and connect to Google Calendar
+   * Process calendar access using PostOAuthHandler orchestrator
    * @param credential Google Auth credential
    */
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
-      // NOTE: isOAuthInProgress should already be true when this function is called
+      console.log("🎬 Starting simplified processCalendarAccess with PostOAuthHandler...");
       
       // Get scopes and check for calendar access
       const scopes = await getScopes(credential.accessToken);
@@ -52,65 +55,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Has calendar access:", hasCalendarAccess);
       
-      // Store user with correct calendar access flag
+      // Store user with correct calendar access flag (simplified - no calendar connection here)
       if (auth.currentUser) {
         console.log("Storing user with calendar access flag:", hasCalendarAccess);
         await storeUserInBackend(auth.currentUser, hasCalendarAccess);
       }
       
       if (hasCalendarAccess) {
-        console.log("Starting calendar connection process...");
+        console.log("✅ Calendar access granted - triggering PostOAuthHandler");
+        
+        // Set credential for PostOAuthHandler and show it
+        setPostOAuthCredential(credential);
+        setShowPostOAuthHandler(true);
+        
+        // Keep OAuth in progress - PostOAuthHandler will handle completion
         setCalendarConnectionStage('connecting');
         
-        // Small delay to ensure Firebase auth state is fully established
-        console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Create credentials object and connect to calendar
-        console.log("Connecting to Google Calendar...");
-        setCalendarConnectionStage('verifying');
-        const credentials: CalendarCredentials = {
-          accessToken: credential.accessToken,
-          expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
-          scopes: scopes
-        };
-        
-        // Connect to calendar - this should be atomic (either succeeds or fails)
-        await calendarApi.connectCalendar(credentials);
-        console.log("Connected to Google Calendar successfully");
-        setCalendarConnectionStage('complete');
-        
-        // Small delay to ensure all async operations complete before resetting OAuth state
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Success - reset OAuth state without localStorage flag  
-        setIsOAuthInProgress(false);
-        setCalendarConnectionStage(null);
-        
-        // Calendar connection is complete - no need to show connecting page
-        // The dashboard will handle calendar integration naturally
-        
       } else {
-        // No calendar access, reset OAuth state - let RouteGuard handle navigation
+        console.log("❌ No calendar access granted - RouteGuard will handle navigation");
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
-        console.log("No calendar access granted - RouteGuard will handle navigation");
       }
       
     } catch (error) {
-      console.error("Error processing calendar access:", error);
+      console.error("Error in simplified processCalendarAccess:", error);
       setIsOAuthInProgress(false);
       setCalendarConnectionStage(null);
-      setError(error instanceof Error ? error.message : 'Failed to connect calendar');
+      setError(error instanceof Error ? error.message : 'Failed to process calendar access');
       
-      // Store error information for connecting page to handle
+      // Store error information for routing logic to handle
       localStorage.setItem('calendarConnectionError', JSON.stringify({
-        error: error instanceof Error ? error.message : 'Failed to connect calendar',
+        error: error instanceof Error ? error.message : 'Failed to process calendar access',
         action: 'redirect_to_integrations'
       }));
-      
-      // Let RouteGuard handle navigation
-      console.log("Calendar connection error - RouteGuard will handle navigation");
     }
   };
 
@@ -439,6 +416,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Refresh calendar credentials using Firebase OAuth without redirecting to backend
+   * This replaces the backend OAuth flow for token refresh scenarios
+   */
+  const refreshCalendarCredentials = async () => {
+    try {
+      setError(null);
+      console.log("Starting calendar credential refresh process");
+      
+      if (!user) {
+        throw new Error('User must be authenticated to refresh calendar credentials');
+      }
+      
+      // Configure provider for calendar access with offline access
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+      provider.setCustomParameters({
+        prompt: 'consent',      // Force consent to get fresh tokens
+        access_type: 'offline', // Request refresh tokens
+        include_granted_scopes: 'true'
+      });
+      
+      console.log("Refreshing Firebase credentials with popup");
+      
+      // Use popup to refresh credentials
+      const result = await signInWithPopup(auth, provider);
+      console.log("Firebase credential refresh successful");
+      
+      // Extract Google OAuth credentials from Firebase result
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error('No access token received from Firebase refresh');
+      }
+      
+      // Get scopes and validate calendar access
+      const scopes = await getScopes(credential.accessToken);
+      const hasCalendarAccess = scopes.some(scope => 
+        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
+      );
+      
+      if (!hasCalendarAccess) {
+        throw new Error('Calendar access not granted in refreshed credentials');
+      }
+      
+      // Create credentials object with both access and refresh tokens
+      const credentials: CalendarCredentials = {
+        accessToken: credential.accessToken,
+        refreshToken: (credential as any).refreshToken, // Firebase may not expose this in types
+        expiresAt: Date.now() + 3600000, // 1 hour expiry as fallback
+        scopes: scopes
+      };
+      
+      // Update backend with refreshed credentials
+      await calendarApi.connectCalendar(credentials);
+      console.log("Calendar credentials refreshed and updated in backend");
+      
+    } catch (error) {
+      console.error('Calendar credential refresh error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh calendar credentials';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  /**
+   * Handle successful completion of PostOAuthHandler
+   */
+  const handlePostOAuthComplete = () => {
+    console.log("✅ PostOAuthHandler completed successfully");
+    
+    // Reset all OAuth-related state
+    setIsOAuthInProgress(false);
+    setCalendarConnectionStage(null);
+    setShowPostOAuthHandler(false);
+    setPostOAuthCredential(null);
+    setError(null);
+    
+    console.log("🎯 OAuth flow completed - user should be navigated to dashboard");
+  };
+
+  /**
+   * Handle PostOAuthHandler error
+   */
+  const handlePostOAuthError = (errorMessage: string) => {
+    console.error("❌ PostOAuthHandler failed:", errorMessage);
+    
+    // Reset OAuth state and set error
+    setIsOAuthInProgress(false);
+    setCalendarConnectionStage(null);
+    setShowPostOAuthHandler(false);
+    setPostOAuthCredential(null);
+    setError(errorMessage);
+    
+    // Store error for routing logic
+    localStorage.setItem('calendarConnectionError', JSON.stringify({
+      error: errorMessage,
+      action: 'redirect_to_integrations'
+    }));
+  };
+
   const value: AuthContextType = {
     user,                // Add this to satisfy AuthState
     currentUser: user,   // This is your renamed property
@@ -448,7 +525,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     reconnectCalendar,
+    refreshCalendarCredentials,
   };
+
+  // Show PostOAuthHandler overlay if in post-OAuth flow
+  if (showPostOAuthHandler && postOAuthCredential) {
+    return (
+      <AuthContext.Provider value={value}>
+        <PostOAuthHandler
+          credential={postOAuthCredential}
+          onComplete={handlePostOAuthComplete}
+          onError={handlePostOAuthError}
+        />
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>

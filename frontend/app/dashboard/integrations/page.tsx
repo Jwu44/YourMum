@@ -50,7 +50,7 @@ const integrationServices: IntegrationService[] = [
     icon: Slack,
     status: 'available',
     component: SlackIntegrationCard
-  },
+  }
   // Future integrations can be added here
 ]
 
@@ -83,7 +83,7 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
 /**
  * Main Integrations Page Component
  */
-export default function DashboardIntegrationsPage() {
+export default function DashboardIntegrationsPage () {
   return (
     <SidebarLayout>
       <div className="flex-1 overflow-y-auto mobile-scroll">

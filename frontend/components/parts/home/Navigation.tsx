@@ -13,16 +13,18 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Image
-              src="/favicon-96x96.png"
-              alt="YourMum logo"
-              width={124}
-              height={32}
-              className="h-8 w-auto"
-              priority
-              quality={100}
-              style={{ imageRendering: 'crisp-edges' }}
-            />
+            <button onClick={handleGetStarted} className="focus:outline-none">
+              <Image
+                src="/favicon-96x96.png"
+                alt="YourMum logo"
+                width={124}
+                height={32}
+                className="h-8 w-auto hover:opacity-80 transition-opacity"
+                priority
+                quality={100}
+                style={{ imageRendering: 'crisp-edges' }}
+              />
+            </button>
           </div>
 
           {/* Desktop Navigation */}

@@ -57,7 +57,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 }) => {
   // Determine mode based on presence of task prop
   const isEditMode = Boolean(task)
-  
+
   // Check if we're on desktop to use Sheet instead of Drawer
   const isDesktop = useIsDesktop()
 
@@ -83,14 +83,14 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
   // Helper function to handle time conversion - handles both 12-hour and 24-hour formats
   const convertTimeForInput = useCallback((timeValue: string | null | undefined): string => {
     if (!timeValue) return ''
-    
+
     // Check if already in 24-hour format (e.g., "09:00", "15:00")
     if (/^\d{1,2}:\d{2}$/.test(timeValue)) {
       // Already 24-hour format, pad hour if needed
       const [hour, minute] = timeValue.split(':')
       return `${hour.padStart(2, '0')}:${minute}`
     }
-    
+
     // Otherwise assume 12-hour format and convert
     return convert12HourTo24Hour(timeValue)
   }, [])
@@ -478,7 +478,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </SheetTitle>
           </SheetHeader>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {formContent}
           </div>
@@ -529,7 +529,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
               {isEditMode ? 'Edit Task' : 'Create Task'}
             </DrawerTitle>
           </DrawerHeader>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {formContent}
           </div>
