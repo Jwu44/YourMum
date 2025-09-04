@@ -407,7 +407,7 @@ export default function InputsPage () {
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Inputs</h1>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              Add your inputs for YourMum to personalise your schedule.
+              YourMum uses your preferences to create a personalised schedule.
             </p>
           </div>
 
@@ -417,11 +417,11 @@ export default function InputsPage () {
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
-                    <span>Work Schedule</span>
+                    <span>Working Hours</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Set your working hours and days to optimize task scheduling
+                  Enter your working hours and YourMum will prioritise work tasks during these hours.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -461,13 +461,13 @@ export default function InputsPage () {
             {/* 2. Priority Settings Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+               <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
-                    <span>Priorities</span>
+                    <span>What matters outside of work?</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Higher priority categories will be scheduled first during optimal energy periods. Drag to reorder.
+                  Drag to reorder these priorities based on how important they are to you.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -488,13 +488,13 @@ export default function InputsPage () {
             {/* 3. Energy Patterns Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
-                    <span>Energy Patterns</span>
+                    <span>When do you feel most productive?</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Select your energy pattern to determine when to schedule demanding tasks.
+                  Select the time of day when you feel most productive and YourMum will use this to match your natural rhythm.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -536,18 +536,18 @@ export default function InputsPage () {
             {/* 4. Layout Preferences Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
                     <span>Layout</span>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Customize how your tasks and interface are displayed
+                  Pick how you want your schedule to be displayed.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <label className="text-sm font-medium mb-3 block">Layout Type</label>
+                  <label className="text-sm font-medium mb-3 block">Type</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div
                       className={`task-ordering-card group ${
@@ -619,7 +619,7 @@ export default function InputsPage () {
                 {/* Subcategory dropdown - only show if structured is selected */}
                 {state.layout_preference?.layout === 'todolist-structured' && (
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Subcategory</label>
+                    <label className="text-sm font-medium mb-2 block">Blocks</label>
                     <Select
                       value={state.layout_preference?.subcategory || 'day-sections'}
                       onValueChange={(value) => { handleLayoutChange('subcategory', value) }}
@@ -656,7 +656,7 @@ export default function InputsPage () {
             {/* 5. Step 1: Time Management Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
                     <span>Time Management</span>
                   </div>
@@ -700,7 +700,7 @@ export default function InputsPage () {
             {/* 6. Step 2: Task Ordering Pattern Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-3">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
                   <div>
                     <span>Task Ordering Pattern</span>
                     <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
