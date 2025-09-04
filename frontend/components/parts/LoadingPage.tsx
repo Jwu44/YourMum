@@ -19,7 +19,7 @@ const LOADING_ANIMATIONS = [
     name: 'Tired Woman'
   },
   {
-    path: '/animations/BusinessEnterprise Solutions.json',
+    path: '/animations/BusinessEnterprise Solutions Development.json',
     name: 'Business Enterprise Solutions'
   },
   {

@@ -129,3 +129,68 @@ Sec-Fetch-Site: cross-site
 Sec-Gpc: 1
 X-Forwarded-For: 203.194.42.183
 X-Forwarded-Host: yourmum-production.up.railway.app
+
+# Issue 2: ✅ RESOLVED - Multiple Loading States Race Condition
+
+## Root Cause Analysis
+The multiple loading states occurred due to race conditions between 3 async processes:
+1. **AuthContext** processing calendar connection
+2. **Dashboard** detecting missing schedules → redirecting to `/loading?reason=schedule`  
+3. **Loading page** calling autogenerate → redirecting back to dashboard
+4. **Dashboard** re-renders → redirecting again to loading page
+
+## Solution: Single Post-OAuth Orchestrator Pattern
+Implemented unified flow using PostOAuthHandler component:
+
+### Files Modified:
+- **`/frontend/components/parts/PostOAuthHandler.tsx`** - New orchestrator component
+- **`/frontend/auth/AuthContext.tsx`** - Simplified processCalendarAccess, added PostOAuthHandler integration  
+- **`/frontend/app/dashboard/page.tsx`** - Removed complex loadInitialSchedule redirects
+- **`/frontend/app/loading/page.tsx`** - Deprecated, now redirects to dashboard
+- **`/frontend/components/parts/LoadingPage.tsx`** - Enhanced with progress bar support
+
+### New Flow:
+1. User completes Google SSO → PostOAuthHandler overlay appears
+2. **Single LoadingPage** shows unified "Setting up your account..." experience
+3. PostOAuthHandler coordinates: Calendar connection → Schedule generation → Dashboard navigation
+4. **Result**: Single loading state instead of 4+ loading states with race conditions
+
+## Implementation Notes
+- **PostOAuthHandler** acts as single orchestrator for entire post-OAuth flow
+- **AuthContext** no longer handles navigation - just triggers PostOAuthHandler
+- **Dashboard** simplified to only load existing schedules, no autogeneration redirects
+- **Loading route** deprecated - PostOAuthHandler handles all loading UX
+
+## Additional Finding: Autogenerate Logic Issue
+During testing, discovered autogenerate only returns Google Calendar events when schedule exists (`"existed": true`).
+
+**Current Logic**: If schedule exists → return early without pulling incomplete tasks from recent schedules or recurring tasks.
+
+**Expected**: autogenerate should always enhance schedules with:
+- ✅ Google Calendar events
+- ❌ Incomplete tasks from recent schedules (missing)  
+- ❌ Recurring tasks for target date (missing)
+
+**Future Fix**: Modify `backend/services/schedule_service.py` autogenerate_schedule method to always run enhancement logic even for existing schedules.
+
+## Status
+- ✅ **Issue 2 RESOLVED**: Multiple loading states eliminated via PostOAuthHandler pattern
+- ⚠️ **Follow-up needed**: Autogenerate enhancement logic for existing schedules
+
+# Issue 3
+I am facing a bug where I am seeing multiple loading states after google sso and approving gcal
+
+# Preconditions before reproducing:
+- Existing user who is logged out
+- No google calendar connection
+- No schedule for today
+
+# Steps to reproduce:
+1. Complete google sso and give gcal access via https://yourmum-cc74b.firebaseapp.com
+2. Bug #1: After providing calendar access, user is taken to /dashboard and sees loading skeleton
+3. Bug #2: User is then directed to /loading?reason=schedule while autogenerate() is being called
+4. Bug #3: Briefly get taken to /dashboard
+5. Bug #4: User is then directed to /loading?reason=schedule again
+6. User is taken to /dashboard with rendered schedule
+
+# Expected behaviour:
