@@ -16,7 +16,6 @@ import { useLoadingManager } from '@/hooks/useLoadingManager'
 export default function LoadingRoute (): React.ReactElement {
   const searchParams = useSearchParams()
   const reason = (searchParams.get('reason') as 'calendar' | 'schedule') ?? 'calendar'
-  const fromCalendar = searchParams.get('from') === 'calendar'
 
   // Initialize loading manager with reason-based configuration
   const loadingManager = useLoadingManager({
@@ -101,7 +100,6 @@ export default function LoadingRoute (): React.ReactElement {
     <LoadingPage
       reason={reason}
       loadingManager={loadingManager}
-      message={fromCalendar ? 'Calendar connected successfully! Generating your schedule...' : undefined}
     />
   )
 }

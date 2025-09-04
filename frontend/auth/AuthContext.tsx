@@ -83,12 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Small delay to ensure all async operations complete before resetting OAuth state
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Success - reset OAuth state without localStorage flag  
+        // Success - reset OAuth state and set completion flag
         setIsOAuthInProgress(false);
+        sessionStorage.setItem('calendarJustConnected', 'true');
         
-        // Redirect to loading page for schedule generation instead of dashboard
-        // This prevents skeleton loading states in dashboard
-        window.location.href = '/loading?reason=schedule&from=calendar';
+        // Redirect to dashboard which will detect the flag and handle schedule generation
+        window.location.href = '/dashboard';
         return;
         
       } else {

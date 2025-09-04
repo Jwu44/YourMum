@@ -1276,11 +1276,20 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh) {
+    // Check if user just completed calendar connection
+    const justCompletedCalendarConnection = sessionStorage.getItem('calendarJustConnected') === 'true'
+
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh && !justCompletedCalendarConnection) {
       loadInitialSchedule()
-    } else if (hasInitiallyLoaded.current || calendarConnectionStage || isEnsuringRefresh) {
+    } else if (hasInitiallyLoaded.current || calendarConnectionStage || isEnsuringRefresh || justCompletedCalendarConnection) {
       // If we're not loading initial schedule, ensure loading state is false
       setIsLoadingSchedule(false)
+      
+      // If just completed calendar connection, trigger schedule generation directly
+      if (justCompletedCalendarConnection) {
+        sessionStorage.removeItem('calendarJustConnected')
+        router.push('/loading?reason=schedule')
+      }
     }
   }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
 
