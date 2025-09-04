@@ -738,15 +738,27 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - redirect to loading page for autogeneration
-      console.log('Next day is in the future and no schedule exists, redirecting to loading page for autogeneration')
+      // Step 4: Future date with no existing schedule - show empty state
+      console.log('Next day is in the future and no schedule exists, showing empty state')
       
-      // Store navigation info for loading page to handle
-      sessionStorage.setItem('pendingNavigationDate', nextDayDate)
-      sessionStorage.setItem('pendingNavigationIndex', (currentDayIndex + 1).toString())
+      // Show empty schedule for future date - user can manually add tasks or trigger autogeneration
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        const targetIndex = currentDayIndex + 1
+        while (newDays.length <= targetIndex) newDays.push([])
+        newDays[targetIndex] = []
+        return newDays
+      })
       
-      // Redirect to loading page - it will handle autogeneration and return to dashboard
-      router.push('/loading?reason=schedule')
+      // Cache the empty schedule
+      setScheduleCache(prevCache => {
+        const newCache = new Map(prevCache)
+        newCache.set(nextDayDate, [])
+        return newCache
+      })
+      
+      // Navigate to next day
+      setCurrentDayIndex(prevIndex => prevIndex + 1)
       return
     } catch (error) {
       console.error('Error in handleNextDay:', error)
@@ -1228,83 +1240,45 @@ const Dashboard: React.FC = () => {
     const loadInitialSchedule = async () => {
       // Set flag immediately to prevent race conditions in React Strict Mode
       hasInitiallyLoaded.current = true
-      // isLoadingSchedule already starts as true, no need to set it again
-
-      // Check if we're returning from a loading page navigation
-      const pendingIndex = sessionStorage.getItem('pendingNavigationIndex')
-      const pendingDate = sessionStorage.getItem('pendingNavigationDate')
-      
-      if (pendingIndex && pendingDate) {
-        console.log('Returning from loading page, navigating to pending date:', pendingDate)
-        const targetIndex = parseInt(pendingIndex, 10)
-        setCurrentDayIndex(targetIndex)
-        
-        // Clean up session storage
-        sessionStorage.removeItem('pendingNavigationDate')
-        sessionStorage.removeItem('pendingNavigationIndex')
-        
-        // Load the schedule for the target date
-        try {
-          const result = await loadSchedule(pendingDate)
-          if (result.success && result.schedule) {
-            setScheduleDays(prevDays => {
-              const newDays = [...prevDays]
-              while (newDays.length <= targetIndex) newDays.push([])
-              newDays[targetIndex] = result.schedule!
-              return newDays
-            })
-            setScheduleCache(prev => new Map(prev).set(pendingDate, result.schedule!))
-          }
-        } catch (error) {
-          console.error('Error loading pending navigation schedule:', error)
-        }
-        
-        setIsLoadingSchedule(false)
-        return
-      }
+      console.log('📋 Dashboard: Starting simplified loadInitialSchedule...')
 
       const today = getDateString(0)
 
       try {
-        // 1) Try loading existing schedule
+        // Simple approach: just try to load existing schedule
+        console.log('📅 Dashboard: Attempting to load existing schedule for:', today)
         const existingSchedule = await loadSchedule(today)
+        
         if (existingSchedule.success && existingSchedule.schedule) {
+          console.log('✅ Dashboard: Found existing schedule with', existingSchedule.schedule.length, 'tasks')
           setScheduleDays([existingSchedule.schedule])
           setScheduleCache(new Map([[today, existingSchedule.schedule]]))
-          setIsLoadingSchedule(false)
-          return
+        } else {
+          console.log('📝 Dashboard: No existing schedule found, showing empty state')
+          // Show empty state instead of redirecting to loading page
+          // PostOAuthHandler already handled schedule generation during OAuth flow
+          setScheduleDays([[]])
+          setScheduleCache(new Map([[today, []]]))
         }
-
-        // 2) No existing schedule → redirect to loading page for autogeneration
-        console.log('No existing schedule found, redirecting to loading page for autogeneration')
-        
-        // Set pending navigation info to prevent redirect loop when returning from loading page
-        sessionStorage.setItem('pendingNavigationDate', today)
-        sessionStorage.setItem('pendingNavigationIndex', '0')
-        
-        router.push('/loading?reason=schedule')
-        return
       } catch (error) {
-        console.error('Error loading initial schedule:', error)
-        setIsLoadingSchedule(false)
+        console.error('❌ Dashboard: Error loading initial schedule:', error)
+        // Show empty state on error
         setScheduleDays([[]])
+        setScheduleCache(new Map([[today, []]]))
+      } finally {
+        setIsLoadingSchedule(false)
       }
     }
 
-    // Check if user just completed calendar connection
-    const justCompletedCalendarConnection = sessionStorage.getItem('calendarJustConnected') === 'true'
+    // Simplified condition: only check if we're not in an OAuth flow and haven't loaded yet
+    const isInOAuthFlow = calendarConnectionStage !== null || isEnsuringRefresh
 
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !calendarConnectionStage && !isEnsuringRefresh && !justCompletedCalendarConnection) {
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !isInOAuthFlow) {
+      console.log('🚀 Dashboard: Conditions met, loading initial schedule...')
       loadInitialSchedule()
-    } else if (hasInitiallyLoaded.current || calendarConnectionStage || isEnsuringRefresh || justCompletedCalendarConnection) {
-      // If we're not loading initial schedule, ensure loading state is false
+    } else if (hasInitiallyLoaded.current || isInOAuthFlow) {
+      console.log('⏭️ Dashboard: Skipping load - already loaded or in OAuth flow')
       setIsLoadingSchedule(false)
-      
-      // If just completed calendar connection, trigger schedule generation directly
-      if (justCompletedCalendarConnection) {
-        sessionStorage.removeItem('calendarJustConnected')
-        router.push('/loading?reason=schedule')
-      }
     }
   }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh])
 

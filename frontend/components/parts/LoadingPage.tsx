@@ -181,6 +181,21 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
             {displayMessage}
           </p>
+
+          {/* Progress indicator if available */}
+          {loadingManager?.progress !== undefined && loadingManager.progress > 0 && (
+            <div className="space-y-2 mt-6">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${Math.min(loadingManager.progress, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {Math.round(loadingManager.progress)}% complete
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

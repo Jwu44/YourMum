@@ -7,6 +7,7 @@ import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase
 import { AuthContextType, CalendarCredentials } from '@/lib/types';
 import { calendarApi } from '@/lib/api/calendar';
 import { detectBrowserTimezone, shouldUpdateUserTimezone, isValidTimezone } from '@/lib/utils/timezone';
+import { PostOAuthHandler } from '@/components/parts/PostOAuthHandler';
 
 /**
  * Auth Context for managing user authentication state
@@ -35,14 +36,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isOAuthInProgress, setIsOAuthInProgress] = useState(false);
   const [calendarConnectionStage, setCalendarConnectionStage] = useState<'connecting' | 'verifying' | 'complete' | null>(null);
+  const [showPostOAuthHandler, setShowPostOAuthHandler] = useState(false);
+  const [postOAuthCredential, setPostOAuthCredential] = useState<any>(null);
 
   /**
-   * Process calendar access and connect to Google Calendar
+   * Process calendar access using PostOAuthHandler orchestrator
    * @param credential Google Auth credential
    */
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
-      // NOTE: isOAuthInProgress should already be true when this function is called
+      console.log("🎬 Starting simplified processCalendarAccess with PostOAuthHandler...");
       
       // Get scopes and check for calendar access
       const scopes = await getScopes(credential.accessToken);
@@ -52,66 +55,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log("Has calendar access:", hasCalendarAccess);
       
-      // Store user with correct calendar access flag
+      // Store user with correct calendar access flag (simplified - no calendar connection here)
       if (auth.currentUser) {
         console.log("Storing user with calendar access flag:", hasCalendarAccess);
         await storeUserInBackend(auth.currentUser, hasCalendarAccess);
       }
       
       if (hasCalendarAccess) {
-        console.log("Starting calendar connection process...");
+        console.log("✅ Calendar access granted - triggering PostOAuthHandler");
+        
+        // Set credential for PostOAuthHandler and show it
+        setPostOAuthCredential(credential);
+        setShowPostOAuthHandler(true);
+        
+        // Keep OAuth in progress - PostOAuthHandler will handle completion
         setCalendarConnectionStage('connecting');
         
-        // Small delay to ensure Firebase auth state is fully established
-        console.log("Waiting for auth state to stabilize before connecting to Google Calendar...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Create credentials object and connect to calendar
-        console.log("Connecting to Google Calendar...");
-        setCalendarConnectionStage('verifying');
-        const credentials: CalendarCredentials = {
-          accessToken: credential.accessToken,
-          expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
-          scopes: scopes
-        };
-        
-        // Connect to calendar - this should be atomic (either succeeds or fails)
-        await calendarApi.connectCalendar(credentials);
-        console.log("Connected to Google Calendar successfully");
-        setCalendarConnectionStage('complete');
-        
-        // Small delay to ensure all async operations complete before resetting OAuth state
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Success - reset OAuth state and set completion flag
-        setIsOAuthInProgress(false);
-        sessionStorage.setItem('calendarJustConnected', 'true');
-        
-        // Redirect to dashboard which will detect the flag and handle schedule generation
-        window.location.href = '/dashboard';
-        return;
-        
       } else {
-        // No calendar access, reset OAuth state - let RouteGuard handle navigation
+        console.log("❌ No calendar access granted - RouteGuard will handle navigation");
         setIsOAuthInProgress(false);
         setCalendarConnectionStage(null);
-        console.log("No calendar access granted - RouteGuard will handle navigation");
       }
       
     } catch (error) {
-      console.error("Error processing calendar access:", error);
+      console.error("Error in simplified processCalendarAccess:", error);
       setIsOAuthInProgress(false);
       setCalendarConnectionStage(null);
-      setError(error instanceof Error ? error.message : 'Failed to connect calendar');
+      setError(error instanceof Error ? error.message : 'Failed to process calendar access');
       
-      // Store error information for connecting page to handle
+      // Store error information for routing logic to handle
       localStorage.setItem('calendarConnectionError', JSON.stringify({
-        error: error instanceof Error ? error.message : 'Failed to connect calendar',
+        error: error instanceof Error ? error.message : 'Failed to process calendar access',
         action: 'redirect_to_integrations'
       }));
-      
-      // Let RouteGuard handle navigation
-      console.log("Calendar connection error - RouteGuard will handle navigation");
     }
   };
 
@@ -504,6 +480,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Handle successful completion of PostOAuthHandler
+   */
+  const handlePostOAuthComplete = () => {
+    console.log("✅ PostOAuthHandler completed successfully");
+    
+    // Reset all OAuth-related state
+    setIsOAuthInProgress(false);
+    setCalendarConnectionStage(null);
+    setShowPostOAuthHandler(false);
+    setPostOAuthCredential(null);
+    setError(null);
+    
+    console.log("🎯 OAuth flow completed - user should be navigated to dashboard");
+  };
+
+  /**
+   * Handle PostOAuthHandler error
+   */
+  const handlePostOAuthError = (errorMessage: string) => {
+    console.error("❌ PostOAuthHandler failed:", errorMessage);
+    
+    // Reset OAuth state and set error
+    setIsOAuthInProgress(false);
+    setCalendarConnectionStage(null);
+    setShowPostOAuthHandler(false);
+    setPostOAuthCredential(null);
+    setError(errorMessage);
+    
+    // Store error for routing logic
+    localStorage.setItem('calendarConnectionError', JSON.stringify({
+      error: errorMessage,
+      action: 'redirect_to_integrations'
+    }));
+  };
+
   const value: AuthContextType = {
     user,                // Add this to satisfy AuthState
     currentUser: user,   // This is your renamed property
@@ -515,6 +527,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     reconnectCalendar,
     refreshCalendarCredentials,
   };
+
+  // Show PostOAuthHandler overlay if in post-OAuth flow
+  if (showPostOAuthHandler && postOAuthCredential) {
+    return (
+      <AuthContext.Provider value={value}>
+        <PostOAuthHandler
+          credential={postOAuthCredential}
+          onComplete={handlePostOAuthComplete}
+          onError={handlePostOAuthError}
+        />
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
