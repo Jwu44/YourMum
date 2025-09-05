@@ -39,7 +39,7 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
@@ -1259,11 +1259,25 @@ const Dashboard: React.FC = () => {
           setScheduleDays([existingSchedule.schedule])
           setScheduleCache(new Map([[today, existingSchedule.schedule]]))
         } else {
-          console.log('📝 Dashboard: No existing schedule found, showing empty state')
-          // Show empty state instead of redirecting to loading page
-          // PostOAuthHandler already handled schedule generation during OAuth flow
-          setScheduleDays([[]])
-          setScheduleCache(new Map([[today, []]]))
+          console.log('📝 Dashboard: No existing schedule found, attempting autogenerate...')
+          
+          try {
+            const autogenResult = await autogenerateTodaySchedule(today)
+            
+            if (autogenResult.success && autogenResult.schedule) {
+              console.log('✅ Dashboard: Autogenerate successful with', autogenResult.schedule.length, 'tasks')
+              setScheduleDays([autogenResult.schedule])
+              setScheduleCache(new Map([[today, autogenResult.schedule]]))
+            } else {
+              console.log('⚠️ Dashboard: Autogenerate returned no schedule, showing empty state')
+              setScheduleDays([[]])
+              setScheduleCache(new Map([[today, []]]))
+            }
+          } catch (autogenError) {
+            console.error('❌ Dashboard: Autogenerate failed, showing empty state:', autogenError)
+            setScheduleDays([[]])
+            setScheduleCache(new Map([[today, []]]))
+          }
         }
       } catch (error) {
         console.error('❌ Dashboard: Error loading initial schedule:', error)
