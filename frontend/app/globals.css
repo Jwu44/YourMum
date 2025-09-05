@@ -63,6 +63,11 @@ All colors MUST be HSL.
     --sidebar-border: 240 5.9% 90%;
     --sidebar-ring: 262 83% 58%;
 
+    /* Skeleton UI Colors */
+    --card-muted: 240 5% 97%;           /* Light: #F8F8F8 */
+    --skeleton-1: 240 4% 93%;           /* Light: #EEE */
+    --skeleton-2: 240 4% 90%;           /* Light: #E6E6E6 */
+
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
     --shadow-glow: 0 0 40px hsl(var(--primary) / 0.4);
@@ -125,6 +130,11 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 262 83% 58%;
+
+    /* Skeleton UI Colors - Dark theme */
+    --card-muted: 240 8% 7%;            /* Dark: #111214 */
+    --skeleton-1: 240 6% 12%;           /* Dark: #1E1F22 */
+    --skeleton-2: 240 5% 14%;           /* Dark: #222428 */
 
     /* Shadows - Dark theme */
     --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.5);

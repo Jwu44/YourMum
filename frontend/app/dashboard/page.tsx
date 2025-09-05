@@ -1465,19 +1465,34 @@ const Dashboard: React.FC = () => {
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
             {isLoadingSchedule && calendarConnectionStage !== 'complete' ? (
-              <div className="space-y-3 mt-5" data-testid="dashboard-skeleton">
-                {[...Array(5)].map((_, i) => (
+              <div className="flex flex-col gap-[10px] mt-5" data-testid="dashboard-skeleton">
+                {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-3 rounded-lg border border-border p-3"
+                    className="h-[66px] w-full px-4 py-3 rounded-xl flex items-center gap-3"
+                    style={{ backgroundColor: 'hsl(var(--card-muted))' }}
                   >
                     {/* Checkbox placeholder */}
-                    <Skeleton className="h-5 w-5 rounded-md" />
+                    <div
+                      className="animate-pulse rounded-md flex-shrink-0"
+                      style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        borderRadius: '6px',
+                        backgroundColor: 'hsl(var(--skeleton-1))' 
+                      }}
+                    />
 
-                    {/* Task text placeholder */}
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-9/10" />
-                    </div>
+                    {/* Title bar placeholder */}
+                    <div
+                      className="animate-pulse rounded-lg"
+                      style={{ 
+                        width: `${50 + Math.random() * 10}%`,
+                        height: '12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'hsl(var(--skeleton-2))' 
+                      }}
+                    />
                   </div>
                 ))}
               </div>
