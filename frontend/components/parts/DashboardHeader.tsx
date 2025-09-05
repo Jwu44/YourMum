@@ -25,6 +25,7 @@ interface DashboardHeaderProps {
   isCurrentDay: boolean
   onAddTask?: () => void
   showSidebarTrigger?: boolean
+  isLoading?: boolean
 }
 
 /**
@@ -38,7 +39,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   currentDate,
   isCurrentDay,
   onAddTask,
-  showSidebarTrigger = false
+  showSidebarTrigger = false,
+  isLoading = false
 }) => {
   // Mobile detection hook
   const isMobile = useIsMobile()
@@ -216,9 +218,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => { onPreviousDay() }}
-                    disabled={false}
-                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    disabled={isLoading}
+                    className={`h-11 w-11 p-0 transition-colors duration-200 ${
+                      isLoading 
+                        ? 'text-muted-foreground/50 cursor-not-allowed' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                     aria-label="Previous day"
+                    aria-disabled={isLoading}
                   >
                     <ChevronLeft size={20} />
                   </Button>
@@ -240,9 +247,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => { onNextDay() }}
-                    disabled={isCurrentDay}
-                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    disabled={isLoading || isCurrentDay}
+                    className={`h-11 w-11 p-0 transition-colors duration-200 ${
+                      isLoading || isCurrentDay
+                        ? 'text-muted-foreground/50 cursor-not-allowed' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                     aria-label="Next day"
+                    aria-disabled={isLoading || isCurrentDay}
                   >
                     <ChevronRight size={20} />
                   </Button>
@@ -261,8 +273,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  disabled={isLoading}
+                  className={`h-11 w-11 p-0 transition-colors duration-200 ${
+                    isLoading 
+                      ? 'text-muted-foreground/50 cursor-not-allowed' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                   aria-label="Open calendar navigation"
+                  aria-disabled={isLoading}
                   data-testid="calendar-dropdown-trigger"
                 >
                   <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
@@ -303,8 +321,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  disabled={isLoading}
+                  className={`h-8 w-8 p-0 transition-colors duration-200 ${
+                    isLoading 
+                      ? 'text-muted-foreground/50 cursor-not-allowed' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                   aria-label="Open calendar navigation"
+                  aria-disabled={isLoading}
                   data-testid="calendar-dropdown-trigger"
                 >
                   <Calendar className="w-5 h-5" style={{ width: '20px', height: '20px' }} />
@@ -341,9 +365,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => { onPreviousDay() }}
-                      disabled={false}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                      disabled={isLoading}
+                      className={`h-8 w-8 p-0 transition-colors duration-200 ${
+                        isLoading 
+                          ? 'text-muted-foreground/50 cursor-not-allowed' 
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
                       aria-label="Previous day"
+                      aria-disabled={isLoading}
                     >
                       <ChevronLeft size={16} />
                     </Button>
@@ -365,9 +394,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => { onNextDay() }}
-                      disabled={isCurrentDay}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                      disabled={isLoading || isCurrentDay}
+                      className={`h-8 w-8 p-0 transition-colors duration-200 ${
+                        isLoading || isCurrentDay
+                          ? 'text-muted-foreground/50 cursor-not-allowed' 
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
                       aria-label="Next day"
+                      aria-disabled={isLoading || isCurrentDay}
                     >
                       <ChevronRight size={16} />
                     </Button>
@@ -386,7 +420,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <Button
                 size="sm"
                 onClick={onAddTask}
-                className="gradient-accent hover:opacity-90 text-primary-foreground gap-2 px-4 shadow-soft hover:shadow-card transition-all duration-200 hover:scale-105"
+                disabled={isLoading}
+                className={`gap-2 px-4 shadow-soft transition-all duration-200 ${
+                  isLoading 
+                    ? 'bg-muted text-muted-foreground/50 cursor-not-allowed shadow-none' 
+                    : 'gradient-accent hover:opacity-90 text-primary-foreground hover:shadow-card hover:scale-105'
+                }`}
+                aria-disabled={isLoading}
                 data-testid="create-task-button"
               >
                 <Plus size={16} />

@@ -1460,6 +1460,7 @@ const Dashboard: React.FC = () => {
           isCurrentDay={false}
           onAddTask={() => { setIsTaskDrawerOpen(true) }}
           showSidebarTrigger={true}
+          isLoading={isLoadingSchedule && calendarConnectionStage !== 'complete'}
         />
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
