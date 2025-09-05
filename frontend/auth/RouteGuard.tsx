@@ -89,10 +89,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Show loading state while checking authentication
   if (loading && !isPublicPath) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
