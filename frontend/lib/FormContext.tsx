@@ -225,6 +225,55 @@ export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 }
 
 /**
+ * Helper function to check if the current FormData has been modified from initial state
+ * Used to determine whether to load backend data or preserve user changes
+ * @param currentState - Current FormData state
+ * @returns true if state has user modifications, false if it's in initial state
+ */
+export const hasFormModifications = (currentState: FormData): boolean => {
+  // Check for non-initial values that indicate user modifications
+
+  // Check work times (initial state has specific default values)
+  if (currentState.work_start_time !== initialState.work_start_time ||
+      currentState.work_end_time !== initialState.work_end_time) {
+    return true
+  }
+
+  // Check energy patterns (initial state is empty array)
+  if (currentState.energy_patterns != null && currentState.energy_patterns.length > 0) {
+    return true
+  }
+
+  // Check priorities (initial state has empty strings)
+  if (currentState.priorities != null) {
+    const hasNonEmptyPriorities = Object.values(currentState.priorities).some(
+      priority => priority !== ''
+    )
+    if (hasNonEmptyPriorities) {
+      return true
+    }
+  }
+
+  // Check layout preference changes from defaults
+  if (currentState.layout_preference != null) {
+    const defaultLayout = initialState.layout_preference
+    if (currentState.layout_preference.layout !== defaultLayout.layout ||
+        currentState.layout_preference.subcategory !== defaultLayout.subcategory ||
+        currentState.layout_preference.timing !== defaultLayout.timing ||
+        currentState.layout_preference.orderingPattern !== defaultLayout.orderingPattern) {
+      return true
+    }
+  }
+
+  // Check if tasks have been loaded (initial state is empty array)
+  if (currentState.tasks != null && currentState.tasks.length > 0) {
+    return true
+  }
+
+  return false
+}
+
+/**
  * Custom hook to use the form context with type safety
  * @returns The form context value
  * @throws Error if used outside FormProvider

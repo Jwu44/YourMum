@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Reorder, motion } from 'framer-motion'
 
@@ -24,7 +24,7 @@ import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Ca
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import { LoadingPage } from '@/components/parts/LoadingPage'
-import { useForm } from '@/lib/FormContext'
+import { useForm, hasFormModifications } from '@/lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
 
 // Types and Utils
@@ -163,6 +163,7 @@ export default function InputsPage () {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [priorities, setPriorities] = useState(defaultPriorities)
+  const hasLoadedRef = useRef(false)
 
   /**
    * Get the target date from URL parameter or fallback to today
@@ -260,10 +261,28 @@ export default function InputsPage () {
 
   /**
    * Load current schedule tasks when component mounts
+   * Only load from backend if FormContext doesn't have user modifications
    */
   useEffect(() => {
-    loadCurrentScheduleTasks()
-  }, [loadCurrentScheduleTasks])
+    // Only run once on mount to avoid infinite loops
+    if (hasLoadedRef.current) {
+      return
+    }
+
+    // Check if FormContext already has user modifications
+    const hasUserChanges = hasFormModifications(state)
+
+    if (!hasUserChanges) {
+      // Only load from backend if FormContext is in initial state
+      console.log('FormContext is in initial state, loading from backend...')
+      void loadCurrentScheduleTasks()
+    } else {
+      // Preserve existing user changes in FormContext
+      console.log('FormContext has user modifications, preserving existing state...')
+    }
+
+    hasLoadedRef.current = true
+  }, [state, loadCurrentScheduleTasks])
 
   /**
    * Sync priorities display order with loaded form data from backend
