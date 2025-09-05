@@ -39,7 +39,7 @@ import {
 
 // Direct API helpers (no ScheduleHelper)
 import { userApi } from '@/lib/api/users'
-import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate } from '@/lib/ScheduleHelper'
+import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autogenerateTodaySchedule } from '@/lib/ScheduleHelper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
@@ -743,27 +743,69 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Step 4: Future date with no existing schedule - show empty state
-      console.log('Next day is in the future and no schedule exists, showing empty state')
+      // Step 4: Future date with no existing schedule - call autogenerate
+      console.log('Next day is in the future and no schedule exists, attempting autogenerate...')
       
-      // Show empty schedule for future date - user can manually add tasks or trigger autogeneration
+      // Navigate to next day immediately so user sees target date
+      setCurrentDayIndex(prevIndex => prevIndex + 1)
+      
+      // Set loading state and prepare schedule array
+      setIsLoadingSchedule(true)
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
         const targetIndex = currentDayIndex + 1
         while (newDays.length <= targetIndex) newDays.push([])
-        newDays[targetIndex] = []
+        newDays[targetIndex] = [] // Temporary empty array while loading
         return newDays
       })
       
-      // Cache the empty schedule
-      setScheduleCache(prevCache => {
-        const newCache = new Map(prevCache)
-        newCache.set(nextDayDate, [])
-        return newCache
-      })
+      try {
+        const autogenResult = await autogenerateTodaySchedule(nextDayDate)
+        
+        if (autogenResult.success && autogenResult.schedule) {
+          console.log('✅ Next day autogenerate successful with', autogenResult.schedule.length, 'tasks')
+          setScheduleDays(prevDays => {
+            const newDays = [...prevDays]
+            const targetIndex = currentDayIndex + 1
+            newDays[targetIndex] = autogenResult.schedule!
+            return newDays
+          })
+          setScheduleCache(prevCache => {
+            const newCache = new Map(prevCache)
+            newCache.set(nextDayDate, autogenResult.schedule!)
+            return newCache
+          })
+        } else {
+          console.log('⚠️ Next day autogenerate returned no schedule, showing empty state')
+          setScheduleDays(prevDays => {
+            const newDays = [...prevDays]
+            const targetIndex = currentDayIndex + 1
+            newDays[targetIndex] = []
+            return newDays
+          })
+          setScheduleCache(prevCache => {
+            const newCache = new Map(prevCache)
+            newCache.set(nextDayDate, [])
+            return newCache
+          })
+        }
+      } catch (autogenError) {
+        console.error('❌ Next day autogenerate failed, showing empty state:', autogenError)
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays]
+          const targetIndex = currentDayIndex + 1
+          newDays[targetIndex] = []
+          return newDays
+        })
+        setScheduleCache(prevCache => {
+          const newCache = new Map(prevCache)
+          newCache.set(nextDayDate, [])
+          return newCache
+        })
+      } finally {
+        setIsLoadingSchedule(false)
+      }
       
-      // Navigate to next day
-      setCurrentDayIndex(prevIndex => prevIndex + 1)
       return
     } catch (error) {
       console.error('Error in handleNextDay:', error)
@@ -1259,11 +1301,25 @@ const Dashboard: React.FC = () => {
           setScheduleDays([existingSchedule.schedule])
           setScheduleCache(new Map([[today, existingSchedule.schedule]]))
         } else {
-          console.log('📝 Dashboard: No existing schedule found, showing empty state')
-          // Show empty state instead of redirecting to loading page
-          // PostOAuthHandler already handled schedule generation during OAuth flow
-          setScheduleDays([[]])
-          setScheduleCache(new Map([[today, []]]))
+          console.log('📝 Dashboard: No existing schedule found, attempting autogenerate...')
+          
+          try {
+            const autogenResult = await autogenerateTodaySchedule(today)
+            
+            if (autogenResult.success && autogenResult.schedule) {
+              console.log('✅ Dashboard: Autogenerate successful with', autogenResult.schedule.length, 'tasks')
+              setScheduleDays([autogenResult.schedule])
+              setScheduleCache(new Map([[today, autogenResult.schedule]]))
+            } else {
+              console.log('⚠️ Dashboard: Autogenerate returned no schedule, showing empty state')
+              setScheduleDays([[]])
+              setScheduleCache(new Map([[today, []]]))
+            }
+          } catch (autogenError) {
+            console.error('❌ Dashboard: Autogenerate failed, showing empty state:', autogenError)
+            setScheduleDays([[]])
+            setScheduleCache(new Map([[today, []]]))
+          }
         }
       } catch (error) {
         console.error('❌ Dashboard: Error loading initial schedule:', error)
@@ -1383,6 +1439,13 @@ const Dashboard: React.FC = () => {
     console.log('📱 Dashboard: PostOAuthHandler is active, showing LoadingPage')
     return <LoadingPage reason="calendar" message="Setting up your account..." />
   }
+
+  // Mark dashboard as fully loaded for future PostOAuth detection
+  useEffect(() => {
+    if (!isLoadingSchedule && scheduleDays.length > 0) {
+      sessionStorage.setItem('dashboardFullyLoaded', 'true')
+    }
+  }, [isLoadingSchedule, scheduleDays.length])
 
   return (
     <SidebarLayout>

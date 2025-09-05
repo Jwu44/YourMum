@@ -31,7 +31,12 @@ export const isPostOAuthActive = (): boolean => {
   
   const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
   
-  return hasOAuthRedirect || hasSessionIndicator
+  // CRITICAL: Check for fresh navigation to dashboard with authRedirectDestination
+  // This catches the case where user just completed OAuth and was redirected to dashboard
+  const justRedirectedFromAuth = localStorage.getItem('authRedirectDestination') === '/dashboard' &&
+                                 !sessionStorage.getItem('dashboardFullyLoaded')
+  
+  return hasOAuthRedirect || hasSessionIndicator || justRedirectedFromAuth
 }
 
 /**
@@ -135,6 +140,11 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
       await new Promise(resolve => setTimeout(resolve, 800))
       
       console.log('✅ Post-OAuth orchestration completed successfully')
+      
+      // Clean up auth indicators to prevent future false positives
+      localStorage.removeItem('authRedirectDestination')
+      sessionStorage.removeItem('oauth-in-progress')
+      
       onComplete()
       
       // Navigate to dashboard
