@@ -1,88 +1,114 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { type WithHandleGetStarted } from '@/lib/types'
 import Image from 'next/image'
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   return (
-    <nav className="fixed top-0 w-full bg-background/40 backdrop-blur-xl border-b border-border/50 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <button onClick={handleGetStarted} className="focus:outline-none">
+    <header
+      className={`fixed top-3.5 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 rounded-full ${
+        isScrolled 
+          ? "h-14 bg-background/40 backdrop-blur-xl border border-white/10 scale-95 w-[90%] max-w-2xl shadow-lg" 
+          : "h-14 bg-background/40 backdrop-blur-xl w-[95%] max-w-3xl border border-border/50 shadow-md"
+      }`}
+    >
+      <div className="mx-auto h-full px-6">
+        <nav className="flex items-center justify-between h-full">
+          <div className="flex items-center gap-2">
+            <button onClick={handleGetStarted} className="focus:outline-none flex items-center gap-2">
               <Image
                 src="/favicon-96x96.png"
                 alt="YourMum logo"
-                width={124}
-                height={32}
-                className="h-8 w-auto hover:opacity-80 transition-opacity"
+                width={20}
+                height={20}
+                className="w-5 h-5 hover:opacity-80 transition-opacity"
                 priority
                 quality={100}
                 style={{ imageRendering: 'crisp-edges' }}
               />
+              <span className="font-bold text-base text-foreground">YourMum</span>
             </button>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <div className="flex items-center space-x-6">
-              <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                Pricing
-              </a>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button size="sm" className="bg-gradient-primary hover:opacity-90 shadow-glow" onClick={handleGetStarted}>
-                Get started
-              </Button>
-            </div>
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setIsMenuOpen(!isMenuOpen) }}
+          <div className="hidden md:flex items-center gap-6">
+            <a
+              href="#pricing"
+              onClick={(e) => {
+                e.preventDefault()
+                scrollToSection('pricing')
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground transition-all duration-300"
             >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              Pricing
+            </a>
+            <Button 
+              onClick={handleGetStarted}
+              size="sm"
+              className="button-gradient"
+            >
+              Try YourMum
             </Button>
           </div>
-        </div>
 
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t border-border animate-fade-in">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              <a href="#features" className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors">
-                Features
-              </a>
-              <a href="#solutions" className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors">
-                Solutions
-              </a>
-              <a href="#pricing" className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors">
-                Pricing
-              </a>
-              <a href="#about" className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors">
-                About
-              </a>
-              <div className="pt-4 space-y-2">
-                <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleGetStarted}>
-                  Sign In
+          {/* Mobile Navigation */}
+          <div className="md:hidden">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="glass">
+                  <Menu className="h-5 w-5" />
                 </Button>
-                <Button size="sm" className="w-full bg-gradient-primary hover:opacity-90" onClick={handleGetStarted}>
-                  Start Free Trial
-                </Button>
-              </div>
-            </div>
+              </SheetTrigger>
+              <SheetContent className="bg-background/95 backdrop-blur-sm">
+                <div className="flex flex-col gap-4 mt-8">
+                  <a
+                    href="#pricing"
+                    className="text-lg text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setIsMobileMenuOpen(false)
+                      scrollToSection('pricing')
+                    }}
+                  >
+                    Pricing
+                  </a>
+                  <Button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      handleGetStarted()
+                    }}
+                    className="button-gradient mt-4"
+                  >
+                    Try YourMum
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
-        )}
+        </nav>
       </div>
-    </nav>
+    </header>
   )
 }
 
