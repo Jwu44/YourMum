@@ -1,10 +1,16 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/auth/AuthContext'
 import { RouteGuard } from '@/auth/RouteGuard'
 import { FormProvider } from '@/lib/FormContext'
 import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { ToasterClient } from '@/components/ui/toaster-client'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'YourMum',
@@ -31,7 +37,7 @@ export default function RootLayout ({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <head>
         <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

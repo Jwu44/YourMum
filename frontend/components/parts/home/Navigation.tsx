@@ -47,7 +47,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
                 quality={100}
                 style={{ imageRendering: 'crisp-edges' }}
               />
-              <span className="font-bold text-base text-foreground">YourMum</span>
+              <span className="font-bold text-primary-blue">YourMum</span>
             </button>
           </div>
 

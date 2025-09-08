@@ -210,7 +210,7 @@ const Dashboard: React.FC = () => {
   const addTask = useCallback(async (newTask: Task) => {
     try {
       const currentDate = getDateString(currentDayIndex)
-      const currentSchedule = scheduleDays[currentDayIndex] || []
+      const currentSchedule = scheduleDays[Math.abs(currentDayIndex)] || []
 
       const taskWithId = {
         ...newTask,

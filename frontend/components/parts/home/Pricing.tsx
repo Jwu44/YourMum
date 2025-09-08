@@ -20,9 +20,9 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       popular: false
     },
     {
-      name: 'Pro',
+      name: 'Milf',
       price: '$12',
-      period: 'per month',
+      period: 'month',
       description: 'Ideal for professionals and power users',
       features: [
         'Unlimited tasks',
@@ -42,12 +42,11 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
     <section className="py-20 bg-background" id="pricing">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
-            Choose your perfect
-            <span className="text-primary block">productivity plan</span>
+        <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
+            Start For Free
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Start free and upgrade as you grow. All plans include our core AI features.
+            Try YourMum for free and upgrade as you grow.
           </p>
         </div>
 
@@ -102,17 +101,6 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
               </Button>
             </div>
           ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">
-            All plans include a 14-day free trial. No credit card required.
-          </p>
-          <div className="flex justify-center items-center space-x-4 text-sm text-muted-foreground">
-            <span>✓ Cancel anytime</span>
-            <span>✓ 30-day money back guarantee</span>
-            <span>✓ No setup fees</span>
-          </div>
         </div>
       </div>
     </section>
