@@ -621,6 +621,23 @@ All colors MUST be HSL.
     scroll-behavior: smooth;
   }
 
+  /* Custom scale utilities for hero image */
+  .scale-150 {
+    transform: scale(1.5);
+  }
+
+  .scale-175 {
+    transform: scale(1.5);
+  }
+
+  .scale-200 {
+    transform: scale(2.0);
+  }
+
+  .transform-origin-top {
+    transform-origin: center top;
+  }
+
   /* Touch-friendly hover states */
   @media (hover: hover) and (pointer: fine) {
     .hover-desktop:hover {
