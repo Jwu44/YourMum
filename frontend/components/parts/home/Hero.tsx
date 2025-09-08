@@ -46,7 +46,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
 
         {/* Dashboard Image - Full width display like Linear */}
         <div className="opacity-0 translate-y-8 animate-fade-in-up mt-32 md:mt-40 mb-20" style={{ animationDelay: '0.4s' }}>
-          <div className="relative w-screen left-1/2 -translate-x-1/2">
+          <div className="relative w-screen left-1/2 -translate-x-1/2 px-10">
             {/* Full Width Image Container */}
             <div className="relative w-full overflow-hidden">
               <Image
