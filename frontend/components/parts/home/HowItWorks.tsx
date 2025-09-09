@@ -45,10 +45,22 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
         <div className="flex flex-col lg:flex-row items-start justify-center gap-8 lg:gap-12">
           {steps.map((step, index) => (
             <div key={step.id} className="flex flex-col items-center relative">
-              {/* Step connector arrow for desktop */}
+              {/* Enhanced Connection Line */}
               {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute -right-6 top-32 z-10">
-                  <ArrowRight className="w-6 h-6 text-muted-foreground/40" />
+                <div className="hidden lg:block absolute top-1/2 -right-6 w-12 h-1 z-10">
+                  <div className="relative w-full h-full bg-gradient-to-r from-border via-primary/30 to-border rounded-full">
+                    <div className={`absolute inset-0 bg-gradient-primary rounded-full transition-all duration-1000 ${
+                      hoveredCard === step.id || hoveredCard === step.id + 1
+                        ? 'w-full opacity-100' 
+                        : 'w-0 opacity-0'
+                    }`} />
+                    {/* Animated dot */}
+                    <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full transition-all duration-1000 ${
+                      hoveredCard === step.id || hoveredCard === step.id + 1
+                        ? 'left-full -translate-x-3 opacity-100 animate-pulse' 
+                        : 'left-0 opacity-0'
+                    }`} />
+                  </div>
                 </div>
               )}
               
@@ -78,7 +90,6 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
                       }}
                       aria-label={`Demo video for ${step.title}`}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
                   </div>
                 ) : (
                   <div className="w-full bg-gradient-to-br from-accent/50 to-accent flex items-center justify-center" style={{ aspectRatio: '16/10' }}>
@@ -101,18 +112,6 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Call to Action */}
-        <div className="text-center mt-16">
-          <Button
-            onClick={handleGetStarted}
-            size="lg"
-            className="bg-gradient-primary text-primary-foreground hover:shadow-glow transition-all duration-300 px-8 py-4 text-lg font-semibold rounded-2xl border-2 border-white/20"
-          >
-            Get started for free
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
         </div>
       </div>
     </section>
