@@ -25,7 +25,8 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
       id: 3,
       title: 'Link apps',
       description: 'Integrate YourMum with Google Calendar, Slack and more (coming soon) to automatically create tasks.',
-      hasVideo: false
+      hasVideo: true,
+      videoSrc: '/demos/Demo 3.mov'
     }
   ]
 
