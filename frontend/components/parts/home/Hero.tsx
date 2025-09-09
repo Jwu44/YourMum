@@ -20,7 +20,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
           className="text-5xl font-bold text-gray-900 leading-tight opacity-0 translate-y-8 animate-fade-in-up"
           style={{ fontSize: '48px', animationDelay: '0.1s' }}
         >
-          Let YourMum plan your day
+          YourMum knows you best 😉
         </h1>
 
         {/* H2 Subtitle */}
@@ -28,7 +28,7 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
           className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed opacity-0 translate-y-8 animate-fade-in-up"
           style={{ fontSize: '20px', animationDelay: '0.2s' }}
         >
-          Don't waste time on admin overhead and lock in with a personalised schedule YourMum made
+          Don't waste time on admin overhead and focus on tasks that matter.
         </p>
 
         {/* CTA Button */}

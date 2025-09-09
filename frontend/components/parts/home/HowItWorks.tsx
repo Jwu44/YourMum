@@ -3,28 +3,28 @@ import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { type WithHandleGetStarted } from '@/lib/types'
 
-const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
+const HowItWorks = () => {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null)
 
   const steps = [
     {
       id: 1,
-      title: 'Add your tasks',
-      description: 'Quickly input all your unscheduled tasks and to-dos for the day in one simple interface.',
+      title: 'Set up tasks',
+      description: 'Add any unsynced tasks you have for the day.',
       hasVideo: true,
       videoSrc: '/demos/Demo 1.mov'
     },
     {
       id: 2,
-      title: 'Set preferences',
-      description: 'Tell us about your lifestyle, working hours, and energy patterns for personalized scheduling.',
+      title: 'Fill out preferences',
+      description: 'Tell YourMum about your lifestyle so she can personalise your schedule.',
       hasVideo: true,
       videoSrc: '/demos/Demo 2.mov'
     },
     {
       id: 3,
       title: 'Connect apps',
-      description: 'Sync with Google Calendar and Slack to automatically import meetings and create smart tasks.',
+      description: 'Sync with Google Calendar, Slack and more (coming soon!) to have tasks automatically created.',
       hasVideo: true,
       videoSrc: '/demos/Demo 3.mov'
     }
@@ -38,7 +38,7 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
             How it works
           </h1>
           <h2 className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get started with YourMum in three simple steps
+            Get YourMum started in three simple steps.
           </h2>
         </div>
 
@@ -65,7 +65,7 @@ const HowItWorks = ({ handleGetStarted }: WithHandleGetStarted) => {
               )}
               
               <div
-                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group"
+                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[420px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
                 style={{ animationDelay: `${index * 0.15}s` }}
                 onMouseEnter={() => setHoveredCard(step.id)}
                 onMouseLeave={() => setHoveredCard(null)}
