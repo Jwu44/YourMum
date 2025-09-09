@@ -93,7 +93,7 @@ const HomePage = () => {
       <main>
         <Hero handleGetStarted={handleGetStarted} />
         <Features />
-        <HowItWorks />
+        <HowItWorks handleGetStarted={handleGetStarted} />
         <Pricing handleGetStarted={handleGetStarted} />
       </main>
       <Footer />

@@ -165,6 +165,7 @@ export default Navigation;
 - card 1:
   - h3: Create task
   - p: Add unsynced tasks you have for your current day.
+  - screen recording: @demo1
 - card 2:
   - h3: Fill out preferences
   - p: Provide details about your lifestyle so YourMum can create a personalised schedule.

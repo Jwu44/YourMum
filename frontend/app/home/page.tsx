@@ -1,6 +1,7 @@
 'use client'
 import Navigation from '@/components/parts/home/Navigation'
 import Hero from '@/components/parts/home/Hero'
+import HowItWorks from '@/components/parts/home/HowItWorks'
 import PricingSection from '@/components/parts/home/Pricing'
 import Footer from '@/components/parts/home/Footer'
 
@@ -18,6 +19,9 @@ const TestHomePage = () => {
       <main>
         {/* Hero Section with 3D Dashboard */}
         <Hero handleGetStarted={handleGetStarted} />
+
+        {/* How It Works Section */}
+        <HowItWorks handleGetStarted={handleGetStarted} />
 
         {/* Spacer sections to test scroll behavior */}
         <section className="min-h-screen flex items-center justify-center bg-muted/10">

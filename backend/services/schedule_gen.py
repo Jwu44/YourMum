@@ -146,12 +146,12 @@ def create_batch_categorization_prompt(tasks: List[Task]) -> str:
         - If a task is categorized as 'Work', it should not have other categories
         - Respond only with valid JSON in this exact format:
 
-        {
+        {{
             "categorizations": [
-                {"task_id": "task_id_1", "categories": ["Category1", "Category2"]},
-                {"task_id": "task_id_2", "categories": ["Category1"]}
+                {{"task_id": "task_id_1", "categories": ["Category1", "Category2"]}},
+                {{"task_id": "task_id_2", "categories": ["Category1"]}}
             ]
-        }"""
+        }}"""
 
     return prompt
 
