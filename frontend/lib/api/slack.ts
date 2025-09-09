@@ -1,10 +1,10 @@
 /**
  * @file slack.ts
- * @description API client for Slack integration endpoints
+ * @description API client for Slack integration endpoints using centralized API client
  * Handles OAuth flow, webhook management, and integration status
  */
 
-import { auth } from '@/auth/firebase'
+import { apiClient } from './client'
 
 // Types
 export interface SlackIntegrationStatus {
@@ -32,37 +32,7 @@ export interface SlackDisconnectResponse {
   message: string
 }
 
-// Constants
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
-
-/**
- * Get the current user's Firebase ID token for API authentication
- */
-const getAuthToken = async (): Promise<string> => {
-  // In development mode with bypass enabled, return a mock token
-  if (IS_DEVELOPMENT && BYPASS_AUTH) {
-    return 'mock-token-for-development'
-  }
-
-  const currentUser = auth.currentUser
-  if (!currentUser) {
-    throw new Error('User not authenticated')
-  }
-  return await currentUser.getIdToken()
-}
-
-/**
- * Create standard headers for API requests
- */
-const getHeaders = async (): Promise<HeadersInit> => {
-  const token = await getAuthToken()
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`
-  }
-}
+// Slack integration uses centralized API client for authentication
 
 /**
  * Slack Integration API Client
@@ -72,11 +42,7 @@ export const slackApi = {
    * Get current Slack integration status
    */
   async getStatus (): Promise<SlackIntegrationStatus> {
-    const headers = await getHeaders()
-    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
-      method: 'GET',
-      headers
-    })
+    const response = await apiClient.get('/api/integrations/slack/status')
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -90,11 +56,7 @@ export const slackApi = {
    * Generate OAuth URL for Slack workspace connection
    */
   async getOAuthUrl (): Promise<SlackOAuthResponse> {
-    const headers = await getHeaders()
-    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/auth/connect`, {
-      method: 'GET',
-      headers
-    })
+    const response = await apiClient.get('/api/integrations/slack/auth/connect')
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -108,11 +70,7 @@ export const slackApi = {
    * Disconnect Slack integration
    */
   async disconnect (): Promise<SlackDisconnectResponse> {
-    const headers = await getHeaders()
-    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
-      method: 'DELETE',
-      headers
-    })
+    const response = await apiClient.delete('/api/integrations/slack/disconnect')
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))

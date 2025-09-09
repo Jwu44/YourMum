@@ -8,6 +8,7 @@ import { AuthContextType, CalendarCredentials } from '@/lib/types';
 import { calendarApi } from '@/lib/api/calendar';
 import { detectBrowserTimezone, shouldUpdateUserTimezone, isValidTimezone } from '@/lib/utils/timezone';
 import { PostOAuthHandler } from '@/components/parts/PostOAuthHandler';
+import { apiClient } from '@/lib/api/client';
 
 /**
  * Auth Context for managing user authentication state
@@ -38,6 +39,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [calendarConnectionStage, setCalendarConnectionStage] = useState<'connecting' | 'verifying' | 'complete' | null>(null);
   const [showPostOAuthHandler, setShowPostOAuthHandler] = useState(false);
   const [postOAuthCredential, setPostOAuthCredential] = useState<any>(null);
+
+  // Initialize API client on mount
+  useEffect(() => {
+    console.log('🚀 AuthProvider: Initializing centralized API client');
+    apiClient.initialize();
+  }, []);
+
+  /**
+   * Helper function to distinguish between token refresh errors and calendar connection issues
+   * This prevents showing "Calendar Connection Issue" when the problem is actually Firebase auth
+   */
+  const handleAuthError = (error: any, context: string): void => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check if this is a token-related error
+    const isTokenError = errorMessage.includes('token') || 
+                        errorMessage.includes('authentication') || 
+                        errorMessage.includes('unauthorized') ||
+                        error?.status === 401;
+    
+    if (isTokenError) {
+      console.error(`🔐 Token/Auth error in ${context}:`, errorMessage);
+      // Don't set calendar connection errors for token issues
+      // The API client will handle token refresh automatically
+    } else {
+      console.error(`📅 Calendar connection error in ${context}:`, errorMessage);
+      setError(errorMessage);
+      
+      // Only store calendar connection errors for actual calendar issues
+      localStorage.setItem('calendarConnectionError', JSON.stringify({
+        error: errorMessage,
+        action: 'redirect_to_integrations'
+      }));
+    }
+  };
 
   /**
    * Process calendar access using PostOAuthHandler orchestrator
@@ -81,55 +117,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error in simplified processCalendarAccess:", error);
       setIsOAuthInProgress(false);
       setCalendarConnectionStage(null);
-      setError(error instanceof Error ? error.message : 'Failed to process calendar access');
       
-      // Store error information for routing logic to handle
-      localStorage.setItem('calendarConnectionError', JSON.stringify({
-        error: error instanceof Error ? error.message : 'Failed to process calendar access',
-        action: 'redirect_to_integrations'
-      }));
+      // Use helper to properly categorize the error
+      handleAuthError(error, 'processCalendarAccess');
     }
   };
 
   /**
-   * Store user information in the backend
+   * Store user information in the backend using centralized API client
    * @param user Firebase user object
    * @param hasCalendarAccess Optional flag indicating if user has granted calendar access
    */
   const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false): Promise<void> => {
     try {
-      // Force token refresh to ensure it's valid
-      const idToken = await user.getIdToken(true); // Force refresh
-      console.log("Got fresh ID token for backend storage");
-      console.log("Calendar access status:", hasCalendarAccess);
+      console.log("Storing user in backend with calendar access:", hasCalendarAccess);
       
-      // Check if NEXT_PUBLIC_API_URL is set correctly
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-      console.log("API Base URL:", apiBaseUrl);
-
-      const response = await fetch(`${apiBaseUrl}/api/auth/user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          googleId: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          hasCalendarAccess: hasCalendarAccess // Pass the actual calendar access state
-        }),
+      // Use API client instead of direct fetch - it handles token refresh automatically
+      const response = await apiClient.post('/api/auth/user', {
+        googleId: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        hasCalendarAccess: hasCalendarAccess
       });
 
       if (response.ok) {
-        console.log("User stored in backend successfully with calendar access:", hasCalendarAccess);
+        console.log("✅ User stored in backend successfully with calendar access:", hasCalendarAccess);
       } else {
         const errorText = await response.text();
-        console.error("Failed to store user in backend:", response.status, errorText);
+        console.error("❌ Failed to store user in backend:", response.status, errorText);
       }
     } catch (error) {
-      console.error("Error storing user in backend:", error);
+      console.error("❌ Error storing user in backend:", error);
     }
   };
 
@@ -189,13 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Skip if already synced for this browser timezone
         if (cached === browserTz) return
 
-        // Fetch current user to read stored timezone
-        const apiBase = process.env.NEXT_PUBLIC_API_URL
-        const token = await user.getIdToken()
-        const res = await fetch(`${apiBase}/api/auth/user`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-        })
+        // Fetch current user to read stored timezone using API client
+        const res = await apiClient.get('/api/auth/user')
         if (!res.ok) return
         
         const data = await res.json()
@@ -209,12 +223,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log(`🌍 Timezone sync needed: ${serverTz || 'none'} → ${browserTz}`)
 
-        // Update timezone via API
-        const updateRes = await fetch(`${apiBase}/api/user/timezone`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ timezone: browserTz })
-        })
+        // Update timezone via API client - handles token refresh automatically
+        const updateRes = await apiClient.put('/api/user/timezone', { timezone: browserTz })
         
         if (updateRes.ok) {
           const result = await updateRes.json()
@@ -474,8 +484,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
     } catch (error) {
       console.error('Calendar credential refresh error:', error);
+      
+      // Use helper to properly categorize the error
+      handleAuthError(error, 'refreshCalendarCredentials');
+      
       const errorMessage = error instanceof Error ? error.message : 'Failed to refresh calendar credentials';
-      setError(errorMessage);
       throw new Error(errorMessage);
     }
   };
