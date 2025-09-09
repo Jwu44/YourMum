@@ -29,8 +29,8 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
     <header
       className={`fixed top-3.5 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 rounded-full ${
         isScrolled 
-          ? "h-14 bg-background/40 backdrop-blur-xl border border-white/10 scale-95 w-[90%] max-w-2xl shadow-lg" 
-          : "h-14 bg-background/40 backdrop-blur-xl w-[95%] max-w-3xl border border-border/50 shadow-md"
+          ? "h-14 bg-background/40 backdrop-blur-xl border border-white/10 scale-95 w-[60%] max-w-2xl shadow-lg" 
+          : "h-14 bg-background/40 backdrop-blur-xl w-[65%] max-w-3xl border border-border/50 shadow-md"
       }`}
     >
       <div className="mx-auto h-full px-6">

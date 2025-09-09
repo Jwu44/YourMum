@@ -65,14 +65,14 @@ const HowItWorks = () => {
               )}
               
               <div
-                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[420px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
+                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[400px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
                 style={{ animationDelay: `${index * 0.15}s` }}
                 onMouseEnter={() => setHoveredCard(step.id)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
                 {/* Video/Image Section */}
-                {step.hasVideo ? (
-                  <div className="relative bg-gradient-to-br from-accent/50 to-accent overflow-hidden" style={{ aspectRatio: '16/10' }}>
+                <div className="w-full h-[200px] relative bg-gradient-to-br from-accent/50 to-accent overflow-hidden flex-shrink-0">
+                  {step.hasVideo ? (
                     <video
                       src={step.videoSrc}
                       muted
@@ -90,17 +90,17 @@ const HowItWorks = () => {
                       }}
                       aria-label={`Demo video for ${step.title}`}
                     />
-                  </div>
-                ) : (
-                  <div className="w-full bg-gradient-to-br from-accent/50 to-accent flex items-center justify-center" style={{ aspectRatio: '16/10' }}>
-                    <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center">
-                      <div className="w-10 h-10 bg-primary/40 rounded-xl" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-primary/40 rounded-xl" />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 
                 {/* Content Section */}
-                <div className="px-8 py-8">
+                <div className="px-8 py-8 flex-1 flex flex-col justify-start">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="bg-gradient-primary text-primary-foreground w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-lg border-2 border-white/20 flex-shrink-0">
                       {step.id}

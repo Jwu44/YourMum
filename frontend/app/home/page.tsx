@@ -21,7 +21,7 @@ const TestHomePage = () => {
         <Hero handleGetStarted={handleGetStarted} />
 
         {/* How It Works Section */}
-        <HowItWorks handleGetStarted={handleGetStarted} />
+        <HowItWorks />
 
         {/* Spacer sections to test scroll behavior */}
         <section className="min-h-screen flex items-center justify-center bg-muted/10">
