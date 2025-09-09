@@ -43,6 +43,15 @@ class ApiClient {
       throw new Error('User not authenticated')
     }
 
+    // Add a small delay if this is immediately after auth state change
+    // to allow Firebase to fully establish the user session
+    try {
+      await currentUser.getIdToken(false) // Test if token is available without forcing refresh
+    } catch (error) {
+      console.log('Token not immediately available, waiting briefly then trying with force refresh...')
+      await new Promise(resolve => setTimeout(resolve, 100)) // Brief delay
+    }
+
     // Check if we have a valid cached token
     if (this.tokenCache) {
       const now = Date.now()

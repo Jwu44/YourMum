@@ -108,11 +108,35 @@ const Dashboard: React.FC = () => {
         if (hasEnsuredRefresh.current) return
         hasEnsuredRefresh.current = true
 
-        // Require an authenticated user to proceed
-        const me = await userApi.getCurrentUser().catch(() => null as any)
+        // Skip during OAuth/calendar connection flows
+        if (calendarConnectionStage || isPostOAuthHandlerActive) {
+          console.log('OAuth/calendar connection in progress, skipping calendar validation')
+          return
+        }
+
+        // Wait for user authentication to be fully established
+        const currentAuthUser = currentUser || auth.currentUser
+        if (!currentAuthUser) {
+          console.log('No authenticated user available, skipping calendar validation')
+          return
+        }
+
+        // Verify we can get a valid token before proceeding
+        try {
+          await currentAuthUser.getIdToken()
+        } catch (tokenError) {
+          console.log('Unable to get valid token, skipping calendar validation:', tokenError)
+          return
+        }
+
+        // Now safely get user data
+        const me = await userApi.getCurrentUser().catch((error) => {
+          console.log('Failed to get user data during calendar validation:', error)
+          return null
+        })
         if (!me) return
 
-        const calendar = (me).calendar || {}
+        const calendar = (me as any).calendar || {}
         const connected = !!calendar.connected
         const credentials = calendar.credentials || {}
         const hasRefresh = !!credentials.refreshToken
