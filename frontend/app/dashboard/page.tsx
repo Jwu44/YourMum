@@ -43,6 +43,7 @@ import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autoge
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
+import { calendarHealthService } from '@/lib/services/calendar-health'
 
 const Dashboard: React.FC = () => {
   const router = useRouter()
@@ -100,106 +101,64 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex])
 
-  // Check for calendar sync status and show appropriate messages
+  // Check for calendar sync status using Calendar Health Service
   useEffect(() => {
-    // One-time: validate calendar health and only re-authenticate if actually broken
     const validateCalendarHealth = async () => {
       try {
         if (hasEnsuredRefresh.current) return
         hasEnsuredRefresh.current = true
 
-        // Skip during OAuth/calendar connection flows
-        if (calendarConnectionStage || isPostOAuthHandlerActive) {
-          console.log('OAuth/calendar connection in progress, skipping calendar validation')
+        console.log('🔍 Dashboard: Starting calendar health validation...')
+        
+        const healthResult = await calendarHealthService.validateCalendarHealth(
+          calendarConnectionStage,
+          isPostOAuthHandlerActive
+        )
+
+        if (healthResult.skipReason) {
+          console.log(`⏭️ Calendar validation skipped: ${healthResult.skipReason}`)
           return
         }
 
-        // Wait for user authentication to be fully established
-        const currentAuthUser = currentUser || auth.currentUser
-        if (!currentAuthUser) {
-          console.log('No authenticated user available, skipping calendar validation')
+        if (healthResult.healthy) {
+          console.log('✅ Calendar is healthy')
           return
         }
 
-        // Verify we can get a valid token before proceeding
-        try {
-          await currentAuthUser.getIdToken()
-        } catch (tokenError) {
-          console.log('Unable to get valid token, skipping calendar validation:', tokenError)
-          return
-        }
+        console.log(`⚠️ Calendar health issue: ${healthResult.error}`)
 
-        // Now safely get user data
-        const me = await userApi.getCurrentUser().catch((error) => {
-          console.log('Failed to get user data during calendar validation:', error)
-          return null
-        })
-        if (!me) return
-
-        const calendar = (me as any).calendar || {}
-        const connected = !!calendar.connected
-        const credentials = calendar.credentials || {}
-        const hasRefresh = !!credentials.refreshToken
-
-        // Only proceed if calendar is marked as connected
-        if (!connected) return
-
-        // If we have refresh token, assume calendar is healthy
-        if (hasRefresh) return
-
-        // Test if calendar API actually works before forcing re-auth
-        try {
-          const token = await (currentUser || auth.currentUser)?.getIdToken(true)
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
-          const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-
-          // Test calendar API call - if this succeeds, calendar is working fine
-          const testResp = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` }
-          })
-
-          // If calendar API works, don't force re-auth even without refresh token
-          if (testResp.ok) {
-            console.log('Calendar API working fine, no re-auth needed')
-            return
+        // Handle different error types
+        if (healthResult.needsReauth) {
+          try {
+            console.log('🔄 Attempting calendar credential refresh...')
+            setIsEnsuringRefresh(true)
+            
+            await refreshCalendarCredentials()
+            
+            console.log('✅ Calendar credentials refreshed successfully')
+            calendarHealthService.reset() // Reset validation state after successful refresh
+          } catch (refreshError) {
+            console.error('❌ Failed to refresh calendar credentials:', refreshError)
+            
+            toast({
+              title: 'Calendar Connection Issue',
+              description: 'Please reconnect your Google Calendar in the Integrations page.',
+              variant: 'default'
+            })
+          } finally {
+            setIsEnsuringRefresh(false)
           }
-
-          // Only if calendar API fails, attempt Firebase credential refresh
-          if (testResp.status === 401 || testResp.status === 400) {
-            try {
-              console.log('Calendar API failed, refreshing Firebase credentials...')
-              setIsEnsuringRefresh(true)
-              
-              // Use Firebase to refresh credentials instead of backend OAuth redirect
-              await refreshCalendarCredentials()
-              
-              console.log('Calendar credentials refreshed successfully')
-              setIsEnsuringRefresh(false)
-            } catch (refreshError) {
-              console.error('Failed to refresh calendar credentials:', refreshError)
-              setIsEnsuringRefresh(false)
-              
-              // Show user-friendly message instead of crashing
-              toast({
-                title: 'Calendar Connection Issue',
-                description: 'Please reconnect your Google Calendar in the Integrations page.',
-                variant: 'default'
-              })
-            }
-          }
-          // If start failed, do NOT block dashboard; proceed without loader
-        } catch (e) {
-          // Calendar test failed, but don't block dashboard - user can manually reconnect via Integrations
-          console.log('Calendar health check failed, user can reconnect via Integrations:', e)
+        } else {
+          // Non-auth error, just log and continue
+          console.log('📝 Calendar API error (non-auth), continuing without refresh')
         }
-      } catch (_) {
-        // ignore
+      } catch (error) {
+        console.error('📋 Dashboard calendar validation error:', error)
       }
     }
 
     validateCalendarHealth()
-  }, [currentUser])
+  }, [currentUser, calendarConnectionStage, isPostOAuthHandlerActive, refreshCalendarCredentials, toast])
 
   useEffect(() => {
     // Check for general calendar connection errors

@@ -5,10 +5,11 @@ import { User, onAuthStateChanged, signOut as firebaseSignOut, GoogleAuthProvide
 import { auth, provider } from './firebase';
 import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { AuthContextType, CalendarCredentials } from '@/lib/types';
-import { calendarApi } from '@/lib/api/calendar';
 import { detectBrowserTimezone, shouldUpdateUserTimezone, isValidTimezone } from '@/lib/utils/timezone';
 import { PostOAuthHandler } from '@/components/parts/PostOAuthHandler';
 import { apiClient } from '@/lib/api/client';
+import { calendarApi } from '@/lib/api/calendar';
+import { categorizeAuthError, storeCalendarError } from '@/lib/utils/auth-errors';
 
 /**
  * Auth Context for managing user authentication state
@@ -47,31 +48,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Helper function to distinguish between token refresh errors and calendar connection issues
-   * This prevents showing "Calendar Connection Issue" when the problem is actually Firebase auth
+   * Handle errors using centralized error categorization
    */
-  const handleAuthError = (error: any, context: string): void => {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+  const handleError = (error: any, context: string): void => {
+    const categorizedError = categorizeAuthError(error, context)
     
-    // Check if this is a token-related error
-    const isTokenError = errorMessage.includes('token') || 
-                        errorMessage.includes('authentication') || 
-                        errorMessage.includes('unauthorized') ||
-                        error?.status === 401;
+    if (categorizedError.shouldShowToUser) {
+      setError(categorizedError.message)
+    }
     
-    if (isTokenError) {
-      console.error(`🔐 Token/Auth error in ${context}:`, errorMessage);
-      // Don't set calendar connection errors for token issues
-      // The API client will handle token refresh automatically
-    } else {
-      console.error(`📅 Calendar connection error in ${context}:`, errorMessage);
-      setError(errorMessage);
-      
-      // Only store calendar connection errors for actual calendar issues
-      localStorage.setItem('calendarConnectionError', JSON.stringify({
-        error: errorMessage,
-        action: 'redirect_to_integrations'
-      }));
+    if (categorizedError.shouldStoreForRouting) {
+      storeCalendarError(categorizedError.message)
     }
   };
 
@@ -118,8 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsOAuthInProgress(false);
       setCalendarConnectionStage(null);
       
-      // Use helper to properly categorize the error
-      handleAuthError(error, 'processCalendarAccess');
+      // Use centralized error handling
+      handleError(error, 'processCalendarAccess');
     }
   };
 
@@ -485,8 +472,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Calendar credential refresh error:', error);
       
-      // Use helper to properly categorize the error
-      handleAuthError(error, 'refreshCalendarCredentials');
+      // Use centralized error handling
+      handleError(error, 'refreshCalendarCredentials');
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to refresh calendar credentials';
       throw new Error(errorMessage);
@@ -522,11 +509,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPostOAuthCredential(null);
     setError(errorMessage);
     
-    // Store error for routing logic
-    localStorage.setItem('calendarConnectionError', JSON.stringify({
-      error: errorMessage,
-      action: 'redirect_to_integrations'
-    }));
+    // Store error for routing logic using centralized utility
+    storeCalendarError(errorMessage);
   };
 
   const value: AuthContextType = {
