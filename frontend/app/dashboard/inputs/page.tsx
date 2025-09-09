@@ -181,6 +181,7 @@ export default function InputsPage () {
   /**
    * Load current schedule tasks for the target date
    * This ensures tasks are included in the payload when saving
+   * Always loads from backend to get the most recent task state
    */
   const loadCurrentScheduleTasks = useCallback(async () => {
     setIsLoadingTasks(true)
@@ -261,7 +262,8 @@ export default function InputsPage () {
 
   /**
    * Load current schedule tasks when component mounts
-   * Only load from backend if FormContext doesn't have user modifications
+   * Always reload from backend to ensure we have the most recent tasks
+   * This fixes the bug where FormContext contains stale task data from previous sessions
    */
   useEffect(() => {
     // Only run once on mount to avoid infinite loops
@@ -269,20 +271,13 @@ export default function InputsPage () {
       return
     }
 
-    // Check if FormContext already has user modifications
-    const hasUserChanges = hasFormModifications(state)
-
-    if (!hasUserChanges) {
-      // Only load from backend if FormContext is in initial state
-      console.log('FormContext is in initial state, loading from backend...')
-      void loadCurrentScheduleTasks()
-    } else {
-      // Preserve existing user changes in FormContext
-      console.log('FormContext has user modifications, preserving existing state...')
-    }
+    // Always load current schedule from backend to ensure we have the most recent tasks
+    // This fixes the bug where dashboard modifications aren't reflected in FormContext
+    console.log('Loading current schedule from backend to ensure fresh task data...')
+    void loadCurrentScheduleTasks()
 
     hasLoadedRef.current = true
-  }, [state, loadCurrentScheduleTasks])
+  }, [loadCurrentScheduleTasks])
 
   /**
    * Sync priorities display order with loaded form data from backend
