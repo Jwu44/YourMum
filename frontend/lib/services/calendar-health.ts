@@ -5,6 +5,7 @@
  */
 
 import { auth } from '@/auth/firebase'
+import { apiClient } from '@/lib/api/client'
 
 export interface CalendarHealthResult {
   healthy: boolean
@@ -50,17 +51,8 @@ export class CalendarHealthService {
         return { healthy: true, skipReason: 'no_user' }
       }
 
-      // Verify we can get a valid token before proceeding
-      let token: string
-      try {
-        token = await currentUser.getIdToken()
-      } catch (tokenError) {
-        console.log('Unable to get valid token, skipping calendar validation:', tokenError)
-        return { healthy: true, skipReason: 'invalid_token' }
-      }
-
-      // Test calendar API connectivity
-      const result = await this.testCalendarApi(token)
+      // Test calendar API connectivity using API Client (handles authentication automatically)
+      const result = await this.testCalendarApi()
       
       // Mark as validated on successful test
       if (result.healthy) {
@@ -80,19 +72,15 @@ export class CalendarHealthService {
   }
 
   /**
-   * Test actual calendar API endpoint
-   * @param token - Firebase ID token for authentication
+   * Test actual calendar API endpoint using API Client
    * @returns API test result
    */
-  private async testCalendarApi(token: string): Promise<CalendarHealthResult> {
+  private async testCalendarApi(): Promise<CalendarHealthResult> {
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
       const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
 
-      const response = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // Use API Client for automatic token refresh and retry logic
+      const response = await apiClient.get(`/api/calendar/events?date=${testDate}`)
 
       if (response.ok) {
         console.log('Calendar API working fine, no re-auth needed')

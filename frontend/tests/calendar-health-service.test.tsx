@@ -6,10 +6,16 @@
 
 import { CalendarHealthService } from '@/lib/services/calendar-health'
 import { auth } from '@/auth/firebase'
+import { apiClient } from '@/lib/api/client'
 
 // Mock dependencies
 jest.mock('@/auth/firebase')
 jest.mock('@/lib/api/users')
+jest.mock('@/lib/api/client', () => ({
+  apiClient: {
+    get: jest.fn()
+  }
+}))
 
 // Mock fetch globally
 global.fetch = jest.fn()
@@ -20,11 +26,14 @@ describe('CalendarHealthService', () => {
     getIdToken: jest.fn().mockResolvedValue('mock-token'),
     uid: 'test-user'
   }
+  
+  const mockApiClient = apiClient as jest.Mocked<typeof apiClient>
 
   beforeEach(() => {
     service = new CalendarHealthService()
     jest.clearAllMocks()
     ;(fetch as jest.Mock).mockClear()
+    mockApiClient.get.mockClear()
     ;(auth as any).currentUser = mockUser
     mockUser.getIdToken.mockResolvedValue('mock-token') // Reset mock
   })
@@ -36,7 +45,7 @@ describe('CalendarHealthService', () => {
   describe('validateCalendarHealth', () => {
     it('should return early if already validated', async () => {
       // First call should validate
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+      mockApiClient.get.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
@@ -47,7 +56,7 @@ describe('CalendarHealthService', () => {
       const result = await service.validateCalendarHealth()
       
       expect(result).toEqual({ healthy: true, skipReason: 'already_validated' })
-      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(mockApiClient.get).toHaveBeenCalledTimes(1)
     })
 
     it('should skip validation during OAuth flows', async () => {
@@ -57,7 +66,7 @@ describe('CalendarHealthService', () => {
         healthy: true, 
         skipReason: 'oauth_in_progress' 
       })
-      expect(fetch).not.toHaveBeenCalled()
+      expect(mockApiClient.get).not.toHaveBeenCalled()
     })
 
     it('should skip validation when no authenticated user', async () => {
@@ -69,23 +78,12 @@ describe('CalendarHealthService', () => {
         healthy: true, 
         skipReason: 'no_user' 
       })
-      expect(fetch).not.toHaveBeenCalled()
+      expect(mockApiClient.get).not.toHaveBeenCalled()
     })
 
-    it('should skip validation when token is invalid', async () => {
-      mockUser.getIdToken.mockRejectedValueOnce(new Error('Token error'))
-      
-      const result = await service.validateCalendarHealth()
-      
-      expect(result).toEqual({ 
-        healthy: true, 
-        skipReason: 'invalid_token' 
-      })
-      expect(fetch).not.toHaveBeenCalled()
-    })
-
-    it('should return healthy when calendar API works', async () => {
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+    it('should use API Client for calendar API requests', async () => {
+      // Mock successful API Client response
+      mockApiClient.get.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
@@ -93,18 +91,15 @@ describe('CalendarHealthService', () => {
       const result = await service.validateCalendarHealth()
       
       expect(result).toEqual({ healthy: true })
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/calendar/events'),
-        expect.objectContaining({
-          method: 'GET',
-          headers: { Authorization: 'Bearer mock-token' }
-        })
+      expect(mockApiClient.get).toHaveBeenCalledWith(
+        expect.stringContaining('/api/calendar/events?date=')
       )
-      expect(mockUser.getIdToken).toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled() // Should not use direct fetch
+      expect(mockUser.getIdToken).not.toHaveBeenCalled() // API Client handles auth
     })
 
-    it('should return unhealthy when calendar API fails with auth error', async () => {
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+    it('should return unhealthy when API Client returns auth error', async () => {
+      mockApiClient.get.mockResolvedValueOnce({
         ok: false,
         status: 401
       })
@@ -118,8 +113,8 @@ describe('CalendarHealthService', () => {
       })
     })
 
-    it('should return unhealthy when calendar API fails with other error', async () => {
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+    it('should return unhealthy when API Client returns other error', async () => {
+      mockApiClient.get.mockResolvedValueOnce({
         ok: false,
         status: 500
       })
@@ -134,7 +129,7 @@ describe('CalendarHealthService', () => {
     })
 
     it('should handle network errors gracefully', async () => {
-      ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'))
+      mockApiClient.get.mockRejectedValueOnce(new Error('Network error'))
 
       const result = await service.validateCalendarHealth()
       
@@ -149,24 +144,24 @@ describe('CalendarHealthService', () => {
   describe('reset', () => {
     it('should reset validation state', async () => {
       // First validation
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+      mockApiClient.get.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
       
       await service.validateCalendarHealth()
-      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(mockApiClient.get).toHaveBeenCalledTimes(1)
 
       // Reset and validate again
       service.reset()
       
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
+      mockApiClient.get.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
       
       await service.validateCalendarHealth()
-      expect(fetch).toHaveBeenCalledTimes(2)
+      expect(mockApiClient.get).toHaveBeenCalledTimes(2)
     })
   })
 })
