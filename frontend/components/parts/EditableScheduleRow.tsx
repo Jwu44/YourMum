@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
@@ -11,9 +11,6 @@ import { useToast } from '@/hooks/use-toast'
 import {
   type Task
 } from '../../lib/types'
-import {
-  handleMicrostepDecomposition
-} from '../../lib/helper'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
@@ -22,9 +19,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
-// Import our new drag drop hook
+// Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
 import { useDragState } from '../../contexts/DragStateContext'
+import { useMicrostepDecomposition } from '@/hooks/useMicrostepDecomposition'
+import { useDecompositionContext } from '@/contexts/DecompositionContext'
 
 interface CustomDropdownItem {
   label: string
@@ -44,6 +43,7 @@ interface EditableScheduleRowProps {
   onEditTask?: (task: Task) => void // New prop for edit functionality
   onDeleteTask?: (task: Task) => void // New prop for delete functionality
   onArchiveTask?: (task: Task) => void // New prop for archive functionality
+  onMicrostepInsert?: (newSubtask: Task, parentId: string) => void // New prop for simplified microstep insertion
   customDropdownItems?: CustomDropdownItem[] // Custom dropdown items for specific contexts
 }
 
@@ -257,6 +257,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onEditTask, // New prop for edit functionality
   onDeleteTask, // New prop for delete functionality
   onArchiveTask, // New prop for archive functionality
+  onMicrostepInsert, // New prop for simplified microstep insertion
   customDropdownItems // Custom dropdown items for specific contexts
 }) => {
   // Use our new drag drop hook instead of complex local state
@@ -274,28 +275,38 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
 
-  // New state for microsteps
-  const [isDecomposing, setIsDecomposing] = useState(false)
-  const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
-  const [showMicrosteps, setShowMicrosteps] = useState(false)
-
   // State to track dropdown menu visibility
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Hooks
   const { state: formData } = useForm()
   const { toast } = useToast()
+  
+  // Use new microstep decomposition hook
+  const microstepHook = useMicrostepDecomposition()
+  
+  // Use decomposition context for global state management
+  const decompositionContext = useDecompositionContext()
 
-  // Can only decompose non-section, non-microstep, non-subtask tasks
-  const canDecompose = !isSection && !task.is_microstep && !task.is_subtask
+  // Memoize canDecompose calculation to prevent unnecessary re-renders
+  const canDecompose = useMemo(() => {
+    const isDecomposableType = !isSection && !task.is_microstep && !task.is_subtask
+    return isDecomposableType && decompositionContext.canDecompose(task.id)
+  }, [isSection, task.is_microstep, task.is_subtask, task.id, decompositionContext])
 
-  // Add state for re-rendering when emoji changes
+  // Add state for re-rendering when emoji changes (optimized)
   const [, forceUpdate] = useState(0)
 
-  // Callback to force re-render when emoji changes
+  // Memoized callback to force re-render when emoji changes
   const handleEmojiChange = useCallback(() => {
     forceUpdate(prev => prev + 1)
   }, [])
+
+  // Memoize expensive getSectionIcon computation to prevent localStorage access on every render
+  const sectionIcon = useMemo(() => {
+    if (!isSection) return null
+    return getSectionIcon(task.text, handleEmojiChange)
+  }, [isSection, task.text, handleEmojiChange, forceUpdate])
 
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {
@@ -460,148 +471,47 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text])
 
   /**
-   * Handles task decomposition into microsteps
-   *
-   * Uses the AI service to break down a task into smaller, more manageable steps
-   * and presents them to the user for selection.
+   * Handles task decomposition using the new hook and context
+   * 
+   * Optimized version that uses the decomposition hook and prevents
+   * concurrent decompositions across all tasks.
    */
   const handleDecompose = useCallback(async () => {
-    // Guard clause - only proceed if decomposition is allowed and not already in progress
-    if (!canDecompose || isDecomposing) return
+    // Guard clause - only proceed if decomposition is allowed
+    if (!canDecompose || microstepHook.isDecomposing) return
 
     try {
-      // Set loading state and clear any existing microsteps
-      setIsDecomposing(true)
-      setShowMicrosteps(false)
-
-      // Get microstep texts from backend
-      const microstepTexts = await handleMicrostepDecomposition(task, formData)
-
-      // Convert microstep texts into full Task objects
-      // Updated to handle both string array and object array responses
-      const microstepTasks = microstepTexts.map((step: string | {
-        text: string
-        rationale?: string
-        estimated_time?: string
-        energy_level_required?: 'low' | 'medium' | 'high'
-      }) => {
-        // Handle both string and object formats
-        const isObject = typeof step !== 'string'
-        const text = isObject ? step.text : step
-        const rationale = isObject ? step.rationale : undefined
-        const estimatedTime = isObject ? step.estimated_time : undefined
-        const energyLevel = isObject ? step.energy_level_required : undefined
-
-        return {
-          id: crypto.randomUUID(), // Generate unique ID for each microstep
-          text, // The microstep text
-          rationale, // Store explanation if available
-          estimated_time: estimatedTime, // Store time estimate if available
-          energy_level_required: energyLevel, // Store energy level if available
-          is_microstep: true, // Mark as microstep
-          completed: false,
-          is_section: false,
-          section: task.section, // Inherit section from parent
-          parent_id: task.id, // Link to parent task
-          level: (task.level || 0) + 1, // Indent one level from parent
-          type: 'microstep',
-          categories: task.categories || [], // Inherit categories from parent
-          // Add layout-related information for proper rendering
-          section_index: 0 // Will be recalculated when added to schedule
-        }
-      })
-
-      // Update UI with new microsteps
-      setSuggestedMicrosteps(microstepTasks)
-      setShowMicrosteps(true)
-
-      // Show success message
-      toast({
-        title: 'Success',
-        description: 'Select which microsteps to add'
-      })
+      // Set global decomposition state to prevent concurrent operations
+      decompositionContext.setDecomposingTask(task.id)
+      
+      // Use the hook to handle decomposition
+      await microstepHook.decompose(task, formData)
     } catch (error) {
-      // Handle and display any errors
-      console.error('Error decomposing task:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to decompose task',
-        variant: 'destructive'
-      })
+      // Error handling is managed by the hook
+      console.error('Error in handleDecompose:', error)
     } finally {
-      // Reset loading state regardless of outcome
-      setIsDecomposing(false)
+      // Clear global decomposition state
+      decompositionContext.clearDecomposingTask()
     }
-  }, [canDecompose, task, formData, toast, isDecomposing])
+  }, [canDecompose, microstepHook, decompositionContext, task, formData])
 
   /**
    * Handles user acceptance of a suggested microstep
-   *
-   * Converts a microstep suggestion into an actual task and adds it to the schedule
-   * Preserves layout information and parent-child relationships.
-   *
-   * @param microstep - The microstep suggestion to convert to a task
+   * 
+   * Optimized version that uses the microstep hook for all logic
    */
-  const handleMicrostepAccept = useCallback(async (microstep: Task) => {
-    try {
-      // Create a new task object with all required properties for a subtask
-      const newSubtask: Task = {
-        ...microstep,
-        id: crypto.randomUUID(), // Generate new ID for the actual task
-        is_subtask: true,
-        parent_id: task.id, // Link to parent task
-        level: (task.level || 0) + 1, // Indent one level from parent
-        section: task.section, // Inherit section from parent
-        categories: task.categories || [], // Inherit categories from parent
-        completed: false,
-        is_section: false,
-        type: 'task', // Change type from 'microstep' to 'task'
-        start_time: null,
-        end_time: null,
-        is_recurring: null,
-        section_index: 0, // Will be recalculated by EditableSchedule
-        // Include additional properties from the microstep if available
-        rationale: microstep.rationale || task.rationale,
-        estimated_time: microstep.estimated_time || task.estimated_time,
-        energy_level_required: microstep.energy_level_required || task.energy_level_required
-      }
+  const handleMicrostepAccept = useCallback((microstep: Task) => {
+    microstepHook.acceptMicrostep(microstep, onUpdateTask)
+  }, [microstepHook, onUpdateTask])
 
-      // Call the main onUpdateTask function which will handle the task creation
-      onUpdateTask(newSubtask)
-
-      // Remove the microstep from suggestions
-      setSuggestedMicrosteps(prev => prev.filter(step => step.id !== microstep.id))
-
-      // Close suggestions panel when all microsteps are handled
-      if (suggestedMicrosteps.length <= 1) {
-        setShowMicrosteps(false)
-      }
-
-      // Show success toast
-      toast({
-        title: 'Success',
-        description: 'Microstep added to schedule'
-      })
-    } catch (error) {
-      console.error('Error accepting microstep:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to add microstep to schedule',
-        variant: 'destructive'
-      })
-    }
-  }, [task, onUpdateTask, suggestedMicrosteps.length, toast])
-
-  // Update the handleMicrostepReject to simply remove the suggestion
+  /**
+   * Handles user rejection of a suggested microstep
+   * 
+   * Optimized version that uses the microstep hook for all logic
+   */
   const handleMicrostepReject = useCallback((microstep: Task) => {
-    // Remove the rejected microstep from suggestions
-    setSuggestedMicrosteps(prev => prev.filter(step => step.id !== microstep.id))
-
-    // Close suggestions panel when all microsteps are handled
-    if (suggestedMicrosteps.length <= 1) {
-      setShowMicrosteps(false)
-    }
-  }, [suggestedMicrosteps.length])
+    microstepHook.rejectMicrostep(microstep)
+  }, [microstepHook])
 
   // Enhanced task actions with decompose button and ellipses dropdown
   const renderTaskActions = () => (
@@ -638,10 +548,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleDecompose}
-          disabled={isDecomposing}
+          disabled={microstepHook.isDecomposing || !canDecompose}
           className="h-8 w-8 p-0 gradient-accent hover:opacity-90 text-primary-foreground hover:scale-105 transition-all duration-200"
         >
-          {isDecomposing
+          {microstepHook.isDecomposing
             ? (
             <Loader2 className="h-4 w-4 animate-spin" />
               )
@@ -755,7 +665,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           className={cn(
             dragDropHook.getRowClassName(),
             isSection ? 'cursor-default' : '',
-            isDecomposing && 'animate-pulse',
+            microstepHook.isDecomposing && 'animate-pulse',
             // Section styling - removed px-4 to align with task content
             isSection ? 'mt-2.5 mb-2.5 w-full'
             // Task card styling - no gap-4 to control spacing manually, grip is positioned absolutely
@@ -805,7 +715,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           {isSection
             ? (
             <div className="flex items-center gap-3 py-3">
-              {getSectionIcon(task.text, handleEmojiChange)}
+              {sectionIcon}
               <TypographyH4 className="text-foreground font-semibold mb-0">
                 {task.text}
               </TypographyH4>
@@ -837,9 +747,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       </div>
 
       {/* Microstep Suggestions */}
-      {showMicrosteps && suggestedMicrosteps.length > 0 && (
+      {microstepHook.showMicrosteps && microstepHook.suggestedMicrosteps.length > 0 && (
         <MicrostepSuggestions
-          microsteps={suggestedMicrosteps}
+          microsteps={microstepHook.suggestedMicrosteps}
           onAccept={handleMicrostepAccept}
           onReject={handleMicrostepReject}
           className="mt-2"

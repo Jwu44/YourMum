@@ -315,9 +315,19 @@ const Dashboard: React.FC = () => {
             // Add new task (for microsteps)
             const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id)
             if (parentIndex !== -1) {
-              const insertIndex = parentIndex + 1 + currentTasks
-                .slice(0, parentIndex + 1)
-                .filter(t => t.parent_id === updatedTask.parent_id).length
+              let insertIndex: number
+              
+              if (updatedTask.insertAtTop) {
+                // Insert at top: right after parent
+                insertIndex = parentIndex + 1
+                console.log('🔝 Inserting at top, index:', insertIndex)
+              } else {
+                // Insert at bottom: after existing subtasks
+                insertIndex = parentIndex + 1 + currentTasks
+                  .slice(0, parentIndex + 1)
+                  .filter(t => t.parent_id === updatedTask.parent_id).length
+                console.log('📍 Inserting at bottom, index:', insertIndex)
+              }
 
               const newTasks = [...currentTasks]
               newTasks.splice(insertIndex, 0, updatedTask)

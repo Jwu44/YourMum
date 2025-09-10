@@ -32,6 +32,8 @@ export interface Task {
   slack_message_url?: string
   // Preferred container for Slack message links; UI will prefer deep_link, then message_url
   slack_metadata?: SlackMetadata
+  // Flag to indicate microstep should be inserted at top of subtask list
+  insertAtTop?: boolean
 }
 
 export interface FormData {
