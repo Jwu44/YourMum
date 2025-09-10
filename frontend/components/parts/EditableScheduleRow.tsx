@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
 import { TypographyH4 } from '@/app/dashboard/fonts/text'
-import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
+import { Pickaxe, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
@@ -544,21 +545,28 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )}
       {/* Decompose button - existing functionality */}
       {canDecompose && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDecompose}
-          disabled={microstepHook.isDecomposing || !canDecompose}
-          className="h-8 w-8 p-0 gradient-accent hover:opacity-90 text-primary-foreground hover:scale-105 transition-all duration-200"
-        >
-          {microstepHook.isDecomposing
-            ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-              )
-            : (
-            <Sparkles className="h-4 w-4 animate-sparkle" />
-              )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDecompose}
+              disabled={microstepHook.isDecomposing || !canDecompose}
+              className="h-8 w-8 p-0 gradient-accent hover:bg-transparent text-primary-foreground hover:scale-105 transition-all duration-200"
+            >
+              {microstepHook.isDecomposing
+                ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+                  )
+                : (
+                <Pickaxe className="h-4 w-4 animate-sparkle" />
+                  )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Breakdown task</p>
+          </TooltipContent>
+        </Tooltip>
       )}
 
       {/* Ellipses dropdown menu - new functionality */}

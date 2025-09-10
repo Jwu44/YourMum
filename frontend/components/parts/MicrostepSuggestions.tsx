@@ -61,7 +61,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
         animate="animate"
         exit="exit"
         layout // Use layout animation for smoother transitions
-        className="flex items-center justify-between p-2 bg-gray-800 rounded-md border border-gray-700"
+        className="flex items-center justify-between p-4 my-2 bg-purple-50 rounded-xl border border-purple-200"
       >
         {/* Checkbox and text container */}
         <div className="flex items-center flex-1 mr-4">
@@ -76,9 +76,9 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
           </div>
           {/* Text content */}
           <div className="flex-1">
-            <p className="text-sm text-white">{microstep.text}</p>
+            <p className="text-sm text-gray-900">{microstep.text}</p>
             {microstep.rationale && (
-              <p className="text-xs text-gray-400 mt-1">{microstep.rationale}</p>
+              <p className="text-xs text-gray-600 mt-1">{microstep.rationale}</p>
             )}
           </div>
         </div>
@@ -88,7 +88,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
           <Button
             size="sm"
             variant="ghost"
-            className="text-success hover:text-success/80 transition-colors"
+            className="text-success hover:text-white hover:bg-green-600 transition-colors"
             onClick={() => handleAccept(microstep)}
             aria-label="Accept microstep"
           >
@@ -97,7 +97,7 @@ const MicrostepSuggestions: React.FC<MicrostepSuggestionsProps> = ({
           <Button
             size="sm"
             variant="ghost"
-            className="text-destructive hover:text-destructive/80 transition-colors"
+            className="text-destructive hover:text-white hover:bg-red-600 transition-colors"
             onClick={() => handleReject(microstep)}
             aria-label="Reject microstep"
           >
