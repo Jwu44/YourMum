@@ -73,6 +73,13 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 40px hsl(var(--primary) / 0.4);
 
     --radius: 0.75rem;
+
+    /* Features component specific variables */
+    --feature-radius: 1.25rem;
+    --feature-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    --feature-toggle-bg: hsl(var(--muted));
+    --feature-toggle-active: hsl(var(--primary));
+    --feature-bg-pastel: hsl(var(--muted)/0.5);
   }
 
   .dark {
@@ -139,6 +146,12 @@ All colors MUST be HSL.
     /* Shadows - Dark theme */
     --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.5);
     --shadow-glow: 0 0 40px hsl(var(--primary) / 0.6);
+
+    /* Features component specific variables - Dark theme */
+    --feature-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    --feature-toggle-bg: hsl(var(--muted));
+    --feature-toggle-active: hsl(var(--primary));
+    --feature-bg-pastel: hsl(var(--card));
   }
 }
 
@@ -648,6 +661,64 @@ All colors MUST be HSL.
   @media (hover: none) and (pointer: coarse) {
     .hover-desktop {
       @apply active:bg-hover active:text-hover-foreground;
+    }
+  }
+
+  /* Features component animations and utilities */
+  .feature-toggle-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+
+  .dark .feature-toggle-sticky {
+    background-color: rgba(15, 23, 42, 0.8);
+  }
+
+  /* Feature group transitions */
+  .feature-group-transition {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: feature-group-enter 250ms ease forwards;
+  }
+
+  .feature-group-enter {
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes feature-group-enter {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Feature card animations */
+  .feature-card-enter {
+    animation: feature-card-slide-in 250ms ease forwards;
+  }
+
+  @keyframes feature-card-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .feature-group-transition,
+    .feature-card-enter {
+      animation: none;
+      opacity: 1;
+      transform: none;
     }
   }
 }

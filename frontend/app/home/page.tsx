@@ -1,6 +1,7 @@
 'use client'
 import Navigation from '@/components/parts/home/Navigation'
 import Hero from '@/components/parts/home/Hero'
+import Features from '@/components/parts/home/Features'
 import HowItWorks from '@/components/parts/home/HowItWorks'
 import PricingSection from '@/components/parts/home/Pricing'
 import Footer from '@/components/parts/home/Footer'
@@ -19,6 +20,9 @@ const TestHomePage = () => {
       <main>
         {/* Hero Section with 3D Dashboard */}
         <Hero handleGetStarted={handleGetStarted} />
+
+        {/* Features Section */}
+        <Features />
 
         {/* How It Works Section */}
         <HowItWorks />
