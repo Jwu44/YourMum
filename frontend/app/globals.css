@@ -721,4 +721,30 @@ All colors MUST be HSL.
       transform: none;
     }
   }
+
+  /* Stable pulse animation for task decomposition */
+  @keyframes pulse-gentle-stable {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+}
+
+/* Global keyframes for task decomposition - ensure it's accessible everywhere */
+@keyframes pulse-prominent {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Task decomposition animation class */
+.task-decomposing {
+  animation: pulse-prominent 3s ease-in-out infinite;
+  animation-fill-mode: both;
 }

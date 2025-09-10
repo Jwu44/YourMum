@@ -164,6 +164,14 @@ export default {
 						opacity: '0.5'
 					}
 				},
+				'pulse-gentle': {
+					'0%, 100%': {
+						opacity: '1'
+					},
+					'50%': {
+						opacity: '0.7'
+					}
+				},
 				'sparkle': {
 					'0%, 100%': { transform: 'rotate(0deg) scale(1)', opacity: '0.8' },
 					'50%': { transform: 'rotate(180deg) scale(1.1)', opacity: '1' }
@@ -177,6 +185,7 @@ export default {
 				'slide-up': 'slide-up 0.4s ease-out',
 				'scale-in': 'scale-in 0.3s ease-out',
 				'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'pulse-gentle': 'pulse-gentle 4s ease-in-out infinite',
 				'sparkle': 'sparkle 2s ease-in-out infinite'
 			},
 			animationDelay: {
