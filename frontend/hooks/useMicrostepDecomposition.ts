@@ -84,7 +84,8 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
 
       toast({
         title: 'Success',
-        description: 'Select which microsteps to add'
+        description: 'Select which microsteps to add',
+        variant: 'success'
       })
     } catch (error) {
       console.error('Error decomposing task:', error)

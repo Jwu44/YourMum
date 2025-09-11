@@ -105,7 +105,7 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
       toast({
         title: 'Calendar Connected',
         description: 'Google Calendar has been successfully connected',
-        variant: 'default'
+        variant: 'success'
       })
 
       // Refresh status after successful connection
@@ -131,15 +131,15 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
       setIsDisconnecting(true)
       await calendarApi.disconnectCalendar(currentUser.uid)
       toast({
-        title: 'Disconnected',
+        title: 'Success!',
         description: 'Google Calendar has been disconnected',
-        variant: 'default'
+        variant: 'success'
       })
       await fetchConnectionStatus()
     } catch (error) {
       console.error('Calendar disconnection failed:', error)
       toast({
-        title: 'Disconnection Failed',
+        title: 'Error!',
         description: error instanceof Error ? error.message : 'Failed to disconnect calendar',
         variant: 'destructive'
       })

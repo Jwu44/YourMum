@@ -108,7 +108,7 @@ const ArchivePage: React.FC = () => {
           toast({
             title: 'Warning',
             description: 'Task moved but may not appear in today\'s schedule immediately',
-            variant: 'default'
+            variant: 'warning'
           })
         } else {
         }
@@ -117,7 +117,7 @@ const ArchivePage: React.FC = () => {
         toast({
           title: 'Warning',
           description: 'Task moved but may not appear in today\'s schedule immediately',
-          variant: 'default'
+          variant: 'warning'
         })
       }
 
@@ -150,7 +150,7 @@ const ArchivePage: React.FC = () => {
       toast({
         title: 'Success',
         description: 'Archived task deleted permanently',
-        variant: 'default'
+        variant: 'success'
       })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete archived task'

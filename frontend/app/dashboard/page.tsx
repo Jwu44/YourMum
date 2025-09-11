@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
             toast({
               title: 'Calendar Connection Issue',
               description: 'Please reconnect your Google Calendar in the Integrations page.',
-              variant: 'default'
+              variant: 'destructive'
             })
           } finally {
             setIsEnsuringRefresh(false)
@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
       toast({
         title: 'Calendar Connection Issue',
         description: 'To sync calendar events, please connect your Google Calendar in Integrations.',
-        variant: 'default'
+        variant: 'destructive'
       })
       localStorage.removeItem('calendarConnectionError')
     }
