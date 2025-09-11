@@ -102,9 +102,10 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
       }
 
       // Create credentials and connect to calendar
+      // Note: Firebase doesn't provide refresh tokens, so we only use access token here
+      // For long-term access, users should use the direct OAuth flow via reconnectCalendar()
       const credentials: CalendarCredentials = {
         accessToken: credential.accessToken,
-        refreshToken: (credential as any).refreshToken, // Include refresh token for long-term access
         expiresAt: Date.now() + 3600000, // 1 hour expiry as fallback
         scopes: scopes
       }

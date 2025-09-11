@@ -354,60 +354,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Reconnect Google Calendar for existing authenticated users
-   * This triggers the OAuth flow specifically for calendar access
+   * Reconnect Google Calendar for existing authenticated users using direct Google OAuth
+   * This bypasses Firebase to get real refresh tokens from Google
    */
   const reconnectCalendar = async () => {
     try {
       setError(null);
-      console.log("Starting calendar reconnection process");
+      console.log("Starting direct Google OAuth calendar reconnection");
       
       if (!user) {
         throw new Error('User must be authenticated to reconnect calendar');
       }
       
-      // Configure provider to request calendar access and force consent screen
-      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
-      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
-      provider.setCustomParameters({
-        prompt: 'consent'  // Force the consent screen to appear
-      });
-      
-      console.log("Initiating calendar reconnection with popup");
-      
-      // Use popup for calendar reconnection (no redirect needed)
-      const result = await signInWithPopup(auth, provider);
-      console.log("Calendar reconnection successful");
-      
-      // Get credentials from result
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential || !credential.accessToken) {
-        throw new Error('No calendar access token received');
+      // Build direct Google OAuth URL with proper parameters for refresh tokens
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Google Client ID not configured');
       }
       
-      // Get scopes and connect to calendar
-      const scopes = await getScopes(credential.accessToken);
-      const hasCalendarAccess = scopes.some(scope => 
-        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
-      );
+      const redirectUri = `${window.location.origin}/integrations/calendar/callback`;
+      const scopes = [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events.readonly'
+      ].join(' ');
       
-      if (!hasCalendarAccess) {
-        throw new Error('Calendar access not granted');
-      }
+      const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      oauthUrl.searchParams.set('client_id', clientId);
+      oauthUrl.searchParams.set('redirect_uri', redirectUri);
+      oauthUrl.searchParams.set('response_type', 'code');
+      oauthUrl.searchParams.set('scope', scopes);
+      oauthUrl.searchParams.set('access_type', 'offline'); // Critical for refresh tokens
+      oauthUrl.searchParams.set('prompt', 'consent'); // Force consent to get refresh tokens
+      oauthUrl.searchParams.set('include_granted_scopes', 'true');
       
-      // Create credentials and connect
-      const credentials: CalendarCredentials = {
-        accessToken: credential.accessToken,
-        expiresAt: Date.now() + 3600000, // 1 hour expiry as a fallback
-        scopes: scopes
-      };
+      console.log("Redirecting to Google OAuth for calendar access");
       
-      await calendarApi.connectCalendar(credentials);
-      console.log("Calendar reconnected successfully");
+      // Store current page to return to after OAuth
+      localStorage.setItem('calendar-oauth-redirect', window.location.pathname);
+      
+      // Redirect to Google OAuth
+      window.location.href = oauthUrl.toString();
       
     } catch (error) {
       console.error('Calendar reconnection error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to reconnect calendar';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  /**
+   * Handle OAuth callback from Google with authorization code
+   * This exchanges the code for access and refresh tokens via backend
+   */
+  const handleOAuthCallback = async (authorizationCode: string) => {
+    try {
+      setError(null);
+      console.log("Processing OAuth authorization code from Google");
+      
+      if (!user) {
+        throw new Error('User must be authenticated');
+      }
+      
+      // Exchange authorization code for tokens via backend
+      const response = await apiClient.post('/api/calendar/oauth-exchange', {
+        authorization_code: authorizationCode
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to exchange OAuth tokens');
+      }
+      
+      const data = await response.json();
+      console.log("✅ OAuth token exchange successful - refresh tokens stored");
+      
+      // Redirect back to where user came from
+      const redirectPath = localStorage.getItem('calendar-oauth-redirect') || '/dashboard';
+      localStorage.removeItem('calendar-oauth-redirect');
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        window.location.href = redirectPath;
+      }, 1000);
+      
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process OAuth callback';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -523,6 +556,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     reconnectCalendar,
     refreshCalendarCredentials,
+    handleOAuthCallback,
   };
 
   // Show PostOAuthHandler overlay if in post-OAuth flow

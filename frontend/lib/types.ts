@@ -359,6 +359,7 @@ export interface AuthContextType extends AuthState {
   signOut: () => Promise<void>
   reconnectCalendar: () => Promise<void> // New method for calendar reconnection
   refreshCalendarCredentials: () => Promise<void> // New method for refreshing calendar credentials
+  handleOAuthCallback: (authorizationCode: string) => Promise<void> // New method for OAuth callback
 }
 
 // Python backend response types

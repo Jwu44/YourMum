@@ -1,4 +1,4 @@
-# Status: To Do
+# Status: To do
 I am facing a bug where I am asked forced to re sign in via google sso to reconnect my google calendar every hour
 
 # Steps to reproduce:
@@ -49,6 +49,37 @@ X-Request-Start: 1757480546043
 Request body: {'googleId': 'VlCf1isTbDM2lSlj1rJkNMQlORN2', 'email': 'justin.wu4444@gmail.com', 'displayName': 'Justin Wu', 'photoURL': 'https://lh3.googleusercontent.com/a/ACg8ocL0LSvlk8wllunIei33pP_1Cce4t4DyHmlBrTaL1LNVYyKaU68FiA=s96-c', 'hasCalendarAccess': False}
 DEBUG: Access token expired but no refresh token available for user VlCf1isTbDM2lSlj1rJkNMQlORN2
 
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/firebase_admin/_token_gen.py", line 392, in verify
+    verified_claims = google.oauth2.id_token.verify_token(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/google/oauth2/id_token.py", line 150, in verify_token
+    return jwt.decode(
+           ^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/google/auth/jwt.py", line 302, in decode
+    _verify_iat_and_exp(payload, clock_skew_in_seconds)
+  File "/usr/local/lib/python3.11/site-packages/google/auth/jwt.py", line 228, in _verify_iat_and_exp
+    raise exceptions.InvalidValue("Token expired, {} < {}".format(latest, now))
+google.auth.exceptions.InvalidValue: Token expired, 1757492040 < 1757496922
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/app/backend/utils/auth.py", line 75, in verify_firebase_token
+    return auth.verify_id_token(token)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/firebase_admin/auth.py", line 220, in verify_id_token
+    return client.verify_id_token(id_token, check_revoked=check_revoked)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/firebase_admin/_auth_client.py", line 127, in verify_id_token
+    verified_claims = self._token_verifier.verify_id_token(id_token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/firebase_admin/_token_gen.py", line 293, in verify_id_token
+    return self.id_token_verifier.verify(id_token, self.request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/firebase_admin/_token_gen.py", line 403, in verify
+    raise self._expired_token_error(str(error), cause=error)
+firebase_admin._token_gen.ExpiredIdTokenError: Token expired, 1757492040 < 1757496922
+
 # Browser logs
 Setting currentDate: Wed Sep 10 2025 15:02:36 GMT+1000 (Australian Eastern Standard Time)
 page-2a89121f1b90c99c.js:1 🔍 Dashboard: Starting calendar health validation...
@@ -65,3 +96,51 @@ page-2a89121f1b90c99c.js:1 🔄 Attempting calendar credential refresh...
 page-2a89121f1b90c99c.js:1 User creation date: Thu Aug 28 2025 06:56:25 GMT+1000 (Australian Eastern Standard Time)
 page-2a89121f1b90c99c.js:1 ✅ Dashboard: Found existing schedule with 16 tasks
 page-2a89121f1b90c99c.js:1 ✅ Rendering optimized backend structure
+
+# Notes
+- It looks like it's just google calendar that's disconnected at this point
+- Auth itself is fine as the user can perform other actions like creating a new task
+
+---
+
+# Previous Solution Implemented
+
+## Root Cause
+Firebase Auth discards Google OAuth refresh tokens and only provides short-lived access tokens. The backend logs showed "no refresh token available" because Firebase never provides them.
+
+## Implementation Approach
+**Hybrid Solution**: Keep Firebase for user authentication + Direct Google OAuth for calendar access with refresh tokens.
+
+## Changes Made
+
+### Frontend (`frontend/auth/AuthContext.tsx`)
+- **New OAuth Flow**: Added `connectCalendarWithOAuth()` using direct Google OAuth
+- **Proper Parameters**: `access_type: 'offline'` and `prompt: 'consent'` to ensure refresh tokens
+- **OAuth Callback**: Added `handleCalendarOAuthCallback()` to process authorization code  
+- **Updated Connect Flow**: `reconnectCalendar()` now uses proper OAuth that gets refresh tokens
+
+### Backend (`backend/apis/calendar_routes.py`)
+- **New Endpoint**: Added `/api/calendar/oauth-callback` route
+- **Secure Token Exchange**: Backend exchanges authorization code for access + refresh tokens
+- **Proper Storage**: Stores both tokens in MongoDB user collection
+- **Debug Logging**: Verifies refresh tokens are captured
+
+### Type Updates (`frontend/lib/types.ts`)
+- **CalendarCredentials**: Made `refreshToken` optional (handles re-authorization edge cases)
+- **AuthContextType**: Added OAuth callback method
+
+## Technical Flow
+1. User clicks "Connect" → Redirects to Google OAuth with refresh token parameters
+2. User grants permissions → Google redirects with authorization code  
+3. Frontend sends code to backend → Backend exchanges for access + refresh tokens
+4. Backend stores tokens → Future API calls auto-refresh when needed
+
+## Expected Result
+- **No more hourly re-authentication** - refresh tokens last indefinitely
+- **Backend logs should show**: "refresh token stored: true" 
+- **Users only re-auth when**: explicitly disconnecting or revoking calendar access
+
+## Environment Variables Required
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (frontend)
+- `GOOGLE_CLIENT_ID` (backend)
+- `GOOGLE_CLIENT_SECRET` (backend)

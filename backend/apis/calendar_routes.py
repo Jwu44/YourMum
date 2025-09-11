@@ -60,6 +60,150 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     """Backwards-compatible shim to centralized auth utility."""
     return auth_get_user_id_from_token(token)
 
+@calendar_bp.route("/oauth-exchange", methods=["POST"])
+def oauth_exchange():
+    """
+    Exchange Google OAuth authorization code for access and refresh tokens
+    
+    This endpoint handles direct Google OAuth flow to obtain refresh tokens,
+    which Firebase Auth doesn't provide. Essential for long-term calendar access.
+    
+    Expected request body:
+    {
+        "authorization_code": str
+    }
+    
+    Authorization header required with Firebase ID token
+    """
+    try:
+        data = request.json
+        if not data or 'authorization_code' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing required parameter: authorization_code"
+            }), 400
+        
+        # Get user ID from token
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]  # Remove 'Bearer ' prefix
+        else:
+            token = auth_header
+            
+        user_id = get_user_id_from_token(token)
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Invalid or missing authentication token"
+            }), 401
+        
+        authorization_code = data['authorization_code']
+        
+        # Get Google OAuth credentials from environment
+        client_id = os.getenv('GOOGLE_CLIENT_ID')
+        client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+        redirect_uri = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', 'http://localhost:3000/integrations/calendar/callback')
+        
+        if not client_id or not client_secret:
+            return jsonify({
+                "success": False,
+                "error": "Google OAuth credentials not configured"
+            }), 500
+        
+        print(f"DEBUG: Exchanging authorization code for user {user_id}")
+        
+        # Exchange authorization code for tokens with Google
+        token_url = 'https://oauth2.googleapis.com/token'
+        token_data = {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'code': authorization_code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri
+        }
+        
+        token_response = requests.post(token_url, data=token_data)
+        
+        if token_response.status_code != 200:
+            print(f"DEBUG: Google token exchange failed: {token_response.status_code} - {token_response.text}")
+            return jsonify({
+                "success": False,
+                "error": f"Google OAuth token exchange failed: {token_response.text}"
+            }), 400
+        
+        token_json = token_response.json()
+        
+        # Extract tokens and calculate expiry
+        access_token = token_json.get('access_token')
+        refresh_token = token_json.get('refresh_token')
+        expires_in = token_json.get('expires_in', 3600)
+        scope = token_json.get('scope', '')
+        
+        if not access_token:
+            return jsonify({
+                "success": False,
+                "error": "No access token received from Google"
+            }), 400
+        
+        if not refresh_token:
+            print("WARNING: No refresh token received from Google. User may need to re-consent.")
+        
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        scopes = scope.split(' ') if scope else []
+        
+        # Create credentials object
+        credentials = {
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresAt': expires_at,
+            'scopes': scopes
+        }
+        
+        print(f"DEBUG: Received tokens - access: {bool(access_token)}, refresh: {bool(refresh_token)}")
+        
+        # Store credentials in database
+        db = get_database()
+        users = db['users']
+        
+        update_result = users.update_one(
+            {"googleId": user_id},
+            {"$set": {
+                "calendar.connected": True,
+                "calendar.credentials": credentials,
+                "calendar.syncStatus": "completed",
+                "calendar.lastSyncTime": datetime.now(timezone.utc),
+                "calendarSynced": True,
+                "metadata.lastModified": datetime.now(timezone.utc)
+            }}
+        )
+        
+        if update_result.modified_count == 0:
+            return jsonify({
+                "success": False,
+                "error": "User not found"
+            }), 404
+        
+        print(f"DEBUG: Successfully stored OAuth tokens for user {user_id}")
+        
+        return jsonify({
+            "success": True,
+            "credentials": {
+                "accessToken": access_token,
+                "refreshToken": refresh_token,
+                "expiresAt": expires_at.isoformat(),
+                "scopes": scopes
+            },
+            "connected": True
+        })
+        
+    except Exception as e:
+        print(f"Error in OAuth token exchange: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Failed to exchange OAuth tokens: {str(e)}"
+        }), 500
+
 def fetch_google_calendar_events(access_token: str, date: str, user_timezone: str = "Australia/Sydney") -> List[Dict]:
     """
     Fetch Google Calendar events for a specific date using the access token.
