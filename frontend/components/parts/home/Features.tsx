@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { ChevronUp } from 'lucide-react'
 
 interface FeatureCard {
   id: string
   title: string
   description?: string
   image: string
+  hasVideo?: boolean
+  videoSrc?: string
 }
 
 interface FeatureGroup {
@@ -25,7 +25,7 @@ const featureGroups: FeatureGroup[] = [
         id: 'p1',
         title: 'Create a schedule that works for you',
         description: 'YourMum captures inputs about your lifestyle to design a feasible schedule for you.',
-        image: '/images/features/layout-feature.jpg'
+        image: '/images/features/Personalisation.png'
       }
     ]
   },
@@ -37,19 +37,23 @@ const featureGroups: FeatureGroup[] = [
         id: 'a1',
         title: 'Auto-categorise tasks',
         description: 'YourMum automatically categorises your tasks for prioritisation after you provide your lifestyle.',
-        image: '/images/features/edit-task-feature.jpg'
+        image: '/images/features/Auto categorise.png'
       },
       {
         id: 'a2',
         title: 'Create your next day in 1 click',
         description: 'YourMum rolls over incomplete, recurring, and calendar tasks into your next day automatically.',
-        image: '/images/features/next-day-feature.jpg'
+        image: '/images/features/Create next day demo.mov',
+        hasVideo: true,
+        videoSrc: '/images/features/Create next day demo.mov'
       },
       {
         id: 'a3',
         title: 'Task decomposition',
         description: 'Break down complex tasks into smaller, actionable steps with ease.',
-        image: '/images/features/decision-log-feature.jpg'
+        image: '/images/features/Decompose.mov',
+        hasVideo: true,
+        videoSrc: '/images/features/Decompose.mov'
       }
     ]
   },
@@ -61,7 +65,9 @@ const featureGroups: FeatureGroup[] = [
         id: 's1',
         title: 'Integrations',
         description: 'Connect third-party apps to auto-create tasks. Soon, YourMum will also handle simple admin tasks for you.',
-        image: '/images/features/integrations-feature.jpg'
+        image: '/images/features/Integration demo.mov',
+        hasVideo: true,
+        videoSrc: '/images/features/Integration demo.mov'
       }
     ]
   }
@@ -70,7 +76,6 @@ const featureGroups: FeatureGroup[] = [
 const Features = (): JSX.Element => {
   const [activeGroup, setActiveGroup] = useState<'personalisation' | 'automation' | 'streamlined'>('personalisation')
   const [visibleCards, setVisibleCards] = useState<Set<string>>(new Set())
-  const [showBackToTop, setShowBackToTop] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const cardsRef = useRef<Record<string, HTMLDivElement | null>>({})
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -150,42 +155,9 @@ const Features = (): JSX.Element => {
     }
   }, [activeGroup])
 
-  // Handle back to top visibility for automation group
-  useEffect(() => {
-    if (activeGroup === 'automation') {
-      const firstCard = cardsRef.current.a1
-      if (firstCard && observerRef.current) {
-        const backToTopObserver = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              setShowBackToTop(!entry.isIntersecting)
-            })
-          },
-          { threshold: 0.1 }
-        )
-        backToTopObserver.observe(firstCard)
-
-        return () => { backToTopObserver.disconnect() }
-      }
-    } else {
-      setShowBackToTop(false)
-    }
-  }, [activeGroup])
-
   const handleGroupChange = (groupId: 'personalisation' | 'automation' | 'streamlined') => {
     setActiveGroup(groupId)
     setVisibleCards(new Set())
-
-    // Reset scroll position to top of content area
-    if (contentRef.current) {
-      contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }
-
-  const scrollToTop = () => {
-    if (contentRef.current) {
-      contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
   }
 
   const activeGroupData = featureGroups.find(g => g.id === activeGroup)
@@ -237,24 +209,15 @@ const Features = (): JSX.Element => {
             aria-labelledby={`tab-${activeGroup}`}
             className="feature-group-transition feature-group-enter"
           >
-            <div className={`
-              ${activeGroup === 'automation'
-                ? 'space-y-8'
-                : 'flex justify-center'
-              }
-            `}>
+            <div className="space-y-8">
               {activeGroupData.cards.map((card, index) => (
                 <Card
                   key={card.id}
                   ref={(el) => { cardsRef.current[card.id] = el }}
                   data-card-id={card.id}
                   className={`
-                    bg-feature-bg-pastel border-0 overflow-hidden
+                    bg-feature-bg-pastel border-0 overflow-hidden w-full scroll-mt-8
                     ${visibleCards.has(card.id) ? 'feature-card-enter' : 'opacity-0'}
-                    ${activeGroup === 'automation'
-                      ? 'w-full scroll-mt-8'
-                      : 'max-w-4xl w-full'
-                    }
                   `}
                   style={{
                     borderRadius: 'var(--feature-radius)',
@@ -265,38 +228,60 @@ const Features = (): JSX.Element => {
                   <CardContent className="p-0">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                       <div className="p-12 flex flex-col justify-center">
-                        <h2 className="text-3xl font-bold text-foreground mb-6 leading-tight">
+                        <h2 className="text-3xl font-bold mb-6 leading-tight" style={{ color: '#373667' }}>
                           {card.title}
                         </h2>
                         {card.description && (
-                          <p className="text-lg text-muted-foreground leading-relaxed">
+                          <p className="text-lg leading-relaxed" style={{ color: '#373667' }}>
                             {card.description}
                           </p>
                         )}
                       </div>
                       <div className="relative overflow-hidden">
                         <div
-                          className="w-full h-80 lg:h-full bg-muted flex items-center justify-center"
+                          className={`w-full h-80 lg:h-full bg-white flex items-center justify-center ${
+                            card.hasVideo ? '' : 'p-2.5'
+                          }`}
                           style={{ aspectRatio: '16/10' }}
                         >
-                          <img
-                            src={card.image}
-                            alt={`Feature illustration for ${card.title}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-muted-foreground text-center p-8">
-                                    <div class="text-sm font-mono">PLACEHOLDER_${card.id.toUpperCase()}</div>
-                                  </div>
-                                `
-                              }
-                            }}
-                          />
+                          {card.hasVideo ? (
+                            <video
+                              src={card.videoSrc}
+                              muted
+                              loop
+                              playsInline
+                              className="w-full h-full object-cover"
+                              onMouseEnter={(e) => {
+                                const video = e.target as HTMLVideoElement
+                                video.play().catch(console.error)
+                              }}
+                              onMouseLeave={(e) => {
+                                const video = e.target as HTMLVideoElement
+                                video.pause()
+                                video.currentTime = 0
+                              }}
+                              aria-label={`Demo video for ${card.title}`}
+                            />
+                          ) : (
+                            <img
+                              src={card.image}
+                              alt={`Feature illustration for ${card.title}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                const parent = target.parentElement
+                                if (parent) {
+                                  parent.innerHTML = `
+                                    <div class="text-muted-foreground text-center p-8">
+                                      <div class="text-sm font-mono">PLACEHOLDER_${card.id.toUpperCase()}</div>
+                                    </div>
+                                  `
+                                }
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -307,17 +292,6 @@ const Features = (): JSX.Element => {
           </div>
         )}
       </div>
-
-      {/* Back to Top Button for Automation */}
-      {showBackToTop && activeGroup === 'automation' && (
-        <Button
-          onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-20 rounded-full w-12 h-12 p-0 shadow-lg"
-          aria-label="Back to top"
-        >
-          <ChevronUp className="w-5 h-5" />
-        </Button>
-      )}
     </section>
   )
 }

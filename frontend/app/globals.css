@@ -79,7 +79,7 @@ All colors MUST be HSL.
     --feature-shadow: 0 10px 30px rgba(0,0,0,0.08);
     --feature-toggle-bg: hsl(var(--muted));
     --feature-toggle-active: hsl(var(--primary));
-    --feature-bg-pastel: hsl(var(--muted)/0.5);
+    --feature-bg-pastel: rgba(243, 242, 255, 0.4);
   }
 
   .dark {
@@ -151,7 +151,7 @@ All colors MUST be HSL.
     --feature-shadow: 0 10px 30px rgba(0,0,0,0.2);
     --feature-toggle-bg: hsl(var(--muted));
     --feature-toggle-active: hsl(var(--primary));
-    --feature-bg-pastel: hsl(var(--card));
+    --feature-bg-pastel: rgba(243, 242, 255, 0.4);
   }
 }
 
@@ -730,6 +730,16 @@ All colors MUST be HSL.
     50% {
       opacity: 0.7;
     }
+  }
+
+  /* Feature card background utility */
+  .bg-feature-bg-pastel {
+    background-color: var(--feature-bg-pastel);
+  }
+
+  /* Feature toggle active state utility */
+  .bg-feature-toggle-active {
+    background-color: var(--feature-toggle-active);
   }
 }
 

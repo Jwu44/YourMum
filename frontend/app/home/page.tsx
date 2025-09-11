@@ -21,11 +21,11 @@ const TestHomePage = () => {
         {/* Hero Section with 3D Dashboard */}
         <Hero handleGetStarted={handleGetStarted} />
 
-        {/* Features Section */}
-        <Features />
-
         {/* How It Works Section */}
         <HowItWorks />
+
+        {/* Features Section */}
+        <Features />
 
         {/* Spacer sections to test scroll behavior */}
         <section className="min-h-screen flex items-center justify-center bg-muted/10">

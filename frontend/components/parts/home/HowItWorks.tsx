@@ -1,7 +1,4 @@
 import { useState } from 'react'
-import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { type WithHandleGetStarted } from '@/lib/types'
 
 const HowItWorks = () => {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null)
