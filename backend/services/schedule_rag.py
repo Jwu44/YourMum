@@ -295,7 +295,7 @@ def create_enhanced_ordering_prompt_content(
     priority_text = ", ".join([f"{k}: {v}" for k, v in priorities.items()])
     
     # Build enhanced prompt
-    prompt = f"""You are a productivity expert. Place the following tasks into the most optimal sections and order based on user preferences and the provided examples.
+    prompt = f"""You are a productivity expert. Place the following tasks into the most optimal sections and order based on user context and the provided examples.
 
 <definitions>
 Pattern Definitions:
@@ -316,7 +316,6 @@ Pattern Definitions:
     print(f"[RAG] Added {pattern_count} pattern definitions to prompt")
     
     prompt += """
-Note: 'untimebox' is the baseline pattern. Other patterns build upon it by adding specific constraints or structures.
 </definitions>
 
 """

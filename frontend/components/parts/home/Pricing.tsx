@@ -8,30 +8,25 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       name: 'Free',
       price: '$0',
       period: 'forever',
-      description: 'Perfect for getting started with AI-powered planning',
       features: [
-        'Up to 50 tasks per month',
-        'Basic AI scheduling',
-        'Calendar integration',
-        'Mobile app access',
-        'Email support'
+        'Unlimited task creation',
+        'Auto capture tasks from integrations',
+        'Auto create next day schedule',
+        'Limited schedule generation',
+        'Limited task decomposition',
       ],
-      cta: 'Start YourMum',
+      cta: 'Try For Free',
       popular: false
     },
     {
       name: 'Milf',
-      price: '$12',
+      price: '$7',
       period: 'month',
-      description: 'Ideal for professionals and power users',
       features: [
-        'Unlimited tasks',
-        'Advanced AI insights',
-        'Team collaboration (up to 5 members)',
-        'Priority support',
-        'Custom integrations',
-        'Productivity analytics',
-        'Time tracking'
+        'Everything in Free',
+        'More schedule generation',
+        'More task decomposition',
+        'Access to new integrations',
       ],
       cta: 'Start Free Trial',
       popular: true
@@ -46,7 +41,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
             Start For Free
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Try YourMum for free and upgrade as you grow.
+            Try YourMum for free and upgrade to a Milf as you grow.
           </p>
         </div>
 
@@ -75,7 +70,6 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
                   <span className="text-4xl font-bold text-card-foreground">{plan.price}</span>
                   <span className="text-muted-foreground">/{plan.period}</span>
                 </div>
-                <p className="text-muted-foreground">{plan.description}</p>
               </div>
 
               <ul className="space-y-4 mb-8">
