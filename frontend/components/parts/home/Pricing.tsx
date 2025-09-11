@@ -11,7 +11,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       features: [
         'Unlimited task creation',
         'Auto capture tasks from integrations',
-        'Auto create next day schedule',
+        'Auto create your next day',
         'Limited schedule generation',
         'Limited task decomposition',
       ],

@@ -1,4 +1,4 @@
-# Status: To do
+# Status: Fixed
 I am facing a bug where I am asked forced to re sign in via google sso to reconnect my google calendar every hour
 
 # Steps to reproduce:
@@ -144,3 +144,31 @@ Firebase Auth discards Google OAuth refresh tokens and only provides short-lived
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (frontend)
 - `GOOGLE_CLIENT_ID` (backend)
 - `GOOGLE_CLIENT_SECRET` (backend)
+
+---
+
+# Final Fix Applied (2025-01-15)
+
+## Root Cause Identified
+The dashboard was calling `refreshCalendarCredentials()` (Firebase OAuth - no refresh tokens) instead of `reconnectCalendar()` (direct Google OAuth - with refresh tokens) when calendar auth failed.
+
+## Changes Made
+1. **`frontend/app/dashboard/page.tsx`**:
+   - Replaced `refreshCalendarCredentials` with `reconnectCalendar` in auth destructuring
+   - Updated calendar health validation to call the correct OAuth flow
+
+2. **`frontend/auth/AuthContext.tsx`**:
+   - Removed `refreshCalendarCredentials` from exported context value
+
+3. **`frontend/lib/types.ts`**:
+   - Removed `refreshCalendarCredentials` from `AuthContextType` interface
+
+4. **Test fixes**:
+   - Updated test files to use `reconnectCalendar` instead of removed method
+
+## Result
+✅ **Dashboard now uses direct Google OAuth flow** - Users will be redirected to Google consent screen to properly authorize calendar access with refresh tokens, eliminating hourly re-authentication.
+
+✅ **Backend auto-refresh functionality works** - Existing refresh token logic in `/api/calendar/events` endpoint will handle token renewal automatically.
+
+✅ **Build verification passed** - Frontend compiles successfully with no type errors.

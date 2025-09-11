@@ -80,6 +80,7 @@ const Features = (): JSX.Element => {
   const cardsRef = useRef<Record<string, HTMLDivElement | null>>({})
   const observerRef = useRef<IntersectionObserver | null>(null)
   const toggleRef = useRef<HTMLDivElement>(null)
+  const preloadedVideosRef = useRef<HTMLVideoElement[]>([])
 
   // Handle keyboard navigation for toggles
   const handleKeyDown = useCallback((event: KeyboardEvent, currentIndex: number) => {
@@ -135,6 +136,45 @@ const Features = (): JSX.Element => {
       if (observerRef.current) {
         observerRef.current.disconnect()
       }
+    }
+  }, [])
+
+  // Preload demo videos so they can autoplay without lag
+  useEffect(() => {
+    const videoSources = featureGroups
+      .flatMap(group => group.cards)
+      .filter(card => card.hasVideo && card.videoSrc)
+      .map(card => card.videoSrc as string)
+
+    preloadedVideosRef.current = videoSources.map((src) => {
+      const video = document.createElement('video')
+      video.src = src
+      video.preload = 'auto'
+      video.muted = true
+      // playsInline is not always reflected via property on some browsers
+      video.setAttribute('playsinline', '')
+      try {
+        // Attempt a silent play to warm up decoding pipeline
+        // Some browsers will ignore this off-DOM, but it's safe
+        // and helps when allowed.
+        // We intentionally don't await.
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        video.play()
+      } catch {
+        // Ignore autoplay restrictions during preload
+      }
+      // Ensure buffering starts
+      video.load()
+      return video
+    })
+
+    return () => {
+      preloadedVideosRef.current.forEach(v => {
+        v.pause()
+        v.removeAttribute('src')
+        v.load()
+      })
+      preloadedVideosRef.current = []
     }
   }, [])
 
@@ -247,6 +287,8 @@ const Features = (): JSX.Element => {
                           {card.hasVideo ? (
                             <video
                               src={card.videoSrc}
+                              preload="auto"
+                              autoPlay
                               muted
                               loop
                               playsInline
@@ -259,6 +301,12 @@ const Features = (): JSX.Element => {
                                 const video = e.target as HTMLVideoElement
                                 video.pause()
                                 video.currentTime = 0
+                              }}
+                              onCanPlay={(e) => {
+                                const video = e.target as HTMLVideoElement
+                                if (video.paused) {
+                                  video.play().catch(() => {})
+                                }
                               }}
                               aria-label={`Demo video for ${card.title}`}
                             />
