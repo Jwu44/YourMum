@@ -31,7 +31,7 @@ const HowItWorks = () => {
     <section className="py-20 bg-gradient-section" id="how-it-works">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-20">
-          <h1 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
+          <h1 className="text-3xl lg:text-5xl font-bold text-foreground mb-5">
             How it works
           </h1>
           <h2 className="text-xl text-muted-foreground max-w-2xl mx-auto">

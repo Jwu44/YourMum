@@ -203,14 +203,14 @@ const Features = (): JSX.Element => {
   const activeGroupData = featureGroups.find(g => g.id === activeGroup)
 
   return (
-    <section className="py-24 px-4 max-w-7xl mx-auto">
+    <section id="features" className="py-24 px-4 max-w-7xl mx-auto">
       {/* Section Header */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-foreground">Features</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-5">Features</h1>
       </div>
 
       {/* Horizontal Toggle Group */}
-      <div className="mb-12 py-4" ref={toggleRef}>
+      <div className="mb-5 py-5" ref={toggleRef}>
         <div
           className="flex justify-center"
           role="tablist"

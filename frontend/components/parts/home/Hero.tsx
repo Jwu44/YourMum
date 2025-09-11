@@ -14,10 +14,10 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
       {/* Seamless fade to next section */}
       <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent via-white/30 to-white"></div>
       
-      <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8 mt-16">
+      <div className="relative z-10 max-w-4xl mx-auto text-center mt-16">
         {/* H1 Title */}
         <h1 
-          className="text-5xl font-bold text-gray-900 leading-tight opacity-0 translate-y-8 animate-fade-in-up"
+          className="text-5xl font-bold text-gray-900 leading-tight opacity-0 translate-y-8 animate-fade-in-up mb-5"
           style={{ fontSize: '48px', animationDelay: '0.1s' }}
         >
           YourMum knows you best 😉
@@ -32,9 +32,9 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
         </p>
 
         {/* CTA Button */}
-        <div className="opacity-0 translate-y-8 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <div className="opacity-0 translate-y-8 animate-fade-in-up mt-5" style={{ animationDelay: '0.3s' }}>
           <Button 
-            variant="premium" 
+            variant="default" 
             size="lg" 
             className="px-8 py-4 button-gradient"
             style={{ fontSize: '16px' }}
