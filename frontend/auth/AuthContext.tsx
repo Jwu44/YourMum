@@ -555,7 +555,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     reconnectCalendar,
-    refreshCalendarCredentials,
     handleOAuthCallback,
   };
 

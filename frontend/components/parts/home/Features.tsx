@@ -169,8 +169,8 @@ const Features = (): JSX.Element => {
         <h1 className="text-4xl font-bold text-foreground">Features</h1>
       </div>
 
-      {/* Horizontal Toggle Group - Sticky */}
-      <div className="feature-toggle-sticky mb-12 py-4" ref={toggleRef}>
+      {/* Horizontal Toggle Group */}
+      <div className="mb-12 py-4" ref={toggleRef}>
         <div
           className="flex justify-center"
           role="tablist"

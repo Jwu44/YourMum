@@ -51,6 +51,7 @@ describe('Settings Page - Account Deletion', () => {
       signIn: jest.fn(),
       currentUser: mockUser,
       reconnectCalendar: jest.fn(),
+      handleOAuthCallback: jest.fn(),
       calendarConnectionStage: null
     });
 

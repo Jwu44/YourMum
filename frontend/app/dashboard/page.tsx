@@ -53,14 +53,14 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   // Be resilient in test environments where AuthProvider may be mocked
-  const { calendarConnectionStage, currentUser, refreshCalendarCredentials } = (() => {
+  const { calendarConnectionStage, currentUser, reconnectCalendar } = (() => {
     try {
       return useAuth()
     } catch (e) {
       return { 
         calendarConnectionStage: null as any, 
         currentUser: auth.currentUser,
-        refreshCalendarCredentials: async () => {} // No-op fallback for tests
+        reconnectCalendar: async () => {} // No-op fallback for tests
       }
     }
   })()
@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
             console.log('🔄 Attempting calendar credential refresh...')
             setIsEnsuringRefresh(true)
             
-            await refreshCalendarCredentials()
+            await reconnectCalendar()
             
             console.log('✅ Calendar credentials refreshed successfully')
             calendarHealthService.reset() // Reset validation state after successful refresh
@@ -158,7 +158,7 @@ const Dashboard: React.FC = () => {
     }
 
     validateCalendarHealth()
-  }, [currentUser, calendarConnectionStage, isPostOAuthHandlerActive, refreshCalendarCredentials, toast])
+  }, [currentUser, calendarConnectionStage, isPostOAuthHandlerActive, reconnectCalendar, toast])
 
   useEffect(() => {
     // Check for general calendar connection errors
