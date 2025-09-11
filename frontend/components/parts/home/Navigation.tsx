@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { type WithHandleGetStarted } from '@/lib/types'
 import Image from 'next/image'
+import Link from 'next/link'
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -36,7 +37,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
       <div className="mx-auto h-full px-6">
         <nav className="flex items-center justify-between h-full">
           <div className="flex items-center gap-2">
-            <button onClick={handleGetStarted} className="focus:outline-none flex items-center gap-2">
+            <Link href="/" className="focus:outline-none flex items-center gap-2">
               <Image
                 src="/favicon-96x96.png"
                 alt="YourMum logo"
@@ -48,7 +49,7 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
                 style={{ imageRendering: 'crisp-edges' }}
               />
               <span className="font-bold text-primary-blue">YourMum</span>
-            </button>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
