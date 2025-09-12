@@ -17,24 +17,34 @@ type OrchestratorStage = 'generating' | 'complete' | 'error'
 /**
  * Utility to detect if PostOAuthHandler should be active
  * Used by components to defer their logic while PostOAuthHandler is running
+ * SIMPLIFIED: Reduced complex conditions to prevent infinite loops
  */
 export const isPostOAuthActive = (): boolean => {
   // Check if we're in browser environment
   if (typeof window === 'undefined') return false
 
-  // Check for various indicators that post-OAuth flow is active
+  // Simplified detection logic to prevent infinite loops
+  // Primary indicator: session storage flag set during active OAuth flow
+  const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
+
+  // Secondary indicator: URL parameters from OAuth redirect (but with timeout protection)
   const hasOAuthRedirect = window.location.pathname === '/dashboard' &&
                           (window.location.search.includes('code=') ||
                            window.location.search.includes('state='))
 
-  const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
+  // Safety check: Clear stale session indicators older than 2 minutes to prevent infinite loops
+  const oauthTimestamp = sessionStorage.getItem('oauth-timestamp')
+  if (hasSessionIndicator && oauthTimestamp) {
+    const elapsed = Date.now() - parseInt(oauthTimestamp)
+    if (elapsed > 120000) { // 2 minutes
+      console.log('🧹 Clearing stale OAuth session indicators after 2 minutes')
+      sessionStorage.removeItem('oauth-in-progress')
+      sessionStorage.removeItem('oauth-timestamp')
+      return false
+    }
+  }
 
-  // CRITICAL: Check for fresh navigation to dashboard with authRedirectDestination
-  // This catches the case where user just completed OAuth and was redirected to dashboard
-  const justRedirectedFromAuth = localStorage.getItem('authRedirectDestination') === '/dashboard' &&
-                                 !sessionStorage.getItem('dashboardFullyLoaded')
-
-  return hasOAuthRedirect || hasSessionIndicator || justRedirectedFromAuth
+  return hasSessionIndicator || hasOAuthRedirect
 }
 
 /**
@@ -98,6 +108,7 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
       // Clean up auth indicators to prevent future false positives
       localStorage.removeItem('authRedirectDestination')
       sessionStorage.removeItem('oauth-in-progress')
+      sessionStorage.removeItem('oauth-timestamp')
 
       onComplete()
 
@@ -113,8 +124,9 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
 
   // Start orchestration on mount
   useEffect(() => {
-    // Mark OAuth as in progress in session storage
+    // Mark OAuth as in progress in session storage with timestamp for timeout protection
     sessionStorage.setItem('oauth-in-progress', 'true')
+    sessionStorage.setItem('oauth-timestamp', Date.now().toString())
 
     // Small delay to ensure component is fully mounted
     const timeoutId = setTimeout(() => {
@@ -125,6 +137,7 @@ export const PostOAuthHandler: React.FC<PostOAuthHandlerProps> = ({
       clearTimeout(timeoutId)
       // Clean up session storage when component unmounts
       sessionStorage.removeItem('oauth-in-progress')
+      sessionStorage.removeItem('oauth-timestamp')
     }
   }, [orchestratePostOAuthFlow])
 

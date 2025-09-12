@@ -61,12 +61,32 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
   }
 
   /**
+   * Wait for Firebase auth state to be fully established
+   * @param maxRetries Maximum number of retry attempts
+   * @param delayMs Delay between retry attempts
+   */
+  const waitForAuthState = async (maxRetries: number = 5, delayMs: number = 200): Promise<User> => {
+    for (let i = 0; i < maxRetries; i++) {
+      if (auth.currentUser) {
+        return auth.currentUser
+      }
+      console.log(`Waiting for auth state... attempt ${i + 1}/${maxRetries}`)
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+    throw new Error('Auth state not established within timeout period')
+  }
+
+  /**
    * Process calendar access using direct OAuth flow (single source of truth)
    * @param credential Google Auth credential
    */
   const processCalendarAccess = async (credential: any): Promise<void> => {
     try {
       console.log('🎬 Starting processCalendarAccess with direct OAuth flow...')
+
+      // Wait for Firebase auth state to be fully established to prevent race condition
+      const currentUser = await waitForAuthState()
+      console.log('✅ Auth state confirmed, user:', currentUser.email)
 
       // Get scopes and check for calendar access
       const scopes = await getScopes(credential.accessToken)
@@ -77,10 +97,8 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
       console.log('Has calendar access:', hasCalendarAccess)
 
       // Store user with correct calendar access flag
-      if (auth.currentUser) {
-        console.log('Storing user with calendar access flag:', hasCalendarAccess)
-        await storeUserInBackend(auth.currentUser, hasCalendarAccess)
-      }
+      console.log('Storing user with calendar access flag:', hasCalendarAccess)
+      await storeUserInBackend(currentUser, hasCalendarAccess)
 
       if (hasCalendarAccess) {
         console.log('✅ Calendar access granted - redirecting to proper OAuth flow for refresh tokens')
@@ -102,11 +120,27 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error in processCalendarAccess:', error)
+      
+      // Reset OAuth state to prevent infinite loading
       setIsOAuthInProgress(false)
       setCalendarConnectionStage(null)
 
-      // Use centralized error handling
-      handleError(error, 'processCalendarAccess')
+      // Critical fix: Allow user to proceed with schedule functionality even if calendar fails
+      // This prevents the infinite loading loop by triggering PostOAuthHandler for schedule-only flow
+      console.log('📋 Calendar connection failed, proceeding with schedule-only flow...')
+      
+      try {
+        // Still trigger PostOAuthHandler for schedule generation (without calendar)
+        setPostOAuthCredential(credential)
+        setShowPostOAuthHandler(true)
+        setCalendarConnectionStage('connecting')
+        
+        console.log('✅ Schedule-only flow initiated successfully')
+      } catch (fallbackError) {
+        console.error('❌ Failed to initiate schedule-only flow:', fallbackError)
+        // Use centralized error handling as last resort
+        handleError(error, 'processCalendarAccess')
+      }
     }
   }
 
