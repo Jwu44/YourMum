@@ -1,6 +1,15 @@
 # Status: To do
 I am facing a bug where I am asked forced to re sign in via google sso to reconnect my google calendar every hour
 
+# Context
+**Root Cause**: PostOAuthHandler was storing calendar credentials without refresh tokens during every sign-in, causing hourly re-authentication when access tokens expired.
+
+**Key Issue**: Two competing OAuth flows existed:
+1. PostOAuthHandler (Firebase OAuth) - No refresh tokens, runs on every sign-in
+2. reconnectCalendar() (Direct Google OAuth) - Proper refresh tokens, but never used in normal flow
+
+**Evidence from logs**: `DEBUG: Access token expired but no refresh token available for user VlCf1isTbDM2lSlj1rJkNMQlORN2`
+
 # Steps to reproduce:
 1. As an existing user, have a google calendar connection and schedule for the day
 2. Wait more than an hour
@@ -97,78 +106,34 @@ page-2a89121f1b90c99c.js:1 User creation date: Thu Aug 28 2025 06:56:25 GMT+1000
 page-2a89121f1b90c99c.js:1 ✅ Dashboard: Found existing schedule with 16 tasks
 page-2a89121f1b90c99c.js:1 ✅ Rendering optimized backend structure
 
-# Notes
-- It looks like it's just google calendar that's disconnected at this point
-- Auth itself is fine as the user can perform other actions like creating a new task
+# Fix Applied
 
----
-
-# Previous Solution Implemented
-
-## Root Cause
-Firebase Auth discards Google OAuth refresh tokens and only provides short-lived access tokens. The backend logs showed "no refresh token available" because Firebase never provides them.
-
-## Implementation Approach
-**Hybrid Solution**: Keep Firebase for user authentication + Direct Google OAuth for calendar access with refresh tokens.
+**Solution**: Implemented single source of truth for calendar OAuth by simplifying PostOAuthHandler and enforcing direct Google OAuth flow.
 
 ## Changes Made
 
-### Frontend (`frontend/auth/AuthContext.tsx`)
-- **New OAuth Flow**: Added `connectCalendarWithOAuth()` using direct Google OAuth
-- **Proper Parameters**: `access_type: 'offline'` and `prompt: 'consent'` to ensure refresh tokens
-- **OAuth Callback**: Added `handleCalendarOAuthCallback()` to process authorization code  
-- **Updated Connect Flow**: `reconnectCalendar()` now uses proper OAuth that gets refresh tokens
+### 1. Simplified PostOAuthHandler (`/auth/PostOAuthHandler.tsx`)
+- **Removed**: Calendar connection logic (lines 89-115) that stored credentials without refresh tokens
+- **Kept**: Schedule generation and navigation orchestration only
+- **Result**: No more broken OAuth flow storing access-token-only credentials
 
-### Backend (`backend/apis/calendar_routes.py`)
-- **New Endpoint**: Added `/api/calendar/oauth-callback` route
-- **Secure Token Exchange**: Backend exchanges authorization code for access + refresh tokens
-- **Proper Storage**: Stores both tokens in MongoDB user collection
-- **Debug Logging**: Verifies refresh tokens are captured
+### 2. Modified AuthContext (`/auth/AuthContext.tsx`) 
+- **Updated**: `processCalendarAccess()` to redirect to proper OAuth flow when calendar access detected
+- **Enforced**: Single source of truth - all calendar OAuth goes through `reconnectCalendar()`
+- **Flow**: Sign-in with calendar → Direct Google OAuth → `/oauth-exchange` → Refresh tokens stored
 
-### Type Updates (`frontend/lib/types.ts`)
-- **CalendarCredentials**: Made `refreshToken` optional (handles re-authorization edge cases)
-- **AuthContextType**: Added OAuth callback method
+### 3. Added Tests (`/tests/SimplifiedPostOAuthHandler.test.tsx`)
+- Created comprehensive test suite following TDD principles
+- Verified simplified PostOAuthHandler functionality
+- Ensured no regressions in schedule orchestration
 
-## Technical Flow
-1. User clicks "Connect" → Redirects to Google OAuth with refresh token parameters
-2. User grants permissions → Google redirects with authorization code  
-3. Frontend sends code to backend → Backend exchanges for access + refresh tokens
-4. Backend stores tokens → Future API calls auto-refresh when needed
+## Technical Details
+- **Backend OAuth exchange**: Already functional at `/api/calendar/oauth-exchange` 
+- **Refresh token storage**: Backend properly handles token refresh via existing logic
+- **OAuth parameters**: `access_type: 'offline'` and `prompt: 'consent'` ensure refresh tokens
 
 ## Expected Result
-- **No more hourly re-authentication** - refresh tokens last indefinitely
-- **Backend logs should show**: "refresh token stored: true" 
-- **Users only re-auth when**: explicitly disconnecting or revoking calendar access
-
-## Environment Variables Required
-- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (frontend)
-- `GOOGLE_CLIENT_ID` (backend)
-- `GOOGLE_CLIENT_SECRET` (backend)
-
----
-
-# Fix 2 Applied (still doesn't work)
-
-## Root Cause Identified
-The dashboard was calling `refreshCalendarCredentials()` (Firebase OAuth - no refresh tokens) instead of `reconnectCalendar()` (direct Google OAuth - with refresh tokens) when calendar auth failed.
-
-## Changes Made
-1. **`frontend/app/dashboard/page.tsx`**:
-   - Replaced `refreshCalendarCredentials` with `reconnectCalendar` in auth destructuring
-   - Updated calendar health validation to call the correct OAuth flow
-
-2. **`frontend/auth/AuthContext.tsx`**:
-   - Removed `refreshCalendarCredentials` from exported context value
-
-3. **`frontend/lib/types.ts`**:
-   - Removed `refreshCalendarCredentials` from `AuthContextType` interface
-
-4. **Test fixes**:
-   - Updated test files to use `reconnectCalendar` instead of removed method
-
-## Result
-✅ **Dashboard now uses direct Google OAuth flow** - Users will be redirected to Google consent screen to properly authorize calendar access with refresh tokens, eliminating hourly re-authentication.
-
-✅ **Backend auto-refresh functionality works** - Existing refresh token logic in `/api/calendar/events` endpoint will handle token renewal automatically.
-
-✅ **Build verification passed** - Frontend compiles successfully with no type errors.
+- Users authenticate once with proper refresh tokens
+- No more hourly re-authentication prompts
+- Backend automatically refreshes tokens when needed
+- Clean separation: Firebase for user auth, Direct Google OAuth for calendar

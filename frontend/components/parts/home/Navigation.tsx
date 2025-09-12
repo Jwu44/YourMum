@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Menu } from 'lucide-react'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { type WithHandleGetStarted } from '@/lib/types'
 import Image from 'next/image'
 import Link from 'next/link'
 
 const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,8 +27,8 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
     <header
       className={`fixed top-7 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 rounded-full ${
         isScrolled 
-          ? "h-[60px] bg-background/40 backdrop-blur-xl border border-white/10 scale-95 w-[30%] max-w-1xl shadow-lg" 
-          : "h-[60px] bg-background/40 backdrop-blur-xl w-[40%] max-w-3xl border border-border/50 shadow-md"
+          ? "h-[60px] bg-background/40 backdrop-blur-xl border border-white/10 scale-95 w-[90%] md:w-[30%] max-w-sm md:max-w-xl shadow-lg" 
+          : "h-[60px] bg-background/40 backdrop-blur-xl w-[90%] md:w-[40%] max-w-sm md:max-w-3xl border border-border/50 shadow-md"
       }`}
     >
       <div className="mx-auto h-full px-6">
@@ -83,40 +80,17 @@ const Navigation = ({ handleGetStarted }: WithHandleGetStarted) => {
             </Button>
           </div>
 
-          {/* Mobile Navigation */}
+          {/* Mobile CTA - Only logo and Get Started button visible */}
           <div className="md:hidden">
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="glass">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="bg-background/95 backdrop-blur-sm">
-                <div className="flex flex-col gap-4 mt-8">
-                  <a
-                    href="#pricing"
-                    className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setIsMobileMenuOpen(false)
-                      scrollToSection('pricing')
-                    }}
-                  >
-                    Pricing
-                  </a>
-                  <Button 
-                    onClick={() => {
-                      setIsMobileMenuOpen(false)
-                      handleGetStarted()
-                    }}
-                    className="button-gradient rounded-full mt-4"
-                  >
-                    Get Started
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+            <Button 
+              onClick={handleGetStarted}
+              size="sm"
+              className="button-gradient rounded-full text-sm px-4 py-2"
+            >
+              Get Started
+            </Button>
           </div>
+
         </nav>
       </div>
     </header>

@@ -212,11 +212,11 @@ const Features = (): JSX.Element => {
       {/* Horizontal Toggle Group */}
       <div className="mb-5 py-5" ref={toggleRef}>
         <div
-          className="flex justify-center"
+          className="flex justify-center overflow-x-auto px-4 sm:px-6 lg:px-8"
           role="tablist"
           aria-label="Feature categories"
         >
-          <div className="bg-feature-toggle-bg rounded-[var(--feature-radius)] p-2 flex gap-1">
+          <div className="bg-feature-toggle-bg rounded-[var(--feature-radius)] p-2 flex gap-1 min-w-fit">
             {featureGroups.map((group, index) => (
               <button
                 key={group.id}
@@ -224,7 +224,7 @@ const Features = (): JSX.Element => {
                 aria-selected={activeGroup === group.id}
                 aria-controls={`panel-${group.id}`}
                 className={`
-                  px-6 py-3 rounded-[calc(var(--feature-radius)-0.5rem)] font-medium transition-all duration-200
+                  px-4 md:px-6 py-2 md:py-3 rounded-[calc(var(--feature-radius)-0.5rem)] font-medium transition-all duration-200 text-sm md:text-base whitespace-nowrap
                   ${activeGroup === group.id
                     ? 'bg-feature-toggle-active text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground hover:bg-white/50'
@@ -266,20 +266,20 @@ const Features = (): JSX.Element => {
                   }}
                 >
                   <CardContent className="p-0">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-                      <div className="p-12 flex flex-col justify-center">
-                        <h2 className="text-3xl font-bold mb-6 leading-tight" style={{ color: '#373667' }}>
+                    <div className="flex flex-col lg:grid lg:grid-cols-2 gap-0">
+                      <div className="p-6 md:p-12 flex flex-col justify-center order-2 lg:order-1">
+                        <h2 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 leading-tight" style={{ color: '#373667' }}>
                           {card.title}
                         </h2>
                         {card.description && (
-                          <p className="text-lg leading-relaxed" style={{ color: '#373667' }}>
+                          <p className="text-base md:text-lg leading-relaxed" style={{ color: '#373667' }}>
                             {card.description}
                           </p>
                         )}
                       </div>
-                      <div className="relative overflow-hidden">
+                      <div className="relative overflow-hidden order-1 lg:order-2">
                         <div
-                          className={`w-full h-80 lg:h-full bg-white flex items-center justify-center ${
+                          className={`w-full h-64 md:h-80 lg:h-full bg-white flex items-center justify-center ${
                             card.hasVideo ? '' : 'p-2.5'
                           }`}
                           style={{ aspectRatio: '16/10' }}

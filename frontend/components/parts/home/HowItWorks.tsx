@@ -62,13 +62,13 @@ const HowItWorks = () => {
               )}
               
               <div
-                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[400px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
+                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[400px] md:h-[400px] sm:h-[380px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
                 style={{ animationDelay: `${index * 0.15}s` }}
                 onMouseEnter={() => setHoveredCard(step.id)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
                 {/* Video/Image Section */}
-                <div className="w-full h-[200px] relative bg-gradient-to-br from-accent/50 to-accent overflow-hidden flex-shrink-0">
+                <div className="w-full h-[180px] md:h-[200px] relative bg-gradient-to-br from-accent/50 to-accent overflow-hidden flex-shrink-0">
                   {step.hasVideo ? (
                     <video
                       src={step.videoSrc}
@@ -97,14 +97,14 @@ const HowItWorks = () => {
                 </div>
                 
                 {/* Content Section */}
-                <div className="px-8 py-8 flex-1 flex flex-col justify-start">
+                <div className="px-6 md:px-8 py-6 md:py-8 flex-1 flex flex-col justify-start">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="bg-gradient-primary text-primary-foreground w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-lg border-2 border-white/20 flex-shrink-0">
                       {step.id}
                     </div>
-                    <h3 className="text-2xl font-bold text-card-foreground capitalize">{step.title}</h3>
+                    <h3 className="text-xl md:text-2xl font-bold text-card-foreground capitalize">{step.title}</h3>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed text-base">{step.description}</p>
+                  <p className="text-muted-foreground leading-relaxed text-sm md:text-base">{step.description}</p>
                 </div>
               </div>
             </div>

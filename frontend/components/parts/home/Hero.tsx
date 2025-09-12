@@ -17,16 +17,16 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
       <div className="relative z-10 max-w-4xl mx-auto text-center mt-16">
         {/* H1 Title */}
         <h1 
-          className="text-5xl font-bold text-gray-900 leading-tight opacity-0 translate-y-8 animate-fade-in-up mb-5"
-          style={{ fontSize: '48px', animationDelay: '0.1s' }}
+          className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 leading-tight opacity-0 translate-y-8 animate-fade-in-up mb-5"
+          style={{ animationDelay: '0.1s' }}
         >
           YourMum knows you best 😉
         </h1>
 
         {/* H2 Subtitle */}
         <p 
-          className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed opacity-0 translate-y-8 animate-fade-in-up"
-          style={{ fontSize: '20px', animationDelay: '0.2s' }}
+          className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed opacity-0 translate-y-8 animate-fade-in-up"
+          style={{ animationDelay: '0.2s' }}
         >
           Don't waste time on admin overhead and focus on tasks that matter.
         </p>
