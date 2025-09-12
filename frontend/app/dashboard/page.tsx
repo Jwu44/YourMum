@@ -16,7 +16,7 @@ import EditableSchedule from '@/components/parts/EditableSchedule'
 import { DragStateProvider } from '@/contexts/DragStateContext'
 import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 import { LoadingPage } from '@/components/parts/LoadingPage'
-import { isPostOAuthActive } from '@/components/parts/PostOAuthHandler'
+import { isPostOAuthActive } from '@/auth/PostOAuthHandler'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'

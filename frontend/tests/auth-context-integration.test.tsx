@@ -108,7 +108,6 @@ describe('AuthContext Integration with API Client', () => {
     expect(typeof contextValue.signIn).toBe('function')
     expect(typeof contextValue.signOut).toBe('function')
     expect(typeof contextValue.reconnectCalendar).toBe('function')
-    expect(typeof contextValue.refreshCalendarCredentials).toBe('function')
   })
 
   it('should handle development mode', () => {
@@ -116,7 +115,11 @@ describe('AuthContext Integration with API Client', () => {
     const originalEnv = process.env.NODE_ENV
     const originalBypass = process.env.NEXT_PUBLIC_BYPASS_AUTH
     
-    process.env.NODE_ENV = 'development'
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'development',
+      writable: true,
+      configurable: true
+    })
     process.env.NEXT_PUBLIC_BYPASS_AUTH = 'true'
 
     render(
@@ -128,7 +131,11 @@ describe('AuthContext Integration with API Client', () => {
     expect(apiClient.initialize).toHaveBeenCalled()
 
     // Cleanup
-    process.env.NODE_ENV = originalEnv
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalEnv,
+      writable: true,
+      configurable: true
+    })
     process.env.NEXT_PUBLIC_BYPASS_AUTH = originalBypass
   })
 })

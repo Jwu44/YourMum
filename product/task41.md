@@ -1,4 +1,4 @@
-# Status: Fixed
+# Status: To do
 I am facing a bug where I am asked forced to re sign in via google sso to reconnect my google calendar every hour
 
 # Steps to reproduce:
@@ -147,7 +147,7 @@ Firebase Auth discards Google OAuth refresh tokens and only provides short-lived
 
 ---
 
-# Final Fix Applied (2025-01-15)
+# Fix 2 Applied (still doesn't work)
 
 ## Root Cause Identified
 The dashboard was calling `refreshCalendarCredentials()` (Firebase OAuth - no refresh tokens) instead of `reconnectCalendar()` (direct Google OAuth - with refresh tokens) when calendar auth failed.
