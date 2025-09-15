@@ -517,11 +517,27 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const deltaY = Math.abs(touch.clientY - touchStartPosition.current.y)
       const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
 
-      // Mark as moved if user moved more than threshold
+      // Detect if this is primarily a vertical scroll gesture
       if (totalMovement > TOUCH_MOVEMENT_THRESHOLD) {
+        // If movement is primarily vertical (scroll gesture), don't interfere
+        if (deltaY > deltaX && deltaY > TOUCH_MOVEMENT_THRESHOLD) {
+          setHasTouchMoved(true)
+
+          // Cancel long press immediately for scroll gestures
+          if (isLongPressing && longPressTimer.current) {
+            clearTimeout(longPressTimer.current)
+            longPressTimer.current = null
+            setIsLongPressing(false)
+          }
+
+          // Don't prevent default for vertical scrolling - let browser handle it
+          return
+        }
+
+        // For non-vertical movement, mark as moved for potential drag
         setHasTouchMoved(true)
 
-        // Cancel long press immediately on significant movement (likely scrolling)
+        // Cancel long press on significant movement (likely intentional drag preparation)
         if (isLongPressing && longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null

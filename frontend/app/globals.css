@@ -358,7 +358,7 @@ All colors MUST be HSL.
 
   /* 🔧 FIX: Drag performance optimizations */
   [data-touch-action="none"] {
-    touch-action: none;
+    touch-action: pan-y pinch-zoom; /* Allow vertical scrolling and pinch zoom, prevent horizontal pan */
   }
 
   /* Optimizations for dragging state */
