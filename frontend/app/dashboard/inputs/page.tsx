@@ -419,10 +419,14 @@ export default function InputsPage () {
   return (
     <SidebarLayout>
       {/* Mobile Top Navigation */}
-      <MobileTopNav showUpgradeButton={true} />
+      <MobileTopNav
+        showUpgradeButton={true}
+        onSave={handleSave}
+        isLoading={isLoading}
+      />
 
       <div className="flex-1 overflow-y-auto mobile-scroll">
-        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe pt-16 sm:pt-0">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Inputs</h1>
@@ -762,8 +766,8 @@ export default function InputsPage () {
               </CardContent>
             </Card>
 
-            {/* Save Button */}
-            <div className="flex justify-end">
+            {/* Save Button - Hidden on mobile (using top nav instead) */}
+            <div className="flex justify-end hidden sm:flex">
               <Button
                 onClick={handleSave}
                 disabled={isLoading || isLoadingTasks}
