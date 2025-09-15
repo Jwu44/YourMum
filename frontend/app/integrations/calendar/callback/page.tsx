@@ -77,7 +77,7 @@ export default function CalendarOAuthCallback() {
         timeRemaining: 0,
         reason: getLoadingReason(),
         markContentReady: () => {}, // Not used here
-        progress: status === 'success' ? 100 : (status === 'error' ? 0 : 50)
+        progress: 0 // Disable custom progress bar during OAuth to prevent duplicate loading indicators
       }}
     />
   );
