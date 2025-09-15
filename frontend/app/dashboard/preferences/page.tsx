@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 // Icons
-import { Sun, Sunset, Moon, Clock, Target, Heart, Trophy, Calendar, GripVertical, Users, Gamepad2, Zap, BatteryLow, Layout, Grid, List, Layers, Shuffle } from 'lucide-react'
+import { Sun, Sunset, Moon, Clock, Target, Heart, Trophy, Calendar, GripVertical, Users, Gamepad2, Zap, BatteryLow, Layout, Grid, List, Layers, Shuffle, AlarmClockOff, Group } from 'lucide-react'
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
@@ -79,18 +79,18 @@ const timingOptions = [
   {
     value: 'timebox',
     label: 'Timeboxed',
-    description: 'Tasks with specific time allocations',
+    description: 'YourMum assigns start and end times',
     icon: Clock,
-    color: 'theme-blue',
-    bgColor: 'theme-blue-bg'
+    color: 'theme-gray',
+    bgColor: 'theme-gray-bg'
   },
   {
     value: 'untimebox',
     label: 'Untimeboxed',
-    description: 'Tasks without specific times',
-    icon: Layers,
-    color: 'theme-green',
-    bgColor: 'theme-green-bg'
+    description: 'No start and end times',
+    icon: AlarmClockOff,
+    color: 'theme-gray',
+    bgColor: 'theme-gray-bg'
   }
 ]
 
@@ -99,15 +99,15 @@ const orderingPatternOptions = [
   {
     value: 'batching',
     label: 'Batching',
-    description: 'Tasks grouped by similar activities',
-    icon: Layers,
-    color: 'theme-purple',
-    bgColor: 'theme-purple-bg'
+    description: 'Cluster similar tasks together (same theme, skill, or activity)',
+    icon: Group,
+    color: 'theme-blue',
+    bgColor: 'theme-blue-bg'
   },
   {
     value: 'alternating',
     label: 'Alternating',
-    description: 'Tasks that alternate between energy levels',
+    description: 'Switch between different task types (theme, skill, or activity)',
     icon: Shuffle,
     color: 'theme-orange',
     bgColor: 'theme-orange-bg'
@@ -115,7 +115,7 @@ const orderingPatternOptions = [
   {
     value: '3-3-3',
     label: '3-3-3',
-    description: '3 hours focus, 3 medium tasks, 3 maintenance tasks',
+    description: '1 deep focus task (~3 hrs), ~3 medium tasks, ~3 quick tasks',
     icon: Target,
     color: 'theme-red',
     bgColor: 'theme-red-bg'
@@ -126,8 +126,8 @@ const orderingPatternOptions = [
 const defaultPriorities: Priority[] = [
   { id: 'health', name: 'Health', icon: Heart, color: 'theme-red', bgColor: 'theme-red-bg' },
   { id: 'relationships', name: 'Relationships', icon: Users, color: 'theme-blue', bgColor: 'theme-blue-bg' },
-  { id: 'fun_activities', name: 'Fun Activities', icon: Gamepad2, color: 'theme-green', bgColor: 'theme-green-bg' },
-  { id: 'ambitions', name: 'Ambitions', icon: Trophy, color: 'theme-yellow', bgColor: 'theme-yellow-bg' }
+  { id: 'fun_activities', name: 'Fun', icon: Gamepad2, color: 'theme-green', bgColor: 'theme-green-bg' },
+  { id: 'ambitions', name: 'Ambition', icon: Trophy, color: 'theme-yellow', bgColor: 'theme-yellow-bg' }
 ]
 
 // Draggable card component for priorities
@@ -535,7 +535,7 @@ export default function PreferencesPage () {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Select the time of day when you feel most productive and YourMum will use this to match your natural rhythm.
+                  Select when you focus best and YourMum will plan your day accordingly.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -583,7 +583,7 @@ export default function PreferencesPage () {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Pick how you want your schedule to be displayed.
+                  Pick how you want your day to be organised.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -618,7 +618,7 @@ export default function PreferencesPage () {
                             ? 'text-foreground/80'
                             : 'text-muted-foreground'
                         }`}>
-                          Organized with clear categories
+                          Organise your schedule into sections
                         </p>
                       </div>
                     </div>
@@ -650,7 +650,7 @@ export default function PreferencesPage () {
                             ? 'text-foreground/80'
                             : 'text-muted-foreground'
                         }`}>
-                          Flexible, free-form layout
+                          Simple task list with no sections
                         </p>
                       </div>
                     </div>
@@ -660,7 +660,7 @@ export default function PreferencesPage () {
                 {/* Subcategory dropdown - only show if structured is selected */}
                 {state.layout_preference?.layout === 'todolist-structured' && (
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Blocks</label>
+                    <label className="text-sm font-medium mb-2 block">Sections</label>
                     <Select
                       value={state.layout_preference?.subcategory || 'day-sections'}
                       onValueChange={(value) => { handleLayoutChange('subcategory', value) }}
@@ -670,21 +670,30 @@ export default function PreferencesPage () {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="day-sections">
-                          <div className="flex items-center gap-2">
+                          <div className="flex w-full items-center gap-2 justify-start">
                             <Calendar className="h-4 w-4" />
-                            <span>Day Sections</span>
+                            <div className="flex items-baseline gap-2 text-left overflow-hidden">
+                              <span>Day</span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap truncate">(Morning, Afternoon, Evening)</span>
+                            </div>
                           </div>
                         </SelectItem>
                         <SelectItem value="priority">
-                          <div className="flex items-center gap-2">
+                          <div className="flex w-full items-center gap-2 justify-start">
                             <Layers className="h-4 w-4" />
-                            <span>Priority</span>
+                            <div className="flex items-baseline gap-2 text-left overflow-hidden">
+                              <span>Priority</span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap truncate">(High, Medium, Low)</span>
+                            </div>
                           </div>
                         </SelectItem>
                         <SelectItem value="category">
-                          <div className="flex items-center gap-2">
+                          <div className="flex w-full items-center gap-2 justify-start">
                             <Layout className="h-4 w-4" />
-                            <span>Category</span>
+                            <div className="flex items-baseline gap-2 text-left overflow-hidden">
+                              <span>Category</span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap truncate">(Work, Health, Relo, Ambition, Fun)</span>
+                            </div>
                           </div>
                         </SelectItem>
                       </SelectContent>
@@ -703,7 +712,7 @@ export default function PreferencesPage () {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Choose how you want to manage time for your tasks
+                  Choose if you want your tasks to be timeboxed.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -742,13 +751,13 @@ export default function PreferencesPage () {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
-                  <div>
-                    <span>Task Ordering Pattern</span>
+                  <div className="flex items-center">
+                    <span>Advanced Task Ordering</span>
                     <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Optionally choose how to organize and sequence your tasks
+                  Choose an advanced pattern to organise your tasks within sections. Otherwise, leave as empty.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

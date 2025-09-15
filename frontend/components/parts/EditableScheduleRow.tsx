@@ -206,8 +206,20 @@ const getSectionIcon = (sectionName: string, onEmojiChange?: (emoji: string) => 
   const lowerName = sectionName.toLowerCase()
   let defaultEmoji = '🦕' // Default emoji
 
+  // Category-based sections
+  if (lowerName.includes('work')) {
+    defaultEmoji = '💼'
+  } else if (lowerName.includes('relationships')) {
+    defaultEmoji = '❤️'
+  } else if (lowerName.includes('fun')) {
+    defaultEmoji = '🎉'
+  } else if (lowerName.includes('ambition')) {
+    defaultEmoji = '🚀'
+  } else if (lowerName.includes('exercise')) {
+    defaultEmoji = '🍎'
+  }
   // Priority-based sections
-  if (lowerName.includes('high priority')) {
+  else if (lowerName.includes('high priority')) {
     defaultEmoji = '⚡️'
   } else if (lowerName.includes('medium priority')) {
     defaultEmoji = '✏️'

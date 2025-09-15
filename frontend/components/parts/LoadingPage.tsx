@@ -48,7 +48,7 @@ const PRODUCTIVITY_TIPS = [
   { title: 'Getting Things Done (GTD)', description: 'Splitting your tasks into archive, current list, and backlog makes it way easier to balance priorities.' },
   { title: 'SMART Goals', description: 'Vague goals stall progress. Instead of saying "Get fitter," a SMART goal would be: "Run a 5k race in under 30 minutes by June 30th.' },
   { title: 'Batching', description: 'Grouping similar tasks into one block saves huge amounts of mental energy by cutting context switching.' },
-  { title: 'Alternating', description: 'Switching between different blocks of work throughout the day can reduce fatigue by nearly 30%.' },
+  { title: 'Alternating', description: 'Switching between different types of work throughout the day can reduce fatigue by nearly 30%.' },
   { title: 'Pre mortem', description: 'Thinking about what might go wrong before you start helps you plan fixes early—and reduces anxiety about the unknown.' },
   { title: '3-3-3', description: 'Focusing 3 hours on your top priority, then tackling 3 medium tasks and 3 small ones, leads to higher completion rates and lower stress.' },
   { title: 'Overflow buffer', description: 'High performers leave 20% of their day unscheduled for surprises. It keeps you calm and prevents that "unfinished task" mental nag.' },
