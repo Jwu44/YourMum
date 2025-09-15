@@ -277,12 +277,15 @@ const Features = (): JSX.Element => {
                           </p>
                         )}
                       </div>
-                      <div className="relative overflow-hidden order-1 lg:order-2">
+                      <div className="relative order-1 lg:order-2 lg:overflow-hidden">
                         <div
-                          className={`w-full h-64 md:h-80 lg:h-full bg-white flex items-center justify-center ${
-                            card.hasVideo ? '' : 'p-2.5'
+                          className={`w-full bg-white flex items-center justify-center ${
+                            card.hasVideo ? 'lg:h-full' : 'p-2.5 lg:h-full'
                           }`}
-                          style={{ aspectRatio: '16/10' }}
+                          style={{
+                            minHeight: '240px',
+                            aspectRatio: card.hasVideo ? undefined : '16/10'
+                          }}
                         >
                           {card.hasVideo ? (
                             <video
@@ -292,7 +295,11 @@ const Features = (): JSX.Element => {
                               muted
                               loop
                               playsInline
-                              className="w-full h-full object-cover"
+                              className="w-full h-full lg:object-cover object-contain"
+                              style={{
+                                minHeight: '240px',
+                                maxHeight: '400px'
+                              }}
                               onMouseEnter={(e) => {
                                 const video = e.target as HTMLVideoElement
                                 video.play().catch(console.error)
@@ -314,7 +321,11 @@ const Features = (): JSX.Element => {
                             <img
                               src={card.image}
                               alt={`Feature illustration for ${card.title}`}
-                              className="w-full h-full object-cover"
+                              className="w-full h-auto lg:h-full lg:object-cover object-contain"
+                              style={{
+                                minHeight: '200px',
+                                maxHeight: '400px'
+                              }}
                               loading="lazy"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement

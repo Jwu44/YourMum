@@ -72,6 +72,8 @@ const HowItWorks = () => {
                   {step.hasVideo ? (
                     <video
                       src={step.videoSrc}
+                      preload="auto"
+                      autoPlay
                       muted
                       loop
                       playsInline
@@ -84,6 +86,12 @@ const HowItWorks = () => {
                         const video = e.target as HTMLVideoElement
                         video.pause()
                         video.currentTime = 0
+                      }}
+                      onCanPlay={(e) => {
+                        const video = e.target as HTMLVideoElement
+                        if (video.paused) {
+                          video.play().catch(() => {})
+                        }
                       }}
                       aria-label={`Demo video for ${step.title}`}
                     />
