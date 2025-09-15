@@ -46,7 +46,23 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
 
         {/* Dashboard Image - Full width display like Linear */}
         <div className="opacity-0 translate-y-8 animate-fade-in-up mt-32 md:mt-40 mb-20" style={{ animationDelay: '0.4s' }}>
-          <div className="relative w-screen left-1/2 -translate-x-1/2 px-10">
+          {/* Mobile: Centered crop with no horizontal overflow */}
+          <div className="relative w-full overflow-hidden md:hidden">
+            <div className="relative w-full h-[300px] sm:h-[400px] overflow-hidden rounded-lg">
+              <Image
+                src="/images/home/Dashboard Edited.png"
+                alt="YourMum Dashboard"
+                width={1920}
+                height={1080}
+                className="absolute inset-0 w-auto h-full min-w-full object-cover object-center"
+                priority
+                quality={100}
+              />
+            </div>
+          </div>
+
+          {/* Desktop: Keep original full-width behavior */}
+          <div className="relative w-screen left-1/2 -translate-x-1/2 px-10 hidden md:block">
             {/* Full Width Image Container */}
             <div className="relative w-full overflow-hidden">
               <Image
