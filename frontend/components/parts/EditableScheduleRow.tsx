@@ -433,28 +433,38 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   }, [])
 
   /**
-   * Long press handlers for mobile drag mode
+   * Scroll-friendly touch handlers for mobile
+   * Only treats touches as intentional taps when there's minimal movement
    */
+  const touchStartPosition = useRef<{ x: number; y: number } | null>(null)
+  const TOUCH_MOVEMENT_THRESHOLD = 10 // pixels
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
 
+    // Store initial touch position for movement detection
+    const touch = e.touches[0]
+    touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
+
     longPressStartTime.current = Date.now()
     setIsLongPressing(true)
-    setHasTouchMoved(false) // Reset movement flag for new touch
+    setHasTouchMoved(false)
 
-    // Start long press timer (500ms threshold)
+    // Start long press timer (600ms threshold - increased to avoid conflicts with scrolling)
     longPressTimer.current = setTimeout(() => {
-      // Trigger haptic feedback for drag mode
-      triggerHapticFeedback(HapticPatterns.LONG_PRESS)
-      setIsDragMode(true)
-      setIsLongPressing(false)
+      // Only trigger drag mode if user hasn't moved significantly
+      if (!hasTouchMoved) {
+        triggerHapticFeedback(HapticPatterns.LONG_PRESS)
+        setIsDragMode(true)
+        setIsLongPressing(false)
 
-      // Trigger drag start if we have listeners
-      if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchStart === 'function') {
-        dragDropHook.listeners.onTouchStart(e as any)
+        // Trigger drag start if we have listeners
+        if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchStart === 'function') {
+          dragDropHook.listeners.onTouchStart(e as any)
+        }
       }
-    }, 500)
-  }, [isMobile, isSection, dragDropHook.listeners])
+    }, 600) // Increased from 500ms to reduce conflicts with scroll gestures
+  }, [isMobile, isSection, hasTouchMoved, dragDropHook.listeners])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
@@ -469,8 +479,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     setIsLongPressing(false)
 
-    // If it was a short press (< 500ms) and not in drag mode and user didn't move finger, treat as tap
-    if (pressDuration < 500 && !isDragMode && !hasTouchMoved) {
+    // Only treat as tap if it was short, didn't move, and not in drag mode
+    // Also ensure minimal movement (< 10px) to distinguish from scroll
+    if (pressDuration < 600 && !isDragMode && !hasTouchMoved) {
       handleMobileTap()
     }
 
@@ -483,24 +494,37 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         dragDropHook.listeners.onTouchEnd(e as any)
       }
     }
-  }, [isMobile, isSection, isDragMode, handleMobileTap, dragDropHook.listeners])
+
+    // Reset touch position
+    touchStartPosition.current = null
+  }, [isMobile, isSection, isDragMode, handleMobileTap, hasTouchMoved, dragDropHook.listeners])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
 
-    // Mark that touch has moved (prevents accidental tap during scroll)
-    setHasTouchMoved(true)
+    // Calculate movement distance from start position
+    const touch = e.touches[0]
+    if (touchStartPosition.current) {
+      const deltaX = Math.abs(touch.clientX - touchStartPosition.current.x)
+      const deltaY = Math.abs(touch.clientY - touchStartPosition.current.y)
+      const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
+      // Mark as moved if user moved more than threshold
+      if (totalMovement > TOUCH_MOVEMENT_THRESHOLD) {
+        setHasTouchMoved(true)
+
+        // Cancel long press immediately on significant movement (likely scrolling)
+        if (isLongPressing && longPressTimer.current) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+          setIsLongPressing(false)
+        }
+      }
+    }
 
     // If we're in drag mode, handle drag move
     if (isDragMode && dragDropHook.listeners && typeof dragDropHook.listeners.onTouchMove === 'function') {
       dragDropHook.listeners.onTouchMove(e as any)
-    }
-
-    // Cancel long press if user moves finger before long press threshold
-    if (isLongPressing && longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-      setIsLongPressing(false)
     }
   }, [isMobile, isSection, isDragMode, isLongPressing, dragDropHook.listeners])
 
