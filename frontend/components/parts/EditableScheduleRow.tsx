@@ -3,11 +3,13 @@ import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
+import MobileTaskActionDrawer from '@/components/parts/MobileTaskActionDrawer'
 import { TypographyH4 } from '@/app/dashboard/fonts/text'
 import { Pickaxe, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   type Task
 } from '../../lib/types'
@@ -19,6 +21,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { triggerHapticFeedback, HapticPatterns } from '@/lib/haptics'
 
 // Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
@@ -273,11 +276,23 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Global drag state for suppressing hover effects
   const { isDraggingAny } = useDragState()
 
+  // Mobile detection
+  const isMobile = useIsMobile()
+
   // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
 
   // State to track dropdown menu visibility
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  // Mobile drawer state
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+
+  // Long press state for mobile drag
+  const [isLongPressing, setIsLongPressing] = useState(false)
+  const [isDragMode, setIsDragMode] = useState(false)
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressStartTime = useRef<number>(0)
 
   // Hooks
   const { state: formData } = useForm()
@@ -385,6 +400,100 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       })
     }
   }, [task, onArchiveTask, toast])
+
+  /**
+   * Handle mobile tap to open action drawer
+   */
+  const handleMobileTap = useCallback(() => {
+    if (isMobile && !isSection && !isDragMode) {
+      triggerHapticFeedback(HapticPatterns.TAP)
+      setIsMobileDrawerOpen(true)
+    }
+  }, [isMobile, isSection, isDragMode])
+
+  /**
+   * Handle mobile drawer close
+   */
+  const handleMobileDrawerClose = useCallback(() => {
+    setIsMobileDrawerOpen(false)
+  }, [])
+
+  /**
+   * Long press handlers for mobile drag mode
+   */
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    longPressStartTime.current = Date.now()
+    setIsLongPressing(true)
+
+    // Start long press timer (500ms threshold)
+    longPressTimer.current = setTimeout(() => {
+      // Trigger haptic feedback for drag mode
+      triggerHapticFeedback(HapticPatterns.LONG_PRESS)
+      setIsDragMode(true)
+      setIsLongPressing(false)
+
+      // Trigger drag start if we have listeners
+      if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchStart === 'function') {
+        dragDropHook.listeners.onTouchStart(e as any)
+      }
+    }, 500)
+  }, [isMobile, isSection, dragDropHook.listeners])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    const pressDuration = Date.now() - longPressStartTime.current
+
+    // Clear long press timer
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+
+    setIsLongPressing(false)
+
+    // If it was a short press (< 500ms) and not in drag mode, treat as tap
+    if (pressDuration < 500 && !isDragMode) {
+      handleMobileTap()
+    }
+
+    // Exit drag mode on touch end
+    if (isDragMode) {
+      setIsDragMode(false)
+
+      // Trigger drag end if we have listeners
+      if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchEnd === 'function') {
+        dragDropHook.listeners.onTouchEnd(e as any)
+      }
+    }
+  }, [isMobile, isSection, isDragMode, handleMobileTap, dragDropHook.listeners])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    // If we're in drag mode, handle drag move
+    if (isDragMode && dragDropHook.listeners && typeof dragDropHook.listeners.onTouchMove === 'function') {
+      dragDropHook.listeners.onTouchMove(e as any)
+    }
+
+    // Cancel long press if user moves finger before long press threshold
+    if (isLongPressing && longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+      setIsLongPressing(false)
+    }
+  }, [isMobile, isSection, isDragMode, isLongPressing, dragDropHook.listeners])
+
+  // Cleanup long press timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+      }
+    }
+  }, [])
 
   // TODO: Remove old drag handlers - replaced by @dnd-kit hook
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
@@ -514,15 +623,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     microstepHook.rejectMicrostep(microstep)
   }, [microstepHook])
 
-  // Enhanced task actions with decompose button and ellipses dropdown
-  const renderTaskActions = () => (
-    <div
-      className={cn(
-        'flex items-center gap-2 transition-opacity duration-200',
-        isDraggingAny ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
-        isDropdownOpen && 'opacity-100' // Keep visible when dropdown is open
-      )}
-    >
+  // Enhanced task actions with decompose button and ellipses dropdown (Desktop only)
+  const renderTaskActions = () => {
+    // Don't render desktop actions on mobile - mobile uses tap drawer instead
+    if (isMobile) return null
+
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-2 transition-opacity duration-200',
+          isDraggingAny ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
+          isDropdownOpen && 'opacity-100' // Keep visible when dropdown is open
+        )}
+      >
       {/* Slack "View" link - only for top-level Slack tasks */}
       {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
         (() => {
@@ -628,7 +741,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  )
+    )
+  }
 
   return (
     <motion.div
@@ -659,7 +773,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               isDraggingAny && 'opacity-0 cursor-grab transition-opacity duration-200 mr-2',
               'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10' // Position grip 24px to the left
             )}
-            {...dragDropHook.listeners}
+            {...(dragDropHook.listeners || {})}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
           </div>
@@ -674,10 +788,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             dragDropHook.getRowClassName(),
             isSection ? 'cursor-default' : '',
             microstepHook.isDecomposing && 'task-decomposing',
+            // Mobile touch feedback
+            isMobile && !isSection && 'active:scale-[0.98] transition-transform duration-100',
+            // Long press visual feedback
+            isLongPressing && 'scale-[1.02] shadow-lg',
+            // Drag mode visual feedback
+            isDragMode && 'scale-[1.05] shadow-xl z-50 rotate-1',
             // Section styling - removed px-4 to align with task content
             isSection ? 'mt-2.5 mb-2.5 w-full'
-            // Task card styling - no gap-4 to control spacing manually, grip is positioned absolutely
-              : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-[background-color,border-color,box-shadow] duration-200 shadow-soft w-full'
+            // Task card styling - conditional right padding for mobile
+              : isMobile
+                ? 'p-4 pr-4 my-2 rounded-xl border border-border bg-card transition-[background-color,border-color,box-shadow,transform,scale] duration-200 shadow-soft w-full'
+                : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-[background-color,border-color,box-shadow] duration-200 shadow-soft w-full'
           )}
           style={{
             minHeight: isSection ? '48px' : 'auto',
@@ -687,20 +809,25 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             // Only disable transitions for the actively dragged item
             transition: dragDropHook.isDragging ? 'none' : undefined
           }}
+          // Desktop mouse events
           onMouseEnter={(e) => {
             // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
             // This ensures we track position relative to the TARGET task, not dragged task
-            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            if (!isMobile && dragDropHook.isOver && !dragDropHook.isDragging) {
               dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
             }
           }}
           onMouseMove={(e) => {
             // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
             // This enables real-time drag type updates relative to the TARGET task
-            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            if (!isMobile && dragDropHook.isOver && !dragDropHook.isDragging) {
               dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
             }
           }}
+          // Mobile touch events
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
         >
           {/* Task/Section Content */}
           {!isSection && (
@@ -735,7 +862,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 'flex-1 text-foreground transition-[color] duration-200',
                 task.completed && 'line-through text-muted-foreground',
                 // Add 16px left margin only when no logo is present
-                !getTaskSourceLogo(task) && 'ml-4'
+                !getTaskSourceLogo(task) && 'ml-4',
+                // On mobile, extend to full width since no action buttons shown
+                isMobile && 'pr-0'
               )}
               data-task-content="true"
             >
@@ -761,6 +890,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           onAccept={handleMicrostepAccept}
           onReject={handleMicrostepReject}
           className="mt-2"
+        />
+      )}
+
+      {/* Mobile Action Drawer */}
+      {isMobile && !isSection && (
+        <MobileTaskActionDrawer
+          task={task}
+          isOpen={isMobileDrawerOpen}
+          onClose={handleMobileDrawerClose}
+          onBreakdown={canDecompose ? handleDecompose : undefined}
+          onEdit={onEditTask ? () => onEditTask(task) : undefined}
+          onArchive={onArchiveTask ? () => onArchiveTask(task) : undefined}
+          onDelete={onDeleteTask ? () => onDeleteTask(task) : undefined}
         />
       )}
     </motion.div>

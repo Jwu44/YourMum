@@ -45,7 +45,7 @@ export const MobileTopNav: React.FC<MobileTopNavProps> = ({
 
   return (
     <div className="fixed top-0 left-0 right-0 w-full bg-background/40 backdrop-blur-xl mobile-header-safe z-50">
-      <div className="w-full max-w-4xl mx-auto px-3 py-3 mobile-padding-safe">
+      <div className="w-full max-w-4xl mx-auto px-4 py-3 mobile-padding-safe">
         <div className="flex items-center justify-between h-14 gap-3">
           {/* Left section: Sidebar trigger */}
           <div className="flex items-center gap-2 flex-shrink-0">
