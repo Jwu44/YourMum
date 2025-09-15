@@ -291,6 +291,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Long press state for mobile drag
   const [isLongPressing, setIsLongPressing] = useState(false)
   const [isDragMode, setIsDragMode] = useState(false)
+  const [hasTouchMoved, setHasTouchMoved] = useState(false)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const longPressStartTime = useRef<number>(0)
 
@@ -426,6 +427,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     longPressStartTime.current = Date.now()
     setIsLongPressing(true)
+    setHasTouchMoved(false) // Reset movement flag for new touch
 
     // Start long press timer (500ms threshold)
     longPressTimer.current = setTimeout(() => {
@@ -454,8 +456,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     setIsLongPressing(false)
 
-    // If it was a short press (< 500ms) and not in drag mode, treat as tap
-    if (pressDuration < 500 && !isDragMode) {
+    // If it was a short press (< 500ms) and not in drag mode and user didn't move finger, treat as tap
+    if (pressDuration < 500 && !isDragMode && !hasTouchMoved) {
       handleMobileTap()
     }
 
@@ -472,6 +474,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
+
+    // Mark that touch has moved (prevents accidental tap during scroll)
+    setHasTouchMoved(true)
 
     // If we're in drag mode, handle drag move
     if (isDragMode && dragDropHook.listeners && typeof dragDropHook.listeners.onTouchMove === 'function') {
