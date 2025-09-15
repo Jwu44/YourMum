@@ -1,5 +1,5 @@
 /**
- * Test for inputs config preservation functionality following TDD approach
+ * Test for preferences config preservation functionality following TDD approach
  * These tests should FAIL initially and PASS after implementation
  */
 import React from 'react';
@@ -46,7 +46,7 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 // Sample inputs config data
-const sampleInputsConfig = {
+const samplePreferencesConfig = {
   name: "Test User",
   work_start_time: "09:00",
   work_end_time: "17:00",
@@ -65,7 +65,7 @@ const sampleInputsConfig = {
   tasks: []
 };
 
-describe('InputsConfigPreservation', () => {
+describe('PreferencesConfigPreservation', () => {
   beforeEach(() => {
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -79,7 +79,7 @@ describe('InputsConfigPreservation', () => {
     mockLoadSchedule.mockResolvedValue({
       success: true,
       schedule: [],
-      inputs: sampleInputsConfig
+      inputs: samplePreferencesConfig
     });
 
     render(
@@ -139,7 +139,7 @@ describe('InputsConfigPreservation', () => {
     mockLoadSchedule.mockResolvedValue({
       success: true,
       schedule: [],
-      inputs: sampleInputsConfig
+      inputs: samplePreferencesConfig
     });
 
     // Mock generateSchedule to verify it receives the inputs config
@@ -212,7 +212,7 @@ describe('InputsConfigPreservation', () => {
     mockLoadSchedule.mockResolvedValue({
       success: true,
       schedule: [],
-      inputs: sampleInputsConfig
+      inputs: samplePreferencesConfig
     });
 
     render(
@@ -234,7 +234,7 @@ describe('InputsConfigPreservation', () => {
     mockLoadSchedule.mockResolvedValue({
       success: true,
       schedule: [],
-      inputs: sampleInputsConfig
+      inputs: samplePreferencesConfig
     });
 
     render(

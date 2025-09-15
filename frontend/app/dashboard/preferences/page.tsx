@@ -1,6 +1,6 @@
 /**
- * @file InputConfigurationPage.tsx
- * @description Input Configuration page for customizing workflow settings and preferences
+ * @file PreferencesPage.tsx
+ * @description Preferences page for customizing workflow settings and preferences
  */
 
 'use client'
@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 // Icons
-import { Sun, Sunset, Moon, Clock, Target, CheckSquare, Heart, Trophy, Timer, Calendar, GripVertical, Users, Gamepad2, Zap, BatteryLow, Layout, Grid, List, Layers, Shuffle } from 'lucide-react'
+import { Sun, Sunset, Moon, Clock, Target, Heart, Trophy, Calendar, GripVertical, Users, Gamepad2, Zap, BatteryLow, Layout, Grid, List, Layers, Shuffle } from 'lucide-react'
 
 // Components and Hooks
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
@@ -155,10 +155,10 @@ const DraggableCard: React.FC<{ item: Priority, index: number }> = ({ item, inde
 }
 
 /**
- * Input Configuration Page Component
+ * Preferences Page Component
  */
-export default function InputsPage () {
-  const { state, dispatch } = useForm()
+export default function PreferencesPage () {
+  const { state, dispatch, clearFormState } = useForm()
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -265,8 +265,8 @@ export default function InputsPage () {
 
   /**
    * Load current schedule tasks when component mounts
-   * Always reload from backend to ensure we have the most recent tasks
-   * This fixes the bug where FormContext contains stale task data from previous sessions
+   * Only load from backend if no user modifications exist to preserve user changes
+   * This fixes the bug where user changes are lost when navigating away and returning
    */
   useEffect(() => {
     // Only run once on mount to avoid infinite loops
@@ -274,13 +274,20 @@ export default function InputsPage () {
       return
     }
 
-    // Always load current schedule from backend to ensure we have the most recent tasks
-    // This fixes the bug where dashboard modifications aren't reflected in FormContext
-    console.log('Loading current schedule from backend to ensure fresh task data...')
+    // Check if user has made modifications before loading from backend
+    // This preserves user changes when navigating away and returning
+    if (hasFormModifications(state)) {
+      console.log('User has modifications, preserving FormContext state instead of loading from backend')
+      hasLoadedRef.current = true
+      return
+    }
+
+    // Load current schedule from backend only if no user modifications exist
+    console.log('No user modifications detected, loading current schedule from backend...')
     void loadCurrentScheduleTasks()
 
     hasLoadedRef.current = true
-  }, [loadCurrentScheduleTasks])
+  }, [loadCurrentScheduleTasks, state])
 
   /**
    * Sync priorities display order with loaded form data from backend
@@ -397,6 +404,9 @@ export default function InputsPage () {
       // Generate schedule with updated preferences and existing tasks
       await generateSchedule(payload)
 
+      // Clear form state from localStorage after successful save
+      clearFormState()
+
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error) {
@@ -429,9 +439,9 @@ export default function InputsPage () {
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe pt-16 sm:pt-0">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Inputs</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Preferences</h1>
             <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              YourMum uses your preferences to create a personalised schedule.
+              YourMum uses your preferences to build a schedule that works for you.
             </p>
           </div>
 
@@ -767,7 +777,7 @@ export default function InputsPage () {
             </Card>
 
             {/* Save Button - Hidden on mobile (using top nav instead) */}
-            <div className="flex justify-end hidden sm:flex">
+            <div className="hidden sm:flex justify-end">
               <Button
                 onClick={handleSave}
                 disabled={isLoading || isLoadingTasks}

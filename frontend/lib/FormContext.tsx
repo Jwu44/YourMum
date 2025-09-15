@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useReducer, type ReactNode, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, type ReactNode, useCallback } from 'react'
 import {
   type FormData,
   type FormAction,
@@ -192,7 +192,48 @@ const FormContext = createContext<FormContextType | undefined>(undefined)
  * Form provider component that manages state for the entire form
  */
 export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(formReducer, initialState)
+  // Load initial state from localStorage if available, otherwise use defaults
+  const getInitialState = useCallback((): FormData => {
+    if (typeof window === 'undefined') {
+      return initialState
+    }
+
+    try {
+      const saved = localStorage.getItem('form-state')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Validate that the parsed data has the expected structure
+        if (parsed && typeof parsed === 'object') {
+          return { ...initialState, ...parsed }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load form state from localStorage:', error)
+    }
+
+    return initialState
+  }, [])
+
+  const [state, dispatch] = useReducer(formReducer, getInitialState())
+
+  // Save state to localStorage whenever it changes (but not on initial load)
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      // Only save if there are user modifications to avoid overwriting with initial state
+      if (hasFormModifications(state)) {
+        localStorage.setItem('form-state', JSON.stringify(state))
+      } else {
+        // Clear localStorage if no modifications (user reset to defaults)
+        localStorage.removeItem('form-state')
+      }
+    } catch (error) {
+      console.warn('Failed to save form state to localStorage:', error)
+    }
+  }, [state])
 
   /**
    * Helper to update layout preference with validation
@@ -210,12 +251,26 @@ export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     })
   }, [state.layout_preference])
 
+  /**
+   * Clear the form state from localStorage (called after successful save)
+   */
+  const clearFormState = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('form-state')
+      } catch (error) {
+        console.warn('Failed to clear form state from localStorage:', error)
+      }
+    }
+  }, [])
+
   // Memoize context value to prevent unnecessary rerenders
   const value = React.useMemo(() => ({
     state,
     dispatch,
-    updateLayoutPreference
-  }), [state, updateLayoutPreference])
+    updateLayoutPreference,
+    clearFormState
+  }), [state, updateLayoutPreference, clearFormState])
 
   return (
     <FormContext.Provider value={value}>

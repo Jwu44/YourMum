@@ -40,8 +40,8 @@ export const MobileTopNav: React.FC<MobileTopNavProps> = ({
     return null
   }
 
-  // Check if we're on the inputs page
-  const isInputsPage = pathname.startsWith('/dashboard/inputs')
+  // Check if we're on the preferences page
+  const isPreferencesPage = pathname.startsWith('/dashboard/preferences')
 
   return (
     <div className="fixed top-0 left-0 right-0 w-full bg-background/40 backdrop-blur-xl mobile-header-safe z-50">
@@ -57,8 +57,8 @@ export const MobileTopNav: React.FC<MobileTopNavProps> = ({
 
           {/* Right section: Save or Upgrade button */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isInputsPage ? (
-              /* Save button for inputs page */
+            {isPreferencesPage ? (
+              /* Save button for preferences page */
               <Button
                 onClick={onSave}
                 disabled={isLoading}

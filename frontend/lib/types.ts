@@ -225,6 +225,8 @@ export function isValidSubcategoryForLayout (
 export interface FormContextType {
   state: FormData
   dispatch: React.Dispatch<FormAction>
+  updateLayoutPreference: (layoutUpdates: Partial<LayoutPreference>) => void
+  clearFormState: () => void
 }
 
 // Add new types for recurrence
