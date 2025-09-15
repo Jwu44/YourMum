@@ -901,7 +901,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
+                className={cn(
+                  "data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200",
+                  isMobile ? "h-11 w-11" : "h-5 w-5"
+                )}
               />
             </div>
           )}
