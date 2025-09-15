@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, Calendar, AlertCircle, Trash2 } from 'lucide-react'
+import { Archive, Calendar, Home, AlertCircle, Trash2 } from 'lucide-react'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -297,17 +297,14 @@ const ArchivePage: React.FC = () => {
             <div className="flex items-center justify-center min-h-[30vh] sm:min-h-[40vh]">
               <div className="text-center max-w-md px-4">
                 <Archive className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/50 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-base sm:text-lg font-medium mb-2">No archived tasks yet</h3>
-                <p className="text-muted-foreground mb-6 text-sm sm:text-base">
-                  Archive any tasks for future use. Archived tasks can be moved back to your schedule or deleted permanently.
-                </p>
+                <h3 className="text-base sm:text-lg font-medium mb-4">No archived tasks yet</h3>
                 <Button
                   onClick={() => { router.push('/dashboard') }}
-                  variant="outline"
+                  variant="default"
                   className="flex items-center gap-2 mx-auto mobile-form-button sm:w-auto"
                 >
-                  <Calendar className="h-4 w-4" />
-                  Go to Dashboard
+                  <Home className="h-4 w-4" />
+                  Back Home
                 </Button>
               </div>
             </div>

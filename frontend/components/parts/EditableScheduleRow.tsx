@@ -464,7 +464,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         }
       }
     }, 600) // Increased from 500ms to reduce conflicts with scroll gestures
-  }, [isMobile, isSection, hasTouchMoved, dragDropHook.listeners])
+  }, [isMobile, isSection, dragDropHook.listeners])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
@@ -563,11 +563,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const segmentCount = Math.min(levels, 4)
       const segments = []
 
-      // Always show dark purple (10%) + regular purple (90%) for any indent
-      // For level 1: dark purple (10%) + regular purple (90%)
-      // For level 2+: dark purple (10%) + progressive segments (90% split)
-      const firstSegmentWidth = 10 // 10% for darkest
-      const remainingWidth = 90 // 90% for remaining segments
+      // Responsive visual feedback to match actual drag zones
+      // Mobile: 40% outdent/reorder : 60% indent
+      // Desktop: 10% outdent/reorder : 90% indent
+      const firstSegmentWidth = isMobile ? 40 : 10 // Mobile: 40%, Desktop: 10%
+      const remainingWidth = isMobile ? 60 : 90 // Mobile: 60%, Desktop: 90%
 
       // Always have at least 2 segments total (dark + regular)
       const totalSegments = Math.max(segmentCount, 2)
@@ -620,7 +620,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
         )
     }
-  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text])
+  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text, isMobile])
 
   /**
    * Handles task decomposition using the new hook and context
