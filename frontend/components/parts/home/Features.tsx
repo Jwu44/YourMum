@@ -212,11 +212,11 @@ const Features = (): JSX.Element => {
       {/* Horizontal Toggle Group */}
       <div className="mb-5 py-5" ref={toggleRef}>
         <div
-          className="flex justify-center overflow-x-auto px-4 sm:px-6 lg:px-8"
+          className="flex justify-center px-4 sm:px-6 lg:px-8"
           role="tablist"
           aria-label="Feature categories"
         >
-          <div className="bg-feature-toggle-bg rounded-[var(--feature-radius)] p-2 flex gap-1 min-w-fit">
+          <div className="bg-feature-toggle-bg rounded-[var(--feature-radius)] p-2 flex gap-1 w-full max-w-md sm:max-w-lg md:max-w-none md:w-auto">
             {featureGroups.map((group, index) => (
               <button
                 key={group.id}
@@ -224,7 +224,7 @@ const Features = (): JSX.Element => {
                 aria-selected={activeGroup === group.id}
                 aria-controls={`panel-${group.id}`}
                 className={`
-                  px-4 md:px-6 py-2 md:py-3 rounded-[calc(var(--feature-radius)-0.5rem)] font-medium transition-all duration-200 text-sm md:text-base whitespace-nowrap
+                  flex-1 md:flex-initial px-2 sm:px-3 md:px-6 py-2 md:py-3 rounded-[calc(var(--feature-radius)-0.5rem)] font-medium transition-all duration-200 text-xs sm:text-sm md:text-base
                   ${activeGroup === group.id
                     ? 'bg-feature-toggle-active text-white shadow-sm'
                     : 'text-muted-foreground hover:text-foreground hover:bg-white/50'

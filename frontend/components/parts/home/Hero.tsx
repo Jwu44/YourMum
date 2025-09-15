@@ -45,16 +45,16 @@ const Hero = ({ handleGetStarted }: WithHandleGetStarted) => {
         </div>
 
         {/* Dashboard Image - Full width display like Linear */}
-        <div className="opacity-0 translate-y-8 animate-fade-in-up mt-32 md:mt-40 mb-20" style={{ animationDelay: '0.4s' }}>
-          {/* Mobile: Centered crop with no horizontal overflow */}
+        <div className="opacity-0 translate-y-8 animate-fade-in-up mt-8 md:mt-40" style={{ animationDelay: '0.4s' }}>
+          {/* Mobile: Full mobile dashboard image */}
           <div className="relative w-full overflow-hidden md:hidden">
-            <div className="relative w-full h-[300px] sm:h-[400px] overflow-hidden rounded-lg">
+            <div className="relative w-full aspect-[9/16] sm:aspect-[3/4] overflow-hidden rounded-lg p-0">
               <Image
-                src="/images/home/Dashboard Edited.png"
-                alt="YourMum Dashboard"
-                width={1920}
-                height={1080}
-                className="absolute inset-0 w-auto h-full min-w-full object-cover object-center"
+                src="/images/home/Dashboard mobile.png"
+                alt="YourMum Dashboard Mobile"
+                width={390}
+                height={844}
+                className="w-full h-full object-contain"
                 priority
                 quality={100}
               />
