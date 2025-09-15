@@ -454,6 +454,14 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     longPressTimer.current = setTimeout(() => {
       // Only trigger drag mode if user hasn't moved significantly
       if (!hasTouchMoved) {
+        // Clear any existing text selection to prevent interference
+        if (document.getSelection) {
+          const selection = document.getSelection()
+          if (selection && selection.removeAllRanges) {
+            selection.removeAllRanges()
+          }
+        }
+
         triggerHapticFeedback(HapticPatterns.LONG_PRESS)
         setIsDragMode(true)
         setIsLongPressing(false)
@@ -464,7 +472,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         }
       }
     }, 600) // Increased from 500ms to reduce conflicts with scroll gestures
-  }, [isMobile, isSection, dragDropHook.listeners])
+  }, [isMobile, isSection, dragDropHook.listeners, hasTouchMoved])
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
@@ -906,8 +914,15 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 // Add 16px left margin only when no logo is present
                 !getTaskSourceLogo(task) && 'ml-4',
                 // On mobile, extend to full width since no action buttons shown
-                isMobile && 'pr-0'
+                isMobile && 'pr-0',
+                // Prevent text selection on mobile to avoid interference with drag positioning
+                isMobile && 'select-none'
               )}
+              style={{
+                // Additional webkit-specific prevention for better mobile compatibility
+                WebkitUserSelect: isMobile ? 'none' : 'auto',
+                WebkitTouchCallout: isMobile ? 'none' : 'inherit'
+              } as React.CSSProperties}
               data-task-content="true"
             >
               {task.start_time && task.end_time
