@@ -80,6 +80,9 @@ All colors MUST be HSL.
     --feature-toggle-bg: hsl(var(--muted));
     --feature-toggle-active: hsl(var(--primary));
     --feature-bg-pastel: rgba(243, 242, 255, 0.4);
+    
+    /* Preferences page config */
+    --preferences-hover-bg: hsl(var(--primary) / 0.02);
   }
 
   .dark {
@@ -152,6 +155,9 @@ All colors MUST be HSL.
     --feature-toggle-bg: hsl(var(--muted));
     --feature-toggle-active: hsl(var(--primary));
     --feature-bg-pastel: rgba(243, 242, 255, 0.4);
+    
+    /* Preferences page config (dark) */
+    --preferences-hover-bg: hsl(var(--primary) / 0.08);
   }
 }
 
@@ -172,6 +178,16 @@ All colors MUST be HSL.
 }
 
 @layer components {
+  /* Preferences-scope hover utility */
+  .hover-preferences-bg {
+    @apply transition-colors duration-200;
+  }
+
+  .preferences-scope .hover-preferences-bg:hover {
+    background-color: var(--preferences-hover-bg);
+    border-color: hsl(var(--primary) / 0.1);
+  }
+
   /* Consistent hover and selection utilities */
   .hover-selection {
     @apply hover:bg-hover hover:text-hover-foreground transition-colors duration-200;

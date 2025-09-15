@@ -134,12 +134,19 @@ const defaultPriorities: Priority[] = [
 const DraggableCard: React.FC<{ item: Priority, index: number }> = ({ item, index }) => {
   return (
     <motion.div layout className="mb-2">
-      <div className="draggable-card group">
+      <div className="draggable-card group relative cursor-grab active:cursor-grabbing hover-preferences-bg">
+        {/* Hover-only external grip positioned outside the left border */}
+        <div
+          className="absolute left-[-24px] top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab"
+          aria-hidden="true"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+        </div>
+
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs px-2">
             {index + 1}
           </Badge>
-          <GripVertical className="draggable-card-grip" />
         </div>
 
         <div className={`p-2 rounded-lg ${item.bgColor}`}>
@@ -435,7 +442,7 @@ export default function PreferencesPage () {
         isLoading={isLoading}
       />
 
-      <div className="flex-1 overflow-y-auto mobile-scroll">
+      <div className="flex-1 overflow-y-auto mobile-scroll preferences-scope">
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe pt-16 sm:pt-0">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
@@ -455,7 +462,7 @@ export default function PreferencesPage () {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Enter your working hours and YourMum will prioritise work tasks during these hours.
+                  Set your working hours and YourMum will prioritise work tasks inside that window.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -465,7 +472,7 @@ export default function PreferencesPage () {
                     <label className="text-sm font-medium">
                       Start Time
                     </label>
-                    <div className="relative">
+                    <div className="relative hover-preferences-bg rounded-lg border">
                       <Input
                         type="time"
                         value={state.work_start_time || '09:00'}
@@ -478,7 +485,7 @@ export default function PreferencesPage () {
                     <label className="text-sm font-medium">
                       End Time
                     </label>
-                    <div className="relative">
+                    <div className="relative hover-preferences-bg rounded-lg border">
                       <Input
                         type="time"
                         value={state.work_end_time || '17:00'}
@@ -501,7 +508,7 @@ export default function PreferencesPage () {
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  Drag to reorder these priorities based on how important they are to you.
+                  Drag these categories to reorder them based on how important they are to you.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -539,7 +546,7 @@ export default function PreferencesPage () {
                       return (
                         <div
                           key={option.value}
-                          className={`energy-pattern-card ${
+                          className={`energy-pattern-card hover-preferences-bg ${
                             isChecked
                               ? 'energy-pattern-card-checked'
                               : 'energy-pattern-card-unchecked'
@@ -588,7 +595,7 @@ export default function PreferencesPage () {
                         (state.layout_preference?.layout || 'todolist-structured') === 'todolist-structured'
                           ? 'task-ordering-card-selected'
                           : 'task-ordering-card-unselected'
-                      }`}
+                      } hover-preferences-bg`}
                       onClick={() => { handleLayoutChange('layout', 'todolist-structured') }}
                     >
                       <div className={`p-2 rounded-lg ${
@@ -620,7 +627,7 @@ export default function PreferencesPage () {
                         state.layout_preference?.layout === 'todolist-unstructured'
                           ? 'task-ordering-card-selected'
                           : 'task-ordering-card-unselected'
-                      }`}
+                      } hover-preferences-bg`}
                       onClick={() => { handleLayoutChange('layout', 'todolist-unstructured') }}
                     >
                       <div className={`p-2 rounded-lg ${
@@ -706,7 +713,7 @@ export default function PreferencesPage () {
                     return (
                       <div
                         key={option.value}
-                        className={`timing-card group cursor-pointer ${
+                        className={`timing-card group cursor-pointer hover-preferences-bg ${
                           isSelected
                             ? 'timing-card-selected'
                             : 'timing-card-unselected'
@@ -751,7 +758,7 @@ export default function PreferencesPage () {
                     return (
                       <div
                         key={option.value}
-                        className={`ordering-card group cursor-pointer ${
+                        className={`ordering-card group cursor-pointer hover-preferences-bg ${
                           isSelected
                             ? 'ordering-card-selected'
                             : 'ordering-card-unselected'
