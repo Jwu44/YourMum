@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react'
+import dynamic from 'next/dynamic'
+import data from '@emoji-mart/data'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
@@ -100,6 +102,11 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
   const [isOpen, setIsOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
+  // Lazy-load Emoji Mart Picker (@emoji-mart/react) for SSR safety
+  const EmojiMartPicker = useMemo(() => (
+    dynamic(() => import('@emoji-mart/react'), { ssr: false })
+  ), [])
+
   const handleEmojiSelect = useCallback((emoji: string) => {
     onEmojiChange(emoji)
     setIsOpen(false)
@@ -120,27 +127,21 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
           {currentEmoji}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2">
-        <div className="grid grid-cols-7 gap-1">
-          {COMMON_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => { handleEmojiSelect(emoji) }}
-              className={cn(
-                'w-8 h-8 flex items-center justify-center text-lg hover-selection rounded transition-colors',
-                emoji === currentEmoji && 'selection-active'
-              )}
-              title={`Select ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-        <div className="mt-2 pt-2 border-t">
-          <p className="text-xs text-muted-foreground text-center">
-            Click any emoji to select it
-          </p>
-        </div>
+      <PopoverContent className="p-0 border-0 shadow-none bg-transparent">
+        {/* Emoji Mart Picker */}
+        <EmojiMartPicker
+          data={data}
+          onEmojiSelect={(e: any) => {
+            const native = e?.native
+            if (typeof native === 'string' && native.length > 0) {
+              handleEmojiSelect(native)
+            }
+          }}
+          theme="light"
+          previewPosition="none"
+          skinTonePosition="search"
+          perLine={8}
+        />
       </PopoverContent>
     </Popover>
   )
@@ -324,18 +325,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   }, [isSection, task.is_microstep, task.is_subtask, task.id, decompositionContext])
 
   // Add state for re-rendering when emoji changes (optimized)
-  const [, forceUpdate] = useState(0)
+  const [emojiVersion, setEmojiVersion] = useState(0)
 
   // Memoized callback to force re-render when emoji changes
   const handleEmojiChange = useCallback(() => {
-    forceUpdate(prev => prev + 1)
+    setEmojiVersion(prev => prev + 1)
   }, [])
 
   // Memoize expensive getSectionIcon computation to prevent localStorage access on every render
   const sectionIcon = useMemo(() => {
     if (!isSection) return null
     return getSectionIcon(task.text, handleEmojiChange)
-  }, [isSection, task.text, handleEmojiChange, forceUpdate])
+  }, [isSection, task.text, handleEmojiChange, emojiVersion])
 
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {

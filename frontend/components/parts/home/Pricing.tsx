@@ -19,7 +19,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       popular: false
     },
     {
-      name: 'Milf',
+      name: 'Pro',
       price: '$7',
       period: 'month',
       features: [
@@ -41,7 +41,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
             Start For Free
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Try YourMum for free and upgrade to a Milf as you grow.
+            Try YourMum for free and upgrade to a Pro as you grow.
           </p>
         </div>
 
