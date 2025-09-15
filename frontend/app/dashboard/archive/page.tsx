@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Archive, Calendar, Home, AlertCircle, Trash2 } from 'lucide-react'
 
@@ -19,6 +19,7 @@ import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import EditableScheduleRow from '@/components/parts/EditableScheduleRow'
 import { DragStateProvider } from '@/contexts/DragStateContext'
+import { DecompositionProvider } from '@/contexts/DecompositionContext'
 
 // Hooks and Services
 import { useToast } from '@/hooks/use-toast'
@@ -246,9 +247,33 @@ const ArchivePage: React.FC = () => {
     }
   }, [])
 
+  /**
+   * Group archived tasks by their archive date
+   */
+  const groupedArchivedTasks = useMemo(() => {
+    const groups = new Map<string, ArchivedTask[]>()
+
+    archivedTasks.forEach(archivedTask => {
+      const dateKey = archivedTask.archivedAt.split('T')[0] // Get YYYY-MM-DD part
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, [])
+      }
+      groups.get(dateKey)!.push(archivedTask)
+    })
+
+    // Convert to array and sort by date (newest first)
+    return Array.from(groups.entries())
+      .sort(([dateA], [dateB]) => new Date(dateB).getTime() - new Date(dateA).getTime())
+      .map(([date, tasks]) => ({
+        date,
+        tasks: tasks.sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime())
+      }))
+  }, [archivedTasks])
+
   return (
-    <DragStateProvider>
-      <SidebarLayout>
+    <DecompositionProvider>
+      <DragStateProvider>
+        <SidebarLayout>
         {/* Mobile Top Navigation */}
         <MobileTopNav showUpgradeButton={true} />
 
@@ -312,36 +337,33 @@ const ArchivePage: React.FC = () => {
 
           {/* Archived Tasks List */}
           {!isLoading && !error && archivedTasks.length > 0 && (
-            <div className="space-y-3 sm:space-y-4">
-              {archivedTasks.map((archivedTask, index) => (
-                <div key={archivedTask.taskId} className="space-y-2">
-                  {/* Archive metadata */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground px-1">
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <Calendar className="h-3 w-3 flex-shrink-0" />
-                      <span>Archived on {formatArchiveDate(archivedTask.archivedAt)}</span>
-                    </div>
-                    {archivedTask.originalDate && (
-                      <div className="flex items-center gap-1 sm:gap-2 ml-4 sm:ml-0">
-                        <span className="hidden sm:inline">•</span>
-                        <span>Originally from {formatArchiveDate(archivedTask.originalDate)}</span>
-                      </div>
-                    )}
+            <div className="space-y-6 sm:space-y-8">
+              {groupedArchivedTasks.map(({ date, tasks }) => (
+                <div key={date} className="space-y-3 sm:space-y-4">
+                  {/* Date section header */}
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground px-1">
+                    <Archive className="h-4 w-4 flex-shrink-0" />
+                    <span>Archived on {formatArchiveDate(tasks[0].archivedAt)}</span>
                   </div>
 
-                  {/* Archived task displayed as EditableScheduleRow */}
-                  <EditableScheduleRow
-                    task={archivedTask.task}
-                    index={index}
-                    onUpdateTask={handleUpdateTask}
-                    moveTask={handleMoveTask}
-                    isSection={false}
-                    allTasks={archivedTasks.map(at => at.task)}
-                    onEditTask={handleEditTask} // Maps to "Move to today"
-                    onDeleteTask={handleDeleteTask} // Maps to "Delete permanently"
-                    onArchiveTask={handleArchiveTask} // Disabled in archive context
-                    customDropdownItems={createCustomDropdownItems(archivedTask)}
-                  />
+                  {/* Tasks for this date */}
+                  <div className="space-y-2 sm:space-y-3">
+                    {tasks.map((archivedTask, taskIndex) => (
+                      <EditableScheduleRow
+                        key={archivedTask.taskId}
+                        task={archivedTask.task}
+                        index={taskIndex}
+                        onUpdateTask={handleUpdateTask}
+                        moveTask={handleMoveTask}
+                        isSection={false}
+                        allTasks={tasks.map(at => at.task)}
+                        onEditTask={handleEditTask} // Maps to "Move to today"
+                        onDeleteTask={handleDeleteTask} // Maps to "Delete permanently"
+                        onArchiveTask={handleArchiveTask} // Disabled in archive context
+                        customDropdownItems={createCustomDropdownItems(archivedTask)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -352,7 +374,8 @@ const ArchivePage: React.FC = () => {
           </div>
         </div>
       </SidebarLayout>
-    </DragStateProvider>
+      </DragStateProvider>
+    </DecompositionProvider>
   )
 }
 

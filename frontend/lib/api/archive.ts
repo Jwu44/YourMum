@@ -14,14 +14,15 @@ export const archiveApi = {
   ): Promise<{ success: boolean, message?: string, error?: string }> {
     try {
       const response = await apiClient.post('/api/archive/task', {
-        task: taskData,
-        date: originalDate
+        taskId: taskData.id,
+        taskData,
+        originalDate
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`)
+        throw new Error((result.error as string) !== '' ? (result.error as string) : `HTTP error! status: ${response.status}`)
       }
 
       return result
@@ -53,7 +54,7 @@ export const archiveApi = {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`)
+        throw new Error((result.error as string) !== '' ? (result.error as string) : `HTTP error! status: ${response.status}`)
       }
 
       return result
@@ -81,7 +82,7 @@ export const archiveApi = {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`)
+        throw new Error((result.error as string) !== '' ? (result.error as string) : `HTTP error! status: ${response.status}`)
       }
 
       return result
@@ -107,7 +108,7 @@ export const archiveApi = {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`)
+        throw new Error((result.error as string) !== '' ? (result.error as string) : `HTTP error! status: ${response.status}`)
       }
 
       return result
@@ -122,8 +123,8 @@ export const archiveApi = {
 }
 
 // Legacy exports for backwards compatibility
-export const archiveTask = archiveApi.archiveTask
-export const getArchivedTasks = archiveApi.getArchivedTasks
-export const moveTaskToToday = archiveApi.moveTaskToToday
-export const moveArchivedTaskToToday = archiveApi.moveTaskToToday  // Alternative name used in some components
-export const deleteArchivedTask = archiveApi.deleteArchivedTask
+export const archiveTask = archiveApi.archiveTask.bind(archiveApi)
+export const getArchivedTasks = archiveApi.getArchivedTasks.bind(archiveApi)
+export const moveTaskToToday = archiveApi.moveTaskToToday.bind(archiveApi)
+export const moveArchivedTaskToToday = archiveApi.moveTaskToToday.bind(archiveApi) // Alternative name used in some components
+export const deleteArchivedTask = archiveApi.deleteArchivedTask.bind(archiveApi)
