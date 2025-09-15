@@ -171,10 +171,27 @@ export const useDragDropProvider = ({
       let currentMouseY: number
 
       // Method 1: Try to get coordinates from activatorEvent + delta
-      const activatorEvent = event.activatorEvent as MouseEvent
-      if (activatorEvent && activatorEvent.clientX !== undefined && activatorEvent.clientY !== undefined) {
-        currentMouseX = activatorEvent.clientX + delta.x
-        currentMouseY = activatorEvent.clientY + delta.y
+      // Handle both mouse and touch events for proper mobile support
+      const activatorEvent = event.activatorEvent
+
+      if (activatorEvent) {
+        // Check if it's a mouse event
+        if ('clientX' in activatorEvent && 'clientY' in activatorEvent) {
+          const mouseEvent = activatorEvent as MouseEvent
+          currentMouseX = mouseEvent.clientX + delta.x
+          currentMouseY = mouseEvent.clientY + delta.y
+        }
+        // Check if it's a touch event
+        else if ('touches' in activatorEvent && (activatorEvent as TouchEvent).touches.length > 0) {
+          const touchEvent = activatorEvent as TouchEvent
+          const touch = touchEvent.touches[0]
+          currentMouseX = touch.clientX + delta.x
+          currentMouseY = touch.clientY + delta.y
+        }
+        // Fallback - no valid coordinates
+        else {
+          return
+        }
       } else {
         // Method 2: Final fallback - no coordinates available
         return
