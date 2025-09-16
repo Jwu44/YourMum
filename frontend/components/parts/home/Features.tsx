@@ -23,8 +23,8 @@ const featureGroups: FeatureGroup[] = [
     cards: [
       {
         id: 'p1',
-        title: 'Create a schedule that works for you',
-        description: 'YourMum captures inputs about your lifestyle to design a feasible schedule for you.',
+        title: 'Adapts to your changing lifestyle',
+        description: 'YourMum learns your energy levels, priorities, and habits overtime— then builds a schedule that fits you.',
         image: '/images/features/Personalisation.png'
       }
     ]
@@ -36,21 +36,21 @@ const featureGroups: FeatureGroup[] = [
       {
         id: 'a1',
         title: 'Auto-categorise tasks',
-        description: 'YourMum automatically categorises your tasks for prioritisation after you provide your lifestyle.',
+        description: 'YourMum categorises tasks for prioritisation after providing details about your lifestyle.',
         image: '/images/features/Auto categorise.png'
       },
       {
         id: 'a2',
         title: 'Create your next day in 1 click',
-        description: 'YourMum rolls over incomplete, recurring, and calendar tasks into your next day automatically.',
+        description: 'YourMum rolls over incomplete, recurring and calendar tasks into your next day.',
         image: '/images/features/Create next day demo.mov',
         hasVideo: true,
         videoSrc: '/images/features/Create next day demo.mov'
       },
       {
         id: 'a3',
-        title: 'Task decomposition',
-        description: 'Break down complex tasks into smaller, actionable steps with ease.',
+        title: 'Turn big tasks into mini steps',
+        description: 'Break down complex tasks into clear, smaller and actionable steps. Then you can choose which to keep.',
         image: '/images/features/Decompose.mov',
         hasVideo: true,
         videoSrc: '/images/features/Decompose.mov'
@@ -64,7 +64,7 @@ const featureGroups: FeatureGroup[] = [
       {
         id: 's1',
         title: 'Integrations',
-        description: 'Connect third-party apps to auto-create tasks. Soon, YourMum will also handle simple admin tasks for you.',
+        description: 'Connect third-party apps to auto-create tasks. YourMum will act as an agent to action simple admin tasks (Coming Soon)',
         image: '/images/features/Integration demo.mov',
         hasVideo: true,
         videoSrc: '/images/features/Integration demo.mov'
@@ -206,7 +206,7 @@ const Features = (): JSX.Element => {
     <section id="features" className="py-24 px-4 max-w-7xl mx-auto">
       {/* Section Header */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-foreground mb-5">Features</h1>
+        <h1 className="text-4xl font-bold text-foreground">Features</h1>
       </div>
 
       {/* Horizontal Toggle Group */}

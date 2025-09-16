@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckCircle } from "lucide-react";
 
 const HowItWorks = () => {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null)
@@ -6,22 +7,22 @@ const HowItWorks = () => {
   const steps = [
     {
       id: 1,
-      title: 'Set up tasks',
-      description: 'Add any unsynced tasks you have for the day.',
+      title: 'Add tasks',
+      description: 'Drop in your to-dos or let YourMum sync them for your Google Calendar.',
       hasVideo: true,
       videoSrc: '/demos/Demo 1.mov'
     },
     {
       id: 2,
-      title: 'Fill out preferences',
-      description: 'Tell YourMum about your lifestyle so she can personalise your schedule.',
+      title: 'Personalise your day',
+      description: 'Tell YourMum when you work best and what matters most.',
       hasVideo: true,
       videoSrc: '/demos/Demo 2.mov'
     },
     {
       id: 3,
       title: 'Connect apps',
-      description: 'Sync with Google Calendar, Slack and more (coming soon!) to have tasks automatically created.',
+      description: 'Sync Google Calendar, Slack, and more — everything stays in one place.',
       hasVideo: true,
       videoSrc: '/demos/Demo 3.mov'
     }
@@ -30,13 +31,24 @@ const HowItWorks = () => {
   return (
     <section className="py-20 bg-gradient-section" id="how-it-works">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="text-center mb-20">
+        <div className="text-center mb-5 py-5">
           <h1 className="text-3xl lg:text-5xl font-bold text-foreground mb-5">
-            How it works
+            Setup in 3 steps
           </h1>
-          <h2 className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get YourMum started in three simple steps.
-          </h2>
+          <div className="flex justify-center items-center gap-8 text-lg sm:text-xl text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Free
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              No credit card required
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Sign in with Google
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row items-start justify-center gap-8 lg:gap-12">
