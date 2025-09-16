@@ -901,7 +901,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               ref={checkboxRef}
               className={cn(
                 "flex items-center",
-                isMobile ? "p-4 -m-4" : "" // Larger touch target on mobile
+                isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
               // Prevent touch events from bubbling to parent task row
               onTouchStart={(e) => {
@@ -923,7 +923,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
+                className="h-6 w-6 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
               />
             </div>
           )}
