@@ -24,7 +24,7 @@ const featureGroups: FeatureGroup[] = [
       {
         id: 'p1',
         title: 'Adapts to your changing lifestyle',
-        description: 'YourMum learns your energy levels, priorities, and habits overtime— then builds a schedule that fits you.',
+        description: 'YourMum learns your energy levels, priorities, and habits overtime — then builds a schedule that fits you.',
         image: '/images/features/Personalisation.png'
       }
     ]

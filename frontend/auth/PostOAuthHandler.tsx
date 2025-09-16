@@ -23,14 +23,20 @@ export const isPostOAuthActive = (): boolean => {
   // Check if we're in browser environment
   if (typeof window === 'undefined') return false
 
-  // Simplified detection logic to prevent infinite loops
-  // Primary indicator: session storage flag set during active OAuth flow
-  const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
-
-  // Secondary indicator: URL parameters from OAuth redirect (but with timeout protection)
+  // Primary indicator: Immediate OAuth redirect detection
   const hasOAuthRedirect = window.location.pathname === '/dashboard' &&
                           (window.location.search.includes('code=') ||
                            window.location.search.includes('state='))
+
+  // If OAuth redirect detected, immediately set session indicators for consistency
+  if (hasOAuthRedirect) {
+    sessionStorage.setItem('oauth-in-progress', 'true')
+    sessionStorage.setItem('oauth-timestamp', Date.now().toString())
+    return true
+  }
+
+  // Secondary indicator: session storage flag set during active OAuth flow
+  const hasSessionIndicator = sessionStorage.getItem('oauth-in-progress') === 'true'
 
   // Safety check: Clear stale session indicators older than 2 minutes to prevent infinite loops
   const oauthTimestamp = sessionStorage.getItem('oauth-timestamp')
@@ -44,7 +50,7 @@ export const isPostOAuthActive = (): boolean => {
     }
   }
 
-  return hasSessionIndicator || hasOAuthRedirect
+  return hasSessionIndicator
 }
 
 /**

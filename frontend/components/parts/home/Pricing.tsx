@@ -13,7 +13,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
         'Auto capture tasks from integrations',
         'Auto create your next day',
         'Limited schedule generation',
-        'Limited task decomposition',
+        'Limited task break downs',
       ],
       cta: 'Try For Free',
       popular: false
@@ -25,7 +25,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       features: [
         'Everything in Free',
         'More schedule generation',
-        'More task decomposition',
+        'More task break downs',
         'Access to new integrations',
       ],
       cta: 'Start Free Trial',
