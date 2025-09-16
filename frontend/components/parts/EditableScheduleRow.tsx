@@ -837,7 +837,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               !isDraggingAny && dragDropHook.getGripClassName(),
               // When any task is dragging, use static classes without hover states
               isDraggingAny && 'opacity-0 cursor-grab transition-opacity duration-200 mr-2',
-              'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10' // Position grip 24px to the left
+              'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10', // Position grip 24px to the left
+              isMobile && 'hidden' // Hide grip entirely on mobile
             )}
             {...(dragDropHook.listeners || {})}
           >
