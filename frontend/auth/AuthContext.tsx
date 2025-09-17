@@ -96,20 +96,21 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
 
       console.log('Has calendar access:', hasCalendarAccess)
 
-      // Store user with correct calendar access flag
+      // Store user with correct calendar access flag and access token
       console.log('Storing user with calendar access flag:', hasCalendarAccess)
-      await storeUserInBackend(currentUser, hasCalendarAccess)
+      const accessToken = hasCalendarAccess ? credential.accessToken : null
+      await storeUserInBackend(currentUser, hasCalendarAccess, accessToken)
 
       if (hasCalendarAccess) {
-        console.log('✅ Calendar access granted - redirecting to proper OAuth flow for refresh tokens')
+        console.log('✅ Calendar access granted - proceeding with schedule generation')
 
-        // Reset OAuth state since we'll be redirecting
-        setIsOAuthInProgress(false)
-        setCalendarConnectionStage(null)
+        // Store the calendar access token for later use
+        // This will be handled by the backend during user storage
 
-        // Use reconnectCalendar() which implements proper OAuth flow with refresh tokens
-        // This ensures single source of truth for calendar OAuth
-        await reconnectCalendar()
+        // Trigger PostOAuthHandler for schedule generation (with calendar)
+        setPostOAuthCredential(credential)
+        setShowPostOAuthHandler(true)
+        setCalendarConnectionStage('connecting')
       } else {
         console.log('❌ No calendar access granted')
 
@@ -148,19 +149,27 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
    * Store user information in the backend using centralized API client
    * @param user Firebase user object
    * @param hasCalendarAccess Optional flag indicating if user has granted calendar access
+   * @param accessToken Optional calendar access token to store
    */
-  const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false): Promise<void> => {
+  const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false, accessToken: string | null = null): Promise<void> => {
     try {
       console.log('Storing user in backend with calendar access:', hasCalendarAccess)
 
       // Use API client instead of direct fetch - it handles token refresh automatically
-      const response = await apiClient.post('/api/auth/user', {
+      const requestBody: any = {
         googleId: user.uid,
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
         hasCalendarAccess
-      })
+      }
+
+      // Include calendar access token if provided
+      if (accessToken) {
+        requestBody.calendarAccessToken = accessToken
+      }
+
+      const response = await apiClient.post('/api/auth/user', requestBody)
 
       if (response.ok) {
         console.log('✅ User stored in backend successfully with calendar access:', hasCalendarAccess)

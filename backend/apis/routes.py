@@ -393,7 +393,8 @@ def get_auth_user_info():
                     "email": "string (required)",
                     "displayName": "string",
                     "photoURL": "string",
-                    "hasCalendarAccess": "boolean"
+                    "hasCalendarAccess": "boolean",
+                    "calendarAccessToken": "string (optional, when hasCalendarAccess is true)"
                 }
             }), 200
             
@@ -412,10 +413,11 @@ def create_or_update_user():
     
     Expected JSON body:
         - googleId: string (required)
-        - email: string (required) 
+        - email: string (required)
         - displayName: string (optional)
         - photoURL: string (optional)
         - hasCalendarAccess: boolean (optional)
+        - calendarAccessToken: string (optional, used when hasCalendarAccess is true)
     
     Returns:
         - 200: User successfully created/updated
@@ -600,6 +602,8 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Prepare calendar settings based on hasCalendarAccess
     has_calendar_access = user_data.get('hasCalendarAccess', False)
+    calendar_access_token = user_data.get('calendarAccessToken')
+
     calendar_settings = {
         "connected": has_calendar_access,
         "lastSyncTime": None,
@@ -612,6 +616,19 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
             "defaultReminders": True
         }
     }
+
+    # If calendar access token is provided, store it as credentials
+    if has_calendar_access and calendar_access_token:
+        from datetime import datetime, timezone, timedelta
+        calendar_settings["credentials"] = {
+            "accessToken": calendar_access_token,
+            "refreshToken": None,  # Firebase OAuth doesn't provide refresh tokens
+            "expiresAt": datetime.now(timezone.utc) + timedelta(hours=1),  # Typical OAuth token expiry
+            "tokenType": "Bearer",
+            "scope": "https://www.googleapis.com/auth/calendar.readonly"
+        }
+        calendar_settings["syncStatus"] = "completed"
+        calendar_settings["lastSyncTime"] = datetime.now(timezone.utc)
 
     # Ensure displayName is never None/null
     display_name = user_data.get("displayName")
