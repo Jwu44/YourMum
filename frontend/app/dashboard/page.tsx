@@ -53,14 +53,12 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   // Be resilient in test environments where AuthProvider may be mocked
-  const { calendarConnectionStage, currentUser, reconnectCalendar } = (() => {
+  const { currentUser } = (() => {
     try {
       return useAuth()
     } catch (e) {
-      return { 
-        calendarConnectionStage: null as any, 
-        currentUser: auth.currentUser,
-        reconnectCalendar: async () => {} // No-op fallback for tests
+      return {
+        currentUser: auth.currentUser
       }
     }
   })()
@@ -101,64 +99,8 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex])
 
-  // Check for calendar sync status using Calendar Health Service
-  useEffect(() => {
-    const validateCalendarHealth = async () => {
-      try {
-        if (hasEnsuredRefresh.current) return
-        hasEnsuredRefresh.current = true
-
-        console.log('🔍 Dashboard: Starting calendar health validation...')
-        
-        const healthResult = await calendarHealthService.validateCalendarHealth(
-          calendarConnectionStage,
-          isPostOAuthHandlerActive
-        )
-
-        if (healthResult.skipReason) {
-          console.log(`⏭️ Calendar validation skipped: ${healthResult.skipReason}`)
-          return
-        }
-
-        if (healthResult.healthy) {
-          console.log('✅ Calendar is healthy')
-          return
-        }
-
-        console.log(`⚠️ Calendar health issue: ${healthResult.error}`)
-
-        // Handle different error types
-        if (healthResult.needsReauth) {
-          try {
-            console.log('🔄 Attempting calendar credential refresh...')
-            setIsEnsuringRefresh(true)
-            
-            await reconnectCalendar()
-            
-            console.log('✅ Calendar credentials refreshed successfully')
-            calendarHealthService.reset() // Reset validation state after successful refresh
-          } catch (refreshError) {
-            console.error('❌ Failed to refresh calendar credentials:', refreshError)
-            
-            toast({
-              title: 'Calendar Connection Issue',
-              description: 'Please reconnect your Google Calendar in the Integrations page.',
-              variant: 'destructive'
-            })
-          } finally {
-            setIsEnsuringRefresh(false)
-          }
-        } else {
-          // Non-auth error, just log and continue
-          console.log('📝 Calendar API error (non-auth), continuing without refresh')
-        }
-      } catch (error) {
-        console.error('📋 Dashboard calendar validation error:', error)
-      }
-    }
-
-    validateCalendarHealth()
-  }, [currentUser, calendarConnectionStage, isPostOAuthHandlerActive, reconnectCalendar, toast])
+  // Calendar health is now managed by the OAuth callback flow
+  // No complex validation needed in dashboard
 
   useEffect(() => {
     // Check for general calendar connection errors
@@ -1262,16 +1204,7 @@ const Dashboard: React.FC = () => {
     })
   }, [])
 
-  // Separate useEffect to detect calendar connection completion
-  const prevCalendarStageRef = useRef(calendarConnectionStage)
-  useEffect(() => {
-    // Reset hasInitiallyLoaded when calendarConnectionStage changes from truthy to null
-    // This allows schedule to reload with calendar events after connection completes
-    if (prevCalendarStageRef.current && !calendarConnectionStage) {
-      hasInitiallyLoaded.current = false
-    }
-    prevCalendarStageRef.current = calendarConnectionStage
-  }, [calendarConnectionStage])
+  // Calendar connection is now handled by OAuth callback flow
 
   useEffect(() => {
     // Prevent duplicate loads in React Strict Mode
@@ -1324,17 +1257,15 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    // Simplified condition: only check if we're not in an OAuth flow and haven't loaded yet
-    const isInOAuthFlow = calendarConnectionStage !== null || isEnsuringRefresh || isPostOAuthHandlerActive
-
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !isInOAuthFlow) {
+    // Simplified condition: load if we haven't loaded yet and no form data
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
       console.log('🚀 Dashboard: Conditions met, loading initial schedule...')
       loadInitialSchedule()
-    } else if (hasInitiallyLoaded.current || isInOAuthFlow) {
-      console.log('⏭️ Dashboard: Skipping load - already loaded or in OAuth flow')
+    } else if (hasInitiallyLoaded.current) {
+      console.log('⏭️ Dashboard: Skipping load - already loaded')
       setIsLoadingSchedule(false)
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh, isPostOAuthHandlerActive])
+  }, [state.formUpdate?.response, toast])
 
   // Monitor PostOAuthHandler status changes
   useEffect(() => {
@@ -1453,12 +1384,12 @@ const Dashboard: React.FC = () => {
           isCurrentDay={false}
           onAddTask={() => { setIsTaskDrawerOpen(true) }}
           showSidebarTrigger={true}
-          isLoading={isLoadingSchedule && calendarConnectionStage !== 'complete'}
+          isLoading={isLoadingSchedule}
         />
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
-            {isLoadingSchedule && calendarConnectionStage !== 'complete' ? (
+            {isLoadingSchedule ? (
               <div className="flex flex-col gap-[10px] mt-5" data-testid="dashboard-skeleton">
                 {[...Array(4)].map((_, i) => (
                   <div

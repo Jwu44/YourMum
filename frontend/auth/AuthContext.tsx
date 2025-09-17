@@ -1,13 +1,11 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { type User, onAuthStateChanged, signOut as firebaseSignOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth'
-import { auth, provider } from './firebase'
+import { type User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
+import { auth } from './firebase'
 import { type AuthContextType } from '@/lib/types'
 import { detectBrowserTimezone, shouldUpdateUserTimezone } from '@/lib/utils/timezone'
-import { PostOAuthHandler } from '@/auth/PostOAuthHandler'
 import { apiClient } from '@/lib/api/client'
-import { categorizeAuthError, storeCalendarError } from '@/lib/utils/auth-errors'
 
 /**
  * Auth Context for managing user authentication state
@@ -34,10 +32,7 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isOAuthInProgress, setIsOAuthInProgress] = useState(false)
-  const [calendarConnectionStage, setCalendarConnectionStage] = useState<'connecting' | 'verifying' | 'complete' | null>(null)
-  const [showPostOAuthHandler, setShowPostOAuthHandler] = useState(false)
-  const [postOAuthCredential, setPostOAuthCredential] = useState<any>(null)
+  // Simplified state - removed complex OAuth flags
 
   // Initialize API client on mount
   useEffect(() => {
@@ -45,146 +40,9 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     apiClient.initialize()
   }, [])
 
-  /**
-   * Handle errors using centralized error categorization
-   */
-  const handleError = (error: any, context: string): void => {
-    const categorizedError = categorizeAuthError(error, context)
+  // Removed complex OAuth processing methods - handled by callback page
 
-    if (categorizedError.shouldShowToUser) {
-      setError(categorizedError.message)
-    }
-
-    if (categorizedError.shouldStoreForRouting) {
-      storeCalendarError(categorizedError.message)
-    }
-  }
-
-  /**
-   * Wait for Firebase auth state to be fully established
-   * @param maxRetries Maximum number of retry attempts
-   * @param delayMs Delay between retry attempts
-   */
-  const waitForAuthState = async (maxRetries: number = 5, delayMs: number = 200): Promise<User> => {
-    for (let i = 0; i < maxRetries; i++) {
-      if (auth.currentUser) {
-        return auth.currentUser
-      }
-      console.log(`Waiting for auth state... attempt ${i + 1}/${maxRetries}`)
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-    }
-    throw new Error('Auth state not established within timeout period')
-  }
-
-  /**
-   * Process calendar access using direct OAuth flow (single source of truth)
-   * @param credential Google Auth credential
-   */
-  const processCalendarAccess = async (credential: any): Promise<void> => {
-    try {
-      console.log('🎬 Starting processCalendarAccess with direct OAuth flow...')
-
-      // Wait for Firebase auth state to be fully established to prevent race condition
-      const currentUser = await waitForAuthState()
-      console.log('✅ Auth state confirmed, user:', currentUser.email)
-
-      // Get scopes and check for calendar access
-      const scopes = await getScopes(credential.accessToken)
-      const hasCalendarAccess = scopes.some(scope =>
-        scope.includes('calendar.readonly') || scope.includes('calendar.events.readonly')
-      )
-
-      console.log('Has calendar access:', hasCalendarAccess)
-
-      // Store user with correct calendar access flag and access token
-      console.log('Storing user with calendar access flag:', hasCalendarAccess)
-      const accessToken = hasCalendarAccess ? credential.accessToken : null
-      await storeUserInBackend(currentUser, hasCalendarAccess, accessToken)
-
-      if (hasCalendarAccess) {
-        console.log('✅ Calendar access granted - proceeding with schedule generation')
-
-        // Store the calendar access token for later use
-        // This will be handled by the backend during user storage
-
-        // Trigger PostOAuthHandler for schedule generation (with calendar)
-        setPostOAuthCredential(credential)
-        setShowPostOAuthHandler(true)
-        setCalendarConnectionStage('connecting')
-      } else {
-        console.log('❌ No calendar access granted')
-
-        // Still trigger PostOAuthHandler for schedule generation (without calendar)
-        setPostOAuthCredential(credential)
-        setShowPostOAuthHandler(true)
-        setCalendarConnectionStage('connecting')
-      }
-    } catch (error) {
-      console.error('Error in processCalendarAccess:', error)
-      
-      // Reset OAuth state to prevent infinite loading
-      setIsOAuthInProgress(false)
-      setCalendarConnectionStage(null)
-
-      // Critical fix: Allow user to proceed with schedule functionality even if calendar fails
-      // This prevents the infinite loading loop by triggering PostOAuthHandler for schedule-only flow
-      console.log('📋 Calendar connection failed, proceeding with schedule-only flow...')
-      
-      try {
-        // Still trigger PostOAuthHandler for schedule generation (without calendar)
-        setPostOAuthCredential(credential)
-        setShowPostOAuthHandler(true)
-        setCalendarConnectionStage('connecting')
-        
-        console.log('✅ Schedule-only flow initiated successfully')
-      } catch (fallbackError) {
-        console.error('❌ Failed to initiate schedule-only flow:', fallbackError)
-        // Use centralized error handling as last resort
-        handleError(error, 'processCalendarAccess')
-      }
-    }
-  }
-
-  /**
-   * Store user information in the backend using centralized API client
-   * @param user Firebase user object
-   * @param hasCalendarAccess Optional flag indicating if user has granted calendar access
-   * @param accessToken Optional calendar access token to store
-   */
-  const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false, accessToken: string | null = null): Promise<void> => {
-    const startTime = Date.now()
-    const requestId = Math.random().toString(36).substr(2, 9)
-    try {
-      console.log(`[${requestId}] Starting user storage with calendar access:`, hasCalendarAccess, `at ${new Date().toISOString()}`)
-
-      // Use API client instead of direct fetch - it handles token refresh automatically
-      const requestBody: any = {
-        googleId: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        hasCalendarAccess
-      }
-
-      // Include calendar access token if provided
-      if (accessToken) {
-        requestBody.calendarAccessToken = accessToken
-      }
-
-      const response = await apiClient.post('/api/auth/user', requestBody)
-
-      const duration = Date.now() - startTime
-      if (response.ok) {
-        console.log(`[${requestId}] ✅ User stored in backend successfully with calendar access:`, hasCalendarAccess, `(${duration}ms)`)
-      } else {
-        const errorText = await response.text()
-        console.error(`[${requestId}] ❌ Failed to store user in backend:`, response.status, errorText, `(${duration}ms)`)
-      }
-    } catch (error) {
-      const duration = Date.now() - startTime
-      console.error(`[${requestId}] ❌ Error storing user in backend:`, error, `(${duration}ms)`)
-    }
-  }
+  // Removed storeUserInBackend - handled by OAuth callback page
 
   // Listen for authentication state changes
   useEffect(() => {
@@ -206,22 +64,17 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed. User:', user ? `${user.displayName} (${user.email})` : 'null')
-      console.log('OAuth in progress:', isOAuthInProgress)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('✅ Auth state changed. User:', user ? `${user.displayName} (${user.email})` : 'null')
 
-      // Set user state immediately to prevent UI blocking
+      // Simple state update - OAuth callback page handles user storage
       setUser(user)
       setLoading(false)
 
-      // IMPORTANT: Do not store user during OAuth flow to prevent race condition
-      // The OAuth flow (processCalendarAccess) will handle user storage with correct calendar access
-      if (user && !isOAuthInProgress) {
-        console.log('Storing user from auth state change (non-OAuth)')
-        await storeUserInBackend(user, false) // Explicitly set no calendar access for non-OAuth
-        console.log('Authentication completed successfully')
-      } else if (user && isOAuthInProgress) {
-        console.log('Skipping user storage during OAuth flow to prevent race condition')
+      if (user) {
+        console.log('✅ User authenticated successfully')
+      } else {
+        console.log('👋 User signed out')
       }
     })
 
@@ -229,10 +82,10 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     return () => { unsubscribe() }
   }, []) // Empty dependency array - setup once on mount
 
-  // Enhanced timezone sync when user becomes available and not in OAuth flow
+  // Simple timezone sync when user becomes available
   useEffect(() => {
     const syncTimezoneIfNeeded = async () => {
-      if (!user || isOAuthInProgress) return
+      if (!user) return
 
       try {
         const browserTz = detectBrowserTimezone()
@@ -257,7 +110,7 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
 
         console.log(`🌍 Timezone sync needed: ${serverTz || 'none'} → ${browserTz}`)
 
-        // Update timezone via API client - handles token refresh automatically
+        // Update timezone via API client
         const updateRes = await apiClient.put('/api/user/timezone', { timezone: browserTz })
 
         if (updateRes.ok) {
@@ -273,55 +126,19 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     }
 
     syncTimezoneIfNeeded()
-  }, [user, isOAuthInProgress])
+  }, [user])
 
-  // Handle redirect result and check for calendar access
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        console.log('Checking redirect result...')
-        const result = await getRedirectResult(auth)
-        console.log('Redirect result:', result)
-
-        if (result) {
-          // User successfully signed in after redirect
-          console.log('Redirect sign-in successful')
-
-          // Set OAuth in progress to prevent race condition with auth state change
-          setIsOAuthInProgress(true)
-
-          // Get credentials from result
-          const credential = GoogleAuthProvider.credentialFromResult(result)
-          if (!credential?.accessToken) {
-            console.error('Missing credential or access token')
-            setIsOAuthInProgress(false) // Reset OAuth state
-            console.log('Missing credential - RouteGuard will handle navigation')
-            return
-          }
-
-          await processCalendarAccess(credential)
-        } else {
-          console.log('No redirect result found')
-        }
-      } catch (error) {
-        console.error('Redirect sign-in error:', error)
-        setIsOAuthInProgress(false) // Reset OAuth state on error
-        setError('Failed to sign in with Google')
-        console.log('Redirect sign-in error - RouteGuard will handle navigation')
-      }
-    }
-
-    handleRedirectResult()
-  }, [])
+  // Removed complex redirect result handling - OAuth callback page handles redirects
 
   /**
-   * Sign in with Google and request calendar access
+   * Sign in with Google using single OAuth flow for authentication + calendar access
    * @param redirectTo Destination after successful sign-in
    */
   const signIn = async (redirectTo = '/dashboard') => {
     try {
       setError(null)
-      console.log('Starting sign in process, redirect destination:', redirectTo)
+      console.log('🚀 Starting single OAuth flow for auth + calendar access')
+      console.log('Redirect destination:', redirectTo)
 
       // Check if user is already authenticated
       if (user) {
@@ -333,53 +150,16 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
       localStorage.setItem('authRedirectDestination', redirectTo)
       console.log('Stored redirect destination in localStorage')
 
-      // Configure provider to request calendar access and force consent screen
-      provider.addScope('https://www.googleapis.com/auth/calendar.readonly')
-      provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly')
-      provider.setCustomParameters({
-        prompt: 'consent' // Force the consent screen to appear
-      })
+      // Import the Google OAuth service
+      const { googleOAuthService } = await import('@/lib/services/google-oauth')
 
-      console.log('Initiating signInWithPopup')
+      // Initiate single OAuth flow (redirects to Google)
+      // This will handle both authentication and calendar access in one step
+      googleOAuthService.initiateOAuthFlow()
 
-      // Set OAuth in progress BEFORE popup to prevent race condition
-      setIsOAuthInProgress(true)
-
-      try {
-        // Try popup first
-        const result = await signInWithPopup(auth, provider)
-        console.log('Sign in successful:', result.user
-          ? `${result.user.displayName} (${result.user.email})`
-          : 'No user')
-
-        // Get credentials from result
-        const credential = GoogleAuthProvider.credentialFromResult(result)
-        if (credential?.accessToken) {
-          await processCalendarAccess(credential)
-        } else {
-          // No calendar access - let RouteGuard handle navigation
-          console.log('No calendar access from popup - RouteGuard will handle navigation')
-        }
-      } catch (popupError: any) {
-        // If popup fails, try redirect as fallback
-        console.log('Popup failed, falling back to redirect:', popupError.message)
-
-        if (popupError.code === 'auth/popup-blocked' ||
-            popupError.code === 'auth/cancelled-popup-request' ||
-            popupError.code === 'auth/popup-closed-by-user') {
-          console.log('Using signInWithRedirect as fallback')
-          await signInWithRedirect(auth, provider)
-          // Note: signInWithRedirect doesn't return immediately
-          // The result will be handled by getRedirectResult in the useEffect
-        } else {
-          throw popupError
-        }
-      }
     } catch (error) {
-      console.error('Sign in error:', error)
-      setIsOAuthInProgress(false) // Reset OAuth state on error
-      setError('Failed to sign in with Google')
-      console.log('Sign in error - RouteGuard will handle navigation')
+      console.error('❌ Single OAuth flow initiation failed:', error)
+      setError('Failed to start sign in process')
       throw error
     }
   }
@@ -400,153 +180,15 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     }
   }
 
-  /**
-   * Reconnect Google Calendar for existing authenticated users using direct Google OAuth
-   * This bypasses Firebase to get real refresh tokens from Google
-   */
-  const reconnectCalendar = async () => {
-    try {
-      setError(null)
-      console.log('Starting direct Google OAuth calendar reconnection')
-
-      if (!user) {
-        throw new Error('User must be authenticated to reconnect calendar')
-      }
-
-      // Build direct Google OAuth URL with proper parameters for refresh tokens
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-      if (!clientId) {
-        throw new Error('Google Client ID not configured')
-      }
-
-      const redirectUri = `${window.location.origin}/integrations/calendar/callback`
-      const scopes = [
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/calendar.events.readonly'
-      ].join(' ')
-
-      const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-      oauthUrl.searchParams.set('client_id', clientId)
-      oauthUrl.searchParams.set('redirect_uri', redirectUri)
-      oauthUrl.searchParams.set('response_type', 'code')
-      oauthUrl.searchParams.set('scope', scopes)
-      oauthUrl.searchParams.set('access_type', 'offline') // Critical for refresh tokens
-      oauthUrl.searchParams.set('prompt', 'consent') // Force consent to get refresh tokens
-      oauthUrl.searchParams.set('include_granted_scopes', 'true')
-
-      console.log('Redirecting to Google OAuth for calendar access')
-
-      // Store current page to return to after OAuth
-      localStorage.setItem('calendar-oauth-redirect', window.location.pathname)
-
-      // Redirect to Google OAuth
-      window.location.href = oauthUrl.toString()
-    } catch (error) {
-      console.error('Calendar reconnection error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reconnect calendar'
-      setError(errorMessage)
-      throw new Error(errorMessage)
-    }
-  }
-
-  /**
-   * Handle OAuth callback from Google with authorization code
-   * This exchanges the code for access and refresh tokens via backend
-   */
-  const handleOAuthCallback = async (authorizationCode: string) => {
-    try {
-      setError(null)
-      console.log('Processing OAuth authorization code from Google')
-
-      if (!user) {
-        throw new Error('User must be authenticated')
-      }
-
-      // Exchange authorization code for tokens via backend
-      const response = await apiClient.post('/api/calendar/oauth-exchange', {
-        authorization_code: authorizationCode
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to exchange OAuth tokens')
-      }
-
-      const data = await response.json()
-      console.log('✅ OAuth token exchange successful - refresh tokens stored')
-
-      // Redirect back to where user came from
-      const redirectPath = localStorage.getItem('calendar-oauth-redirect') || '/dashboard'
-      localStorage.removeItem('calendar-oauth-redirect')
-
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        window.location.href = redirectPath
-      }, 1000)
-    } catch (error) {
-      console.error('OAuth callback error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to process OAuth callback'
-      setError(errorMessage)
-      throw new Error(errorMessage)
-    }
-  }
-
-  /**
-   * Handle successful completion of PostOAuthHandler
-   */
-  const handlePostOAuthComplete = () => {
-    console.log('✅ PostOAuthHandler completed successfully')
-
-    // Reset all OAuth-related state
-    setIsOAuthInProgress(false)
-    setCalendarConnectionStage(null)
-    setShowPostOAuthHandler(false)
-    setPostOAuthCredential(null)
-    setError(null)
-
-    console.log('🎯 OAuth flow completed - user should be navigated to dashboard')
-  }
-
-  /**
-   * Handle PostOAuthHandler error
-   */
-  const handlePostOAuthError = (errorMessage: string) => {
-    console.error('❌ PostOAuthHandler failed:', errorMessage)
-
-    // Reset OAuth state and set error
-    setIsOAuthInProgress(false)
-    setCalendarConnectionStage(null)
-    setShowPostOAuthHandler(false)
-    setPostOAuthCredential(null)
-    setError(errorMessage)
-
-    // Store error for routing logic using centralized utility
-    storeCalendarError(errorMessage)
-  }
+  // Removed complex OAuth methods - handled by OAuth callback page
 
   const value: AuthContextType = {
-    user, // Add this to satisfy AuthState
-    currentUser: user, // This is your renamed property
+    user,
+    currentUser: user, // Alias for compatibility
     loading,
     error,
-    calendarConnectionStage,
     signIn,
-    signOut,
-    reconnectCalendar,
-    handleOAuthCallback
-  }
-
-  // Show PostOAuthHandler overlay if in post-OAuth flow
-  if (showPostOAuthHandler && postOAuthCredential) {
-    return (
-      <AuthContext.Provider value={value}>
-        <PostOAuthHandler
-          credential={postOAuthCredential}
-          onComplete={handlePostOAuthComplete}
-          onError={handlePostOAuthError}
-        />
-      </AuthContext.Provider>
-    )
+    signOut
   }
 
   return (

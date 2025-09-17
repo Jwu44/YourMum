@@ -448,9 +448,13 @@ def create_or_update_user():
         db = get_database()
         users = db['users']
 
+        # Check if user exists before creating/updating to determine isNewUser flag
+        existing_user = users.find_one({"googleId": user_data["googleId"]})
+        is_new_user = existing_user is None
+
         # Create or update user using the utility function
         user = db_create_or_update_user(users, processed_user_data)
-        
+
         if not user:
             return jsonify({
                 "error": "Failed to create or update user"
@@ -459,9 +463,13 @@ def create_or_update_user():
         # Convert ObjectId to string and dates to ISO format for JSON serialization
         serialized_user = process_user_for_response(user)
 
+        # Enhanced response structure for single OAuth flow
+        message = "User created successfully" if is_new_user else "User updated successfully"
+
         return jsonify({
             "user": serialized_user,
-            "message": "User successfully created/updated"
+            "message": message,
+            "isNewUser": is_new_user
         }), 200
 
     except Exception as e:
@@ -618,17 +626,65 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-    # If calendar access token is provided, store it as credentials
-    if has_calendar_access and calendar_access_token:
+    # Enhanced: Handle proper calendar tokens from single OAuth flow
+    calendar_tokens = user_data.get('calendarTokens')
+    if has_calendar_access and calendar_tokens:
+        # Validate required token fields
+        required_token_fields = ['accessToken']
+        missing_fields = [field for field in required_token_fields if not calendar_tokens.get(field)]
+        if missing_fields:
+            print(f"⚠️ Missing required calendar token fields: {missing_fields}")
+            calendar_settings["connected"] = False
+            calendar_settings["syncStatus"] = "failed"
+            calendar_settings["error"] = f"Missing token fields: {', '.join(missing_fields)}"
+        else:
+            # Process expiration time with enhanced validation
+            expires_at = calendar_tokens.get('expiresAt')
+            if isinstance(expires_at, str):
+                try:
+                    expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                except ValueError as e:
+                    print(f"⚠️ Invalid expiresAt format: {expires_at}, error: {e}")
+                    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+            elif not expires_at:
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+            # Validate refresh token presence (critical for single OAuth flow)
+            refresh_token = calendar_tokens.get('refreshToken', '')
+            if not refresh_token:
+                print("⚠️ WARNING: No refresh token provided - calendar sync may fail when access token expires")
+
+            calendar_settings["credentials"] = {
+                "accessToken": calendar_tokens.get('accessToken'),
+                "refreshToken": refresh_token,
+                "expiresAt": expires_at,
+                "tokenType": calendar_tokens.get('tokenType', 'Bearer'),
+                "scope": calendar_tokens.get('scope', 'https://www.googleapis.com/auth/calendar.readonly')
+            }
+            calendar_settings["syncStatus"] = "completed"
+            calendar_settings["lastSyncTime"] = datetime.now(timezone.utc)
+            calendar_settings["connected"] = True
+
+            print(f"✅ Stored calendar credentials from single OAuth flow:")
+            print(f"   - Access token: {bool(calendar_tokens.get('accessToken'))}")
+            print(f"   - Refresh token: {bool(refresh_token)}")
+            print(f"   - Scope: {calendar_tokens.get('scope', 'N/A')}")
+            print(f"   - Expires at: {expires_at}")
+    elif has_calendar_access and calendar_access_token:
+        # Fallback for legacy calendar access token (without refresh token)
+        # This should be rare with single OAuth flow
         calendar_settings["credentials"] = {
             "accessToken": calendar_access_token,
-            "refreshToken": "",  # Firebase OAuth doesn't provide refresh tokens - use empty string to satisfy schema
-            "expiresAt": datetime.now(timezone.utc) + timedelta(hours=1),  # Typical OAuth token expiry
+            "refreshToken": "",
+            "expiresAt": datetime.now(timezone.utc) + timedelta(hours=1),
             "tokenType": "Bearer",
             "scope": "https://www.googleapis.com/auth/calendar.readonly"
         }
         calendar_settings["syncStatus"] = "completed"
         calendar_settings["lastSyncTime"] = datetime.now(timezone.utc)
+        calendar_settings["connected"] = True
+
+        print("⚠️ LEGACY: Stored calendar credentials without refresh token - consider upgrading to single OAuth flow")
 
     # Ensure displayName is never None/null
     display_name = user_data.get("displayName")
