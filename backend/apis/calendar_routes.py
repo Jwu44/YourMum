@@ -154,7 +154,7 @@ def oauth_exchange():
         # Create credentials object
         credentials = {
             'accessToken': access_token,
-            'refreshToken': refresh_token,
+            'refreshToken': refresh_token or "",  # Ensure refreshToken is never None to satisfy MongoDB schema
             'expiresAt': expires_at,
             'scopes': scopes
         }

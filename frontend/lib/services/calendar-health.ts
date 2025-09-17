@@ -87,13 +87,22 @@ export class CalendarHealthService {
         return { healthy: true }
       }
 
-      // Handle different error types
-      if (response.status === 401 || response.status === 400) {
-        console.log('Calendar API failed with auth error, needs re-authentication')
+      // Handle different error types with precise classification
+      if (response.status === 401) {
+        console.log('Calendar API failed with 401 Unauthorized - auth token expired, needs re-authentication')
         return {
           healthy: false,
           error: 'calendar_auth_failed',
           needsReauth: true
+        }
+      }
+
+      if (response.status === 400) {
+        console.log('Calendar API failed with 400 Bad Request - likely missing credentials or API error, no reauth needed')
+        return {
+          healthy: false,
+          error: 'calendar_api_error',
+          needsReauth: false
         }
       }
 

@@ -152,8 +152,10 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
    * @param accessToken Optional calendar access token to store
    */
   const storeUserInBackend = async (user: User, hasCalendarAccess: boolean = false, accessToken: string | null = null): Promise<void> => {
+    const startTime = Date.now()
+    const requestId = Math.random().toString(36).substr(2, 9)
     try {
-      console.log('Storing user in backend with calendar access:', hasCalendarAccess)
+      console.log(`[${requestId}] Starting user storage with calendar access:`, hasCalendarAccess, `at ${new Date().toISOString()}`)
 
       // Use API client instead of direct fetch - it handles token refresh automatically
       const requestBody: any = {
@@ -171,14 +173,16 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
 
       const response = await apiClient.post('/api/auth/user', requestBody)
 
+      const duration = Date.now() - startTime
       if (response.ok) {
-        console.log('✅ User stored in backend successfully with calendar access:', hasCalendarAccess)
+        console.log(`[${requestId}] ✅ User stored in backend successfully with calendar access:`, hasCalendarAccess, `(${duration}ms)`)
       } else {
         const errorText = await response.text()
-        console.error('❌ Failed to store user in backend:', response.status, errorText)
+        console.error(`[${requestId}] ❌ Failed to store user in backend:`, response.status, errorText, `(${duration}ms)`)
       }
     } catch (error) {
-      console.error('❌ Error storing user in backend:', error)
+      const duration = Date.now() - startTime
+      console.error(`[${requestId}] ❌ Error storing user in backend:`, error, `(${duration}ms)`)
     }
   }
 

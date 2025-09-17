@@ -622,7 +622,7 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     if has_calendar_access and calendar_access_token:
         calendar_settings["credentials"] = {
             "accessToken": calendar_access_token,
-            "refreshToken": None,  # Firebase OAuth doesn't provide refresh tokens
+            "refreshToken": "",  # Firebase OAuth doesn't provide refresh tokens - use empty string to satisfy schema
             "expiresAt": datetime.now(timezone.utc) + timedelta(hours=1),  # Typical OAuth token expiry
             "tokenType": "Bearer",
             "scope": "https://www.googleapis.com/auth/calendar.readonly"

@@ -113,6 +113,21 @@ describe('CalendarHealthService', () => {
       })
     })
 
+    it('should return unhealthy when API Client returns 400 Bad Request without reauth', async () => {
+      mockApiClient.get.mockResolvedValueOnce({
+        ok: false,
+        status: 400
+      })
+
+      const result = await service.validateCalendarHealth()
+
+      expect(result).toEqual({
+        healthy: false,
+        error: 'calendar_api_error',
+        needsReauth: false
+      })
+    })
+
     it('should return unhealthy when API Client returns other error', async () => {
       mockApiClient.get.mockResolvedValueOnce({
         ok: false,
