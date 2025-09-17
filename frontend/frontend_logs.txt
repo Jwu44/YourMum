@@ -1,0 +1,24 @@
+
+> yourmum@0.1.0 dev
+> next dev
+
+ ⚠ Specified "rewrites" will not automatically work with "output: export". See more info here: https://nextjs.org/docs/messages/export-no-custom-routes
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Specified "rewrites" will not automatically work with "output: export". See more info here: https://nextjs.org/docs/messages/export-no-custom-routes
+  ▲ Next.js 14.2.32
+  - Local:        http://localhost:3001
+  - Environments: .env.local
+
+ ✓ Starting...
+ ⚠ Specified "rewrites" will not automatically work with "output: export". See more info here: https://nextjs.org/docs/messages/export-no-custom-routes
+ ⚠ Specified "rewrites" will not automatically work with "output: export". See more info here: https://nextjs.org/docs/messages/export-no-custom-routes
+ ✓ Ready in 1148ms
+ ○ Compiling /dashboard ...
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled /dashboard in 2.8s (5462 modules)
+Firebase app verification disabled for testing (development mode)
+🚀 API Client initialized with automatic token refresh
+ GET /dashboard 200 in 3011ms
+ ✓ Compiled in 238ms (2713 modules)

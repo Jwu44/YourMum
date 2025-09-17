@@ -248,10 +248,10 @@ class TestCreditService:
 
         # Assert
         assert status['plan'] == 'free'
-        assert status['credits_available'] == 3
-        assert status['credits_limit'] == 5
-        assert status['lifetime_free_used'] == 2
-        assert status['plan_interval'] is None
+        assert status['creditsThisMonth'] == 3
+        assert status['creditsLimit'] == 5
+        assert status['lifetimeFreeUsed'] == 2
+        assert status['planInterval'] is None
 
     def test_get_user_credit_status_pro_user(self, credit_service, pro_user):
         """Test getting credit status for pro user."""
@@ -260,7 +260,7 @@ class TestCreditService:
 
         # Assert
         assert status['plan'] == 'pro'
-        assert status['credits_available'] == 25
-        assert status['credits_limit'] == 40
-        assert status['lifetime_free_used'] == 5
-        assert status['plan_interval'] == 'month'
+        assert status['creditsThisMonth'] == 25
+        assert status['creditsLimit'] == 40
+        assert status['lifetimeFreeUsed'] == 5
+        assert status['planInterval'] == 'month'

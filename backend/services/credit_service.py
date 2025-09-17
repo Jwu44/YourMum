@@ -236,10 +236,10 @@ class CreditService:
 
         return {
             'plan': plan,
-            'plan_interval': user.get('planInterval'),
-            'credits_available': user.get('creditsThisMonth', 0),
-            'credits_limit': limits.get('monthly_limit') or limits.get('total_limit'),
-            'lifetime_free_used': user.get('lifetimeFreeUsed', 0),
-            'next_reset_at': user.get('nextCreditResetAt'),
-            'reset_frequency': limits.get('reset_frequency')
+            'planInterval': user.get('planInterval'),
+            'creditsThisMonth': user.get('creditsThisMonth', 0),
+            'creditsLimit': limits.get('monthly_limit') or limits.get('total_limit'),
+            'lifetimeFreeUsed': user.get('lifetimeFreeUsed', 0),
+            'nextCreditResetAt': user.get('nextCreditResetAt'),
+            'resetFrequency': limits.get('reset_frequency')
         }
