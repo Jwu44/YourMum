@@ -394,7 +394,7 @@ export default function SettingsPage () {
                 <div>
                   <Label className="text-sm font-medium">Subscription</Label>
                   <p className="text-sm text-muted-foreground">
-                    {userProfile?.role === 'premium' ? 'Premium' : 'Free'}
+                    {userProfile?.role === 'pro' ? 'Pro' : 'Free'}
                   </p>
                 </div>
                 <Button variant="outline" className="mobile-form-button sm:w-auto">

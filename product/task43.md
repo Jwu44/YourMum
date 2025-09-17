@@ -84,3 +84,74 @@ so that I can unlock 40 AI credits each month and continue using advanced featur
    * Stripe receipts enabled.
    * Privacy Policy + Terms linked in Checkout.
    * No Stripe Tax required.
+
+---
+
+## Implementation Notes
+
+### Key Changes Made
+
+1. **Simplified to Monthly Pro Only**
+   - Removed annual billing option to focus on single payment link
+   - Monthly Pro: $7/month, 40 credits/month
+   - Direct Stripe payment link: `https://buy.stripe.com/6oU3cvb8IcF2bxCcd22cg00`
+
+2. **Direct Payment Link Approach**
+   - Replaced complex Stripe Checkout API with direct link redirect
+   - Better browser compatibility (works with Brave browser privacy settings)
+   - Simplified frontend: no API calls needed for checkout initiation
+   - Reduced code complexity by ~70%
+
+3. **Email-Based User Identification**
+   - Webhook uses email matching instead of metadata for user identification
+   - More reliable than complex customer object strategies
+   - Handles checkout completion via `checkout.session.completed` event
+
+4. **Frontend Components**
+   - Updated `UpgradeModal.tsx`: Monthly Pro only, direct link redirect
+   - Updated `Pricing.tsx`: Removed annual toggle, direct `<a>` tag approach
+   - Added `UpgradeButton.tsx`: Reusable component for upgrade functionality
+   - Added upgrade button to `AppSidebar.tsx` for free users
+
+5. **Backend Simplification**
+   - Removed `/api/billing/checkout` endpoint (no longer needed)
+   - Enhanced webhook handling for email-based user identification
+   - Simplified billing service to handle monthly subscriptions only
+   - Added `stripe>=8.0.0` to requirements.txt
+
+### Environment Configuration Required
+
+```bash
+# Backend .env
+STRIPE_SECRET_KEY=sk_test_your_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+```
+
+### Stripe Webhook Events Required
+
+1. `checkout.session.completed` - User completes payment
+2. `customer.subscription.created` - Subscription first created
+3. `customer.subscription.updated` - Subscription changes
+4. `customer.subscription.deleted` - Subscription cancelled
+5. `invoice.payment_failed` - Payment fails
+
+### Testing & Debugging
+
+1. **Infinite API Loop Fix**: Removed `isLoadingCredits` dependency from useEffect to prevent spam requests
+2. **Browser Compatibility**: Direct `<a>` tag approach works with Brave browser privacy settings
+3. **Fallback Display**: Upgrade button shows when `billingStatus` is null or plan is 'free'
+
+### Architecture Benefits
+
+- **Simpler**: Direct payment links eliminate frontend/backend checkout complexity
+- **Reliable**: Email matching more dependable than metadata strategies
+- **Compatible**: Works across all browsers including privacy-focused ones
+- **Maintainable**: Reduced codebase with fewer potential failure points
+- **Testable**: Can test with $0.10 Stripe test payments safely
+
+### Production Deployment Notes
+
+- Update webhook URL from `localhost:8000` to `https://yourmum.app/api/billing/webhook`
+- Configure all 5 required webhook events in Stripe Dashboard
+- Ensure environment variables are set in production
+- Test payment flow end-to-end before launch

@@ -316,6 +316,44 @@ export interface UserDocument {
       defaultReminders: boolean
     }
   }
+  // Stripe billing and credits fields
+  stripeCustomerId?: string | null
+  subscriptionId?: string | null
+  plan?: 'free' | 'pro'
+  planInterval?: 'month' | 'year' | null
+  creditsThisMonth?: number
+  nextCreditResetAt?: string | null
+  lifetimeFreeUsed?: number
+}
+
+// Billing and subscription types
+export interface BillingStatus {
+  plan: 'free' | 'pro'
+  planInterval?: 'month' | 'year' | null
+  creditsThisMonth: number
+  creditsLimit: number
+  nextCreditResetAt?: string | null
+  lifetimeFreeUsed: number
+  subscriptionId?: string | null
+  subscriptionStatus?: 'active' | 'inactive' | 'canceled' | 'past_due'
+}
+
+export interface CheckoutSessionRequest {
+  priceId: string
+  successUrl?: string
+  cancelUrl?: string
+}
+
+export interface CheckoutSessionResponse {
+  success: boolean
+  checkoutUrl?: string
+  error?: string
+}
+
+export interface CustomerPortalResponse {
+  success: boolean
+  portalUrl?: string
+  error?: string
 }
 
 export interface CalendarEvent {
@@ -333,7 +371,7 @@ export interface CalendarEvent {
   organizer: { email: string, displayName?: string }
 }
 
-export type UserRole = 'free' | 'premium' | 'admin'
+export type UserRole = 'free' | 'pro' | 'admin'
 
 export interface AuthResponse {
   message: string

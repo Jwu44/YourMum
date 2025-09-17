@@ -7,7 +7,7 @@
 'use client'
 
 import * as React from 'react'
-import { ClipboardPen, Archive, Blocks, PanelLeft, Home } from 'lucide-react'
+import { ClipboardPen, Archive, Blocks, PanelLeft, Home, Zap, Crown } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -28,6 +28,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // Import helper to get current date string
 import { formatDateToString } from '@/lib/helper'
 import { useAuth } from '@/auth/AuthContext'
+import { billingApi } from '@/lib/api/billing'
+import type { BillingStatus } from '@/lib/types'
+import { UpgradeModal } from '@/components/parts/UpgradeModal'
 
 // Hooks
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -156,6 +159,11 @@ export function AppSidebar (): JSX.Element {
     user = { email: 'test@example.com' }
   }
 
+  // Credits and billing state
+  const [billingStatus, setBillingStatus] = React.useState<BillingStatus | null>(null)
+  const [isLoadingCredits, setIsLoadingCredits] = React.useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false)
+
   // Get navigation items with current active state
   const navigationItems = React.useMemo(() => getNavigationItems(pathname), [pathname])
   const thinNavigationItems = React.useMemo(() => getThinNavigationItems(pathname, toggleSidebar), [pathname, toggleSidebar])
@@ -193,6 +201,27 @@ export function AppSidebar (): JSX.Element {
       localStorage.setItem('sidebar:state', 'expanded')
     }
   }, [sidebarState, setOpen, isMobile])
+
+  // Fetch billing status when user is available
+  React.useEffect(() => {
+    const fetchBillingStatus = async () => {
+      if (!user || isLoadingCredits) return
+
+      try {
+        setIsLoadingCredits(true)
+        const result = await billingApi.getBillingStatus()
+        if (result.success && result.status) {
+          setBillingStatus(result.status)
+        }
+      } catch (error) {
+        console.warn('Failed to fetch billing status:', error)
+      } finally {
+        setIsLoadingCredits(false)
+      }
+    }
+
+    fetchBillingStatus()
+  }, [user]) // Remove isLoadingCredits dependency to prevent loop
 
   /**
    * Get the first letter of the user's email for the avatar
@@ -358,6 +387,33 @@ export function AppSidebar (): JSX.Element {
           ))}
         </div>
 
+        {/* Credits Display for Thin Sidebar */}
+        {billingStatus && (
+          <div className="px-2 pb-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-sidebar-accent/20 border border-sidebar-border/50">
+                    {billingStatus.plan === 'pro' ? (
+                      <Crown className="w-3 h-3 text-yellow-500" />
+                    ) : (
+                      <Zap className="w-3 h-3 text-blue-500" />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="text-sm">
+                    <div className="font-medium">{billingStatus.plan.toUpperCase()} Plan</div>
+                    <div className="text-xs text-muted-foreground">
+                      {billingStatus.creditsThisMonth} / {billingStatus.creditsLimit} credits
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
+
         {/* Settings Icon at Bottom */}
         <div className="px-2 pb-3">
           <TooltipProvider>
@@ -487,6 +543,73 @@ export function AppSidebar (): JSX.Element {
         </nav>
       </SidebarContent>
 
+      {/* Billing Section - Above Footer */}
+      <div className="px-5 pb-3">
+        {/* Credits Display */}
+        {billingStatus && (
+          <div className="mb-4 p-3 bg-sidebar-accent/20 rounded-lg border border-sidebar-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {billingStatus.plan === 'pro' ? (
+                  <Crown className="w-4 h-4 text-yellow-500" />
+                ) : (
+                  <Zap className="w-4 h-4 text-blue-500" />
+                )}
+                <span className="text-xs font-medium text-sidebar-foreground uppercase tracking-wide">
+                  {billingStatus.plan} Plan
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold text-sidebar-foreground">
+                  {billingStatus.creditsThisMonth}
+                  <span className="text-xs text-muted-foreground ml-1">
+                    / {billingStatus.creditsLimit}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">credits</div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-2 w-full bg-sidebar-border rounded-full h-1.5">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  billingStatus.plan === 'pro'
+                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-600'
+                    : 'bg-gradient-to-r from-blue-400 to-blue-600'
+                }`}
+                style={{
+                  width: `${Math.max(
+                    (billingStatus.creditsThisMonth / billingStatus.creditsLimit) * 100,
+                    2
+                  )}%`
+                }}
+              />
+            </div>
+
+            {/* Plan Status */}
+            {billingStatus.plan === 'free' && billingStatus.creditsThisMonth <= 1 && (
+              <div className="mt-2 text-xs text-orange-600 font-medium">
+                Low credits remaining
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Upgrade to Pro Button - Show for free users or when billing status is unknown */}
+        {(!billingStatus || billingStatus.plan === 'free') && (
+          <Button
+            className="w-full mb-3 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-medium"
+            size="sm"
+            onClick={() => setShowUpgradeModal(true)}
+            data-testid="upgrade-to-pro-button"
+          >
+            <Crown className="w-4 h-4 mr-2" />
+            Upgrade to Pro
+          </Button>
+        )}
+      </div>
+
       {/* Footer Section */}
       <SidebarFooter className="border-t border-sidebar-border p-5">
         <div
@@ -512,6 +635,13 @@ export function AppSidebar (): JSX.Element {
           </div>
           <span className="font-medium text-sidebar-foreground truncate">{getUserEmail}</span>
         </div>
+
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          creditsNeeded={1}
+        />
       </SidebarFooter>
     </Sidebar>
   )
