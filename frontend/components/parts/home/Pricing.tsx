@@ -9,8 +9,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       price: '$0',
       period: 'forever',
       features: [
-        'Unlimited task creation',
-        'Auto capture tasks from integrations',
+        'Auto capture tasks from Gcal only',
         'Auto create your next day',
         'Limited schedule generation',
         'Limited task break downs',
@@ -24,11 +23,11 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       period: 'month',
       features: [
         'Everything in Free',
+        'Access to Slack (and more) integrations',
         'More schedule generation',
         'More task break downs',
-        'Access to new integrations',
       ],
-      cta: 'Start Free Trial',
+      cta: 'Choose Pro',
       popular: true
     }
   ]
