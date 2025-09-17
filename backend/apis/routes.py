@@ -39,8 +39,13 @@ from backend.services.archive_service import (
 from backend.services.slack_service import SlackService
 slack_service = SlackService()
 from backend.apis.calendar_routes import ensure_calendar_watch_for_user
+import requests
+import os
+import base64
+import json as json_lib
 
 api_bp = Blueprint("api", __name__)
+auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 # Add a global OPTIONS request handler for all routes
 @api_bp.route('/<path:path>', methods=['OPTIONS'])
@@ -1953,6 +1958,196 @@ def delete_user_account():
 @api_bp.route("/auth/logout", methods=["OPTIONS"])
 def handle_logout_options():
     """Handle CORS preflight requests for logout endpoint."""
+    return jsonify({"status": "ok"})
+
+# New OAuth callback endpoint for single OAuth flow
+@auth_bp.route("/oauth-callback", methods=["POST"])
+def oauth_callback():
+    """
+    Handle OAuth callback for single authentication + calendar flow.
+
+    This endpoint handles the authorization code exchange without requiring
+    a Firebase token (solves chicken-and-egg problem). It exchanges the code
+    for Google tokens, validates the ID token, and returns both user data
+    and OAuth tokens for frontend Firebase authentication.
+
+    Expected request body:
+    {
+        "authorization_code": str (required),
+        "state": str (required)
+    }
+
+    Returns:
+        200: OAuth successful with user data and tokens
+        400: Missing parameters or validation errors
+        500: Google OAuth or server errors
+    """
+    try:
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Check required parameters
+        authorization_code = data.get('authorization_code')
+        state = data.get('state')
+
+        if not authorization_code:
+            return jsonify({
+                "success": False,
+                "error": "Missing required parameter: authorization_code"
+            }), 400
+
+        if not state:
+            return jsonify({
+                "success": False,
+                "error": "Missing required parameter: state"
+            }), 400
+
+        # Get Google OAuth credentials from environment
+        client_id = os.getenv('GOOGLE_CLIENT_ID')
+        client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+        redirect_uri = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', 'https://yourmum.app/auth/callback')
+
+        if not client_id or not client_secret:
+            return jsonify({
+                "success": False,
+                "error": "Google OAuth credentials not configured"
+            }), 500
+
+        print(f"DEBUG: Processing OAuth callback with code: {authorization_code[:20]}...")
+
+        # Exchange authorization code for tokens with Google
+        token_url = 'https://oauth2.googleapis.com/token'
+        token_data = {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'code': authorization_code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri
+        }
+
+        token_response = requests.post(token_url, data=token_data)
+
+        if token_response.status_code != 200:
+            print(f"DEBUG: Google token exchange failed: {token_response.status_code} - {token_response.text}")
+            return jsonify({
+                "success": False,
+                "error": f"Google OAuth token exchange failed: {token_response.text}"
+            }), 400
+
+        token_json = token_response.json()
+
+        # Extract and validate tokens
+        access_token = token_json.get('access_token')
+        refresh_token = token_json.get('refresh_token')
+        id_token = token_json.get('id_token')
+        expires_in = token_json.get('expires_in', 3600)
+        scope = token_json.get('scope', '')
+
+        if not access_token or not id_token:
+            return jsonify({
+                "success": False,
+                "error": "Incomplete token response from Google"
+            }), 400
+
+        # Decode and validate ID token (basic validation)
+        try:
+            # Split JWT and decode payload
+            id_token_parts = id_token.split('.')
+            if len(id_token_parts) != 3:
+                raise ValueError("Invalid JWT format")
+
+            # Decode payload (add padding if needed)
+            payload_b64 = id_token_parts[1]
+            payload_b64 += '=' * (4 - len(payload_b64) % 4)  # Add padding
+            payload_json = base64.b64decode(payload_b64)
+            user_info = json_lib.loads(payload_json)
+
+            # Basic validation
+            if not user_info.get('iss', '').endswith('google.com'):
+                raise ValueError("Invalid token issuer")
+
+            if user_info.get('exp', 0) * 1000 < datetime.now().timestamp() * 1000:
+                raise ValueError("Token expired")
+
+        except Exception as e:
+            print(f"DEBUG: ID token validation failed: {e}")
+            return jsonify({
+                "success": False,
+                "error": "Invalid ID token format"
+            }), 400
+
+        print(f"✅ OAuth tokens received successfully for user: {user_info.get('email')}")
+        print(f"   - Access token: {bool(access_token)}")
+        print(f"   - Refresh token: {bool(refresh_token)}")
+        print(f"   - Scope: {scope}")
+
+        # Prepare user data from ID token
+        user_data = {
+            'googleId': user_info.get('sub'),
+            'email': user_info.get('email'),
+            'displayName': user_info.get('name'),
+            'photoURL': user_info.get('picture', ''),
+            'hasCalendarAccess': True,
+            'calendarTokens': {
+                'accessToken': access_token,
+                'refreshToken': refresh_token or '',
+                'expiresAt': datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+                'scope': scope
+            }
+        }
+
+        # Store user in database
+        processed_user_data = _prepare_user_data_for_storage(user_data)
+        db = get_database()
+        users = db['users']
+
+        # Check if user exists to determine isNewUser flag
+        existing_user = users.find_one({"googleId": user_data["googleId"]})
+        is_new_user = existing_user is None
+
+        # Create or update user
+        user = db_create_or_update_user(users, processed_user_data)
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Failed to store user data"
+            }), 500
+
+        # Serialize user data for response
+        serialized_user = process_user_for_response(user)
+
+        # Return success response with user data and tokens
+        return jsonify({
+            "success": True,
+            "user": serialized_user,
+            "tokens": {
+                "access_token": access_token,
+                "refresh_token": refresh_token or '',
+                "id_token": id_token,
+                "expires_in": expires_in,
+                "scope": scope,
+                "token_type": "Bearer"
+            },
+            "isNewUser": is_new_user,
+            "message": "OAuth callback processed successfully"
+        }), 200
+
+    except Exception as e:
+        print(f"Error in oauth_callback: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@auth_bp.route("/oauth-callback", methods=["OPTIONS"])
+def handle_oauth_callback_options():
+    """Handle CORS preflight requests for OAuth callback endpoint."""
     return jsonify({"status": "ok"})
 
 # Archive functionality endpoints

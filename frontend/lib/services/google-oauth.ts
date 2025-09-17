@@ -109,7 +109,7 @@ export class GoogleOAuthService {
   }
 
   /**
-   * Exchange authorization code for access, refresh, and ID tokens
+   * Exchange authorization code for access, refresh, and ID tokens via backend
    * @param authorizationCode Authorization code from OAuth callback
    * @param state State parameter for CSRF validation
    * @returns Promise resolving to OAuth tokens
@@ -121,28 +121,31 @@ export class GoogleOAuthService {
     }
 
     try {
-      const tokenRequestBody = new URLSearchParams({
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        code: authorizationCode,
-        grant_type: 'authorization_code',
-        redirect_uri: this.config.redirectUri,
-      });
-
-      const response = await fetch('https://oauth2.googleapis.com/token', {
+      // Call backend OAuth callback endpoint instead of Google directly
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/auth/oauth-callback`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: tokenRequestBody.toString(),
+        body: JSON.stringify({
+          authorization_code: authorizationCode,
+          state: state,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error}`);
+        throw new Error(`Token exchange failed: ${errorData.error || 'Unknown error'}`);
       }
 
-      const tokens: GoogleOAuthTokens = await response.json();
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(`Backend OAuth failed: ${data.error}`);
+      }
+
+      const tokens = data.tokens;
 
       // Validate that we received all required tokens
       if (!tokens.access_token || !tokens.id_token) {
@@ -155,11 +158,18 @@ export class GoogleOAuthService {
       }
 
       // Log success (remove in production)
-      console.log('✅ OAuth token exchange successful', {
+      console.log('✅ OAuth token exchange successful via backend', {
         hasRefreshToken: !!tokens.refresh_token,
         scopes: tokens.scope,
         expiresIn: tokens.expires_in,
+        isNewUser: data.isNewUser,
       });
+
+      // Store additional user data for callback page
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('oauth_user_data', JSON.stringify(data.user));
+        sessionStorage.setItem('oauth_is_new_user', data.isNewUser.toString());
+      }
 
       return tokens;
 

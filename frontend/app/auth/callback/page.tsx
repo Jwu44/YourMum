@@ -67,11 +67,8 @@ export default function OAuthCallbackPage() {
 
         console.log('✅ Firebase authentication successful:', user.email);
 
-        // Store user in backend with calendar tokens
-        console.log('🔄 Storing user in backend with calendar credentials...');
-        await storeUserWithCalendarTokens(user, tokens);
-
-        console.log('✅ User stored successfully with calendar access');
+        // User data is already stored by the backend OAuth endpoint
+        console.log('✅ User already stored by backend OAuth flow with calendar access');
 
         // Set success status
         setStatus('success');
@@ -98,33 +95,6 @@ export default function OAuthCallbackPage() {
     processCallback();
   }, [searchParams, router]);
 
-  /**
-   * Store user in backend with calendar tokens
-   */
-  const storeUserWithCalendarTokens = async (user: any, tokens: any) => {
-    const requestBody = {
-      googleId: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      hasCalendarAccess: true,
-      calendarTokens: {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-        scope: tokens.scope,
-      },
-    };
-
-    const response = await apiClient.post('/api/auth/user', requestBody);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to store user: ${errorText}`);
-    }
-
-    return response.json();
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
