@@ -3,7 +3,7 @@ from backend.db_config import get_database, store_microstep_feedback, create_or_
 import traceback
 
 from bson import ObjectId
-from datetime import datetime, timezone 
+from datetime import datetime, timezone, timedelta
 from backend.models.task import Task
 from typing import List, Dict, Any, Optional, Union, Tuple
 import json
@@ -593,13 +593,14 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Helper function to prepare user data for database storage.
     Handles default values, calendar settings, and data validation.
-    
+
     Args:
         user_data: Raw user data from request
-        
+
     Returns:
         Processed user data ready for database storage
     """
+
     # Prepare calendar settings based on hasCalendarAccess
     has_calendar_access = user_data.get('hasCalendarAccess', False)
     calendar_access_token = user_data.get('calendarAccessToken')
@@ -619,7 +620,6 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # If calendar access token is provided, store it as credentials
     if has_calendar_access and calendar_access_token:
-        from datetime import datetime, timezone, timedelta
         calendar_settings["credentials"] = {
             "accessToken": calendar_access_token,
             "refreshToken": None,  # Firebase OAuth doesn't provide refresh tokens
@@ -744,8 +744,7 @@ def autogenerate_schedule_api():
             }), 400
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -812,8 +811,7 @@ def get_recent_with_tasks_api():
                 "error": "Missing required query param: before"
             }), 400
         try:
-            from datetime import datetime as dt
-            dt.strptime(before, '%Y-%m-%d')
+            datetime.strptime(before, '%Y-%m-%d')
             days = int(days_param)
         except Exception:
             return jsonify({
@@ -1222,8 +1220,7 @@ def submit_data():
         # Validate date format
         date = data['date']
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1345,8 +1342,7 @@ def get_schedule_by_date(date):
     try:
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1414,8 +1410,7 @@ def update_schedule_by_date(date):
     try:
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1537,8 +1532,7 @@ def create_schedule():
         
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1653,8 +1647,7 @@ def delete_task(task_id):
         
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1976,8 +1969,7 @@ def api_archive_task():
 
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(original_date, '%Y-%m-%d')
+            datetime.strptime(original_date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
