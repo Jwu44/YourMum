@@ -731,8 +731,9 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "timezone": timezone_value,  # Add timezone field with default
         "jobTitle": job_title,  # Add jobTitle field (optional)
         "age": age,  # Add age field (optional)
+        "hasCalendarAccess": has_calendar_access,  # Preserve this for create_or_update_user
         "calendarSynced": has_calendar_access,
-        "lastLogin": datetime.now(timezone.utc), 
+        "lastLogin": datetime.now(timezone.utc),
         "calendar": calendar_settings,
         "metadata": {
             "lastModified": datetime.now(timezone.utc)

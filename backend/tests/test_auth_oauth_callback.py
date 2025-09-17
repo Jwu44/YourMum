@@ -30,6 +30,11 @@ class TestAuthOAuthCallback(unittest.TestCase):
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
 
+    @patch.dict('os.environ', {
+        'GOOGLE_CLIENT_ID': 'test_client_id',
+        'GOOGLE_CLIENT_SECRET': 'test_client_secret',
+        'GOOGLE_OAUTH_REDIRECT_URI': 'https://yourmum.app/auth/callback'
+    })
     @patch('backend.apis.routes.requests.post')
     @patch('backend.apis.routes.get_database')
     @patch('backend.apis.routes.db_create_or_update_user')
@@ -123,6 +128,10 @@ class TestAuthOAuthCallback(unittest.TestCase):
         assert response_data['success'] is False
         assert 'state' in response_data['error']
 
+    @patch.dict('os.environ', {
+        'GOOGLE_CLIENT_ID': 'test_client_id',
+        'GOOGLE_CLIENT_SECRET': 'test_client_secret'
+    })
     @patch('backend.apis.routes.requests.post')
     def test_oauth_callback_google_error(self, mock_requests_post):
         """Test OAuth callback when Google OAuth returns error."""
@@ -168,6 +177,10 @@ class TestAuthOAuthCallback(unittest.TestCase):
             assert response_data['success'] is False
             assert 'Google OAuth credentials not configured' in response_data['error']
 
+    @patch.dict('os.environ', {
+        'GOOGLE_CLIENT_ID': 'test_client_id',
+        'GOOGLE_CLIENT_SECRET': 'test_client_secret'
+    })
     @patch('backend.apis.routes.requests.post')
     @patch('backend.apis.routes.get_database')
     def test_oauth_callback_invalid_id_token(self, mock_get_db, mock_requests_post):
