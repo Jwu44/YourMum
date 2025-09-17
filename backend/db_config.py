@@ -286,17 +286,25 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             }
         }
         
-        # Handle calendar fields carefully to preserve existing connections
-        if existing_user and existing_user.get("calendar", {}).get("connected"):
-            # Preserve existing calendar connection if it exists
+        # Handle calendar fields with merge logic to prevent race condition overwrites
+        has_calendar_access_explicitly_set = "hasCalendarAccess" in user_data
+
+        if existing_user and not has_calendar_access_explicitly_set:
+            # Preserve ALL existing calendar state when hasCalendarAccess not explicitly provided
+            # This prevents auth state change calls from overwriting OAuth calendar setup
             user_doc["calendarSynced"] = existing_user.get("calendarSynced", False)
             user_doc["calendar"] = existing_user.get("calendar", {})
-            print(f"DEBUG: Preserving existing calendar connection for user {user_data['googleId']}")
-        else:
-            # Set calendar fields from user_data for new users or when explicitly updating
+            print(f"DEBUG: Preserving all existing calendar state for user {user_data['googleId']} (no explicit calendar update)")
+        elif has_calendar_access_explicitly_set:
+            # Only update calendar fields when explicitly provided (OAuth flows)
             user_doc["calendarSynced"] = user_data.get("calendarSynced", False)
             user_doc["calendar"] = user_data.get("calendar", {})
-            print(f"DEBUG: Setting new calendar state for user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
+            print(f"DEBUG: Updating calendar state explicitly for user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
+        else:
+            # New user with no existing state
+            user_doc["calendarSynced"] = user_data.get("calendarSynced", False)
+            user_doc["calendar"] = user_data.get("calendar", {})
+            print(f"DEBUG: Setting initial calendar state for new user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
 
         # Use upsert to create or update
         result = users_collection.update_one(
