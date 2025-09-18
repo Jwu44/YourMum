@@ -2149,18 +2149,13 @@ def oauth_callback():
                 }
             }
 
-        print(f"✅ Processing OAuth callback with Firebase UID: {firebase_uid}")
+            # For old format, set firebase_uid to Google Subject ID (will be migrated later)
+            firebase_uid = user_info.get('sub')
+
+        print(f"✅ Processing OAuth callback with ID: {firebase_uid}")
         print(f"   - Email: {user_data.get('email')}")
         print(f"   - Display Name: {user_data.get('displayName')}")
         print(f"   - Has Calendar Access: {user_data.get('hasCalendarAccess')}")
-
-        # Extract tokens (already processed by frontend)
-        access_token = tokens.get('access_token')
-        refresh_token = tokens.get('refresh_token')
-        id_token = tokens.get('id_token')
-        expires_in = tokens.get('expires_in', 3600)
-        scope = tokens.get('scope', '')
-
         print(f"   - Access token: {bool(access_token)}")
         print(f"   - Refresh token: {bool(refresh_token)}")
         print(f"   - Scope: {scope}")
