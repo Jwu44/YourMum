@@ -2096,6 +2096,9 @@ def oauth_callback():
         print(f"   - Refresh token: {bool(refresh_token)}")
         print(f"   - Scope: {scope}")
 
+        # Debug: Log the extracted user information from ID token
+        print(f"DEBUG: ID token user info - googleId: {user_info.get('sub')}, email: {user_info.get('email')}, name: {user_info.get('name')}")
+
         # Prepare user data from ID token
         user_data = {
             'googleId': user_info.get('sub'),

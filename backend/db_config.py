@@ -267,8 +267,11 @@ def update_user_login(users_collection: Collection, google_id: str) -> bool:
 def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Create or update user with proper validation and error handling."""
     try:
+        print(f"DEBUG: create_or_update_user called with googleId: {user_data.get('googleId')}, email: {user_data.get('email')}")
+
         # Check if user already exists to preserve calendar connection state
         existing_user = users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
+        print(f"DEBUG: Found existing user by googleId: {bool(existing_user)}")
         
         # Prepare base user document with required fields
         user_doc = {
@@ -307,6 +310,8 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             print(f"DEBUG: Setting initial calendar state for new user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
 
         # Use upsert to create or update
+        print(f"DEBUG: About to upsert user with googleId: {user_data['googleId']}, email: {user_doc['email']}")
+
         result = users_collection.update_one(
             {"googleId": user_data["googleId"]},
             {
@@ -317,6 +322,8 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             },
             upsert=True
         )
+
+        print(f"DEBUG: Upsert result - matched: {result.matched_count}, modified: {result.modified_count}, upserted: {bool(result.upserted_id)}")
 
         if result.upserted_id:
             return users_collection.find_one({"_id": result.upserted_id}, {"_id": 0})
