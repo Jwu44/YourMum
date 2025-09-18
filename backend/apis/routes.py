@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, Response, stream_with_context
 from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 
-from bson import ObjectId
+from bson import ObjectId, json_util
 from datetime import datetime, timezone, timedelta
 from backend.models.task import Task
 from typing import List, Dict, Any, Optional, Union, Tuple
@@ -323,7 +323,8 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         users = db['users']
         
         # Find user by Google ID (which is the Firebase UID)
-        user = users.find_one({"googleId": user_id})
+        # Exclude _id field to prevent BSON serialization issues
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
         
         # If user found in database, return it (applies to all users including dev users)
         if user:
@@ -373,12 +374,16 @@ def get_auth_user_info():
             user = get_user_from_token(token)
             
             if user:
-                # Process user for JSON serialization
-                serialized_user = process_user_for_response(user)
-                return jsonify({
-                    "user": serialized_user,
+                # Use BSON-safe JSON serialization to handle MongoDB types
+                response_data = {
+                    "user": user,
                     "authenticated": True
-                }), 200
+                }
+                return Response(
+                    json_util.dumps(response_data),
+                    status=200,
+                    mimetype='application/json'
+                )
             else:
                 return jsonify({
                     "error": "Authentication failed",
@@ -912,16 +917,18 @@ def get_user(user_id):
         # Get user collection
         users = db['users']
         
-        # Find user by Google ID
-        user = users.find_one({"googleId": user_id})
-        
+        # Find user by Google ID (exclude _id to prevent BSON serialization issues)
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-            
-        # Convert ObjectId to string for JSON serialization
-        user['_id'] = str(user['_id'])
-        
-        return jsonify({"user": user}), 200
+
+        # Use BSON-safe JSON serialization
+        return Response(
+            json_util.dumps({"user": user}),
+            status=200,
+            mimetype='application/json'
+        )
         
     except Exception as e:
         print(f"Error getting user: {e}")
@@ -952,14 +959,19 @@ def update_user(user_id):
         if result.modified_count == 0:
             return jsonify({"error": "User not found"}), 404
             
-        # Get updated user document
-        updated_user = users.find_one({"googleId": user_id})
-        updated_user['_id'] = str(updated_user['_id'])
-        
-        return jsonify({
+        # Get updated user document (exclude _id to prevent BSON serialization issues)
+        updated_user = users.find_one({"googleId": user_id}, {"_id": 0})
+
+        # Use BSON-safe JSON serialization
+        response_data = {
             "message": "User updated successfully",
             "user": updated_user
-        }), 200
+        }
+        return Response(
+            json_util.dumps(response_data),
+            status=200,
+            mimetype='application/json'
+        )
         
     except Exception as e:
         print(f"Error updating user: {e}")

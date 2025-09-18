@@ -242,7 +242,7 @@ def initialize_db():
 def get_user_by_google_id(users_collection: Collection, google_id: str) -> Optional[Dict[str, Any]]:
     """Get user by Google ID with proper error handling."""
     try:
-        return users_collection.find_one({"googleId": google_id})
+        return users_collection.find_one({"googleId": google_id}, {"_id": 0})
     except Exception as e:
         print(f"Error retrieving user: {e}")
         return None
@@ -268,7 +268,7 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
     """Create or update user with proper validation and error handling."""
     try:
         # Check if user already exists to preserve calendar connection state
-        existing_user = users_collection.find_one({"googleId": user_data["googleId"]})
+        existing_user = users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
         
         # Prepare base user document with required fields
         user_doc = {
@@ -319,9 +319,9 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
         )
 
         if result.upserted_id:
-            return users_collection.find_one({"_id": result.upserted_id})
+            return users_collection.find_one({"_id": result.upserted_id}, {"_id": 0})
         else:
-            return users_collection.find_one({"googleId": user_data["googleId"]})
+            return users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
 
     except Exception as e:
         print(f"Error creating/updating user: {e}")

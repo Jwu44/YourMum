@@ -364,7 +364,7 @@ def connect_google_calendar():
         
         # Verify the connection is actually readable before returning success
         # This ensures write consistency and prevents race conditions with /events endpoint
-        verification_user = users.find_one({"googleId": user_id})
+        verification_user = users.find_one({"googleId": user_id}, {"_id": 0})
         if not verification_user:
             return jsonify({
                 "success": False,
@@ -558,7 +558,7 @@ def get_calendar_events():
         users = db['users']
         
         # Get user with calendar credentials
-        user = users.find_one({"googleId": user_id})
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
         
         if not user:
             return jsonify({
@@ -678,7 +678,7 @@ def get_calendar_status(user_id: str):
         users = db['users']
         
         # Get user
-        user = users.find_one({"googleId": user_id})
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
         
         if not user:
             return jsonify({
