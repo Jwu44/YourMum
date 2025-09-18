@@ -59,11 +59,11 @@ class ScheduleService:
         try:            
             # Format date for database query
             formatted_date = format_schedule_date(date)
-            # Find schedule in database
+            # Find schedule in database (exclude _id to prevent serialization issues)
             schedule_doc = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
-            })
+            }, {"_id": 0})
 
             if not schedule_doc:
                 return False, {"error": "No schedule found for this date"}
