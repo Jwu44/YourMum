@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, Response, stream_with_context
 from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
 import traceback
 
-from bson import ObjectId, json_util
+from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from backend.models.task import Task
 from typing import List, Dict, Any, Optional, Union, Tuple
@@ -374,16 +374,12 @@ def get_auth_user_info():
             user = get_user_from_token(token)
             
             if user:
-                # Use BSON-safe JSON serialization to handle MongoDB types
-                response_data = {
-                    "user": user,
+                # Process user for JSON serialization (handles BSON types)
+                serialized_user = process_user_for_response(user)
+                return jsonify({
+                    "user": serialized_user,
                     "authenticated": True
-                }
-                return Response(
-                    json_util.dumps(response_data),
-                    status=200,
-                    mimetype='application/json'
-                )
+                }), 200
             else:
                 return jsonify({
                     "error": "Authentication failed",
@@ -923,12 +919,9 @@ def get_user(user_id):
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Use BSON-safe JSON serialization
-        return Response(
-            json_util.dumps({"user": user}),
-            status=200,
-            mimetype='application/json'
-        )
+        # Process user for safe JSON serialization
+        serialized_user = process_user_for_response(user)
+        return jsonify({"user": serialized_user}), 200
         
     except Exception as e:
         print(f"Error getting user: {e}")
@@ -962,16 +955,12 @@ def update_user(user_id):
         # Get updated user document (exclude _id to prevent BSON serialization issues)
         updated_user = users.find_one({"googleId": user_id}, {"_id": 0})
 
-        # Use BSON-safe JSON serialization
-        response_data = {
+        # Process user for safe JSON serialization
+        serialized_user = process_user_for_response(updated_user)
+        return jsonify({
             "message": "User updated successfully",
-            "user": updated_user
-        }
-        return Response(
-            json_util.dumps(response_data),
-            status=200,
-            mimetype='application/json'
-        )
+            "user": serialized_user
+        }), 200
         
     except Exception as e:
         print(f"Error updating user: {e}")
