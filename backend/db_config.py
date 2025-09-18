@@ -325,6 +325,9 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
 
     except Exception as e:
         print(f"Error creating/updating user: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"User data that failed: {user_data}")
         return None
 
 def store_microstep_feedback(feedback_data: Dict[str, Any]) -> bool:

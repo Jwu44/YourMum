@@ -768,7 +768,15 @@ def process_user_for_response(user: Dict[str, Any]) -> Dict[str, Any]:
     if 'calendar' in processed_user and 'lastSyncTime' in processed_user['calendar']:
         if isinstance(processed_user['calendar']['lastSyncTime'], datetime):
             processed_user['calendar']['lastSyncTime'] = processed_user['calendar']['lastSyncTime'].isoformat()
-    
+
+    # Process calendar credentials expiresAt if it exists (fixes 500 error in OAuth callback)
+    if ('calendar' in processed_user and
+        'credentials' in processed_user['calendar'] and
+        'expiresAt' in processed_user['calendar']['credentials']):
+        expires_at = processed_user['calendar']['credentials']['expiresAt']
+        if isinstance(expires_at, datetime):
+            processed_user['calendar']['credentials']['expiresAt'] = expires_at.isoformat()
+
     return processed_user
 
 @api_bp.route("/schedules/autogenerate", methods=["POST"])
