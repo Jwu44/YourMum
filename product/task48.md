@@ -67,3 +67,10 @@ await in getUserCreationDate
 page-9ad5770fd6568079.js:1 User creation date: Mon Jan 01 2024 11:00:00 GMT+1100 (Australian Eastern Daylight Time)
 139-4f1a486df036f344.js:1  POST https://yourmum-production.up.railway.app/api/schedules/autogenerate 401 (Unauthorized)
 page-9ad5770fd6568079.js:1 ⚠️ Dashb
+
+# Network requests
+- https://yourmum-production.up.railway.app/api/auth/user: {"error":"Authentication failed","message":"Invalid token or user not found"}
+- https://yourmum-production.up.railway.app/api/events/stream?token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjUwMDZlMjc5MTVhMTcwYWIyNmIxZWUzYjgxZDExNjU0MmYxMjRmMjAiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiSnVzdGluIFd1IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0wwTFN2bGs4d2xsdW5JZWkzM3BQXzFDY2U0dDREeUhtbEJyVGFMMUxOVll5S2FVNjhGaUE9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20veW91cm11bS1jYzc0YiIsImF1ZCI6InlvdXJtdW0tY2M3NGIiLCJhdXRoX3RpbWUiOjE3NTgxNzE1ODEsInVzZXJfaWQiOiJWbENmMWlzVGJETTJsU2xqMXJKa05NUWxPUk4yIiwic3ViIjoiVmxDZjFpc1RiRE0ybFNsajFySmtOTVFsT1JOMiIsImlhdCI6MTc1ODE3MTU4MiwiZXhwIjoxNzU4MTc1MTgyLCJlbWFpbCI6Imp1c3Rpbi53dTQ0NDRAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMTMwMjY1MDI5MTE2OTg1ODM1NTQiXSwiZW1haWwiOlsianVzdGluLnd1NDQ0NEBnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.HmhepViAqi6CIFLU1KeC0ur7u-hmE9uWNZtzsNOBMKU-UWOmorFGXjL6XnFF_6IUGqlCa8bFHB6URci_BQP9XBstxCXl3zZb4GoJlONRSBOgZoFXrc4sv4OkX9SmeKXZoZ-L7VdHwzts5hPYTFnKwIcFonz7qBqHogSNsrSI2BskgSgYYxx3FxfBpCoiyLDHU6VHrx9x3cTGczHzUf1cKhiOQQAI5BCjozC2ktmZzujVZkyYLO-crTdwTGsNOm-9QFqqNxTFCzTqJTeD3sA5kF995MLOBRZ3aS0UPu9cOHK0MhQ6nYxG5eQkWDlm2JtnYfJotp_ZIHBZ8SgVyR-nnA: {"error":"Invalid authentication token","success":false}
+- https://yourmum-production.up.railway.app/api/schedules/2025-09-18: {"error":"Invalid authentication token","success":false}
+- https://yourmum-production.up.railway.app/api/auth/user: {"error":"Authentication failed","message":"Invalid token or user not found"}
+- https://yourmum-production.up.railway.app/api/schedules/autogenerate: {"error":"Invalid authentication token","success":false}

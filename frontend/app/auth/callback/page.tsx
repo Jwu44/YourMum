@@ -9,10 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { googleOAuthService } from '@/lib/services/google-oauth';
-import { auth } from '@/auth/firebase';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { apiClient } from '@/lib/api/client';
+import { processOAuthCallback } from './oauth-utils';
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -21,7 +18,7 @@ export default function OAuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const processCallback = async () => {
+    const handleCallback = async () => {
       try {
         setStatus('processing');
 
@@ -41,39 +38,11 @@ export default function OAuthCallbackPage() {
           throw new Error('Missing authorization code or state parameter');
         }
 
-        console.log('🔄 Processing OAuth callback with code and state');
+        // Process OAuth callback with Firebase UID fix
+        const result = await processOAuthCallback(code, state);
 
-        // Exchange authorization code for tokens
-        const tokens = await googleOAuthService.handleOAuthCallback(code, state);
-
-        console.log('✅ Received OAuth tokens:', {
-          hasAccessToken: !!tokens.access_token,
-          hasRefreshToken: !!tokens.refresh_token,
-          hasIdToken: !!tokens.id_token,
-          scopes: tokens.scope,
-        });
-
-        // Validate ID token
-        const idTokenPayload = googleOAuthService.validateIdToken(tokens.id_token);
-        console.log('✅ ID token validated for user:', idTokenPayload.email);
-
-        // Create Firebase credential from Google ID token
-        const credential = GoogleAuthProvider.credential(tokens.id_token);
-
-        // Sign in to Firebase with Google credential
-        console.log('🔄 Signing in to Firebase with Google credential...');
-        const firebaseResult = await signInWithCredential(auth, credential);
-        const user = firebaseResult.user;
-
-        console.log('✅ Firebase authentication successful:', user.email);
-
-        // Ensure Firebase auth is ready for API calls
-        console.log('🔄 Verifying auth readiness...');
-        await user.getIdToken(true);
-        console.log('✅ Auth state confirmed ready');
-
-        // User data is already stored by the backend OAuth endpoint
-        console.log('✅ User already stored by backend OAuth flow with calendar access');
+        console.log('✅ OAuth callback completed successfully');
+        console.log('🎯 User authenticated with Firebase UID:', result.user.uid);
 
         // Set success status
         setStatus('success');
@@ -97,7 +66,7 @@ export default function OAuthCallbackPage() {
       }
     };
 
-    processCallback();
+    handleCallback();
   }, [searchParams, router]);
 
 

@@ -1970,27 +1970,32 @@ def handle_logout_options():
     """Handle CORS preflight requests for logout endpoint."""
     return jsonify({"status": "ok"})
 
-# New OAuth callback endpoint for single OAuth flow
+# New OAuth callback endpoint for single OAuth flow with Firebase UID fix
 @auth_bp.route("/oauth-callback", methods=["POST"])
 def oauth_callback():
     """
     Handle OAuth callback for single authentication + calendar flow.
 
-    This endpoint handles the authorization code exchange without requiring
-    a Firebase token (solves chicken-and-egg problem). It exchanges the code
-    for Google tokens, validates the ID token, and returns both user data
-    and OAuth tokens for frontend Firebase authentication.
+    KEY FIX: Now expects userData with Firebase UID as primary identifier
+    instead of Google Subject ID, ensuring backend user lookup works correctly.
 
     Expected request body:
     {
-        "authorization_code": str (required),
-        "state": str (required)
+        "userData": {
+            "googleId": str (Firebase UID - PRIMARY FIX),
+            "email": str,
+            "displayName": str,
+            "photoURL": str,
+            "hasCalendarAccess": bool,
+            "calendarTokens": {...}
+        },
+        "tokens": {...}
     }
 
     Returns:
-        200: OAuth successful with user data and tokens
+        200: OAuth successful with user data stored using Firebase UID
         400: Missing parameters or validation errors
-        500: Google OAuth or server errors
+        500: Storage or server errors
     """
     try:
         # Validate request data
@@ -2001,118 +2006,45 @@ def oauth_callback():
                 "error": "No data provided"
             }), 400
 
-        # Check required parameters
-        authorization_code = data.get('authorization_code')
-        state = data.get('state')
+        # Check required parameters - updated for Firebase UID fix
+        user_data = data.get('userData')
+        tokens = data.get('tokens')
 
-        if not authorization_code:
+        if not user_data:
             return jsonify({
                 "success": False,
-                "error": "Missing required parameter: authorization_code"
+                "error": "Missing required parameter: userData"
             }), 400
 
-        if not state:
+        if not tokens:
             return jsonify({
                 "success": False,
-                "error": "Missing required parameter: state"
+                "error": "Missing required parameter: tokens"
             }), 400
 
-        # Get Google OAuth credentials from environment
-        client_id = os.getenv('GOOGLE_CLIENT_ID')
-        client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-        redirect_uri = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', 'https://yourmum.app/auth/callback')
-
-        if not client_id or not client_secret:
+        # Validate that Firebase UID is provided as googleId
+        firebase_uid = user_data.get('googleId')
+        if not firebase_uid:
             return jsonify({
                 "success": False,
-                "error": "Google OAuth credentials not configured"
-            }), 500
-
-        print(f"DEBUG: Processing OAuth callback with code: {authorization_code[:20]}...")
-
-        # Exchange authorization code for tokens with Google
-        token_url = 'https://oauth2.googleapis.com/token'
-        token_data = {
-            'client_id': client_id,
-            'client_secret': client_secret,
-            'code': authorization_code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': redirect_uri
-        }
-
-        token_response = requests.post(token_url, data=token_data)
-
-        if token_response.status_code != 200:
-            print(f"DEBUG: Google token exchange failed: {token_response.status_code} - {token_response.text}")
-            return jsonify({
-                "success": False,
-                "error": f"Google OAuth token exchange failed: {token_response.text}"
+                "error": "Missing Firebase UID in userData.googleId"
             }), 400
 
-        token_json = token_response.json()
+        print(f"✅ Processing OAuth callback with Firebase UID: {firebase_uid}")
+        print(f"   - Email: {user_data.get('email')}")
+        print(f"   - Display Name: {user_data.get('displayName')}")
+        print(f"   - Has Calendar Access: {user_data.get('hasCalendarAccess')}")
 
-        # Extract and validate tokens
-        access_token = token_json.get('access_token')
-        refresh_token = token_json.get('refresh_token')
-        id_token = token_json.get('id_token')
-        expires_in = token_json.get('expires_in', 3600)
-        scope = token_json.get('scope', '')
+        # Extract tokens (already processed by frontend)
+        access_token = tokens.get('access_token')
+        refresh_token = tokens.get('refresh_token')
+        id_token = tokens.get('id_token')
+        expires_in = tokens.get('expires_in', 3600)
+        scope = tokens.get('scope', '')
 
-        if not access_token or not id_token:
-            return jsonify({
-                "success": False,
-                "error": "Incomplete token response from Google"
-            }), 400
-
-        # Decode and validate ID token (basic validation)
-        try:
-            # Split JWT and decode payload
-            id_token_parts = id_token.split('.')
-            if len(id_token_parts) != 3:
-                raise ValueError("Invalid JWT format")
-
-            # Decode payload (add padding if needed)
-            payload_b64 = id_token_parts[1]
-            payload_b64 += '=' * (4 - len(payload_b64) % 4)  # Add padding
-            payload_json = base64.b64decode(payload_b64)
-            user_info = json_lib.loads(payload_json)
-
-            # Basic validation
-            if not user_info.get('iss', '').endswith('google.com'):
-                raise ValueError("Invalid token issuer")
-
-            if user_info.get('exp', 0) * 1000 < datetime.now().timestamp() * 1000:
-                raise ValueError("Token expired")
-
-        except Exception as e:
-            print(f"DEBUG: ID token validation failed: {e}")
-            return jsonify({
-                "success": False,
-                "error": "Invalid ID token format"
-            }), 400
-
-        print(f"✅ OAuth tokens received successfully for user: {user_info.get('email')}")
         print(f"   - Access token: {bool(access_token)}")
         print(f"   - Refresh token: {bool(refresh_token)}")
         print(f"   - Scope: {scope}")
-
-        # Debug: Log the extracted user information from ID token
-        print(f"DEBUG: ID token user info - googleId: {user_info.get('sub')}, email: {user_info.get('email')}, name: {user_info.get('name')}")
-
-        # Prepare user data from ID token
-        user_data = {
-            'googleId': user_info.get('sub'),
-            'email': user_info.get('email'),
-            'displayName': user_info.get('name'),
-            'photoURL': user_info.get('picture', ''),
-            'hasCalendarAccess': True,
-            'calendarTokens': {
-                'accessToken': access_token,
-                'refreshToken': refresh_token or '',
-                'expiresAt': datetime.now(timezone.utc) + timedelta(seconds=expires_in),
-                'scope': scope
-            }
-        }
 
         # Store user in database
         processed_user_data = _prepare_user_data_for_storage(user_data)
