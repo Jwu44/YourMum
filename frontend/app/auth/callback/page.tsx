@@ -67,6 +67,11 @@ export default function OAuthCallbackPage() {
 
         console.log('✅ Firebase authentication successful:', user.email);
 
+        // Ensure Firebase auth is ready for API calls
+        console.log('🔄 Verifying auth readiness...');
+        await user.getIdToken(true);
+        console.log('✅ Auth state confirmed ready');
+
         // User data is already stored by the backend OAuth endpoint
         console.log('✅ User already stored by backend OAuth flow with calendar access');
 
@@ -78,7 +83,7 @@ export default function OAuthCallbackPage() {
           const redirectTo = localStorage.getItem('authRedirectDestination') || '/dashboard';
           localStorage.removeItem('authRedirectDestination');
           router.push(redirectTo);
-        }, 2000);
+        }, 1500);
 
       } catch (error) {
         console.error('❌ OAuth callback processing failed:', error);
