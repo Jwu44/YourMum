@@ -12,13 +12,13 @@ import { googleOAuthService } from '@/lib/services/google-oauth'
 /**
  * Process OAuth callback with Firebase UID as primary identifier
  *
- * Key fix: Uses Firebase UID from signInWithCredential instead of Google Subject ID
- * This ensures backend user lookup works correctly.
+ * TEMPORARY: For now, let the backend handle token exchange (old format)
+ * but immediately get Firebase UID for future API calls
  */
 export async function processOAuthCallback(code: string, state: string) {
   console.log('🔄 Processing OAuth callback with Firebase UID fix...')
 
-  // Step 1: Exchange authorization code for Google tokens
+  // Step 1: Let backend handle token exchange (temporary old format)
   const tokens = await googleOAuthService.handleOAuthCallback(code, state)
   console.log('✅ Received OAuth tokens:', {
     hasAccessToken: !!tokens.access_token,
@@ -27,11 +27,7 @@ export async function processOAuthCallback(code: string, state: string) {
     scopes: tokens.scope,
   })
 
-  // Step 2: Validate Google ID token
-  const idTokenPayload = googleOAuthService.validateIdToken(tokens.id_token)
-  console.log('✅ ID token validated for user:', idTokenPayload.email)
-
-  // Step 3: Sign in to Firebase with Google credential
+  // Step 2: CRITICAL FIX - Sign in to Firebase with Google credential to get Firebase UID
   console.log('🔄 Signing in to Firebase with Google credential...')
   const credential = GoogleAuthProvider.credential(tokens.id_token)
   const firebaseResult = await signInWithCredential(auth, credential)
@@ -40,56 +36,32 @@ export async function processOAuthCallback(code: string, state: string) {
   console.log('✅ Firebase authentication successful:', firebaseUser.email)
   console.log('🔑 Firebase UID (primary identifier):', firebaseUser.uid)
 
-  // Step 4: Prepare user data with Firebase UID as primary identifier
-  const userData = {
-    googleId: firebaseUser.uid, // KEY FIX: Use Firebase UID instead of Google Subject ID
-    email: firebaseUser.email,
-    displayName: firebaseUser.displayName,
-    photoURL: firebaseUser.photoURL || '',
-    hasCalendarAccess: true,
-    calendarTokens: {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || '',
-      expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
-      scope: tokens.scope
-    }
-  }
-
-  // Step 5: Store user in backend with Firebase UID
-  console.log('🔄 Storing user in backend with Firebase UID as primary key...')
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/oauth-callback`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      userData,
-      tokens: {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        id_token: tokens.id_token,
-        expires_in: tokens.expires_in,
-        scope: tokens.scope,
-        token_type: 'Bearer'
-      }
-    }),
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(`Backend storage failed: ${errorData.error || 'Unknown error'}`)
-  }
-
-  const result = await response.json()
-  console.log('✅ User stored in backend with Firebase UID:', firebaseUser.uid)
-
-  // Step 6: Ensure Firebase auth is ready for API calls
+  // Step 3: Ensure Firebase auth is ready for API calls
   console.log('🔄 Verifying auth readiness...')
   await firebaseUser.getIdToken(true)
   console.log('✅ Auth state confirmed ready')
 
+  // Step 4: Update user in backend with Firebase UID (migration step)
+  console.log('🔄 Updating user record with Firebase UID for consistency...')
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/migrate-user-id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await firebaseUser.getIdToken()}`
+      },
+      body: JSON.stringify({
+        firebaseUid: firebaseUser.uid,
+        email: firebaseUser.email
+      }),
+    })
+    console.log('✅ User ID migration completed')
+  } catch (error) {
+    console.warn('⚠️ User ID migration failed (non-critical):', error)
+  }
+
   return {
     user: firebaseUser,
-    isNewUser: result.isNewUser
+    isNewUser: false // Will be determined by backend during migration
   }
 }

@@ -2006,29 +2006,148 @@ def oauth_callback():
                 "error": "No data provided"
             }), 400
 
-        # Check required parameters - updated for Firebase UID fix
-        user_data = data.get('userData')
-        tokens = data.get('tokens')
+        # Support both old format (authorization_code/state) and new format (userData/tokens)
+        if 'userData' in data and 'tokens' in data:
+            # NEW FORMAT: Frontend sends processed user data with Firebase UID
+            user_data = data.get('userData')
+            tokens = data.get('tokens')
 
-        if not user_data:
-            return jsonify({
-                "success": False,
-                "error": "Missing required parameter: userData"
-            }), 400
+            if not user_data:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: userData"
+                }), 400
 
-        if not tokens:
-            return jsonify({
-                "success": False,
-                "error": "Missing required parameter: tokens"
-            }), 400
+            if not tokens:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: tokens"
+                }), 400
 
-        # Validate that Firebase UID is provided as googleId
-        firebase_uid = user_data.get('googleId')
-        if not firebase_uid:
-            return jsonify({
-                "success": False,
-                "error": "Missing Firebase UID in userData.googleId"
-            }), 400
+            # Validate that Firebase UID is provided as googleId
+            firebase_uid = user_data.get('googleId')
+            if not firebase_uid:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing Firebase UID in userData.googleId"
+                }), 400
+
+            print(f"✅ Processing OAuth callback with Firebase UID: {firebase_uid}")
+            print(f"   - Email: {user_data.get('email')}")
+            print(f"   - Display Name: {user_data.get('displayName')}")
+
+            # Extract tokens (already processed by frontend)
+            access_token = tokens.get('access_token')
+            refresh_token = tokens.get('refresh_token')
+            id_token = tokens.get('id_token')
+            expires_in = tokens.get('expires_in', 3600)
+            scope = tokens.get('scope', '')
+
+        else:
+            # OLD FORMAT: Backward compatibility for authorization_code/state
+            authorization_code = data.get('authorization_code')
+            state = data.get('state')
+
+            if not authorization_code:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: authorization_code or userData"
+                }), 400
+
+            if not state:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: state"
+                }), 400
+
+            print(f"DEBUG: Processing OLD OAuth callback format with code: {authorization_code[:20]}...")
+
+            # Handle old format - exchange code for tokens and process normally
+            print(f"DEBUG: Using OLD format for backward compatibility")
+
+            # Get Google OAuth credentials from environment
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            redirect_uri = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', 'https://yourmum.app/auth/callback')
+
+            if not client_id or not client_secret:
+                return jsonify({
+                    "success": False,
+                    "error": "Google OAuth credentials not configured"
+                }), 500
+
+            # Exchange authorization code for tokens with Google
+            token_url = 'https://oauth2.googleapis.com/token'
+            token_data = {
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'code': authorization_code,
+                'grant_type': 'authorization_code',
+                'redirect_uri': redirect_uri
+            }
+
+            token_response = requests.post(token_url, data=token_data)
+
+            if token_response.status_code != 200:
+                print(f"DEBUG: Google token exchange failed: {token_response.status_code} - {token_response.text}")
+                return jsonify({
+                    "success": False,
+                    "error": f"Google OAuth token exchange failed: {token_response.text}"
+                }), 400
+
+            token_json = token_response.json()
+
+            # Extract and validate tokens
+            access_token = token_json.get('access_token')
+            refresh_token = token_json.get('refresh_token')
+            id_token = token_json.get('id_token')
+            expires_in = token_json.get('expires_in', 3600)
+            scope = token_json.get('scope', '')
+
+            if not access_token or not id_token:
+                return jsonify({
+                    "success": False,
+                    "error": "Incomplete token response from Google"
+                }), 400
+
+            # Decode and validate ID token
+            try:
+                id_token_parts = id_token.split('.')
+                if len(id_token_parts) != 3:
+                    raise ValueError("Invalid JWT format")
+
+                payload_b64 = id_token_parts[1]
+                payload_b64 += '=' * (4 - len(payload_b64) % 4)
+                payload_json = base64.b64decode(payload_b64)
+                user_info = json_lib.loads(payload_json)
+
+                if not user_info.get('iss', '').endswith('google.com'):
+                    raise ValueError("Invalid token issuer")
+
+            except Exception as e:
+                print(f"DEBUG: ID token validation failed: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid ID token format"
+                }), 400
+
+            print(f"✅ OAuth tokens received for OLD format - user: {user_info.get('email')}")
+            print(f"   - WARNING: Still using Google Subject ID: {user_info.get('sub')}")
+
+            # Prepare user data using OLD format (Google Subject ID)
+            user_data = {
+                'googleId': user_info.get('sub'),  # OLD: Google Subject ID
+                'email': user_info.get('email'),
+                'displayName': user_info.get('name'),
+                'photoURL': user_info.get('picture', ''),
+                'hasCalendarAccess': True,
+                'calendarTokens': {
+                    'accessToken': access_token,
+                    'refreshToken': refresh_token or '',
+                    'expiresAt': datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+                    'scope': scope
+                }
+            }
 
         print(f"✅ Processing OAuth callback with Firebase UID: {firebase_uid}")
         print(f"   - Email: {user_data.get('email')}")
