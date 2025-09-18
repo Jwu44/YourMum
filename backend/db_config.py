@@ -269,10 +269,18 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
     try:
         print(f"DEBUG: create_or_update_user called with googleId: {user_data.get('googleId')}, email: {user_data.get('email')}")
 
-        # Check if user already exists to preserve calendar connection state
+        # Check if user already exists by googleId first
         existing_user = users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
         print(f"DEBUG: Found existing user by googleId: {bool(existing_user)}")
-        
+
+        # If no user found by googleId, check if there's a user with the same email
+        existing_user_by_email = None
+        if not existing_user:
+            existing_user_by_email = users_collection.find_one({"email": user_data["email"]}, {"_id": 0})
+            print(f"DEBUG: Found existing user by email: {bool(existing_user_by_email)}")
+            if existing_user_by_email:
+                print(f"DEBUG: User with email {user_data['email']} exists with different googleId: {existing_user_by_email.get('googleId')}")
+
         # Prepare base user document with required fields
         user_doc = {
             "googleId": user_data["googleId"],
@@ -288,15 +296,16 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
                 "lastModified": datetime.now(timezone.utc)
             }
         }
-        
+
         # Handle calendar fields with merge logic to prevent race condition overwrites
         has_calendar_access_explicitly_set = "hasCalendarAccess" in user_data
+        base_existing_user = existing_user or existing_user_by_email
 
-        if existing_user and not has_calendar_access_explicitly_set:
+        if base_existing_user and not has_calendar_access_explicitly_set:
             # Preserve ALL existing calendar state when hasCalendarAccess not explicitly provided
             # This prevents auth state change calls from overwriting OAuth calendar setup
-            user_doc["calendarSynced"] = existing_user.get("calendarSynced", False)
-            user_doc["calendar"] = existing_user.get("calendar", {})
+            user_doc["calendarSynced"] = base_existing_user.get("calendarSynced", False)
+            user_doc["calendar"] = base_existing_user.get("calendar", {})
             print(f"DEBUG: Preserving all existing calendar state for user {user_data['googleId']} (no explicit calendar update)")
         elif has_calendar_access_explicitly_set:
             # Only update calendar fields when explicitly provided (OAuth flows)
@@ -309,11 +318,24 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             user_doc["calendar"] = user_data.get("calendar", {})
             print(f"DEBUG: Setting initial calendar state for new user {user_data['googleId']}: {user_data.get('calendarSynced', False)}")
 
-        # Use upsert to create or update
-        print(f"DEBUG: About to upsert user with googleId: {user_data['googleId']}, email: {user_doc['email']}")
+        # Determine the query filter for update operation
+        if existing_user:
+            # Update by googleId (normal case)
+            query_filter = {"googleId": user_data["googleId"]}
+            print(f"DEBUG: Updating existing user by googleId: {user_data['googleId']}")
+        elif existing_user_by_email:
+            # Update by email and change googleId (email exists with different googleId)
+            query_filter = {"email": user_data["email"]}
+            print(f"DEBUG: Updating existing user by email, changing googleId from {existing_user_by_email.get('googleId')} to {user_data['googleId']}")
+        else:
+            # New user - use googleId for upsert
+            query_filter = {"googleId": user_data["googleId"]}
+            print(f"DEBUG: Creating new user with googleId: {user_data['googleId']}")
+
+        print(f"DEBUG: About to upsert user with filter: {query_filter}, email: {user_doc['email']}")
 
         result = users_collection.update_one(
-            {"googleId": user_data["googleId"]},
+            query_filter,
             {
                 "$set": user_doc,
                 "$setOnInsert": {
@@ -325,10 +347,8 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
 
         print(f"DEBUG: Upsert result - matched: {result.matched_count}, modified: {result.modified_count}, upserted: {bool(result.upserted_id)}")
 
-        if result.upserted_id:
-            return users_collection.find_one({"_id": result.upserted_id}, {"_id": 0})
-        else:
-            return users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
+        # Return the updated user document
+        return users_collection.find_one({"googleId": user_data["googleId"]}, {"_id": 0})
 
     except Exception as e:
         print(f"Error creating/updating user: {e}")
