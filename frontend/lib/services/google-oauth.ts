@@ -168,7 +168,7 @@ export class GoogleOAuthService {
       // Store additional user data for callback page
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('oauth_user_data', JSON.stringify(data.user));
-        sessionStorage.setItem('oauth_is_new_user', data.isNewUser.toString());
+        sessionStorage.setItem('oauth_is_new_user', String(data.isNewUser ?? false));
       }
 
       return tokens;
