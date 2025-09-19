@@ -300,10 +300,13 @@ def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
 def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Get user data from database using a verified Firebase token.
-    
+
+    CRITICAL FIX: Now tries both Firebase UID and Google Subject ID for backward compatibility
+    with existing users who were stored before Firebase UID migration.
+
     Args:
         token: The Firebase ID token
-        
+
     Returns:
         User document from database or None if not found
     """
@@ -312,25 +315,45 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         decoded_token = verify_firebase_token(token)
         if not decoded_token:
             return None
-            
+
         # Extract user ID (Firebase UID)
         user_id = decoded_token.get('uid')
         if not user_id:
             return None
-            
+
         # Get database instance
         db = get_database()
         users = db['users']
-        
-        # Find user by Google ID (which is the Firebase UID)
+
+        # STEP 1: Try to find user by Firebase UID (new format)
         # Exclude _id field to prevent BSON serialization issues
         user = users.find_one({"googleId": user_id}, {"_id": 0})
-        
-        # If user found in database, return it (applies to all users including dev users)
+
+        # If user found with Firebase UID, return it
         if user:
+            print(f"✅ User found by Firebase UID: {user.get('email')}")
             return user
-            
-        # Development bypass - return mock user only if user not found in database
+
+        # STEP 2: FALLBACK - Try to find user by Google Subject ID (legacy format)
+        # Extract Google Subject ID from Firebase token identities
+        google_subject_id = None
+        firebase_data = decoded_token.get('firebase', {})
+        identities = firebase_data.get('identities', {})
+        google_identities = identities.get('google.com', [])
+
+        if google_identities:
+            google_subject_id = google_identities[0]  # Take first Google identity
+            print(f"🔄 Attempting fallback lookup with Google Subject ID: {google_subject_id}")
+
+            # Try to find user by Google Subject ID
+            user = users.find_one({"googleId": google_subject_id}, {"_id": 0})
+
+            if user:
+                print(f"✅ User found by Google Subject ID (legacy): {user.get('email')}")
+                print(f"⚠️  User needs migration from Google Subject ID to Firebase UID")
+                return user
+
+        # STEP 3: Development bypass - return mock user only if user not found in database
         if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
             return {
                 'googleId': 'dev-user-123',
@@ -342,9 +365,11 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 'calendarSynced': False,
                 # Add other required fields as needed
             }
-            
-        # User not found and not a dev user
+
+        # User not found with either Firebase UID or Google Subject ID
+        print(f"❌ User not found - Firebase UID: {user_id}, Google Subject ID: {google_subject_id}")
         return None
+
     except Exception as e:
         print(f"Error getting user from token: {e}")
         traceback.print_exc()
@@ -2207,6 +2232,180 @@ def oauth_callback():
 @auth_bp.route("/oauth-callback", methods=["OPTIONS"])
 def handle_oauth_callback_options():
     """Handle CORS preflight requests for OAuth callback endpoint."""
+    return jsonify({"status": "ok"})
+
+@auth_bp.route("/migrate-user-id", methods=["POST"])
+def migrate_user_id():
+    """
+    Migrate user from Google Subject ID to Firebase UID.
+
+    This endpoint allows users to self-migrate their identifier from Google Subject ID
+    (legacy format) to Firebase UID (new format) for consistency with Firebase authentication.
+
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+
+    Body:
+        {
+            "firebaseUid": str (Firebase UID from frontend),
+            "email": str (user email for verification)
+        }
+
+    Returns:
+        200: Migration successful
+        400: Invalid request data or user already migrated
+        401: Authentication required
+        404: User not found with Google Subject ID
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        token = auth_header[7:]
+
+        # Verify Firebase token and extract user info
+        decoded_token = verify_firebase_token(token)
+        if not decoded_token:
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        # Extract Firebase UID and Google Subject ID from token
+        firebase_uid = decoded_token.get('uid')
+        if not firebase_uid:
+            return jsonify({
+                "success": False,
+                "error": "Invalid Firebase token - missing UID"
+            }), 401
+
+        # Extract Google Subject ID from Firebase token identities
+        firebase_data = decoded_token.get('firebase', {})
+        identities = firebase_data.get('identities', {})
+        google_identities = identities.get('google.com', [])
+
+        if not google_identities:
+            return jsonify({
+                "success": False,
+                "error": "No Google identity found in Firebase token"
+            }), 400
+
+        google_subject_id = google_identities[0]
+        token_email = decoded_token.get('email')
+
+        # Validate request body
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        frontend_firebase_uid = data.get('firebaseUid')
+        frontend_email = data.get('email')
+
+        # Verify that frontend data matches token data
+        if frontend_firebase_uid != firebase_uid:
+            return jsonify({
+                "success": False,
+                "error": "Firebase UID mismatch between token and request body"
+            }), 400
+
+        if frontend_email != token_email:
+            return jsonify({
+                "success": False,
+                "error": "Email mismatch between token and request body"
+            }), 400
+
+        print(f"🔄 Starting user ID migration:")
+        print(f"   - Email: {token_email}")
+        print(f"   - Google Subject ID: {google_subject_id}")
+        print(f"   - Firebase UID: {firebase_uid}")
+
+        # Get database instance
+        db = get_database()
+        users = db['users']
+
+        # Check if user already exists with Firebase UID (already migrated)
+        existing_firebase_user = users.find_one({"googleId": firebase_uid})
+        if existing_firebase_user:
+            print(f"✅ User already migrated to Firebase UID")
+            return jsonify({
+                "success": True,
+                "message": "User already migrated to Firebase UID",
+                "alreadyMigrated": True
+            }), 200
+
+        # Find user by Google Subject ID (legacy format)
+        legacy_user = users.find_one({"googleId": google_subject_id})
+        if not legacy_user:
+            print(f"❌ User not found with Google Subject ID: {google_subject_id}")
+            return jsonify({
+                "success": False,
+                "error": "User not found with Google Subject ID - may already be migrated or does not exist"
+            }), 404
+
+        # Verify email matches for security
+        if legacy_user.get('email') != token_email:
+            print(f"❌ Email mismatch - Token: {token_email}, Database: {legacy_user.get('email')}")
+            return jsonify({
+                "success": False,
+                "error": "Email verification failed"
+            }), 400
+
+        # Perform the migration: Update googleId from Google Subject ID to Firebase UID
+        migration_result = users.update_one(
+            {"googleId": google_subject_id},
+            {
+                "$set": {
+                    "googleId": firebase_uid,
+                    "metadata.lastModified": datetime.now(timezone.utc),
+                    "metadata.migratedToFirebaseUid": datetime.now(timezone.utc),
+                    "metadata.originalGoogleSubjectId": google_subject_id
+                }
+            }
+        )
+
+        if migration_result.modified_count == 0:
+            print(f"❌ Migration failed - no documents modified")
+            return jsonify({
+                "success": False,
+                "error": "Migration failed - user document could not be updated"
+            }), 500
+
+        print(f"✅ User ID migration successful:")
+        print(f"   - Updated googleId: {google_subject_id} → {firebase_uid}")
+        print(f"   - Email: {token_email}")
+        print(f"   - Documents modified: {migration_result.modified_count}")
+
+        return jsonify({
+            "success": True,
+            "message": "User ID migration completed successfully",
+            "migration": {
+                "from": google_subject_id,
+                "to": firebase_uid,
+                "email": token_email,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"Error in migrate_user_id: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@auth_bp.route("/migrate-user-id", methods=["OPTIONS"])
+def handle_migrate_user_id_options():
+    """Handle CORS preflight requests for migration endpoint."""
     return jsonify({"status": "ok"})
 
 # Archive functionality endpoints
