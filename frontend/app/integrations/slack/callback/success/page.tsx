@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Cross } from 'lucide-react'
 
 /**
  * Slack OAuth Success Page
@@ -11,7 +11,7 @@ import { CheckCircle } from 'lucide-react'
  */
 export default function SlackOAuthSuccessPage () {
   const searchParams = useSearchParams()
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(1000)
 
   // Extract connection data from URL parameters
   const success = searchParams?.get('success') === 'true'
@@ -67,19 +67,19 @@ export default function SlackOAuthSuccessPage () {
 
   if (!success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-indigo-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-red-500" />
+            <Cross className="w-8 h-8 text-red-500" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">
             Connection Failed
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-4">
             The OAuth flow was not completed successfully. Please try again.
           </p>
-          <p className="text-sm text-gray-500 italic">
-            You may now close this tab
+          <p className="text-xs text-gray-400">
+            You may now close this tab.
           </p>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function SlackOAuthSuccessPage () {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-indigo-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
         {/* Success Icon */}
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -96,42 +96,17 @@ export default function SlackOAuthSuccessPage () {
 
         {/* Success Title */}
         <h1 className="text-xl font-semibold text-gray-900 mb-2">
-          Connected Successfully!
+          Slack connected successfully!
         </h1>
 
         {/* Success Message */}
-        <p className="text-gray-600 mb-6">
-          {message}
-        </p>
-
-        {/* Connection Details */}
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-          <div className="text-sm text-gray-600 space-y-2">
-            <div>
-              <span className="font-medium">Workspace:</span> {workspaceName}
-            </div>
-            {workspaceId && (
-              <div>
-                <span className="font-medium">ID:</span> {workspaceId}
-              </div>
-            )}
-            {connectedAt && (
-              <div>
-                <span className="font-medium">Connected:</span>{' '}
-                {new Date(connectedAt).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Auto-close notice */}
-        <p className="text-sm text-gray-500 italic">
-          You may now close this tab
+        <p className="text-gray-600 mb-4">
+          {workspaceName} has been integrated with YourMum.
         </p>
 
         {countdown > 0 && (
-          <p className="text-xs text-gray-400 mt-2">
-            This window will close automatically in {countdown} seconds
+          <p className="text-xs text-gray-400">
+            You may  close this tab or it will auto close in {countdown} seconds.
           </p>
         )}
       </div>

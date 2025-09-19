@@ -28,8 +28,8 @@ export default function ConnectingPage () {
 
             // Show error toast
             toast({
-              title: 'Calendar Connection Failed',
-              description: errorData.error || 'Failed to connect to Google Calendar',
+              title: 'Error',
+              description: errorData.error || 'Failed to connect to Google Calendar.',
               variant: 'destructive'
             })
 
@@ -64,8 +64,8 @@ export default function ConnectingPage () {
 
         // Show error toast
         toast({
-          title: 'Connection Error',
-          description: 'An unexpected error occurred during setup',
+          title: 'Error',
+          description: 'An unexpected error occurred during setup.',
           variant: 'destructive'
         })
 

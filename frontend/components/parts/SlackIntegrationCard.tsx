@@ -48,7 +48,7 @@ const SlackIntegrationCard: React.FC = () => {
       if (error instanceof Error && !error.message.includes('not authenticated')) {
         toast({
           title: 'Error',
-          description: 'Failed to check Slack connection status',
+          description: 'Failed to check Slack connection status.',
           variant: 'destructive'
         })
       }
@@ -67,8 +67,9 @@ const SlackIntegrationCard: React.FC = () => {
       if (isCompleted) {
         // OAuth is complete and user is connected
         toast({
-          title: 'Success',
-          description: 'Slack integration connected successfully!'
+          title: 'Success!',
+          description: 'Slack has been connected successfully.',
+          variant: 'success'
         })
         return true
       }
@@ -102,8 +103,9 @@ const SlackIntegrationCard: React.FC = () => {
       }
 
       toast({
-        title: 'Slack OAuth',
-        description: 'Complete the authorization in the opened tab. The page will automatically refresh when done.'
+        title: 'Heads up',
+        description: 'Complete the authorization in the opened tab. The page will automatically refresh when done.',
+        variant: 'warning'
       })
 
       // Listen for OAuth completion message from popup
@@ -116,8 +118,9 @@ const SlackIntegrationCard: React.FC = () => {
           window.removeEventListener('message', messageHandler)
 
           toast({
-            title: 'Success',
-            description: `Slack integration connected successfully to ${event.data.data.workspace_name}!`
+            title: 'Success!',
+            description: `Slack integration connected successfully to ${event.data.data.workspace_name}.`,
+            variant: 'success'
           })
 
           // Refresh status to update UI
@@ -129,7 +132,7 @@ const SlackIntegrationCard: React.FC = () => {
           window.removeEventListener('message', messageHandler)
 
           toast({
-            title: 'OAuth Failed',
+            title: 'Error',
             description: event.data.error || 'OAuth process failed. Please try again.',
             variant: 'destructive'
           })
@@ -184,8 +187,8 @@ const SlackIntegrationCard: React.FC = () => {
       setStatus({ connected: false })
 
       toast({
-        title: 'Success',
-        description: data.message || 'Slack integration disconnected successfully'
+        title: 'Success!',
+        description: data.message || 'Slack has been disconnected successfully.'
       })
     } catch (error) {
       console.error('Error disconnecting Slack:', error)

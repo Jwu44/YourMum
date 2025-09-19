@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { processOAuthCallback } from './oauth-utils';
 import { LoadingPage } from '@/components/parts/LoadingPage';
+import { autogenerateTodaySchedule } from '@/lib/ScheduleHelper';
+import { formatDateToString } from '@/lib/helper';
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -46,10 +48,24 @@ export default function OAuthCallbackPage() {
         // Process OAuth callback with Firebase UID fix
         const result = await processOAuthCallback(code, state);
 
-        setProgress(80);
+        setProgress(60);
 
         console.log('✅ OAuth callback completed successfully');
         console.log('🎯 User authenticated with Firebase UID:', result.user.uid);
+
+        // Generate today's schedule automatically
+        console.log('📋 Starting schedule autogeneration...');
+        setProgress(70);
+
+        const today = formatDateToString(new Date());
+        const autogenResult = await autogenerateTodaySchedule(today);
+
+        if (autogenResult.success) {
+          console.log('✅ Schedule generation completed:', autogenResult);
+        } else {
+          console.warn('⚠️ Schedule generation had issues but continuing:', autogenResult.error);
+          // Don't throw error - allow user to proceed to dashboard even if schedule generation fails
+        }
 
         // Set success status
         setStatus('success');
@@ -77,18 +93,25 @@ export default function OAuthCallbackPage() {
     handleCallback();
   }, [searchParams, router]);
 
-  // Determine loading message and reason based on status
+  // Determine loading message and reason based on status and progress
   const getLoadingConfig = () => {
     switch (status) {
       case 'processing':
-        return {
-          reason: 'calendar' as const,
-          message: 'Completing sign in and setting up calendar access...'
+        if (progress >= 60) {
+          return {
+            reason: 'schedule' as const,
+            message: 'Setting up your schedule for today...'
+          }
+        } else {
+          return {
+            reason: 'calendar' as const,
+            message: 'Completing sign in and setting up calendar access...'
+          }
         }
       case 'success':
         return {
-          reason: 'calendar' as const,
-          message: 'Successfully signed in! Taking you to your dashboard...'
+          reason: 'schedule' as const,
+          message: 'All set! Taking you to your dashboard...'
         }
       case 'error':
         return {
