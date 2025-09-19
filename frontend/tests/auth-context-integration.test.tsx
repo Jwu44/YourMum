@@ -34,10 +34,7 @@ jest.mock('firebase/auth', () => ({
   getRedirectResult: jest.fn().mockResolvedValue(null)
 }))
 
-// Mock PostOAuthHandler
-jest.mock('@/components/parts/PostOAuthHandler', () => ({
-  PostOAuthHandler: () => <div>PostOAuthHandler</div>
-}))
+// Note: PostOAuthHandler was removed - OAuth flows now handled directly in callback and dashboard
 
 // Mock timezone utilities
 jest.mock('@/lib/utils/timezone', () => ({

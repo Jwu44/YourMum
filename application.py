@@ -2,7 +2,7 @@ import sys
 import os
 from flask import Flask
 from flask_cors import CORS
-from backend.apis.routes import api_bp
+from backend.apis.routes import api_bp, auth_bp
 from backend.apis.calendar_routes import calendar_bp
 from backend.apis.slack_routes import slack_bp
 from backend.apis.billing_routes import billing_bp
@@ -58,6 +58,7 @@ def create_app(testing=False):
                          
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
     app.register_blueprint(slack_bp, url_prefix="/api/integrations/slack")
     app.register_blueprint(billing_bp)

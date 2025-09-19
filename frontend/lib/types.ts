@@ -390,15 +390,12 @@ export interface AuthState {
   user: User | null
   loading: boolean
   error: string | null
-  calendarConnectionStage: 'connecting' | 'verifying' | 'complete' | null
 }
 
 export interface AuthContextType extends AuthState {
   currentUser: User | null
-  signIn: (redirectTo?: string) => Promise<void> // Updated to accept optional parameter
+  signIn: (redirectTo?: string) => Promise<void>
   signOut: () => Promise<void>
-  reconnectCalendar: () => Promise<void> // New method for calendar reconnection
-  handleOAuthCallback: (authorizationCode: string) => Promise<void> // New method for OAuth callback
 }
 
 // Python backend response types
@@ -523,12 +520,6 @@ export interface FirebaseUser {
 
 export interface WithHandleGetStarted {
   handleGetStarted: () => Promise<void>
-}
-
-export interface CalendarCredentials {
-  accessToken: string
-  expiresAt: number
-  scopes: string[]
 }
 
 // Profile form data interface for settings page

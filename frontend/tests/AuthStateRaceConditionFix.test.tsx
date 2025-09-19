@@ -151,13 +151,13 @@ describe('Auth State Race Condition Fix', () => {
       // This test will pass once we implement the fix
     })
 
-    it('should handle timeout gracefully and still trigger PostOAuthHandler', async () => {
+    it('should handle timeout gracefully for OAuth flows', async () => {
       mockOnAuthStateChanged.mockImplementation((auth, callback) => {
         callback(null) // Never authenticate
         return jest.fn()
       })
 
-      // Test that even if auth state sync times out, we still proceed with PostOAuthHandler
+      // Test that even if auth state sync times out, we still proceed with dashboard
       // for schedule generation without calendar access
       // This ensures user doesn't get completely stuck
     })

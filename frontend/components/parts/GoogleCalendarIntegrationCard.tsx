@@ -29,7 +29,7 @@ import { type UserDocument } from '@/lib/types'
  * Shows connection status and provides reconnection functionality
  */
 const GoogleCalendarIntegrationCard: React.FC = () => {
-  const { currentUser, reconnectCalendar } = useAuth()
+  const { currentUser, signIn } = useAuth()
   const { toast } = useToast()
 
   // State management
@@ -95,32 +95,30 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
   }
 
   /**
-   * Handle calendar connection (OAuth via Firebase popup)
+   * Handle calendar connection (OAuth via single OAuth flow)
    */
   const handleConnect = useCallback(async () => {
     try {
       setIsConnecting(true)
-      await reconnectCalendar()
+
+      // Use the unified OAuth flow that handles both auth and calendar
+      await signIn('/integrations')
 
       toast({
-        title: 'Calendar Connected',
-        description: 'Google Calendar has been successfully connected',
-        variant: 'success'
+        title: 'Starting Calendar Connection',
+        description: 'Redirecting to Google for calendar access...',
+        variant: 'default'
       })
-
-      // Refresh status after successful connection
-      await fetchConnectionStatus()
     } catch (error) {
       console.error('Calendar connection failed:', error)
       toast({
         title: 'Connection Failed',
-        description: error instanceof Error ? error.message : 'Failed to connect calendar',
+        description: error instanceof Error ? error.message : 'Failed to start calendar connection',
         variant: 'destructive'
       })
-    } finally {
       setIsConnecting(false)
     }
-  }, [reconnectCalendar])
+  }, [signIn, toast])
 
   /**
    * Handle calendar disconnection
