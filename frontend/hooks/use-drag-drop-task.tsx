@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { type Task } from '../lib/types'
+import { useIsMobile } from './use-mobile'
 
 /**
  * Custom hook for task drag and drop functionality
@@ -64,7 +65,10 @@ export const useDragDropTask = ({
   allTasks,
   moveTask
 }: UseDragDropTaskProps): DragDropTaskReturn => {
-  
+
+  // Mobile detection for responsive drag zone sizing
+  const isMobile = useIsMobile()
+
   // State for tracking indentation intentions
   // 🔧 FIX: Initialize with 'reorder' as default to ensure purple bar always shows
   const [indentationState, setIndentationState] = useState<IndentationState>({
@@ -100,19 +104,21 @@ export const useDragDropTask = ({
       const targetLevel = targetTask ? parseInt(targetTask, 10) : 0;
       
       
-      // 🔧 FIX: Percentage-based threshold calculation for reliable positioning
+      // 🔧 FIX: Responsive zone calculation for mobile vs desktop
+      // Mobile: 40:60 split for easier finger interaction
+      // Desktop: 10:90 split for precise mouse interaction
       // Following dev-guide principle: keep implementation SIMPLE
-      // Uses 2-zone system: 0-10% (red) for outdent/reorder, 10-100% (green) for indent
-      
+
       // Use the entire visible task container for percentage calculation
       const containerLeft = targetRect.left;
       const containerWidth = targetRect.width;
       const containerRight = containerLeft + containerWidth;
-      
-      // Calculate zone thresholds for 2-zone system
-      const tenPercentWidth = containerWidth * 0.1;
-      const firstZoneEnd = containerLeft + tenPercentWidth;  // 0-10%
-      // Second zone: 10-100%
+
+      // Calculate zone thresholds based on device type
+      const zoneThreshold = isMobile ? 0.4 : 0.1; // Mobile: 40%, Desktop: 10%
+      const firstZoneWidth = containerWidth * zoneThreshold;
+      const firstZoneEnd = containerLeft + firstZoneWidth;
+      // Second zone covers remaining percentage (Mobile: 60%, Desktop: 90%)
       
       const currentTaskLevel = task.level || 0;
       const draggedTaskIsIndented = currentTaskLevel > 0;
@@ -204,7 +210,7 @@ export const useDragDropTask = ({
         targetIndentLevel: undefined
       });
     }
-  }, [isSection, task.level, task.text, task.parent_id, allTasks]);
+  }, [isSection, task.level, task.text, task.parent_id, allTasks, isMobile]);
 
   const {
     attributes,

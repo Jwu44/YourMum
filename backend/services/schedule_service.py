@@ -59,11 +59,11 @@ class ScheduleService:
         try:            
             # Format date for database query
             formatted_date = format_schedule_date(date)
-            # Find schedule in database
+            # Find schedule in database (exclude _id to prevent serialization issues)
             schedule_doc = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
-            })
+            }, {"_id": 0})
 
             if not schedule_doc:
                 return False, {"error": "No schedule found for this date"}
@@ -665,15 +665,54 @@ class ScheduleService:
             print(f"[TIMING] Source schedule lookup (up to {max_days_back} days): {source_lookup_duration:.3f}s")
             
             if not source_schedule:
-                total_duration = time.time() - total_start_time
-                print(f"[TIMING] autogenerate_schedule (no source found): {total_duration:.3f}s")
-                return True, {
-                    "existed": False,
-                    "created": False,
-                    "sourceFound": False,
-                    "date": date,
-                    "schedule": []
-                }
+                # Check if user has calendar connection before early return
+                try:
+                    # Atomic check: get user with calendar data in single query
+                    user_doc = self.schedules_collection.database['users'].find_one(
+                        {"googleId": user_id},
+                        {"calendar.connected": 1, "calendar.credentials": 1, "_id": 0}
+                    )
+
+                    has_valid_calendar = False
+                    if user_doc:
+                        calendar_data = user_doc.get('calendar', {})
+                        has_valid_calendar = (
+                            calendar_data.get('connected') is True and
+                            bool(calendar_data.get('credentials'))
+                        )
+
+                    if has_valid_calendar:
+                        # First-time user with calendar - continue to Step 4 calendar fetch
+                        print(f"[CALENDAR] First-time user with calendar connection - proceeding to calendar sync")
+                        # Create minimal source to continue processing
+                        source_schedule = {
+                            "schedule": [],
+                            "inputs": {},
+                            "metadata": {"source": "first_time_calendar_check"}
+                        }
+                    else:
+                        # No calendar or first-time user - early return (existing behavior)
+                        total_duration = time.time() - total_start_time
+                        print(f"[TIMING] autogenerate_schedule (no source found, no calendar): {total_duration:.3f}s")
+                        return True, {
+                            "existed": False,
+                            "created": False,
+                            "sourceFound": False,
+                            "date": date,
+                            "schedule": []
+                        }
+                except Exception as e:
+                    # Database error - fail safe to empty schedule
+                    print(f"[ERROR] Calendar check failed: {str(e)}")
+                    total_duration = time.time() - total_start_time
+                    print(f"[TIMING] autogenerate_schedule (calendar check error): {total_duration:.3f}s")
+                    return True, {
+                        "existed": False,
+                        "created": False,
+                        "sourceFound": False,
+                        "date": date,
+                        "schedule": []
+                    }
 
             # Step 3: Build new tasks from source schedule
             task_processing_start = time.time()

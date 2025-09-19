@@ -21,6 +21,12 @@ const Footer = () => {
           </div>
           <div className="flex gap-6">
             <Link
+              href="mailto:justin.yourmum4444@gmail.com"
+              className="hover:text-foreground transition-colors"
+            >
+              Contact Us
+            </Link>
+            <Link
                 href="/privacy"
                 className="hover:text-foreground transition-colors"
               >

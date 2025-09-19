@@ -54,11 +54,11 @@ jest.mock('@/lib/utils/timezone', () => ({
 }))
 
 const TestComponent = () => {
-  const { refreshCalendarCredentials } = useAuth()
+  const { reconnectCalendar } = useAuth()
   return (
     <button 
       data-testid="refresh-button"
-      onClick={() => refreshCalendarCredentials()}
+      onClick={() => reconnectCalendar()}
     >
       Refresh Calendar
     </button>

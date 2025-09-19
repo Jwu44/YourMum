@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import Lottie from 'lottie-react'
+import { motion } from 'framer-motion'
 
 // Available loading animations configuration
 const LOADING_ANIMATIONS = [
@@ -40,6 +41,24 @@ const LOADING_ANIMATIONS = [
 const getRandomAnimation = (): { path: string; name: string } => {
   const randomIndex = Math.floor(Math.random() * LOADING_ANIMATIONS.length)
   return LOADING_ANIMATIONS[randomIndex]
+}
+
+// Available productivity tips for random selection
+const PRODUCTIVITY_TIPS = [
+  { title: 'Getting Things Done (GTD)', description: 'Splitting your tasks into archive, current list, and backlog makes it way easier to balance priorities.' },
+  { title: 'SMART Goals', description: 'Vague goals stall progress. Instead of saying "Get fitter," a SMART goal would be: "Run a 5k race in under 30 minutes by June 30th.' },
+  { title: 'Batching', description: 'Grouping similar tasks into one block saves huge amounts of mental energy by cutting context switching.' },
+  { title: 'Alternating', description: 'Switching between different types of work throughout the day can reduce fatigue by nearly 30%.' },
+  { title: 'Pre mortem', description: 'Thinking about what might go wrong before you start helps you plan fixes early—and reduces anxiety about the unknown.' },
+  { title: '3-3-3', description: 'Focusing 3 hours on your top priority, then tackling 3 medium tasks and 3 small ones, leads to higher completion rates and lower stress.' },
+  { title: 'Overflow buffer', description: 'High performers leave 20% of their day unscheduled for surprises. It keeps you calm and prevents that "unfinished task" mental nag.' },
+  { title: 'Zeignark effect', description: 'Your brain clings to unfinished tasks. Writing them down tricks it into letting go—so you can focus on what\'s next.' }
+]
+
+// Function to randomly select a productivity tip
+const getRandomProductivityTip = (): { title: string; description: string } => {
+  const randomIndex = Math.floor(Math.random() * PRODUCTIVITY_TIPS.length)
+  return PRODUCTIVITY_TIPS[randomIndex]
 }
 
 export interface LoadingPageProps {
@@ -104,23 +123,26 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       case 'calendar':
         return {
           title: 'Connecting to Google Calendar...',
-          description: 'Syncing events for today and setting up your schedule'
+          description: 'Syncing events for today and setting up your schedule',
+          isProductivityTip: false
         }
       case 'schedule':
         return {
           title: 'Generating Your Schedule...',
-          description: 'Creating your schedule for today'
+          productivityTip: getRandomProductivityTip(),
+          isProductivityTip: true
         }
       default:
         return {
           title: 'Loading',
-          description: 'Please wait while we prepare your schedule'
+          productivityTip: getRandomProductivityTip(),
+          isProductivityTip: true
         }
     }
   }
 
   const messages = getMessages()
-  const displayMessage = message ?? messages.description
+  const displayMessage = message ?? (messages.isProductivityTip ? messages.productivityTip?.description : messages.description)
 
   // Fallback spinner component
   const FallbackSpinner = () => (
@@ -160,9 +182,14 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-lavender-50 to-indigo-50"></div>
+      <div className="absolute inset-0 bg-gradient-radial from-purple-100/30 via-transparent to-transparent"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl"></div>
+
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-[500px] min-h-[500px] mx-4 flex flex-col"
+        className="relative z-10 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-[500px] min-h-[500px] mx-4 flex flex-col"
         role="status"
         aria-live="polite"
         aria-label="Loading page"
@@ -178,9 +205,15 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
             {messages.title}
           </h1>
 
-          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-            {displayMessage}
-          </p>
+          {messages.isProductivityTip && messages.productivityTip ? (
+            <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+              <strong>{messages.productivityTip.title}:</strong> {messages.productivityTip.description}
+            </p>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+              {displayMessage}
+            </p>
+          )}
 
           {/* Progress indicator if available */}
           {loadingManager?.progress !== undefined && loadingManager.progress > 0 && (

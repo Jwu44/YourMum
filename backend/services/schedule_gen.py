@@ -31,16 +31,19 @@ client = anthropic.Anthropic(api_key=anthropic_api_key)
 
 def create_task_registry(input_tasks: List[Any]) -> Tuple[Dict[str, Task], List[Task]]:
     """
-    Create a task registry and identify uncategorized tasks.
+    Create a task registry and identify tasks needing categorization.
     
     Args:
         input_tasks: List of task dictionaries or Task objects
         
     Returns:
-        Tuple of (task_registry, uncategorized_tasks)
+        Tuple of (task_registry, tasks_needing_categorization)
     """
     task_registry = {}
-    uncategorized_tasks = []
+    tasks_needing_categorization = []
+    
+    # Valid categories for validation
+    valid_categories = {"Work", "Exercise", "Relationships", "Fun", "Ambition"}
     
     for task_data in input_tasks:
         # Convert to Task object if needed
@@ -55,33 +58,40 @@ def create_task_registry(input_tasks: List[Any]) -> Tuple[Dict[str, Task], List[
         # Add to registry
         task_registry[task.id] = task
         
-        # Check if task needs categorization
-        if not task.categories or len(task.categories) == 0:
-            uncategorized_tasks.append(task)
+        # Check if task needs categorization or has invalid categories
+        needs_categorization = (
+            not task.categories or 
+            len(task.categories) == 0 or
+            not all(cat in valid_categories for cat in task.categories)
+        )
+        
+        if needs_categorization:
+            tasks_needing_categorization.append(task)
+            print(f"[CATEGORIZATION] Task '{task.text}' needs categorization. Current categories: {task.categories}")
     
-    return task_registry, uncategorized_tasks
+    return task_registry, tasks_needing_categorization
 
 
-def categorize_uncategorized_tasks(
-    uncategorized_tasks: List[Task], 
+def categorize_tasks(
+    tasks_needing_categorization: List[Task], 
     task_registry: Dict[str, Task]
 ) -> bool:
     """
-    Batch categorize uncategorized tasks using a single LLM call.
+    Batch categorize tasks using a single LLM call.
     
     Args:
-        uncategorized_tasks: List of tasks needing categorization
+        tasks_needing_categorization: List of tasks needing categorization
         task_registry: Registry to update with categorizations
         
     Returns:
         Boolean indicating success
     """
-    if not uncategorized_tasks:
+    if not tasks_needing_categorization:
         return True
     
     try:
         # Create batch categorization prompt
-        prompt = create_batch_categorization_prompt(uncategorized_tasks)
+        prompt = create_batch_categorization_prompt(tasks_needing_categorization)
         
         # Call Claude API
         response = client.messages.create(
@@ -108,8 +118,8 @@ def categorize_uncategorized_tasks(
     except Exception as e:
         print(f"Error in batch categorization: {str(e)}")
         
-        # Fallback: assign 'Work' category to all uncategorized tasks
-        for task in uncategorized_tasks:
+        # Fallback: assign 'Work' category to all tasks needing categorization
+        for task in tasks_needing_categorization:
             task_registry[task.id].categories = ["Work"]
         
         return False
@@ -146,12 +156,12 @@ def create_batch_categorization_prompt(tasks: List[Task]) -> str:
         - If a task is categorized as 'Work', it should not have other categories
         - Respond only with valid JSON in this exact format:
 
-        {
+        {{
             "categorizations": [
-                {"task_id": "task_id_1", "categories": ["Category1", "Category2"]},
-                {"task_id": "task_id_2", "categories": ["Category1"]}
+                {{"task_id": "task_id_1", "categories": ["Category1", "Category2"]}},
+                {{"task_id": "task_id_2", "categories": ["Category1"]}}
             ]
-        }"""
+        }}"""
 
     return prompt
 
@@ -680,10 +690,10 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"[TIMING] generate_schedule started")
     
     try:
-        # Step 1: Create task registry and identify uncategorized tasks
+        # Step 1: Create task registry and identify tasks needing categorization
         registry_start_time = time.time()
         input_tasks = user_data.get('tasks', [])
-        task_registry, uncategorized_tasks = create_task_registry(input_tasks)
+        task_registry, tasks_needing_categorization = create_task_registry(input_tasks)
         registry_duration = time.time() - registry_start_time
         print(f"[TIMING] Task registry creation: {registry_duration:.3f}s")
         
@@ -696,14 +706,21 @@ def generate_schedule(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 "ordering_pattern": user_data.get('layout_preference', {}).get('orderingPattern', 'timebox')
             }
         
-        # Step 2: Categorize uncategorized tasks (single LLM call)
+        # Step 2: Categorize tasks that need categorization (single LLM call)
         categorization_start_time = time.time()
-        categorization_success = categorize_uncategorized_tasks(uncategorized_tasks, task_registry)
+        categorization_success = categorize_tasks(tasks_needing_categorization, task_registry)
         categorization_duration = time.time() - categorization_start_time
         print(f"[TIMING] Task categorization (LLM call): {categorization_duration:.3f}s")
         
         if not categorization_success:
             print("Warning: Categorization failed, using default categories")
+        
+        # Step 2.5: Validate all tasks have valid categories
+        valid_categories = {"Work", "Exercise", "Relationships", "Fun", "Ambition"}
+        for task_id, task in task_registry.items():
+            if not task.categories or not all(cat in valid_categories for cat in task.categories):
+                print(f"[CATEGORIZATION] Warning: Task '{task.text}' has invalid categories {task.categories}, defaulting to Work")
+                task.categories = ["Work"]
         
         # Step 3: Generate sections locally based on layout preferences
         sections_start_time = time.time()

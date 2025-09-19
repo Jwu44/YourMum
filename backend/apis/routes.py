@@ -3,7 +3,7 @@ from backend.db_config import get_database, store_microstep_feedback, create_or_
 import traceback
 
 from bson import ObjectId
-from datetime import datetime, timezone 
+from datetime import datetime, timezone, timedelta
 from backend.models.task import Task
 from typing import List, Dict, Any, Optional, Union, Tuple
 import json
@@ -39,8 +39,10 @@ from backend.services.archive_service import (
 from backend.services.slack_service import SlackService
 slack_service = SlackService()
 from backend.apis.calendar_routes import ensure_calendar_watch_for_user
+import os
 
 api_bp = Blueprint("api", __name__)
+auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 # Add a global OPTIONS request handler for all routes
 @api_bp.route('/<path:path>', methods=['OPTIONS'])
@@ -295,10 +297,13 @@ def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
 def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Get user data from database using a verified Firebase token.
-    
+
+    CRITICAL FIX: Now tries both Firebase UID and Google Subject ID for backward compatibility
+    with existing users who were stored before Firebase UID migration.
+
     Args:
         token: The Firebase ID token
-        
+
     Returns:
         User document from database or None if not found
     """
@@ -307,24 +312,45 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         decoded_token = verify_firebase_token(token)
         if not decoded_token:
             return None
-            
+
         # Extract user ID (Firebase UID)
         user_id = decoded_token.get('uid')
         if not user_id:
             return None
-            
+
         # Get database instance
         db = get_database()
         users = db['users']
-        
-        # Find user by Google ID (which is the Firebase UID)
-        user = users.find_one({"googleId": user_id})
-        
-        # If user found in database, return it (applies to all users including dev users)
+
+        # STEP 1: Try to find user by Firebase UID (new format)
+        # Exclude _id field to prevent BSON serialization issues
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
+
+        # If user found with Firebase UID, return it
         if user:
+            print(f"✅ User found by Firebase UID: {user.get('email')}")
             return user
-            
-        # Development bypass - return mock user only if user not found in database
+
+        # STEP 2: FALLBACK - Try to find user by Google Subject ID (legacy format)
+        # Extract Google Subject ID from Firebase token identities
+        google_subject_id = None
+        firebase_data = decoded_token.get('firebase', {})
+        identities = firebase_data.get('identities', {})
+        google_identities = identities.get('google.com', [])
+
+        if google_identities:
+            google_subject_id = google_identities[0]  # Take first Google identity
+            print(f"🔄 Attempting fallback lookup with Google Subject ID: {google_subject_id}")
+
+            # Try to find user by Google Subject ID
+            user = users.find_one({"googleId": google_subject_id}, {"_id": 0})
+
+            if user:
+                print(f"✅ User found by Google Subject ID (legacy): {user.get('email')}")
+                print(f"⚠️  User needs migration from Google Subject ID to Firebase UID")
+                return user
+
+        # STEP 3: Development bypass - return mock user only if user not found in database
         if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
             return {
                 'googleId': 'dev-user-123',
@@ -336,9 +362,11 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 'calendarSynced': False,
                 # Add other required fields as needed
             }
-            
-        # User not found and not a dev user
+
+        # User not found with either Firebase UID or Google Subject ID
+        print(f"❌ User not found - Firebase UID: {user_id}, Google Subject ID: {google_subject_id}")
         return None
+
     except Exception as e:
         print(f"Error getting user from token: {e}")
         traceback.print_exc()
@@ -368,7 +396,7 @@ def get_auth_user_info():
             user = get_user_from_token(token)
             
             if user:
-                # Process user for JSON serialization
+                # Process user for JSON serialization (handles BSON types)
                 serialized_user = process_user_for_response(user)
                 return jsonify({
                     "user": serialized_user,
@@ -393,7 +421,8 @@ def get_auth_user_info():
                     "email": "string (required)",
                     "displayName": "string",
                     "photoURL": "string",
-                    "hasCalendarAccess": "boolean"
+                    "hasCalendarAccess": "boolean",
+                    "calendarAccessToken": "string (optional, when hasCalendarAccess is true)"
                 }
             }), 200
             
@@ -412,10 +441,11 @@ def create_or_update_user():
     
     Expected JSON body:
         - googleId: string (required)
-        - email: string (required) 
+        - email: string (required)
         - displayName: string (optional)
         - photoURL: string (optional)
         - hasCalendarAccess: boolean (optional)
+        - calendarAccessToken: string (optional, used when hasCalendarAccess is true)
     
     Returns:
         - 200: User successfully created/updated
@@ -446,9 +476,13 @@ def create_or_update_user():
         db = get_database()
         users = db['users']
 
+        # Check if user exists before creating/updating to determine isNewUser flag
+        existing_user = users.find_one({"googleId": user_data["googleId"]})
+        is_new_user = existing_user is None
+
         # Create or update user using the utility function
         user = db_create_or_update_user(users, processed_user_data)
-        
+
         if not user:
             return jsonify({
                 "error": "Failed to create or update user"
@@ -457,9 +491,13 @@ def create_or_update_user():
         # Convert ObjectId to string and dates to ISO format for JSON serialization
         serialized_user = process_user_for_response(user)
 
+        # Enhanced response structure for single OAuth flow
+        message = "User created successfully" if is_new_user else "User updated successfully"
+
         return jsonify({
             "user": serialized_user,
-            "message": "User successfully created/updated"
+            "message": message,
+            "isNewUser": is_new_user
         }), 200
 
     except Exception as e:
@@ -591,15 +629,18 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Helper function to prepare user data for database storage.
     Handles default values, calendar settings, and data validation.
-    
+
     Args:
         user_data: Raw user data from request
-        
+
     Returns:
         Processed user data ready for database storage
     """
+
     # Prepare calendar settings based on hasCalendarAccess
     has_calendar_access = user_data.get('hasCalendarAccess', False)
+    calendar_access_token = user_data.get('calendarAccessToken')
+
     calendar_settings = {
         "connected": has_calendar_access,
         "lastSyncTime": None,
@@ -612,6 +653,66 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
             "defaultReminders": True
         }
     }
+
+    # Enhanced: Handle proper calendar tokens from single OAuth flow
+    calendar_tokens = user_data.get('calendarTokens')
+    if has_calendar_access and calendar_tokens:
+        # Validate required token fields
+        required_token_fields = ['accessToken']
+        missing_fields = [field for field in required_token_fields if not calendar_tokens.get(field)]
+        if missing_fields:
+            print(f"⚠️ Missing required calendar token fields: {missing_fields}")
+            calendar_settings["connected"] = False
+            calendar_settings["syncStatus"] = "failed"
+            calendar_settings["error"] = f"Missing token fields: {', '.join(missing_fields)}"
+        else:
+            # Process expiration time with enhanced validation
+            expires_at = calendar_tokens.get('expiresAt')
+            if isinstance(expires_at, str):
+                try:
+                    expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                except ValueError as e:
+                    print(f"⚠️ Invalid expiresAt format: {expires_at}, error: {e}")
+                    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+            elif not expires_at:
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+            # Validate refresh token presence (critical for single OAuth flow)
+            refresh_token = calendar_tokens.get('refreshToken', '')
+            if not refresh_token:
+                print("⚠️ WARNING: No refresh token provided - calendar sync may fail when access token expires")
+
+            calendar_settings["credentials"] = {
+                "accessToken": calendar_tokens.get('accessToken'),
+                "refreshToken": refresh_token,
+                "expiresAt": expires_at,
+                "tokenType": calendar_tokens.get('tokenType', 'Bearer'),
+                "scope": calendar_tokens.get('scope', 'https://www.googleapis.com/auth/calendar.readonly')
+            }
+            calendar_settings["syncStatus"] = "completed"
+            calendar_settings["lastSyncTime"] = datetime.now(timezone.utc)
+            calendar_settings["connected"] = True
+
+            print(f"✅ Stored calendar credentials from single OAuth flow:")
+            print(f"   - Access token: {bool(calendar_tokens.get('accessToken'))}")
+            print(f"   - Refresh token: {bool(refresh_token)}")
+            print(f"   - Scope: {calendar_tokens.get('scope', 'N/A')}")
+            print(f"   - Expires at: {expires_at}")
+    elif has_calendar_access and calendar_access_token:
+        # Fallback for legacy calendar access token (without refresh token)
+        # This should be rare with single OAuth flow
+        calendar_settings["credentials"] = {
+            "accessToken": calendar_access_token,
+            "refreshToken": "",
+            "expiresAt": datetime.now(timezone.utc) + timedelta(hours=1),
+            "tokenType": "Bearer",
+            "scope": "https://www.googleapis.com/auth/calendar.readonly"
+        }
+        calendar_settings["syncStatus"] = "completed"
+        calendar_settings["lastSyncTime"] = datetime.now(timezone.utc)
+        calendar_settings["connected"] = True
+
+        print("⚠️ LEGACY: Stored calendar credentials without refresh token - consider upgrading to single OAuth flow")
 
     # Ensure displayName is never None/null
     display_name = user_data.get("displayName")
@@ -653,8 +754,9 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "timezone": timezone_value,  # Add timezone field with default
         "jobTitle": job_title,  # Add jobTitle field (optional)
         "age": age,  # Add age field (optional)
+        "hasCalendarAccess": has_calendar_access,  # Preserve this for create_or_update_user
         "calendarSynced": has_calendar_access,
-        "lastLogin": datetime.now(timezone.utc), 
+        "lastLogin": datetime.now(timezone.utc),
         "calendar": calendar_settings,
         "metadata": {
             "lastModified": datetime.now(timezone.utc)
@@ -688,7 +790,15 @@ def process_user_for_response(user: Dict[str, Any]) -> Dict[str, Any]:
     if 'calendar' in processed_user and 'lastSyncTime' in processed_user['calendar']:
         if isinstance(processed_user['calendar']['lastSyncTime'], datetime):
             processed_user['calendar']['lastSyncTime'] = processed_user['calendar']['lastSyncTime'].isoformat()
-    
+
+    # Process calendar credentials expiresAt if it exists (fixes 500 error in OAuth callback)
+    if ('calendar' in processed_user and
+        'credentials' in processed_user['calendar'] and
+        'expiresAt' in processed_user['calendar']['credentials']):
+        expires_at = processed_user['calendar']['credentials']['expiresAt']
+        if isinstance(expires_at, datetime):
+            processed_user['calendar']['credentials']['expiresAt'] = expires_at.isoformat()
+
     return processed_user
 
 @api_bp.route("/schedules/autogenerate", methods=["POST"])
@@ -727,8 +837,7 @@ def autogenerate_schedule_api():
             }), 400
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -795,8 +904,7 @@ def get_recent_with_tasks_api():
                 "error": "Missing required query param: before"
             }), 400
         try:
-            from datetime import datetime as dt
-            dt.strptime(before, '%Y-%m-%d')
+            datetime.strptime(before, '%Y-%m-%d')
             days = int(days_param)
         except Exception:
             return jsonify({
@@ -835,16 +943,15 @@ def get_user(user_id):
         # Get user collection
         users = db['users']
         
-        # Find user by Google ID
-        user = users.find_one({"googleId": user_id})
-        
+        # Find user by Google ID (exclude _id to prevent BSON serialization issues)
+        user = users.find_one({"googleId": user_id}, {"_id": 0})
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-            
-        # Convert ObjectId to string for JSON serialization
-        user['_id'] = str(user['_id'])
-        
-        return jsonify({"user": user}), 200
+
+        # Process user for safe JSON serialization
+        serialized_user = process_user_for_response(user)
+        return jsonify({"user": serialized_user}), 200
         
     except Exception as e:
         print(f"Error getting user: {e}")
@@ -875,13 +982,14 @@ def update_user(user_id):
         if result.modified_count == 0:
             return jsonify({"error": "User not found"}), 404
             
-        # Get updated user document
-        updated_user = users.find_one({"googleId": user_id})
-        updated_user['_id'] = str(updated_user['_id'])
-        
+        # Get updated user document (exclude _id to prevent BSON serialization issues)
+        updated_user = users.find_one({"googleId": user_id}, {"_id": 0})
+
+        # Process user for safe JSON serialization
+        serialized_user = process_user_for_response(updated_user)
         return jsonify({
             "message": "User updated successfully",
-            "user": updated_user
+            "user": serialized_user
         }), 200
         
     except Exception as e:
@@ -1205,8 +1313,7 @@ def submit_data():
         # Validate date format
         date = data['date']
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1328,8 +1435,7 @@ def get_schedule_by_date(date):
     try:
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1397,8 +1503,7 @@ def update_schedule_by_date(date):
     try:
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1520,8 +1625,7 @@ def create_schedule():
         
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1636,8 +1740,7 @@ def delete_task(task_id):
         
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(date, '%Y-%m-%d')
+            datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,
@@ -1889,6 +1992,323 @@ def handle_logout_options():
     """Handle CORS preflight requests for logout endpoint."""
     return jsonify({"status": "ok"})
 
+# New OAuth callback endpoint for single OAuth flow with Firebase UID fix
+@auth_bp.route("/oauth-callback", methods=["POST"])
+def oauth_callback():
+    """
+    Handle OAuth callback for single authentication + calendar flow.
+
+    Phase 3 Cleanup: Now only supports NEW format with Firebase UID as primary identifier.
+    OLD format (authorization_code/state) support has been removed.
+
+    Expected request body (NEW format only):
+    {
+        "userData": {
+            "googleId": str (Firebase UID),
+            "email": str,
+            "displayName": str,
+            "photoURL": str,
+            "hasCalendarAccess": bool,
+            "calendarTokens": {...}
+        },
+        "tokens": {
+            "access_token": str,
+            "refresh_token": str,
+            "id_token": str,
+            "expires_in": int,
+            "scope": str
+        }
+    }
+
+    Returns:
+        200: OAuth successful with user data stored using Firebase UID
+        400: Invalid request format or missing parameters
+        500: Storage or server errors
+    """
+    try:
+        # Validate request data
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        # Only NEW format supported (userData/tokens) - OLD format removed in Phase 3
+        if 'userData' in data and 'tokens' in data:
+            # NEW FORMAT: Frontend sends processed user data with Firebase UID
+            user_data = data.get('userData')
+            tokens = data.get('tokens')
+
+            if not user_data:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: userData"
+                }), 400
+
+            if not tokens:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required parameter: tokens"
+                }), 400
+
+            # Validate that Firebase UID is provided as googleId
+            firebase_uid = user_data.get('googleId')
+            if not firebase_uid:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing Firebase UID in userData.googleId"
+                }), 400
+
+            print(f"✅ Processing OAuth callback with Firebase UID: {firebase_uid}")
+            print(f"   - Email: {user_data.get('email')}")
+            print(f"   - Display Name: {user_data.get('displayName')}")
+
+            # Extract tokens (already processed by frontend)
+            access_token = tokens.get('access_token')
+            refresh_token = tokens.get('refresh_token')
+            id_token = tokens.get('id_token')
+            expires_in = tokens.get('expires_in', 3600)
+            scope = tokens.get('scope', '')
+
+        else:
+            # Only NEW format supported - OLD format removed in Phase 3
+            return jsonify({
+                "success": False,
+                "error": "Invalid request format. Expected userData and tokens parameters."
+            }), 400
+
+        print(f"✅ Processing OAuth callback with ID: {firebase_uid}")
+        print(f"   - Email: {user_data.get('email')}")
+        print(f"   - Display Name: {user_data.get('displayName')}")
+        print(f"   - Has Calendar Access: {user_data.get('hasCalendarAccess')}")
+        print(f"   - Access token: {bool(access_token)}")
+        print(f"   - Refresh token: {bool(refresh_token)}")
+        print(f"   - Scope: {scope}")
+
+        # Store user in database
+        processed_user_data = _prepare_user_data_for_storage(user_data)
+        db = get_database()
+        users = db['users']
+
+        # Check if user exists to determine isNewUser flag
+        existing_user = users.find_one({"googleId": user_data["googleId"]})
+        is_new_user = existing_user is None
+
+        # Create or update user
+        user = db_create_or_update_user(users, processed_user_data)
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Failed to store user data"
+            }), 500
+
+        # Serialize user data for response
+        serialized_user = process_user_for_response(user)
+
+        # Return success response with user data and tokens
+        return jsonify({
+            "success": True,
+            "user": serialized_user,
+            "tokens": {
+                "access_token": access_token,
+                "refresh_token": refresh_token or '',
+                "id_token": id_token,
+                "expires_in": expires_in,
+                "scope": scope,
+                "token_type": "Bearer"
+            },
+            "isNewUser": is_new_user,
+            "message": "OAuth callback processed successfully"
+        }), 200
+
+    except Exception as e:
+        print(f"Error in oauth_callback: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@auth_bp.route("/oauth-callback", methods=["OPTIONS"])
+def handle_oauth_callback_options():
+    """Handle CORS preflight requests for OAuth callback endpoint."""
+    return jsonify({"status": "ok"})
+
+@auth_bp.route("/migrate-user-id", methods=["POST"])
+def migrate_user_id():
+    """
+    Migrate user from Google Subject ID to Firebase UID.
+
+    This endpoint allows users to self-migrate their identifier from Google Subject ID
+    (legacy format) to Firebase UID (new format) for consistency with Firebase authentication.
+
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+
+    Body:
+        {
+            "firebaseUid": str (Firebase UID from frontend),
+            "email": str (user email for verification)
+        }
+
+    Returns:
+        200: Migration successful
+        400: Invalid request data or user already migrated
+        401: Authentication required
+        404: User not found with Google Subject ID
+        500: Internal server error
+    """
+    try:
+        # Extract and validate authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        token = auth_header[7:]
+
+        # Verify Firebase token and extract user info
+        decoded_token = verify_firebase_token(token)
+        if not decoded_token:
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        # Extract Firebase UID and Google Subject ID from token
+        firebase_uid = decoded_token.get('uid')
+        if not firebase_uid:
+            return jsonify({
+                "success": False,
+                "error": "Invalid Firebase token - missing UID"
+            }), 401
+
+        # Extract Google Subject ID from Firebase token identities
+        firebase_data = decoded_token.get('firebase', {})
+        identities = firebase_data.get('identities', {})
+        google_identities = identities.get('google.com', [])
+
+        if not google_identities:
+            return jsonify({
+                "success": False,
+                "error": "No Google identity found in Firebase token"
+            }), 400
+
+        google_subject_id = google_identities[0]
+        token_email = decoded_token.get('email')
+
+        # Validate request body
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        frontend_firebase_uid = data.get('firebaseUid')
+        frontend_email = data.get('email')
+
+        # Verify that frontend data matches token data
+        if frontend_firebase_uid != firebase_uid:
+            return jsonify({
+                "success": False,
+                "error": "Firebase UID mismatch between token and request body"
+            }), 400
+
+        if frontend_email != token_email:
+            return jsonify({
+                "success": False,
+                "error": "Email mismatch between token and request body"
+            }), 400
+
+        print(f"🔄 Starting user ID migration:")
+        print(f"   - Email: {token_email}")
+        print(f"   - Google Subject ID: {google_subject_id}")
+        print(f"   - Firebase UID: {firebase_uid}")
+
+        # Get database instance
+        db = get_database()
+        users = db['users']
+
+        # Check if user already exists with Firebase UID (already migrated)
+        existing_firebase_user = users.find_one({"googleId": firebase_uid})
+        if existing_firebase_user:
+            print(f"✅ User already migrated to Firebase UID")
+            return jsonify({
+                "success": True,
+                "message": "User already migrated to Firebase UID",
+                "alreadyMigrated": True
+            }), 200
+
+        # Find user by Google Subject ID (legacy format)
+        legacy_user = users.find_one({"googleId": google_subject_id})
+        if not legacy_user:
+            print(f"❌ User not found with Google Subject ID: {google_subject_id}")
+            return jsonify({
+                "success": False,
+                "error": "User not found with Google Subject ID - may already be migrated or does not exist"
+            }), 404
+
+        # Verify email matches for security
+        if legacy_user.get('email') != token_email:
+            print(f"❌ Email mismatch - Token: {token_email}, Database: {legacy_user.get('email')}")
+            return jsonify({
+                "success": False,
+                "error": "Email verification failed"
+            }), 400
+
+        # Perform the migration: Update googleId from Google Subject ID to Firebase UID
+        migration_result = users.update_one(
+            {"googleId": google_subject_id},
+            {
+                "$set": {
+                    "googleId": firebase_uid,
+                    "metadata.lastModified": datetime.now(timezone.utc),
+                    "metadata.migratedToFirebaseUid": datetime.now(timezone.utc),
+                    "metadata.originalGoogleSubjectId": google_subject_id
+                }
+            }
+        )
+
+        if migration_result.modified_count == 0:
+            print(f"❌ Migration failed - no documents modified")
+            return jsonify({
+                "success": False,
+                "error": "Migration failed - user document could not be updated"
+            }), 500
+
+        print(f"✅ User ID migration successful:")
+        print(f"   - Updated googleId: {google_subject_id} → {firebase_uid}")
+        print(f"   - Email: {token_email}")
+        print(f"   - Documents modified: {migration_result.modified_count}")
+
+        return jsonify({
+            "success": True,
+            "message": "User ID migration completed successfully",
+            "migration": {
+                "from": google_subject_id,
+                "to": firebase_uid,
+                "email": token_email,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"Error in migrate_user_id: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
+@auth_bp.route("/migrate-user-id", methods=["OPTIONS"])
+def handle_migrate_user_id_options():
+    """Handle CORS preflight requests for migration endpoint."""
+    return jsonify({"status": "ok"})
+
 # Archive functionality endpoints
 @api_bp.route("/archive/task", methods=["POST"])
 def api_archive_task():
@@ -1959,8 +2379,7 @@ def api_archive_task():
 
         # Validate date format
         try:
-            from datetime import datetime as dt
-            dt.strptime(original_date, '%Y-%m-%d')
+            datetime.strptime(original_date, '%Y-%m-%d')
         except ValueError:
             return jsonify({
                 "success": False,

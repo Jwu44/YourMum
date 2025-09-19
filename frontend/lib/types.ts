@@ -32,6 +32,8 @@ export interface Task {
   slack_message_url?: string
   // Preferred container for Slack message links; UI will prefer deep_link, then message_url
   slack_metadata?: SlackMetadata
+  // Flag to indicate microstep should be inserted at top of subtask list
+  insertAtTop?: boolean
 }
 
 export interface FormData {
@@ -223,6 +225,8 @@ export function isValidSubcategoryForLayout (
 export interface FormContextType {
   state: FormData
   dispatch: React.Dispatch<FormAction>
+  updateLayoutPreference: (layoutUpdates: Partial<LayoutPreference>) => void
+  clearFormState: () => void
 }
 
 // Add new types for recurrence
@@ -348,15 +352,12 @@ export interface AuthState {
   user: User | null
   loading: boolean
   error: string | null
-  calendarConnectionStage: 'connecting' | 'verifying' | 'complete' | null
 }
 
 export interface AuthContextType extends AuthState {
   currentUser: User | null
-  signIn: (redirectTo?: string) => Promise<void> // Updated to accept optional parameter
+  signIn: (redirectTo?: string) => Promise<void>
   signOut: () => Promise<void>
-  reconnectCalendar: () => Promise<void> // New method for calendar reconnection
-  refreshCalendarCredentials: () => Promise<void> // New method for refreshing calendar credentials
 }
 
 // Python backend response types
@@ -481,12 +482,6 @@ export interface FirebaseUser {
 
 export interface WithHandleGetStarted {
   handleGetStarted: () => Promise<void>
-}
-
-export interface CalendarCredentials {
-  accessToken: string
-  expiresAt: number
-  scopes: string[]
 }
 
 // Profile form data interface for settings page

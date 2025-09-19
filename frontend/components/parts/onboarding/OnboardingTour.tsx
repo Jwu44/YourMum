@@ -39,8 +39,8 @@ const TOUR_STEPS = [
     id: 'fill-preferences',
     title: 'Fill out your preferences',
     body: 'Provide details about your lifestyle and how you like to operate so YourMum can generate a personalised schedule for you.',
-    targetAttribute: 'data-onboarding-target="inputs-nav"',
-    targetSelector: '[data-onboarding-target="inputs-nav"]',
+    targetAttribute: 'data-onboarding-target="preferences-nav"',
+    targetSelector: '[data-onboarding-target="preferences-nav"]',
     position: 'right' as const
   },
   {

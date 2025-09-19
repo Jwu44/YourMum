@@ -16,7 +16,6 @@ import EditableSchedule from '@/components/parts/EditableSchedule'
 import { DragStateProvider } from '@/contexts/DragStateContext'
 import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 import { LoadingPage } from '@/components/parts/LoadingPage'
-import { isPostOAuthActive } from '@/components/parts/PostOAuthHandler'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
@@ -43,6 +42,7 @@ import { loadSchedule, updateSchedule, deleteTask, shouldTaskRecurOnDate, autoge
 import { Skeleton } from '@/components/ui/skeleton'
 import { archiveTask } from '@/lib/api/archive'
 import { auth } from '@/auth/firebase'
+import { calendarHealthService } from '@/lib/services/calendar-health'
 
 const Dashboard: React.FC = () => {
   const router = useRouter()
@@ -52,23 +52,18 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   // Be resilient in test environments where AuthProvider may be mocked
-  const { calendarConnectionStage, currentUser, refreshCalendarCredentials } = (() => {
+  const { currentUser } = (() => {
     try {
       return useAuth()
     } catch (e) {
-      return { 
-        calendarConnectionStage: null as any, 
-        currentUser: auth.currentUser,
-        refreshCalendarCredentials: async () => {} // No-op fallback for tests
+      return {
+        currentUser: auth.currentUser
       }
     }
   })()
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
-  
-  // Check if PostOAuthHandler is active to prevent race conditions
-  const [isPostOAuthHandlerActive, setIsPostOAuthHandlerActive] = useState(() => isPostOAuthActive())
 
   // Edit task drawer state - following dev-guide.md simplicity principle
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
@@ -100,82 +95,8 @@ const Dashboard: React.FC = () => {
     }
   }, [currentDayIndex])
 
-  // Check for calendar sync status and show appropriate messages
-  useEffect(() => {
-    // One-time: validate calendar health and only re-authenticate if actually broken
-    const validateCalendarHealth = async () => {
-      try {
-        if (hasEnsuredRefresh.current) return
-        hasEnsuredRefresh.current = true
-
-        // Require an authenticated user to proceed
-        const me = await userApi.getCurrentUser().catch(() => null as any)
-        if (!me) return
-
-        const calendar = (me).calendar || {}
-        const connected = !!calendar.connected
-        const credentials = calendar.credentials || {}
-        const hasRefresh = !!credentials.refreshToken
-
-        // Only proceed if calendar is marked as connected
-        if (!connected) return
-
-        // If we have refresh token, assume calendar is healthy
-        if (hasRefresh) return
-
-        // Test if calendar API actually works before forcing re-auth
-        try {
-          const token = await (currentUser || auth.currentUser)?.getIdToken(true)
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
-          const testDate = new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-
-          // Test calendar API call - if this succeeds, calendar is working fine
-          const testResp = await fetch(`${apiBase}/api/calendar/events?date=${testDate}`, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` }
-          })
-
-          // If calendar API works, don't force re-auth even without refresh token
-          if (testResp.ok) {
-            console.log('Calendar API working fine, no re-auth needed')
-            return
-          }
-
-          // Only if calendar API fails, attempt Firebase credential refresh
-          if (testResp.status === 401 || testResp.status === 400) {
-            try {
-              console.log('Calendar API failed, refreshing Firebase credentials...')
-              setIsEnsuringRefresh(true)
-              
-              // Use Firebase to refresh credentials instead of backend OAuth redirect
-              await refreshCalendarCredentials()
-              
-              console.log('Calendar credentials refreshed successfully')
-              setIsEnsuringRefresh(false)
-            } catch (refreshError) {
-              console.error('Failed to refresh calendar credentials:', refreshError)
-              setIsEnsuringRefresh(false)
-              
-              // Show user-friendly message instead of crashing
-              toast({
-                title: 'Calendar Connection Issue',
-                description: 'Please reconnect your Google Calendar in the Integrations page.',
-                variant: 'default'
-              })
-            }
-          }
-          // If start failed, do NOT block dashboard; proceed without loader
-        } catch (e) {
-          // Calendar test failed, but don't block dashboard - user can manually reconnect via Integrations
-          console.log('Calendar health check failed, user can reconnect via Integrations:', e)
-        }
-      } catch (_) {
-        // ignore
-      }
-    }
-
-    validateCalendarHealth()
-  }, [currentUser])
+  // Calendar health is now managed by the OAuth callback flow
+  // No complex validation needed in dashboard
 
   useEffect(() => {
     // Check for general calendar connection errors
@@ -184,7 +105,7 @@ const Dashboard: React.FC = () => {
       toast({
         title: 'Calendar Connection Issue',
         description: 'To sync calendar events, please connect your Google Calendar in Integrations.',
-        variant: 'default'
+        variant: 'destructive'
       })
       localStorage.removeItem('calendarConnectionError')
     }
@@ -210,7 +131,7 @@ const Dashboard: React.FC = () => {
   const addTask = useCallback(async (newTask: Task) => {
     try {
       const currentDate = getDateString(currentDayIndex)
-      const currentSchedule = scheduleDays[currentDayIndex] || []
+      const currentSchedule = scheduleDays[Math.abs(currentDayIndex)] || []
 
       const taskWithId = {
         ...newTask,
@@ -332,9 +253,19 @@ const Dashboard: React.FC = () => {
             // Add new task (for microsteps)
             const parentIndex = currentTasks.findIndex(t => t.id === updatedTask.parent_id)
             if (parentIndex !== -1) {
-              const insertIndex = parentIndex + 1 + currentTasks
-                .slice(0, parentIndex + 1)
-                .filter(t => t.parent_id === updatedTask.parent_id).length
+              let insertIndex: number
+              
+              if (updatedTask.insertAtTop) {
+                // Insert at top: right after parent
+                insertIndex = parentIndex + 1
+                console.log('🔝 Inserting at top, index:', insertIndex)
+              } else {
+                // Insert at bottom: after existing subtasks
+                insertIndex = parentIndex + 1 + currentTasks
+                  .slice(0, parentIndex + 1)
+                  .filter(t => t.parent_id === updatedTask.parent_id).length
+                console.log('📍 Inserting at bottom, index:', insertIndex)
+              }
 
               const newTasks = [...currentTasks]
               newTasks.splice(insertIndex, 0, updatedTask)
@@ -1269,16 +1200,7 @@ const Dashboard: React.FC = () => {
     })
   }, [])
 
-  // Separate useEffect to detect calendar connection completion
-  const prevCalendarStageRef = useRef(calendarConnectionStage)
-  useEffect(() => {
-    // Reset hasInitiallyLoaded when calendarConnectionStage changes from truthy to null
-    // This allows schedule to reload with calendar events after connection completes
-    if (prevCalendarStageRef.current && !calendarConnectionStage) {
-      hasInitiallyLoaded.current = false
-    }
-    prevCalendarStageRef.current = calendarConnectionStage
-  }, [calendarConnectionStage])
+  // Calendar connection is now handled by OAuth callback flow
 
   useEffect(() => {
     // Prevent duplicate loads in React Strict Mode
@@ -1331,36 +1253,16 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    // Simplified condition: only check if we're not in an OAuth flow and haven't loaded yet
-    const isInOAuthFlow = calendarConnectionStage !== null || isEnsuringRefresh || isPostOAuthHandlerActive
-
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && !isInOAuthFlow) {
+    // Simplified condition: load if we haven't loaded yet and no form data
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
       console.log('🚀 Dashboard: Conditions met, loading initial schedule...')
       loadInitialSchedule()
-    } else if (hasInitiallyLoaded.current || isInOAuthFlow) {
-      console.log('⏭️ Dashboard: Skipping load - already loaded or in OAuth flow')
+    } else if (hasInitiallyLoaded.current) {
+      console.log('⏭️ Dashboard: Skipping load - already loaded')
       setIsLoadingSchedule(false)
     }
-  }, [state.formUpdate?.response, toast, calendarConnectionStage, isEnsuringRefresh, isPostOAuthHandlerActive])
+  }, [state.formUpdate?.response, toast])
 
-  // Monitor PostOAuthHandler status changes
-  useEffect(() => {
-    const checkPostOAuthStatus = () => {
-      const currentStatus = isPostOAuthActive()
-      if (currentStatus !== isPostOAuthHandlerActive) {
-        console.log('🔄 Dashboard: PostOAuthHandler status changed:', currentStatus)
-        setIsPostOAuthHandlerActive(currentStatus)
-      }
-    }
-
-    // Check immediately
-    checkPostOAuthStatus()
-    
-    // Set up interval to check periodically
-    const interval = setInterval(checkPostOAuthStatus, 500)
-    
-    return () => clearInterval(interval)
-  }, [isPostOAuthHandlerActive])
 
   // Midnight auto-refresh (local timezone)
   useEffect(() => {
@@ -1434,18 +1336,6 @@ const Dashboard: React.FC = () => {
 
 
 
-  // Show LoadingPage if PostOAuthHandler is active
-  if (isPostOAuthHandlerActive) {
-    console.log('📱 Dashboard: PostOAuthHandler is active, showing LoadingPage')
-    return <LoadingPage reason="calendar" message="Setting up your account..." />
-  }
-
-  // Mark dashboard as fully loaded for future PostOAuth detection
-  useEffect(() => {
-    if (!isLoadingSchedule && scheduleDays.length > 0) {
-      sessionStorage.setItem('dashboardFullyLoaded', 'true')
-    }
-  }, [isLoadingSchedule, scheduleDays.length])
 
   return (
     <SidebarLayout>
@@ -1460,24 +1350,40 @@ const Dashboard: React.FC = () => {
           isCurrentDay={false}
           onAddTask={() => { setIsTaskDrawerOpen(true) }}
           showSidebarTrigger={true}
+          isLoading={isLoadingSchedule}
         />
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
 
-            {isLoadingSchedule && calendarConnectionStage !== 'complete' ? (
-              <div className="space-y-3 mt-5" data-testid="dashboard-skeleton">
-                {[...Array(5)].map((_, i) => (
+            {isLoadingSchedule ? (
+              <div className="flex flex-col gap-[10px] mt-5" data-testid="dashboard-skeleton">
+                {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-3 rounded-lg border border-border p-3"
+                    className="h-[66px] w-full px-4 py-3 rounded-xl flex items-center gap-3"
+                    style={{ backgroundColor: 'hsl(var(--card-muted))' }}
                   >
                     {/* Checkbox placeholder */}
-                    <Skeleton className="h-5 w-5 rounded-md" />
+                    <div
+                      className="animate-pulse rounded-md flex-shrink-0"
+                      style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        borderRadius: '6px',
+                        backgroundColor: 'hsl(var(--skeleton-1))' 
+                      }}
+                    />
 
-                    {/* Task text placeholder */}
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-9/10" />
-                    </div>
+                    {/* Title bar placeholder */}
+                    <div
+                      className="animate-pulse rounded-lg"
+                      style={{ 
+                        width: `${50 + Math.random() * 10}%`,
+                        height: '12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'hsl(var(--skeleton-2))' 
+                      }}
+                    />
                   </div>
                 ))}
               </div>

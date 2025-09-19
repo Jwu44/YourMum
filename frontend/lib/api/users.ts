@@ -1,27 +1,5 @@
-import { auth } from '@/auth/firebase'
 import { type UserDocument } from '../types'
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
-
-// Add development bypass constants
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
-
-/**
- * Get the current user's Firebase ID token for API authentication
- */
-async function getAuthToken (): Promise<string> {
-  // In development mode with bypass enabled, return a mock token
-  if (IS_DEVELOPMENT && BYPASS_AUTH) {
-    return 'mock-token-for-development'
-  }
-
-  const currentUser = auth.currentUser
-  if (!currentUser) {
-    throw new Error('User not authenticated')
-  }
-  // Force refresh token to ensure it's valid and not expired
-  return await currentUser.getIdToken(true)
-}
+import { apiClient } from './client'
 
 // Create a cache for categorization results
 const categoryCache = new Map<string, Promise<{ categories: string[] }>>()
@@ -37,18 +15,14 @@ export const categorizeTask = async (taskText: string) => {
   // Create new promise for categorization
   const categorizationPromise = (async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/categorize_task`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task: taskText }),
-        // Add credentials to ensure cookies are sent with the request if needed
-        credentials: 'include'
-      })
+      // Use API client with skipAuth since this endpoint doesn't require authentication
+      const response = await apiClient.post('/api/categorize_task', 
+        { task: taskText }, 
+        { skipAuth: true }
+      )
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Network response was not ok')
       }
 
@@ -72,7 +46,7 @@ export const clearCategorizationCache = () => {
 }
 
 /**
- * User API helper functions
+ * User API helper functions using centralized API client
  */
 export const userApi = {
   /**
@@ -80,25 +54,18 @@ export const userApi = {
    */
   async getCurrentUser (): Promise<UserDocument> {
     try {
-      const token = await getAuthToken()
-      const response = await fetch(`${API_BASE_URL}/api/auth/user`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
+      const response = await apiClient.get('/api/auth/user')
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to get user data')
+        const error = await response.json().catch(() => ({ error: 'Failed to fetch user profile' }))
+        throw new Error(error.error || 'Failed to fetch user profile')
       }
 
       const result = await response.json()
       return result.user
     } catch (error) {
       console.error('Error fetching user data:', error)
-      throw error
+      throw new Error('Failed to fetch user profile')
     }
   },
 
@@ -125,15 +92,7 @@ export const userApi = {
    */
   async updateTimezone (timezone: string): Promise<{ success: boolean, timezone?: string, error?: string }> {
     try {
-      const token = await getAuthToken()
-      const response = await fetch(`${API_BASE_URL}/api/user/timezone`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ timezone })
-      })
+      const response = await apiClient.put('/api/user/timezone', { timezone })
 
       const result = await response.json().catch(() => ({} as any))
       if (!response.ok) {

@@ -5,6 +5,7 @@ import { SortableContext } from '@dnd-kit/sortable'
 import EditableScheduleRow from './EditableScheduleRow'
 import AISuggestionsList from './AISuggestionsList'
 import { useDragDropProvider } from '../../hooks/use-drag-drop-provider'
+import { DecompositionProvider } from '@/contexts/DecompositionContext'
 import {
   type Task,
   type AISuggestion
@@ -295,62 +296,64 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
   }, [tasks])
 
   return (
-    <DndContext
-      sensors={dragDropProvider.sensors}
-      collisionDetection={dragDropProvider.collisionDetection}
-      onDragStart={dragDropProvider.onDragStart}
-      onDragOver={dragDropProvider.onDragOver}
-      onDragMove={dragDropProvider.onDragMove}
-      onDragEnd={dragDropProvider.onDragEnd}
-    >
-      <SortableContext
-        items={dragDropProvider.items}
-        strategy={dragDropProvider.strategy}
+    <DecompositionProvider>
+      <DndContext
+        sensors={dragDropProvider.sensors}
+        collisionDetection={dragDropProvider.collisionDetection}
+        onDragStart={dragDropProvider.onDragStart}
+        onDragOver={dragDropProvider.onDragOver}
+        onDragMove={dragDropProvider.onDragMove}
+        onDragEnd={dragDropProvider.onDragEnd}
       >
-        <Pane>
-          {/* Direct rendering of pre-structured tasks */}
-          {processedTasks.map((task, index) => (
-            <React.Fragment key={`${task.id}-${task.type || 'task'}`}>
-              <EditableScheduleRow
-                task={task}
-                index={index}
-                onUpdateTask={onUpdateTask}
-                moveTask={moveTask}
-                isSection={task.is_section || task.type === 'section'}
-                allTasks={processedTasks}
-                onEditTask={onEditTask}
-                onDeleteTask={onDeleteTask}
-                onArchiveTask={onArchiveTask}
-              />
+        <SortableContext
+          items={dragDropProvider.items}
+          strategy={dragDropProvider.strategy}
+        >
+          <Pane>
+            {/* Direct rendering of pre-structured tasks */}
+            {processedTasks.map((task, index) => (
+              <React.Fragment key={`${task.id}-${task.type || 'task'}`}>
+                <EditableScheduleRow
+                  task={task}
+                  index={index}
+                  onUpdateTask={onUpdateTask}
+                  moveTask={moveTask}
+                  isSection={task.is_section || task.type === 'section'}
+                  allTasks={processedTasks}
+                  onEditTask={onEditTask}
+                  onDeleteTask={onDeleteTask}
+                  onArchiveTask={onArchiveTask}
+                />
 
-              {/* Render suggestions after each task if they exist */}
-              {suggestionsMap.has(task.id) && (
-                <div className="suggestion-container">
-                  <AISuggestionsList
-                    suggestions={suggestionsMap.get(task.id) || []}
-                    onAccept={onAcceptSuggestion}
-                    onReject={onRejectSuggestion}
-                    className="suggestion-list"
-                  />
-                </div>
-              )}
-            </React.Fragment>
-          ))}
+                {/* Render suggestions after each task if they exist */}
+                {suggestionsMap.has(task.id) && (
+                  <div className="suggestion-container">
+                    <AISuggestionsList
+                      suggestions={suggestionsMap.get(task.id) || []}
+                      onAccept={onAcceptSuggestion}
+                      onReject={onRejectSuggestion}
+                      className="suggestion-list"
+                    />
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
 
-          {/* Render suggestions for schedule start if they exist */}
-          {suggestionsMap.has('schedule-start') && (
-            <div className="schedule-start-container">
-              <AISuggestionsList
-                suggestions={suggestionsMap.get('schedule-start') || []}
-                onAccept={onAcceptSuggestion}
-                onReject={onRejectSuggestion}
-                className="suggestion-list"
-              />
-            </div>
-          )}
-        </Pane>
-      </SortableContext>
-    </DndContext>
+            {/* Render suggestions for schedule start if they exist */}
+            {suggestionsMap.has('schedule-start') && (
+              <div className="schedule-start-container">
+                <AISuggestionsList
+                  suggestions={suggestionsMap.get('schedule-start') || []}
+                  onAccept={onAcceptSuggestion}
+                  onReject={onRejectSuggestion}
+                  className="suggestion-list"
+                />
+              </div>
+            )}
+          </Pane>
+        </SortableContext>
+      </DndContext>
+    </DecompositionProvider>
   )
 }
 

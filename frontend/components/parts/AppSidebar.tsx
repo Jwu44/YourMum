@@ -52,11 +52,11 @@ interface NavigationItem {
  */
 const getNavigationItems = (pathname: string): NavigationItem[] => [
   {
-    id: 'inputs',
-    title: 'Inputs',
+    id: 'preferences',
+    title: 'Preferences',
     icon: ClipboardPen,
-    href: '/dashboard/inputs',
-    isActive: pathname.startsWith('/dashboard/inputs')
+    href: '/dashboard/preferences',
+    isActive: pathname.startsWith('/dashboard/preferences')
   },
   {
     id: 'integrations',
@@ -97,11 +97,11 @@ const getThinNavigationItems = (pathname: string, toggleSidebar: () => void): Na
     isActive: pathname === '/dashboard'
   },
   {
-    id: 'inputs',
-    title: 'Inputs',
+    id: 'preferences',
+    title: 'Preferences',
     icon: ClipboardPen,
-    href: '/dashboard/inputs',
-    isActive: pathname.startsWith('/dashboard/inputs')
+    href: '/dashboard/preferences',
+    isActive: pathname.startsWith('/dashboard/preferences')
   },
   {
     id: 'integrations',
@@ -128,7 +128,7 @@ const getThinNavigationItems = (pathname: string, toggleSidebar: () => void): Na
  * - Full height layout spanning entire viewport
  * - Responsive design for desktop and mobile
  * - Hover effects and smooth transitions
- * - Dynamic navigation for Inputs page with current date context
+ * - Dynamic navigation for Preferences page with current date context
  *
  * @returns {JSX.Element} The rendered sidebar component
  */
@@ -240,26 +240,26 @@ export function AppSidebar (): JSX.Element {
   }, [])
 
   /**
-   * Handle navigation to inputs page with current dashboard date context
+   * Handle navigation to preferences page with current dashboard date context
    * Uses the current dashboard date instead of just today's date
    */
-  const handleInputsNavigation = React.useCallback(() => {
+  const handlePreferencesNavigation = React.useCallback(() => {
     const currentDate = getCurrentDashboardDate()
-    console.log('Navigating to inputs with date:', currentDate)
-    router.push(`/dashboard/inputs?date=${currentDate}`)
+    console.log('Navigating to preferences with date:', currentDate)
+    router.push(`/dashboard/preferences?date=${currentDate}`)
   }, [router, getCurrentDashboardDate])
 
   /**
    * Handle navigation for menu items
-   * Special handling for inputs page to include date context
+   * Special handling for preferences page to include date context
    */
   const handleNavigation = React.useCallback((item: NavigationItem) => {
-    if (item.id === 'inputs') {
-      handleInputsNavigation()
+    if (item.id === 'preferences') {
+      handlePreferencesNavigation()
     } else if (item.href !== '#') {
       router.push(item.href)
     }
-  }, [router, handleInputsNavigation])
+  }, [router, handlePreferencesNavigation])
 
   /**
    * Handle navigation to settings page
@@ -299,12 +299,12 @@ export function AppSidebar (): JSX.Element {
     }
 
     // Handle navigation items
-    if (item.id === 'inputs') {
-      handleInputsNavigation()
+    if (item.id === 'preferences') {
+      handlePreferencesNavigation()
     } else if (item.href !== '#') {
       router.push(item.href)
     }
-  }, [router, handleInputsNavigation])
+  }, [router, handlePreferencesNavigation])
 
   // Check if we're in mobile or desktop collapsed state to show thin sidebar
   const shouldShowThinSidebar = !isMobile && sidebarState === 'collapsed'
@@ -468,7 +468,7 @@ export function AppSidebar (): JSX.Element {
                       : ''
                   }`}
                   data-testid={`nav-item-${item.id}`}
-                  data-onboarding-target={item.id === 'inputs' ? 'inputs-nav' : item.id === 'integrations' ? 'integrations-nav' : undefined}
+                  data-onboarding-target={item.id === 'preferences' ? 'preferences-nav' : item.id === 'integrations' ? 'integrations-nav' : undefined}
                   onClick={() => { handleNavigation(item) }}
                 >
                   <div className="flex items-center gap-3">

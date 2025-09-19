@@ -11,6 +11,7 @@ import { type ProfileFormData, type UserDocument } from '@/lib/types'
 import { useRouter } from 'next/navigation'
 import { fetchUserProfile, updateUserProfile, deleteUserAccount } from '@/lib/api/settings'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
 
 /**
@@ -290,8 +291,11 @@ export default function SettingsPage () {
 
   return (
     <SidebarLayout>
+      {/* Mobile Top Navigation */}
+      <MobileTopNav showUpgradeButton={true} />
+
       <div className="flex-1 overflow-y-auto mobile-scroll">
-        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe pt-16 sm:pt-0">
           {/* Main Settings Heading */}
           <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>

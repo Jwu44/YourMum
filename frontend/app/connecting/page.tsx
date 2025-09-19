@@ -52,9 +52,9 @@ export default function ConnectingPage () {
           }
         }
 
-        // For successful connections, immediately redirect to loading page
-        console.log('Redirecting to loading page for calendar connection')
-        router.push('/loading?reason=calendar')
+        // For successful connections, immediately redirect to dashboard
+        console.log('Redirecting to dashboard for calendar connection')
+        router.push('/dashboard')
       } catch (error) {
         console.error('Error in connecting page:', error)
         // Fallback to dashboard on error

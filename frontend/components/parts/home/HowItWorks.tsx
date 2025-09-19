@@ -1,56 +1,132 @@
-import { ArrowRight, Plus, Brain, CheckCircle } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle } from "lucide-react";
 
 const HowItWorks = () => {
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null)
+
   const steps = [
     {
-      icon: Plus,
-      title: 'Add Your Tasks',
-      description: 'Simply input your tasks, deadlines, and preferences. YourMum understands natural language.'
+      id: 1,
+      title: 'Add tasks',
+      description: 'Drop in your to-dos or let YourMum sync them for your Google Calendar.',
+      hasVideo: true,
+      videoSrc: '/demos/Demo 1.mov'
     },
     {
-      icon: Brain,
-      title: 'AI Does the Planning',
-      description: 'Our AI analyzes your workload, priorities, and schedule to create the optimal daily plan.'
+      id: 2,
+      title: 'Personalise your day',
+      description: 'Tell YourMum when you work best and what matters most.',
+      hasVideo: true,
+      videoSrc: '/demos/Demo 2.mov'
     },
     {
-      icon: CheckCircle,
-      title: 'Execute & Adapt',
-      description: 'Follow your personalized schedule and watch as AI learns and adapts to your working style.'
+      id: 3,
+      title: 'Connect apps',
+      description: 'Sync Google Calendar, Slack, and more — everything stays in one place.',
+      hasVideo: true,
+      videoSrc: '/demos/Demo 3.mov'
     }
   ]
 
   return (
-    <section className="py-20 bg-gradient-section">
+    <section className="py-20 bg-gradient-section" id="how-it-works">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
-            How YourMum works
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get started in minutes with our simple three-step process
-          </p>
+        <div className="text-center mb-5 py-5">
+          <h1 className="text-3xl lg:text-5xl font-bold text-foreground mb-5">
+            Setup in 3 steps
+          </h1>
+          <div className="flex justify-center items-center gap-8 text-lg sm:text-xl text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Free
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              No credit card required
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Sign in with Google
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row items-center justify-center space-y-8 lg:space-y-0 lg:space-x-8">
+        <div className="flex flex-col lg:flex-row items-start justify-center gap-8 lg:gap-12">
           {steps.map((step, index) => (
-            <div key={index} className="flex flex-col lg:flex-row items-center">
-              <div
-                className="bg-card rounded-2xl p-8 shadow-elegant border border-border max-w-sm text-center hover:shadow-glow transition-all duration-300 animate-slide-up"
-                style={{ animationDelay: `${index * 0.2}s` }}
-              >
-                <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <step.icon className="w-8 h-8 text-primary" />
-                </div>
-                <div className="bg-gradient-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-bold shadow-glow">
-                  {index + 1}
-                </div>
-                <h3 className="text-xl font-semibold text-card-foreground mb-4">{step.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{step.description}</p>
-              </div>
-
+            <div key={step.id} className="flex flex-col items-center relative">
+              {/* Enhanced Connection Line */}
               {index < steps.length - 1 && (
-                <ArrowRight className="w-8 h-8 text-primary/30 mt-8 lg:mt-0 lg:mx-4 transform rotate-90 lg:rotate-0" />
+                <div className="hidden lg:block absolute top-1/2 -right-6 w-12 h-1 z-10">
+                  <div className="relative w-full h-full bg-gradient-to-r from-border via-primary/30 to-border rounded-full">
+                    <div className={`absolute inset-0 bg-gradient-primary rounded-full transition-all duration-1000 ${
+                      hoveredCard === step.id || hoveredCard === step.id + 1
+                        ? 'w-full opacity-100' 
+                        : 'w-0 opacity-0'
+                    }`} />
+                    {/* Animated dot */}
+                    <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full transition-all duration-1000 ${
+                      hoveredCard === step.id || hoveredCard === step.id + 1
+                        ? 'left-full -translate-x-3 opacity-100 animate-pulse' 
+                        : 'left-0 opacity-0'
+                    }`} />
+                  </div>
+                </div>
               )}
+              
+              <div
+                className="bg-card rounded-3xl shadow-elegant border border-border w-full max-w-sm h-[400px] md:h-[400px] sm:h-[380px] hover:shadow-glow transition-all duration-500 animate-slide-up overflow-hidden group flex flex-col"
+                style={{ animationDelay: `${index * 0.15}s` }}
+                onMouseEnter={() => setHoveredCard(step.id)}
+                onMouseLeave={() => setHoveredCard(null)}
+              >
+                {/* Video/Image Section */}
+                <div className="w-full h-[180px] md:h-[200px] relative bg-gradient-to-br from-accent/50 to-accent overflow-hidden flex-shrink-0">
+                  {step.hasVideo ? (
+                    <video
+                      src={step.videoSrc}
+                      preload="auto"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onMouseEnter={(e) => {
+                        const video = e.target as HTMLVideoElement
+                        video.play().catch(console.error)
+                      }}
+                      onMouseLeave={(e) => {
+                        const video = e.target as HTMLVideoElement
+                        video.pause()
+                        video.currentTime = 0
+                      }}
+                      onCanPlay={(e) => {
+                        const video = e.target as HTMLVideoElement
+                        if (video.paused) {
+                          video.play().catch(() => {})
+                        }
+                      }}
+                      aria-label={`Demo video for ${step.title}`}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-primary/40 rounded-xl" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Content Section */}
+                <div className="px-6 md:px-8 py-6 md:py-8 flex-1 flex flex-col justify-start">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="bg-gradient-primary text-primary-foreground w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-lg border-2 border-white/20 flex-shrink-0">
+                      {step.id}
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-bold text-card-foreground capitalize">{step.title}</h3>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed text-sm md:text-base">{step.description}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>

@@ -16,6 +16,7 @@ import { Slack, Calendar } from 'lucide-react'
 
 // Components
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
+import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import SlackIntegrationCard from '@/components/parts/SlackIntegrationCard'
 import GoogleCalendarIntegrationCard from '@/components/parts/GoogleCalendarIntegrationCard'
 
@@ -86,8 +87,11 @@ const ComingSoonCard: React.FC<{ service: IntegrationService }> = ({ service }) 
 export default function DashboardIntegrationsPage () {
   return (
     <SidebarLayout>
+      {/* Mobile Top Navigation */}
+      <MobileTopNav showUpgradeButton={true} />
+
       <div className="flex-1 overflow-y-auto mobile-scroll">
-        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">
+        <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe pt-16 sm:pt-0">
         {/* Page Header */}
         <div className="mb-6 sm:mb-8 pt-4 sm:pt-8">
           <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">

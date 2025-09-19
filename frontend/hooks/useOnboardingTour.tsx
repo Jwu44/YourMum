@@ -186,7 +186,6 @@ export const useOnboardingTour = (
     }
     
     if (bestElement) {
-      console.log('Found best visible element:', bestElement, 'Score:', bestScore)
       return bestElement
     }
 

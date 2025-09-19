@@ -8,30 +8,25 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       name: 'Free',
       price: '$0',
       period: 'forever',
-      description: 'Perfect for getting started with AI-powered planning',
       features: [
-        'Up to 50 tasks per month',
-        'Basic AI scheduling',
-        'Calendar integration',
-        'Mobile app access',
-        'Email support'
+        'Unlimited task creation',
+        'Auto capture tasks from integrations',
+        'Auto create your next day',
+        'Limited schedule generation',
+        'Limited task break downs',
       ],
-      cta: 'Start YourMum',
+      cta: 'Try For Free',
       popular: false
     },
     {
       name: 'Pro',
-      price: '$12',
-      period: 'per month',
-      description: 'Ideal for professionals and power users',
+      price: '$7',
+      period: 'month',
       features: [
-        'Unlimited tasks',
-        'Advanced AI insights',
-        'Team collaboration (up to 5 members)',
-        'Priority support',
-        'Custom integrations',
-        'Productivity analytics',
-        'Time tracking'
+        'Everything in Free',
+        'More schedule generation',
+        'More task break downs',
+        'Access to new integrations',
       ],
       cta: 'Start Free Trial',
       popular: true
@@ -42,12 +37,11 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
     <section className="py-20 bg-background" id="pricing">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
-            Choose your perfect
-            <span className="text-primary block">productivity plan</span>
+        <h2 className="text-3xl lg:text-5xl font-bold text-foreground mb-6">
+            Start For Free
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Start free and upgrade as you grow. All plans include our core AI features.
+            Try YourMum for free and upgrade to a Pro as you grow.
           </p>
         </div>
 
@@ -76,7 +70,6 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
                   <span className="text-4xl font-bold text-card-foreground">{plan.price}</span>
                   <span className="text-muted-foreground">/{plan.period}</span>
                 </div>
-                <p className="text-muted-foreground">{plan.description}</p>
               </div>
 
               <ul className="space-y-4 mb-8">
@@ -102,17 +95,6 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
               </Button>
             </div>
           ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">
-            All plans include a 14-day free trial. No credit card required.
-          </p>
-          <div className="flex justify-center items-center space-x-4 text-sm text-muted-foreground">
-            <span>✓ Cancel anytime</span>
-            <span>✓ 30-day money back guarantee</span>
-            <span>✓ No setup fees</span>
-          </div>
         </div>
       </div>
     </section>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useReducer, type ReactNode, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, type ReactNode, useCallback } from 'react'
 import {
   type FormData,
   type FormAction,
@@ -192,7 +192,48 @@ const FormContext = createContext<FormContextType | undefined>(undefined)
  * Form provider component that manages state for the entire form
  */
 export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(formReducer, initialState)
+  // Load initial state from localStorage if available, otherwise use defaults
+  const getInitialState = useCallback((): FormData => {
+    if (typeof window === 'undefined') {
+      return initialState
+    }
+
+    try {
+      const saved = localStorage.getItem('form-state')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Validate that the parsed data has the expected structure
+        if (parsed && typeof parsed === 'object') {
+          return { ...initialState, ...parsed }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load form state from localStorage:', error)
+    }
+
+    return initialState
+  }, [])
+
+  const [state, dispatch] = useReducer(formReducer, getInitialState())
+
+  // Save state to localStorage whenever it changes (but not on initial load)
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      // Only save if there are user modifications to avoid overwriting with initial state
+      if (hasFormModifications(state)) {
+        localStorage.setItem('form-state', JSON.stringify(state))
+      } else {
+        // Clear localStorage if no modifications (user reset to defaults)
+        localStorage.removeItem('form-state')
+      }
+    } catch (error) {
+      console.warn('Failed to save form state to localStorage:', error)
+    }
+  }, [state])
 
   /**
    * Helper to update layout preference with validation
@@ -210,18 +251,81 @@ export const FormProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     })
   }, [state.layout_preference])
 
+  /**
+   * Clear the form state from localStorage (called after successful save)
+   */
+  const clearFormState = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('form-state')
+      } catch (error) {
+        console.warn('Failed to clear form state from localStorage:', error)
+      }
+    }
+  }, [])
+
   // Memoize context value to prevent unnecessary rerenders
   const value = React.useMemo(() => ({
     state,
     dispatch,
-    updateLayoutPreference
-  }), [state, updateLayoutPreference])
+    updateLayoutPreference,
+    clearFormState
+  }), [state, updateLayoutPreference, clearFormState])
 
   return (
     <FormContext.Provider value={value}>
       {children}
     </FormContext.Provider>
   )
+}
+
+/**
+ * Helper function to check if the current FormData has been modified from initial state
+ * Used to determine whether to load backend data or preserve user changes
+ * @param currentState - Current FormData state
+ * @returns true if state has user modifications, false if it's in initial state
+ */
+export const hasFormModifications = (currentState: FormData): boolean => {
+  // Check for non-initial values that indicate user modifications
+
+  // Check work times (initial state has specific default values)
+  if (currentState.work_start_time !== initialState.work_start_time ||
+      currentState.work_end_time !== initialState.work_end_time) {
+    return true
+  }
+
+  // Check energy patterns (initial state is empty array)
+  if (currentState.energy_patterns != null && currentState.energy_patterns.length > 0) {
+    return true
+  }
+
+  // Check priorities (initial state has empty strings)
+  if (currentState.priorities != null) {
+    const hasNonEmptyPriorities = Object.values(currentState.priorities).some(
+      priority => priority !== ''
+    )
+    if (hasNonEmptyPriorities) {
+      return true
+    }
+  }
+
+  // Check layout preference changes from defaults
+  if (currentState.layout_preference != null) {
+    const defaultLayout = initialState.layout_preference
+    if (currentState.layout_preference.layout !== defaultLayout.layout ||
+        currentState.layout_preference.subcategory !== defaultLayout.subcategory ||
+        currentState.layout_preference.timing !== defaultLayout.timing ||
+        currentState.layout_preference.orderingPattern !== defaultLayout.orderingPattern) {
+      return true
+    }
+  }
+
+  // Check if tasks have been loaded (initial state is empty array)
+  if (currentState.tasks != null && currentState.tasks.length > 0) {
+    return true
+  }
+
+  return false
 }
 
 /**

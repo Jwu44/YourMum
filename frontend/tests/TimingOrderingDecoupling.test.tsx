@@ -10,7 +10,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { FormProvider } from '@/lib/FormContext'
-import InputsConfig from '@/app/dashboard/inputs/page'
+import PreferencesPage from '@/app/dashboard/preferences/page'
 
 // Mock the router and navigation
 jest.mock('next/navigation', () => ({
@@ -22,7 +22,7 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => ({
     get: jest.fn(() => '2024-01-01')
   }),
-  usePathname: () => '/dashboard/inputs'
+  usePathname: () => '/dashboard/preferences'
 }))
 
 // Mock toast
@@ -69,7 +69,7 @@ const renderWithFormProvider = (component: React.ReactElement) => {
 describe('TimingOrderingDecoupling', () => {
   describe('Two-Step UI Selection', () => {
     it('should display Step 1: Time Management section', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         expect(screen.getByText('Time Management')).toBeInTheDocument()
@@ -81,7 +81,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should display Step 2: Task Ordering Pattern section as optional', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         expect(screen.getByText('Task Ordering Pattern')).toBeInTheDocument()
@@ -93,7 +93,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should have clear visual separation between Step 1 and Step 2', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const step1Section = screen.getByText('Time Management').closest('[data-testid], [class*="card"], section, div')
@@ -108,7 +108,7 @@ describe('TimingOrderingDecoupling', () => {
 
   describe('Timing Selection (Step 1)', () => {
     it('should allow selecting timebox option', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const timeboxOption = screen.getByText('Timeboxed').closest('.timing-card')
@@ -119,7 +119,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should allow selecting untimebox option', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const untimeboxOption = screen.getByText('Untimeboxed').closest('.timing-card')
@@ -130,7 +130,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should default to untimebox selection', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const untimeboxOption = screen.getByText('Untimeboxed').closest('.timing-card')
@@ -141,7 +141,7 @@ describe('TimingOrderingDecoupling', () => {
 
   describe('Ordering Pattern Selection (Step 2)', () => {
     it('should allow selecting batching pattern', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const batchingOption = screen.getByText('Batching').closest('.ordering-card')
@@ -152,7 +152,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should allow selecting alternating pattern', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const alternatingOption = screen.getByText('Alternating').closest('.ordering-card')
@@ -163,7 +163,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should allow selecting 3-3-3 pattern', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const threeThreeThreeOption = screen.getByText('3-3-3').closest('.ordering-card')
@@ -174,7 +174,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should allow deselecting ordering patterns (optional step)', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const batchingOption = screen.getByText('Batching').closest('.ordering-card')
@@ -192,7 +192,7 @@ describe('TimingOrderingDecoupling', () => {
 
   describe('Form State Preservation', () => {
     it('should preserve timing selection when switching ordering patterns', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         // Select timebox timing
@@ -215,7 +215,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should preserve ordering pattern when switching timing', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         // Select batching pattern first
@@ -247,7 +247,7 @@ describe('TimingOrderingDecoupling', () => {
 
     combinations.forEach(({ timing, pattern, description }) => {
       it(`should support combination: ${description}`, async () => {
-        renderWithFormProvider(<InputsConfig />)
+        renderWithFormProvider(<PreferencesPage />)
         
         await waitFor(() => {
           // Select timing
@@ -268,7 +268,7 @@ describe('TimingOrderingDecoupling', () => {
 
   describe('Visual Feedback and Purple Theme', () => {
     it('should apply purple theme to selected timing option', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const timeboxOption = screen.getByText('Timeboxed').closest('.timing-card')
@@ -284,7 +284,7 @@ describe('TimingOrderingDecoupling', () => {
     })
 
     it('should apply purple theme to selected ordering pattern', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         const batchingOption = screen.getByText('Batching').closest('.ordering-card')
@@ -302,7 +302,7 @@ describe('TimingOrderingDecoupling', () => {
 
   describe('Mobile Responsiveness', () => {
     it('should maintain mobile-responsive design', async () => {
-      renderWithFormProvider(<InputsConfig />)
+      renderWithFormProvider(<PreferencesPage />)
       
       await waitFor(() => {
         // Check for mobile responsive classes - look for grid container with responsive classes

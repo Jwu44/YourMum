@@ -1,32 +1,9 @@
 import { type UserDocument, type Task } from '../types'
+import { apiClient } from './client'
 import { auth } from '@/auth/firebase'
-
-// Add development bypass constants
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
 // Use the calendar part of UserDocument type
 type CalendarStatus = NonNullable<UserDocument['calendar']>
-
-// API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
-
-/**
- * Get the current user's Firebase ID token for API authentication
- */
-async function getAuthToken (): Promise<string> {
-  // In development mode with bypass enabled, return a mock token
-  if (IS_DEVELOPMENT && BYPASS_AUTH) {
-    return 'mock-token-for-development'
-  }
-
-  const currentUser = auth.currentUser
-  if (!currentUser) {
-    throw new Error('User not authenticated')
-  }
-  // Force refresh token to ensure it's valid and not expired
-  return await currentUser.getIdToken(true)
-}
 
 /**
  * Detect user's timezone using browser API with UTC fallback
@@ -51,23 +28,15 @@ export const calendarApi = {
     expiresAt: number
     scopes: string[]
   }) {
-    const token = await getAuthToken()
     const userTimezone = detectUserTimezone()
 
-    const response = await fetch(`${API_BASE_URL}/api/calendar/connect`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        credentials,
-        timezone: userTimezone
-      })
+    const response = await apiClient.post('/api/calendar/connect', {
+      credentials,
+      timezone: userTimezone
     })
 
     if (!response.ok) {
-      const error = await response.json()
+      const error = await response.json().catch(() => ({ error: 'Failed to connect calendar' }))
       throw new Error(error.error || 'Failed to connect calendar')
     }
 
@@ -79,23 +48,15 @@ export const calendarApi = {
    */
   async disconnectCalendar (userId?: string) {
     // Backend expects { userId } in body
-    const token = await getAuthToken()
     const uid = userId || auth.currentUser?.uid
     if (!uid) {
       throw new Error('User not authenticated')
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/calendar/disconnect`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ userId: uid })
-    })
+    const response = await apiClient.post('/api/calendar/disconnect', { userId: uid })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({} as any))
+      const error = await response.json().catch(() => ({ error: 'Failed to disconnect calendar' }))
       throw new Error(error.error || 'Failed to disconnect calendar')
     }
 
@@ -106,7 +67,7 @@ export const calendarApi = {
    * Get calendar connection status for a user
    */
   async getCalendarStatus (userId: string): Promise<CalendarStatus> {
-    const response = await fetch(`${API_BASE_URL}/api/calendar/status/${userId}`)
+    const response = await apiClient.get(`/api/calendar/status/${userId}`, { skipAuth: true })
 
     if (!response.ok) {
       throw new Error('Failed to get calendar status')
@@ -147,18 +108,10 @@ export const calendarApi = {
     }
 
     try {
-      const token = await getAuthToken()
       const userTimezone = detectUserTimezone()
 
-      const response = await fetch(
-          `${API_BASE_URL}/api/calendar/events?date=${encodeURIComponent(dateString)}&timezone=${encodeURIComponent(userTimezone)}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            }
-          }
+      const response = await apiClient.get(
+        `/api/calendar/events?date=${encodeURIComponent(dateString)}&timezone=${encodeURIComponent(userTimezone)}`
       )
 
       const result = await response.json()

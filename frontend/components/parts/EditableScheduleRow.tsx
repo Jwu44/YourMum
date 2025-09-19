@@ -1,19 +1,20 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useMemo } from 'react'
+import dynamic from 'next/dynamic'
+import data from '@emoji-mart/data'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import MicrostepSuggestions from '@/components/parts/MicrostepSuggestions'
+import MobileTaskActionDrawer from '@/components/parts/MobileTaskActionDrawer'
 import { TypographyH4 } from '@/app/dashboard/fonts/text'
-import { Sparkles, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
+import { Pickaxe, Loader2, MoreHorizontal, Pencil, Trash2, Archive, GripVertical, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useForm } from '../../lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   type Task
 } from '../../lib/types'
-import {
-  handleMicrostepDecomposition
-} from '../../lib/helper'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
@@ -21,10 +22,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { triggerHapticFeedback, HapticPatterns } from '@/lib/haptics'
 
-// Import our new drag drop hook
+// Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
 import { useDragState } from '../../contexts/DragStateContext'
+import { useMicrostepDecomposition } from '@/hooks/useMicrostepDecomposition'
+import { useDecompositionContext } from '@/contexts/DecompositionContext'
 
 interface CustomDropdownItem {
   label: string
@@ -44,6 +49,7 @@ interface EditableScheduleRowProps {
   onEditTask?: (task: Task) => void // New prop for edit functionality
   onDeleteTask?: (task: Task) => void // New prop for delete functionality
   onArchiveTask?: (task: Task) => void // New prop for archive functionality
+  onMicrostepInsert?: (newSubtask: Task, parentId: string) => void // New prop for simplified microstep insertion
   customDropdownItems?: CustomDropdownItem[] // Custom dropdown items for specific contexts
 }
 
@@ -96,6 +102,11 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
   const [isOpen, setIsOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
+  // Lazy-load Emoji Mart Picker (@emoji-mart/react) for SSR safety
+  const EmojiMartPicker = useMemo(() => (
+    dynamic(() => import('@emoji-mart/react'), { ssr: false })
+  ), [])
+
   const handleEmojiSelect = useCallback((emoji: string) => {
     onEmojiChange(emoji)
     setIsOpen(false)
@@ -116,27 +127,21 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentEmoji, onEmojiChange }
           {currentEmoji}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2">
-        <div className="grid grid-cols-7 gap-1">
-          {COMMON_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => { handleEmojiSelect(emoji) }}
-              className={cn(
-                'w-8 h-8 flex items-center justify-center text-lg hover-selection rounded transition-colors',
-                emoji === currentEmoji && 'selection-active'
-              )}
-              title={`Select ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-        <div className="mt-2 pt-2 border-t">
-          <p className="text-xs text-muted-foreground text-center">
-            Click any emoji to select it
-          </p>
-        </div>
+      <PopoverContent className="p-0 border-0 shadow-none bg-transparent">
+        {/* Emoji Mart Picker */}
+        <EmojiMartPicker
+          data={data}
+          onEmojiSelect={(e: any) => {
+            const native = e?.native
+            if (typeof native === 'string' && native.length > 0) {
+              handleEmojiSelect(native)
+            }
+          }}
+          theme="light"
+          previewPosition="none"
+          skinTonePosition="search"
+          perLine={8}
+        />
       </PopoverContent>
     </Popover>
   )
@@ -202,8 +207,20 @@ const getSectionIcon = (sectionName: string, onEmojiChange?: (emoji: string) => 
   const lowerName = sectionName.toLowerCase()
   let defaultEmoji = '🦕' // Default emoji
 
+  // Category-based sections
+  if (lowerName.includes('work')) {
+    defaultEmoji = '💼'
+  } else if (lowerName.includes('relationships')) {
+    defaultEmoji = '❤️'
+  } else if (lowerName.includes('fun')) {
+    defaultEmoji = '🎉'
+  } else if (lowerName.includes('ambition')) {
+    defaultEmoji = '🚀'
+  } else if (lowerName.includes('exercise')) {
+    defaultEmoji = '🍎'
+  }
   // Priority-based sections
-  if (lowerName.includes('high priority')) {
+  else if (lowerName.includes('high priority')) {
     defaultEmoji = '⚡️'
   } else if (lowerName.includes('medium priority')) {
     defaultEmoji = '✏️'
@@ -257,6 +274,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   onEditTask, // New prop for edit functionality
   onDeleteTask, // New prop for delete functionality
   onArchiveTask, // New prop for archive functionality
+  onMicrostepInsert, // New prop for simplified microstep insertion
   customDropdownItems // Custom dropdown items for specific contexts
 }) => {
   // Use our new drag drop hook instead of complex local state
@@ -271,31 +289,54 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Global drag state for suppressing hover effects
   const { isDraggingAny } = useDragState()
 
+  // Mobile detection
+  const isMobile = useIsMobile()
+
   // Refs for DOM measurements (keep for compatibility)
   const checkboxRef = useRef<HTMLDivElement>(null)
-
-  // New state for microsteps
-  const [isDecomposing, setIsDecomposing] = useState(false)
-  const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
-  const [showMicrosteps, setShowMicrosteps] = useState(false)
 
   // State to track dropdown menu visibility
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
+  // Mobile drawer state
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+
+  // Long press state for mobile drag
+  const [isLongPressing, setIsLongPressing] = useState(false)
+  const [isDragMode, setIsDragMode] = useState(false)
+  const [hasTouchMoved, setHasTouchMoved] = useState(false)
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressStartTime = useRef<number>(0)
+
   // Hooks
   const { state: formData } = useForm()
   const { toast } = useToast()
+  
+  // Use new microstep decomposition hook
+  const microstepHook = useMicrostepDecomposition()
+  
+  // Use decomposition context for global state management
+  const decompositionContext = useDecompositionContext()
 
-  // Can only decompose non-section, non-microstep, non-subtask tasks
-  const canDecompose = !isSection && !task.is_microstep && !task.is_subtask
+  // Memoize canDecompose calculation to prevent unnecessary re-renders
+  const canDecompose = useMemo(() => {
+    const isDecomposableType = !isSection && !task.is_microstep && !task.is_subtask
+    return isDecomposableType && decompositionContext.canDecompose(task.id)
+  }, [isSection, task.is_microstep, task.is_subtask, task.id, decompositionContext])
 
-  // Add state for re-rendering when emoji changes
-  const [, forceUpdate] = useState(0)
+  // Add state for re-rendering when emoji changes (optimized)
+  const [emojiVersion, setEmojiVersion] = useState(0)
 
-  // Callback to force re-render when emoji changes
+  // Memoized callback to force re-render when emoji changes
   const handleEmojiChange = useCallback(() => {
-    forceUpdate(prev => prev + 1)
+    setEmojiVersion(prev => prev + 1)
   }, [])
+
+  // Memoize expensive getSectionIcon computation to prevent localStorage access on every render
+  const sectionIcon = useMemo(() => {
+    if (!isSection) return null
+    return getSectionIcon(task.text, handleEmojiChange)
+  }, [isSection, task.text, handleEmojiChange, emojiVersion])
 
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {
@@ -374,6 +415,152 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     }
   }, [task, onArchiveTask, toast])
 
+  /**
+   * Handle mobile tap to open action drawer
+   */
+  const handleMobileTap = useCallback(() => {
+    if (isMobile && !isSection && !isDragMode) {
+      triggerHapticFeedback(HapticPatterns.TAP)
+      setIsMobileDrawerOpen(true)
+    }
+  }, [isMobile, isSection, isDragMode])
+
+  /**
+   * Handle mobile drawer close
+   */
+  const handleMobileDrawerClose = useCallback(() => {
+    setIsMobileDrawerOpen(false)
+  }, [])
+
+  /**
+   * Scroll-friendly touch handlers for mobile
+   * Only treats touches as intentional taps when there's minimal movement
+   */
+  const touchStartPosition = useRef<{ x: number; y: number } | null>(null)
+  const TOUCH_MOVEMENT_THRESHOLD = 10 // pixels
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    // Store initial touch position for movement detection
+    const touch = e.touches[0]
+    touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
+
+    longPressStartTime.current = Date.now()
+    setIsLongPressing(true)
+    setHasTouchMoved(false)
+
+    // Start long press timer (600ms threshold - increased to avoid conflicts with scrolling)
+    longPressTimer.current = setTimeout(() => {
+      // Only trigger drag mode if user hasn't moved significantly
+      if (!hasTouchMoved) {
+        // Clear any existing text selection to prevent interference
+        if (document.getSelection) {
+          const selection = document.getSelection()
+          if (selection && selection.removeAllRanges) {
+            selection.removeAllRanges()
+          }
+        }
+
+        triggerHapticFeedback(HapticPatterns.LONG_PRESS)
+        setIsDragMode(true)
+        setIsLongPressing(false)
+
+        // Trigger drag start if we have listeners
+        if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchStart === 'function') {
+          dragDropHook.listeners.onTouchStart(e as any)
+        }
+      }
+    }, 600) // Increased from 500ms to reduce conflicts with scroll gestures
+  }, [isMobile, isSection, dragDropHook.listeners, hasTouchMoved])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    const pressDuration = Date.now() - longPressStartTime.current
+
+    // Clear long press timer
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+
+    setIsLongPressing(false)
+
+    // Only treat as tap if it was short, didn't move, and not in drag mode
+    // Also ensure minimal movement (< 10px) to distinguish from scroll
+    if (pressDuration < 600 && !isDragMode && !hasTouchMoved) {
+      handleMobileTap()
+    }
+
+    // Exit drag mode on touch end
+    if (isDragMode) {
+      setIsDragMode(false)
+
+      // Trigger drag end if we have listeners
+      if (dragDropHook.listeners && typeof dragDropHook.listeners.onTouchEnd === 'function') {
+        dragDropHook.listeners.onTouchEnd(e as any)
+      }
+    }
+
+    // Reset touch position
+    touchStartPosition.current = null
+  }, [isMobile, isSection, isDragMode, handleMobileTap, hasTouchMoved, dragDropHook.listeners])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || isSection) return
+
+    // Calculate movement distance from start position
+    const touch = e.touches[0]
+    if (touchStartPosition.current) {
+      const deltaX = Math.abs(touch.clientX - touchStartPosition.current.x)
+      const deltaY = Math.abs(touch.clientY - touchStartPosition.current.y)
+      const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
+      // Detect if this is primarily a vertical scroll gesture
+      if (totalMovement > TOUCH_MOVEMENT_THRESHOLD) {
+        // If movement is primarily vertical (scroll gesture), don't interfere
+        if (deltaY > deltaX && deltaY > TOUCH_MOVEMENT_THRESHOLD) {
+          setHasTouchMoved(true)
+
+          // Cancel long press immediately for scroll gestures
+          if (isLongPressing && longPressTimer.current) {
+            clearTimeout(longPressTimer.current)
+            longPressTimer.current = null
+            setIsLongPressing(false)
+          }
+
+          // Don't prevent default for vertical scrolling - let browser handle it
+          return
+        }
+
+        // For non-vertical movement, mark as moved for potential drag
+        setHasTouchMoved(true)
+
+        // Cancel long press on significant movement (likely intentional drag preparation)
+        if (isLongPressing && longPressTimer.current) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+          setIsLongPressing(false)
+        }
+      }
+    }
+
+    // If we're in drag mode, handle drag move
+    if (isDragMode && dragDropHook.listeners && typeof dragDropHook.listeners.onTouchMove === 'function') {
+      dragDropHook.listeners.onTouchMove(e as any)
+    }
+  }, [isMobile, isSection, isDragMode, isLongPressing, dragDropHook.listeners])
+
+  // Cleanup long press timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+      }
+    }
+  }, [])
+
   // TODO: Remove old drag handlers - replaced by @dnd-kit hook
   // The old handlers (handleDragStart, handleDragOver, etc.) are no longer needed
   // @dnd-kit handles all drag events through the hook
@@ -400,11 +587,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const segmentCount = Math.min(levels, 4)
       const segments = []
 
-      // Always show dark purple (10%) + regular purple (90%) for any indent
-      // For level 1: dark purple (10%) + regular purple (90%)
-      // For level 2+: dark purple (10%) + progressive segments (90% split)
-      const firstSegmentWidth = 10 // 10% for darkest
-      const remainingWidth = 90 // 90% for remaining segments
+      // Responsive visual feedback to match actual drag zones
+      // Mobile: 40% outdent/reorder : 60% indent
+      // Desktop: 10% outdent/reorder : 90% indent
+      const firstSegmentWidth = isMobile ? 40 : 10 // Mobile: 40%, Desktop: 10%
+      const remainingWidth = isMobile ? 60 : 90 // Mobile: 60%, Desktop: 90%
 
       // Always have at least 2 segments total (dark + regular)
       const totalSegments = Math.max(segmentCount, 2)
@@ -457,161 +644,64 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
         )
     }
-  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text])
+  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text, isMobile])
 
   /**
-   * Handles task decomposition into microsteps
-   *
-   * Uses the AI service to break down a task into smaller, more manageable steps
-   * and presents them to the user for selection.
+   * Handles task decomposition using the new hook and context
+   * 
+   * Optimized version that uses the decomposition hook and prevents
+   * concurrent decompositions across all tasks.
    */
   const handleDecompose = useCallback(async () => {
-    // Guard clause - only proceed if decomposition is allowed and not already in progress
-    if (!canDecompose || isDecomposing) return
+    // Guard clause - only proceed if decomposition is allowed
+    if (!canDecompose || microstepHook.isDecomposing) return
 
     try {
-      // Set loading state and clear any existing microsteps
-      setIsDecomposing(true)
-      setShowMicrosteps(false)
-
-      // Get microstep texts from backend
-      const microstepTexts = await handleMicrostepDecomposition(task, formData)
-
-      // Convert microstep texts into full Task objects
-      // Updated to handle both string array and object array responses
-      const microstepTasks = microstepTexts.map((step: string | {
-        text: string
-        rationale?: string
-        estimated_time?: string
-        energy_level_required?: 'low' | 'medium' | 'high'
-      }) => {
-        // Handle both string and object formats
-        const isObject = typeof step !== 'string'
-        const text = isObject ? step.text : step
-        const rationale = isObject ? step.rationale : undefined
-        const estimatedTime = isObject ? step.estimated_time : undefined
-        const energyLevel = isObject ? step.energy_level_required : undefined
-
-        return {
-          id: crypto.randomUUID(), // Generate unique ID for each microstep
-          text, // The microstep text
-          rationale, // Store explanation if available
-          estimated_time: estimatedTime, // Store time estimate if available
-          energy_level_required: energyLevel, // Store energy level if available
-          is_microstep: true, // Mark as microstep
-          completed: false,
-          is_section: false,
-          section: task.section, // Inherit section from parent
-          parent_id: task.id, // Link to parent task
-          level: (task.level || 0) + 1, // Indent one level from parent
-          type: 'microstep',
-          categories: task.categories || [], // Inherit categories from parent
-          // Add layout-related information for proper rendering
-          section_index: 0 // Will be recalculated when added to schedule
-        }
-      })
-
-      // Update UI with new microsteps
-      setSuggestedMicrosteps(microstepTasks)
-      setShowMicrosteps(true)
-
-      // Show success message
-      toast({
-        title: 'Success',
-        description: 'Select which microsteps to add'
-      })
+      // Set global decomposition state to prevent concurrent operations
+      decompositionContext.setDecomposingTask(task.id)
+      
+      // Use the hook to handle decomposition
+      await microstepHook.decompose(task, formData)
     } catch (error) {
-      // Handle and display any errors
-      console.error('Error decomposing task:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to decompose task',
-        variant: 'destructive'
-      })
+      // Error handling is managed by the hook
+      console.error('Error in handleDecompose:', error)
     } finally {
-      // Reset loading state regardless of outcome
-      setIsDecomposing(false)
+      // Clear global decomposition state
+      decompositionContext.clearDecomposingTask()
     }
-  }, [canDecompose, task, formData, toast, isDecomposing])
+  }, [canDecompose, microstepHook, decompositionContext, task, formData])
 
   /**
    * Handles user acceptance of a suggested microstep
-   *
-   * Converts a microstep suggestion into an actual task and adds it to the schedule
-   * Preserves layout information and parent-child relationships.
-   *
-   * @param microstep - The microstep suggestion to convert to a task
+   * 
+   * Optimized version that uses the microstep hook for all logic
    */
-  const handleMicrostepAccept = useCallback(async (microstep: Task) => {
-    try {
-      // Create a new task object with all required properties for a subtask
-      const newSubtask: Task = {
-        ...microstep,
-        id: crypto.randomUUID(), // Generate new ID for the actual task
-        is_subtask: true,
-        parent_id: task.id, // Link to parent task
-        level: (task.level || 0) + 1, // Indent one level from parent
-        section: task.section, // Inherit section from parent
-        categories: task.categories || [], // Inherit categories from parent
-        completed: false,
-        is_section: false,
-        type: 'task', // Change type from 'microstep' to 'task'
-        start_time: null,
-        end_time: null,
-        is_recurring: null,
-        section_index: 0, // Will be recalculated by EditableSchedule
-        // Include additional properties from the microstep if available
-        rationale: microstep.rationale || task.rationale,
-        estimated_time: microstep.estimated_time || task.estimated_time,
-        energy_level_required: microstep.energy_level_required || task.energy_level_required
-      }
+  const handleMicrostepAccept = useCallback((microstep: Task) => {
+    microstepHook.acceptMicrostep(microstep, onUpdateTask)
+  }, [microstepHook, onUpdateTask])
 
-      // Call the main onUpdateTask function which will handle the task creation
-      onUpdateTask(newSubtask)
-
-      // Remove the microstep from suggestions
-      setSuggestedMicrosteps(prev => prev.filter(step => step.id !== microstep.id))
-
-      // Close suggestions panel when all microsteps are handled
-      if (suggestedMicrosteps.length <= 1) {
-        setShowMicrosteps(false)
-      }
-
-      // Show success toast
-      toast({
-        title: 'Success',
-        description: 'Microstep added to schedule'
-      })
-    } catch (error) {
-      console.error('Error accepting microstep:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to add microstep to schedule',
-        variant: 'destructive'
-      })
-    }
-  }, [task, onUpdateTask, suggestedMicrosteps.length, toast])
-
-  // Update the handleMicrostepReject to simply remove the suggestion
+  /**
+   * Handles user rejection of a suggested microstep
+   * 
+   * Optimized version that uses the microstep hook for all logic
+   */
   const handleMicrostepReject = useCallback((microstep: Task) => {
-    // Remove the rejected microstep from suggestions
-    setSuggestedMicrosteps(prev => prev.filter(step => step.id !== microstep.id))
+    microstepHook.rejectMicrostep(microstep)
+  }, [microstepHook])
 
-    // Close suggestions panel when all microsteps are handled
-    if (suggestedMicrosteps.length <= 1) {
-      setShowMicrosteps(false)
-    }
-  }, [suggestedMicrosteps.length])
+  // Enhanced task actions with decompose button and ellipses dropdown (Desktop only)
+  const renderTaskActions = () => {
+    // Don't render desktop actions on mobile - mobile uses tap drawer instead
+    if (isMobile) return null
 
-  // Enhanced task actions with decompose button and ellipses dropdown
-  const renderTaskActions = () => (
-    <div
-      className={cn(
-        'flex items-center gap-2 transition-opacity duration-200',
-        isDraggingAny ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
-        isDropdownOpen && 'opacity-100' // Keep visible when dropdown is open
-      )}
-    >
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-2 transition-opacity duration-200',
+          isDraggingAny ? 'opacity-0' : 'opacity-0 group-hover:opacity-100',
+          isDropdownOpen && 'opacity-100' // Keep visible when dropdown is open
+        )}
+      >
       {/* Slack "View" link - only for top-level Slack tasks */}
       {task.source === 'slack' && !isSection && !task.is_section && !task.is_subtask && (
         (() => {
@@ -634,21 +724,28 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )}
       {/* Decompose button - existing functionality */}
       {canDecompose && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDecompose}
-          disabled={isDecomposing}
-          className="h-8 w-8 p-0 gradient-accent hover:opacity-90 text-primary-foreground hover:scale-105 transition-all duration-200"
-        >
-          {isDecomposing
-            ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-              )
-            : (
-            <Sparkles className="h-4 w-4 animate-sparkle" />
-              )}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDecompose}
+              disabled={microstepHook.isDecomposing || !canDecompose}
+              className="h-8 w-8 p-0 gradient-accent hover:bg-transparent text-primary-foreground hover:scale-105 transition-all duration-200"
+            >
+              {microstepHook.isDecomposing
+                ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+                  )
+                : (
+                <Pickaxe className="h-4 w-4 animate-sparkle" />
+                  )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Breakdown task</p>
+          </TooltipContent>
+        </Tooltip>
       )}
 
       {/* Ellipses dropdown menu - new functionality */}
@@ -710,7 +807,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  )
+    )
+  }
 
   return (
     <motion.div
@@ -739,9 +837,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
               !isDraggingAny && dragDropHook.getGripClassName(),
               // When any task is dragging, use static classes without hover states
               isDraggingAny && 'opacity-0 cursor-grab transition-opacity duration-200 mr-2',
-              'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10' // Position grip 24px to the left
+              'absolute left-[-24px] top-1/2 -translate-y-1/2 flex-shrink-0 z-10', // Position grip 24px to the left
+              isMobile && 'hidden' // Hide grip entirely on mobile
             )}
-            {...dragDropHook.listeners}
+            {...(dragDropHook.listeners || {})}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
           </div>
@@ -755,11 +854,19 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           className={cn(
             dragDropHook.getRowClassName(),
             isSection ? 'cursor-default' : '',
-            isDecomposing && 'animate-pulse',
+            microstepHook.isDecomposing && 'task-decomposing',
+            // Mobile touch feedback
+            isMobile && !isSection && 'active:scale-[0.98] transition-transform duration-100',
+            // Long press visual feedback
+            isLongPressing && 'scale-[1.02] shadow-lg',
+            // Drag mode visual feedback
+            isDragMode && 'scale-[1.05] shadow-xl z-50 rotate-1',
             // Section styling - removed px-4 to align with task content
             isSection ? 'mt-2.5 mb-2.5 w-full'
-            // Task card styling - no gap-4 to control spacing manually, grip is positioned absolutely
-              : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-all duration-200 shadow-soft w-full'
+            // Task card styling - conditional right padding for mobile
+              : isMobile
+                ? 'p-4 pr-4 my-2 rounded-xl border border-border bg-card transition-[background-color,border-color,box-shadow,transform,scale] duration-200 shadow-soft w-full'
+                : 'p-4 my-2 rounded-xl border border-border bg-card hover:bg-task-hover transition-[background-color,border-color,box-shadow] duration-200 shadow-soft w-full'
           )}
           style={{
             minHeight: isSection ? '48px' : 'auto',
@@ -769,28 +876,58 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             // Only disable transitions for the actively dragged item
             transition: dragDropHook.isDragging ? 'none' : undefined
           }}
+          // Desktop mouse events
           onMouseEnter={(e) => {
             // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
             // This ensures we track position relative to the TARGET task, not dragged task
-            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            if (!isMobile && dragDropHook.isOver && !dragDropHook.isDragging) {
               dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
             }
           }}
           onMouseMove={(e) => {
             // 🔧 FIX: Only track cursor position when this task is a drop target (isOver)
             // This enables real-time drag type updates relative to the TARGET task
-            if (dragDropHook.isOver && !dragDropHook.isDragging) {
+            if (!isMobile && dragDropHook.isOver && !dragDropHook.isDragging) {
               dragDropHook.updateCursorPosition(e.clientX, e.clientY, e.currentTarget as HTMLElement)
             }
           }}
+          // Mobile touch events
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
         >
           {/* Task/Section Content */}
           {!isSection && (
-            <div ref={checkboxRef} className="flex items-center">
+            <div
+              ref={checkboxRef}
+              className={cn(
+                "flex items-center",
+                isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
+              )}
+              // Prevent touch events from bubbling to parent task row
+              onTouchStart={(e) => {
+                e.stopPropagation()
+                if (isMobile) {
+                  triggerHapticFeedback(HapticPatterns.TAP)
+                }
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation()
+              }}
+              onTouchMove={(e) => {
+                e.stopPropagation()
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+              }}
+            >
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={handleToggleComplete}
-                className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200"
+                className={cn(
+                  "data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200",
+                  isMobile ? "h-6 w-6" : "h-5 w-5" // 24x24 on mobile, 20x20 on desktop
+                )}
               />
             </div>
           )}
@@ -805,7 +942,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           {isSection
             ? (
             <div className="flex items-center gap-3 py-3">
-              {getSectionIcon(task.text, handleEmojiChange)}
+              {sectionIcon}
               <TypographyH4 className="text-foreground font-semibold mb-0">
                 {task.text}
               </TypographyH4>
@@ -814,11 +951,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             : (
             <span
               className={cn(
-                'flex-1 text-foreground transition-all duration-200',
+                'flex-1 text-foreground transition-[color] duration-200',
                 task.completed && 'line-through text-muted-foreground',
                 // Add 16px left margin only when no logo is present
-                !getTaskSourceLogo(task) && 'ml-4'
+                !getTaskSourceLogo(task) && 'ml-4',
+                // On mobile, extend to full width since no action buttons shown
+                isMobile && 'pr-0',
+                // Prevent text selection on mobile to avoid interference with drag positioning
+                isMobile && 'select-none'
               )}
+              style={{
+                // Additional webkit-specific prevention for better mobile compatibility
+                WebkitUserSelect: isMobile ? 'none' : 'auto',
+                WebkitTouchCallout: isMobile ? 'none' : 'inherit'
+              } as React.CSSProperties}
               data-task-content="true"
             >
               {task.start_time && task.end_time
@@ -837,12 +983,25 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       </div>
 
       {/* Microstep Suggestions */}
-      {showMicrosteps && suggestedMicrosteps.length > 0 && (
+      {microstepHook.showMicrosteps && microstepHook.suggestedMicrosteps.length > 0 && (
         <MicrostepSuggestions
-          microsteps={suggestedMicrosteps}
+          microsteps={microstepHook.suggestedMicrosteps}
           onAccept={handleMicrostepAccept}
           onReject={handleMicrostepReject}
           className="mt-2"
+        />
+      )}
+
+      {/* Mobile Action Drawer */}
+      {isMobile && !isSection && (
+        <MobileTaskActionDrawer
+          task={task}
+          isOpen={isMobileDrawerOpen}
+          onClose={handleMobileDrawerClose}
+          onBreakdown={canDecompose ? handleDecompose : undefined}
+          onEdit={onEditTask ? () => onEditTask(task) : undefined}
+          onArchive={onArchiveTask ? () => onArchiveTask(task) : undefined}
+          onDelete={onDeleteTask ? () => onDeleteTask(task) : undefined}
         />
       )}
     </motion.div>
