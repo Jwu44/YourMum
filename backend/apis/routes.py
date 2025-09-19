@@ -1998,25 +1998,31 @@ def oauth_callback():
     """
     Handle OAuth callback for single authentication + calendar flow.
 
-    KEY FIX: Now expects userData with Firebase UID as primary identifier
-    instead of Google Subject ID, ensuring backend user lookup works correctly.
+    Phase 3 Cleanup: Now only supports NEW format with Firebase UID as primary identifier.
+    OLD format (authorization_code/state) support has been removed.
 
-    Expected request body:
+    Expected request body (NEW format only):
     {
         "userData": {
-            "googleId": str (Firebase UID - PRIMARY FIX),
+            "googleId": str (Firebase UID),
             "email": str,
             "displayName": str,
             "photoURL": str,
             "hasCalendarAccess": bool,
             "calendarTokens": {...}
         },
-        "tokens": {...}
+        "tokens": {
+            "access_token": str,
+            "refresh_token": str,
+            "id_token": str,
+            "expires_in": int,
+            "scope": str
+        }
     }
 
     Returns:
         200: OAuth successful with user data stored using Firebase UID
-        400: Missing parameters or validation errors
+        400: Invalid request format or missing parameters
         500: Storage or server errors
     """
     try:
