@@ -364,7 +364,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       console.error('Error triggering edit task:', error)
       toast({
         title: 'Error',
-        description: 'Failed to open edit dialog',
+        description: 'Failed to open edit dialog. Please try again.',
         variant: 'destructive'
       })
     }
@@ -387,7 +387,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       console.error('Error triggering delete task:', error)
       toast({
         title: 'Error',
-        description: 'Failed to delete task',
+        description: 'Failed to delete task. Please try again.',
         variant: 'destructive'
       })
     }
@@ -409,7 +409,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       console.error('Error triggering archive task:', error)
       toast({
         title: 'Error',
-        description: 'Failed to archive task',
+        description: 'Failed to archive task. Please try again.',
         variant: 'destructive'
       })
     }

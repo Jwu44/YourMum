@@ -72,8 +72,8 @@ export default function SettingsPage () {
       } catch (error) {
         console.error('Error loading user profile:', error)
         toast({
-          title: 'Error loading profile',
-          description: 'Failed to load user profile data.',
+          title: 'Error',
+          description: 'Failed to load your profile. Please try again.',
           variant: 'destructive'
         })
       }
@@ -167,13 +167,14 @@ export default function SettingsPage () {
       setHasValidationErrors(false)
 
       toast({
-        title: 'Profile updated successfully!',
+        title: 'Success!',
+        description: 'Profile updated successfully.',
         variant: 'success'
       })
     } catch (error) {
       console.error('Error updating profile:', error)
       toast({
-        title: 'Update failed',
+        title: 'Error',
         description: 'Failed to update profile. Please try again.',
         variant: 'destructive'
       })
@@ -230,7 +231,8 @@ export default function SettingsPage () {
 
       // Show error toast
       toast({
-        title: 'Failed to log out. Please try again.',
+        title: 'Error',
+        description: 'Failed to log out. Please try again',
         variant: 'destructive'
       })
     }
@@ -253,7 +255,7 @@ export default function SettingsPage () {
 
       // Show success message
       toast({
-        title: 'Account deleted successfully',
+        title: 'Success!',
         description: result.warnings?.length
           ? `Warning: ${result.warnings.join(', ')}`
           : 'Your account and all data have been permanently deleted.',
@@ -272,7 +274,7 @@ export default function SettingsPage () {
 
       // Show error toast
       toast({
-        title: 'Failed to delete account',
+        title: 'Error',
         description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive'
       })

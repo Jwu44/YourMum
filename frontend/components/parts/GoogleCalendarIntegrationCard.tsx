@@ -86,7 +86,7 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
       console.error('Failed to fetch calendar status:', error)
       toast({
         title: 'Error',
-        description: 'Failed to check calendar connection status',
+        description: 'Failed to check calendar connection status.',
         variant: 'destructive'
       })
     } finally {
@@ -103,17 +103,11 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
 
       // Use the unified OAuth flow that handles both auth and calendar
       await signIn('/integrations')
-
-      toast({
-        title: 'Starting Calendar Connection',
-        description: 'Redirecting to Google for calendar access...',
-        variant: 'default'
-      })
     } catch (error) {
       console.error('Calendar connection failed:', error)
       toast({
-        title: 'Connection Failed',
-        description: error instanceof Error ? error.message : 'Failed to start calendar connection',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to start calendar connection.',
         variant: 'destructive'
       })
       setIsConnecting(false)
@@ -130,7 +124,7 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
       await calendarApi.disconnectCalendar(currentUser.uid)
       toast({
         title: 'Success!',
-        description: 'Google Calendar has been disconnected',
+        description: 'Google Calendar has been disconnected.',
         variant: 'success'
       })
       await fetchConnectionStatus()
@@ -138,7 +132,7 @@ const GoogleCalendarIntegrationCard: React.FC = () => {
       console.error('Calendar disconnection failed:', error)
       toast({
         title: 'Error!',
-        description: error instanceof Error ? error.message : 'Failed to disconnect calendar',
+        description: error instanceof Error ? error.message : 'Failed to disconnect calendar.',
         variant: 'destructive'
       })
     } finally {

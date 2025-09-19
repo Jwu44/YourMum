@@ -83,15 +83,15 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
       setShowMicrosteps(true)
 
       toast({
-        title: 'Success',
-        description: 'Select which microsteps to add',
+        title: 'Success!',
+        description: 'Select relevant subtasks to add.',
         variant: 'success'
       })
     } catch (error) {
       console.error('Error decomposing task:', error)
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to decompose task',
+        description: error instanceof Error ? error.message : 'Failed to break down task.',
         variant: 'destructive'
       })
     } finally {
@@ -142,7 +142,7 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
       console.error('Error accepting microstep:', error)
       toast({
         title: 'Error',
-        description: 'Failed to add microstep to schedule',
+        description: 'Failed to add subtask to schedule.',
         variant: 'destructive'
       })
     }

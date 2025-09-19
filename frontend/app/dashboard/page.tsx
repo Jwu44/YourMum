@@ -103,7 +103,7 @@ const Dashboard: React.FC = () => {
     const calendarError = localStorage.getItem('calendarConnectionError')
     if (calendarError) {
       toast({
-        title: 'Calendar Connection Issue',
+        title: 'Error',
         description: 'To sync calendar events, please connect your Google Calendar in Integrations.',
         variant: 'destructive'
       })
@@ -332,7 +332,7 @@ const Dashboard: React.FC = () => {
       console.error('Error opening edit task:', error)
       toast({
         title: 'Error',
-        description: 'Failed to open edit dialog',
+        description: 'Failed to open edit dialog.',
         variant: 'destructive'
       })
     }
@@ -386,8 +386,8 @@ const Dashboard: React.FC = () => {
 
       // Show success toast
       toast({
-        title: 'Success',
-        description: 'Task deleted successfully',
+        title: 'Success!',
+        description: 'Task deleted successfully.',
         variant: 'success'
       })
     } catch (error) {
@@ -458,8 +458,8 @@ const Dashboard: React.FC = () => {
 
       // Show success toast
       toast({
-        title: 'Success',
-        description: 'Task archived successfully',
+        title: 'Success!',
+        description: 'Task archived successfully.',
         variant: 'success'
       })
     } catch (error) {
@@ -853,8 +853,9 @@ const Dashboard: React.FC = () => {
     // Check if the previous day is before the user's account creation date
     if (isDateBeforeUserCreation(previousDayOffset)) {
       toast({
-        title: 'Navigation Limit',
-        description: 'Cannot navigate to dates before your account was created.'
+        title: 'Warning',
+        description: 'Cannot navigate to dates before your account was created.',
+        variant: 'warning'
       })
       return
     }
@@ -977,7 +978,7 @@ const Dashboard: React.FC = () => {
       setCurrentDayIndex(prevIndex => prevIndex - 1)
 
       toast({
-        title: 'Previous Day',
+        title: 'Error',
         description: 'Unable to load schedule data, showing empty schedule.',
         variant: 'destructive'
       })
@@ -1173,8 +1174,9 @@ const Dashboard: React.FC = () => {
       )
 
       toast({
-        title: 'Success',
-        description: 'Suggestion added to schedule'
+        title: 'Success!',
+        description: 'Suggestion added to schedule.',
+        variant: 'success'
       })
     } catch (error) {
       console.error('Error accepting suggestion:', error)

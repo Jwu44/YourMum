@@ -109,7 +109,7 @@ const ArchivePage: React.FC = () => {
           console.warn('Failed to update schedule with moved task:', updateResult.error)
           toast({
             title: 'Warning',
-            description: 'Task moved but may not appear in today\'s schedule immediately',
+            description: 'Task moved but may not appear in today\'s schedule immediately.',
             variant: 'warning'
           })
         } else {
@@ -118,7 +118,7 @@ const ArchivePage: React.FC = () => {
         console.warn('Schedule operation failed:', scheduleError)
         toast({
           title: 'Warning',
-          description: 'Task moved but may not appear in today\'s schedule immediately',
+          description: 'Task moved but may not appear in today\'s schedule immediately.',
           variant: 'warning'
         })
       }
@@ -150,8 +150,8 @@ const ArchivePage: React.FC = () => {
       setArchivedTasks(prev => prev.filter(archived => archived.taskId !== taskId))
 
       toast({
-        title: 'Success',
-        description: 'Archived task deleted permanently',
+        title: 'Success!',
+        description: 'Archived task deleted permanently.',
         variant: 'success'
       })
     } catch (err) {
