@@ -9,9 +9,9 @@ import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals
 
 // Mock the Google OAuth and Firebase dependencies
 const mockGoogleOAuth = {
-  buildAuthUrl: jest.fn(),
-  exchangeCodeForTokens: jest.fn(),
-  validateTokens: jest.fn(),
+  generateAuthUrl: jest.fn(),
+  validateState: jest.fn(),
+  initiateOAuthFlow: jest.fn(),
 };
 
 const mockFirebaseAuth = {
@@ -79,36 +79,31 @@ describe('Single Google OAuth Flow', () => {
     });
   });
 
-  describe('Authorization Code Exchange', () => {
-    it('should exchange authorization code for tokens including refresh token', async () => {
-      const mockAuthCode = 'test-auth-code';
-      const mockTokenResponse = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        id_token: 'test-id-token',
-        expires_in: 3600,
-        scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
-        token_type: 'Bearer',
-      };
+  describe('OAuth State Validation', () => {
+    it('should validate state parameter for CSRF protection', () => {
+      const validState = 'test-state-123';
+      mockGoogleOAuth.validateState.mockReturnValue(true);
 
-      mockGoogleOAuth.exchangeCodeForTokens.mockResolvedValue(mockTokenResponse);
-
-      // Test implementation should verify all tokens are received
-      expect(mockTokenResponse.access_token).toBeDefined();
-      expect(mockTokenResponse.refresh_token).toBeDefined();
-      expect(mockTokenResponse.id_token).toBeDefined();
-      expect(mockTokenResponse.scope).toContain('calendar.readonly');
+      const result = mockGoogleOAuth.validateState(validState);
+      expect(result).toBe(true);
+      expect(mockGoogleOAuth.validateState).toHaveBeenCalledWith(validState);
     });
 
-    it('should handle token exchange errors gracefully', async () => {
-      const mockAuthCode = 'invalid-code';
-      const mockError = new Error('Invalid authorization code');
+    it('should reject invalid state parameters', () => {
+      const invalidState = 'invalid-state';
+      mockGoogleOAuth.validateState.mockReturnValue(false);
 
-      mockGoogleOAuth.exchangeCodeForTokens.mockRejectedValue(mockError);
+      const result = mockGoogleOAuth.validateState(invalidState);
+      expect(result).toBe(false);
+    });
 
-      // Test that errors are properly handled and user is notified
-      await expect(mockGoogleOAuth.exchangeCodeForTokens(mockAuthCode))
-        .rejects.toThrow('Invalid authorization code');
+    it('should initiate OAuth flow properly', () => {
+      mockGoogleOAuth.initiateOAuthFlow.mockImplementation(() => {
+        // Mock successful initiation
+      });
+
+      mockGoogleOAuth.initiateOAuthFlow();
+      expect(mockGoogleOAuth.initiateOAuthFlow).toHaveBeenCalled();
     });
   });
 

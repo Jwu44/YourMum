@@ -108,76 +108,6 @@ export class GoogleOAuthService {
     return true;
   }
 
-  /**
-   * Exchange authorization code for access, refresh, and ID tokens via backend
-   * @param authorizationCode Authorization code from OAuth callback
-   * @param state State parameter for CSRF validation
-   * @returns Promise resolving to OAuth tokens
-   */
-  async exchangeCodeForTokens(authorizationCode: string, state: string): Promise<GoogleOAuthTokens> {
-    // Validate state first
-    if (!this.validateState(state)) {
-      throw new Error('Invalid OAuth state parameter');
-    }
-
-    try {
-      // Call backend OAuth callback endpoint instead of Google directly
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/auth/oauth-callback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          authorization_code: authorizationCode,
-          state: state,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Token exchange failed: ${errorData.error || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(`Backend OAuth failed: ${data.error}`);
-      }
-
-      const tokens = data.tokens;
-
-      // Validate that we received all required tokens
-      if (!tokens.access_token || !tokens.id_token) {
-        throw new Error('Incomplete token response: Missing required tokens');
-      }
-
-      // Check if we got calendar scope
-      if (!tokens.scope?.includes('calendar.readonly')) {
-        console.warn('Calendar scope not granted by user');
-      }
-
-      // Log success (remove in production)
-      console.log('✅ OAuth token exchange successful via backend', {
-        hasRefreshToken: !!tokens.refresh_token,
-        scopes: tokens.scope,
-        expiresIn: tokens.expires_in,
-        isNewUser: data.isNewUser,
-      });
-
-      // Store additional user data for callback page
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('oauth_user_data', JSON.stringify(data.user));
-        sessionStorage.setItem('oauth_is_new_user', String(data.isNewUser ?? false));
-      }
-
-      return tokens;
-
-    } catch (error) {
-      console.error('❌ OAuth token exchange failed:', error);
-      throw error;
-    }
-  }
 
   /**
    * Validate and decode ID token (basic validation)
@@ -234,35 +164,6 @@ export class GoogleOAuthService {
     }
   }
 
-  /**
-   * Handle OAuth callback with authorization code
-   * @param code Authorization code from URL parameters
-   * @param state State parameter from URL parameters
-   * @returns Promise resolving to OAuth tokens
-   */
-  async handleOAuthCallback(code: string, state: string): Promise<GoogleOAuthTokens> {
-    console.log('🔄 Processing OAuth callback...');
-
-    if (!code) {
-      throw new Error('Missing authorization code');
-    }
-
-    if (!state) {
-      throw new Error('Missing state parameter');
-    }
-
-    try {
-      const tokens = await this.exchangeCodeForTokens(code, state);
-
-      console.log('✅ OAuth callback processed successfully');
-
-      return tokens;
-
-    } catch (error) {
-      console.error('❌ OAuth callback processing failed:', error);
-      throw error;
-    }
-  }
 }
 
 // Export singleton instance

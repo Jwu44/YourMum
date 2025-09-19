@@ -17,10 +17,10 @@ jest.mock('firebase/auth', () => ({
 }))
 
 // Mock Google OAuth service
-const mockHandleOAuthCallback = jest.fn()
+const mockValidateState = jest.fn()
 jest.mock('@/lib/services/google-oauth', () => ({
   googleOAuthService: {
-    handleOAuthCallback: mockHandleOAuthCallback,
+    validateState: mockValidateState,
     validateIdToken: jest.fn()
   }
 }))
