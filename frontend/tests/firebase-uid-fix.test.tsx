@@ -20,8 +20,7 @@ jest.mock('firebase/auth', () => ({
 const mockValidateState = jest.fn()
 jest.mock('@/lib/services/google-oauth', () => ({
   googleOAuthService: {
-    validateState: mockValidateState,
-    validateIdToken: jest.fn()
+    validateState: mockValidateState
   }
 }))
 

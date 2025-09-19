@@ -108,38 +108,6 @@ export class GoogleOAuthService {
     return true;
   }
 
-
-  /**
-   * Validate and decode ID token (basic validation)
-   * @param idToken JWT ID token from Google
-   * @returns Decoded token payload
-   */
-  validateIdToken(idToken: string): any {
-    try {
-      // Basic JWT decode (payload only) - in production, verify signature
-      const payload = JSON.parse(atob(idToken.split('.')[1]));
-
-      // Basic validation
-      if (!payload.iss?.includes('accounts.google.com')) {
-        throw new Error('Invalid token issuer');
-      }
-
-      if (payload.aud !== this.config.clientId) {
-        throw new Error('Invalid token audience');
-      }
-
-      if (payload.exp * 1000 < Date.now()) {
-        throw new Error('Token expired');
-      }
-
-      return payload;
-
-    } catch (error) {
-      console.error('ID token validation failed:', error);
-      throw new Error('Invalid ID token');
-    }
-  }
-
   /**
    * Initiate the OAuth flow by redirecting to Google
    */

@@ -484,12 +484,6 @@ export interface WithHandleGetStarted {
   handleGetStarted: () => Promise<void>
 }
 
-export interface CalendarCredentials {
-  accessToken: string
-  expiresAt: number
-  scopes: string[]
-}
-
 // Profile form data interface for settings page
 export interface ProfileFormData {
   displayName: string
