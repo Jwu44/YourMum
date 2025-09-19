@@ -4,11 +4,11 @@ import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
- * DEPRECATED Loading route - now handled by PostOAuthHandler
- * 
- * This route is no longer used for post-OAuth flows. 
- * PostOAuthHandler now handles all calendar connection and schedule generation.
- * 
+ * DEPRECATED Loading route - redirects to dashboard
+ *
+ * This route is no longer used for post-OAuth flows.
+ * OAuth flows are now handled directly in the callback and dashboard.
+ *
  * This route now simply redirects to dashboard for any legacy references.
  */
 export default function LoadingRoute(): React.ReactElement {

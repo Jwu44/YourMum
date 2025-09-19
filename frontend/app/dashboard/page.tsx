@@ -16,7 +16,6 @@ import EditableSchedule from '@/components/parts/EditableSchedule'
 import { DragStateProvider } from '@/contexts/DragStateContext'
 import OnboardingTour from '@/components/parts/onboarding/OnboardingTour'
 import { LoadingPage } from '@/components/parts/LoadingPage'
-import { isPostOAuthActive } from '@/auth/PostOAuthHandler'
 
 // Hooks and Context
 import { useToast } from '@/hooks/use-toast'
@@ -65,9 +64,6 @@ const Dashboard: React.FC = () => {
 
   // Create task drawer state
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false)
-  
-  // Check if PostOAuthHandler is active to prevent race conditions
-  const [isPostOAuthHandlerActive, setIsPostOAuthHandlerActive] = useState(() => isPostOAuthActive())
 
   // Edit task drawer state - following dev-guide.md simplicity principle
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
@@ -1267,24 +1263,6 @@ const Dashboard: React.FC = () => {
     }
   }, [state.formUpdate?.response, toast])
 
-  // Monitor PostOAuthHandler status changes
-  useEffect(() => {
-    const checkPostOAuthStatus = () => {
-      const currentStatus = isPostOAuthActive()
-      if (currentStatus !== isPostOAuthHandlerActive) {
-        console.log('🔄 Dashboard: PostOAuthHandler status changed:', currentStatus)
-        setIsPostOAuthHandlerActive(currentStatus)
-      }
-    }
-
-    // Check immediately
-    checkPostOAuthStatus()
-    
-    // Set up interval to check periodically
-    const interval = setInterval(checkPostOAuthStatus, 500)
-    
-    return () => clearInterval(interval)
-  }, [isPostOAuthHandlerActive])
 
   // Midnight auto-refresh (local timezone)
   useEffect(() => {
@@ -1358,18 +1336,6 @@ const Dashboard: React.FC = () => {
 
 
 
-  // Show LoadingPage if PostOAuthHandler is active
-  if (isPostOAuthHandlerActive) {
-    console.log('📱 Dashboard: PostOAuthHandler is active, showing LoadingPage')
-    return <LoadingPage reason="calendar" message="Setting up your account..." />
-  }
-
-  // Mark dashboard as fully loaded for future PostOAuth detection
-  useEffect(() => {
-    if (!isLoadingSchedule && scheduleDays.length > 0) {
-      sessionStorage.setItem('dashboardFullyLoaded', 'true')
-    }
-  }, [isLoadingSchedule, scheduleDays.length])
 
   return (
     <SidebarLayout>
