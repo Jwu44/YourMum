@@ -33,8 +33,7 @@ graph TD
         end
         
         subgraph "Context & State"
-            A28[AuthContext - with race condition fixes]
-            A35[PostOAuthHandler - simplified detection]
+            A28[AuthContext - simplified after OAuth cleanup]
             A29[FormContext]
             A30[RouteGuard]
         end
@@ -58,11 +57,9 @@ graph TD
         
         A4 --> B1
         A4 --> A28
-        A4 --> A35
         A4 --> A29
         A6 --> A31
         A6 --> A32
-        A28 --> A35
     end
     
     subgraph "Backend (Flask)"
@@ -160,13 +157,10 @@ graph TD
     A2 --> F6
     B1 -. API Requests .-> C1
     
-    %% Auth Flow (Updated with race condition fixes)
+    %% Auth Flow (Simplified after OAuth cleanup)
     F6 -. Client Auth .-> A2
     A2 -. Auth State .-> A28
-    A28 -. waitForAuthState() .-> A28
-    A28 -. Calendar OAuth .-> F1
-    A28 -. Schedule Flow .-> A35
-    A35 -. Timeout Protection .-> A35
+    A28 -. Single OAuth Flow .-> F1
     F5 -. Token Verification .-> C2
     D39 --> F5
     
@@ -178,10 +172,10 @@ graph TD
     %% Real-time Events
     D38 -. SSE Events .-> B1
     
-    %% Architecture Notes (See task41.md for details)
-    %% - AuthContext (A28) is currently a monolith managing 7+ concerns
-    %% - Multiple OAuth flows exist (Firebase + Direct Google OAuth)
-    %% - 5+ overlapping boolean flags create race conditions  
-    %% - Recommended: Extract calendar logic to separate CalendarContext
-    %% - Recommended: Implement proper state machine pattern
-    %% - PostOAuthHandler (A35) now has simplified detection logic with timeout protection
+    %% Architecture Notes (Updated after OAuth cleanup - see task48.md)
+    %% - AuthContext (A28) simplified to single OAuth flow after Phases 1-4 cleanup
+    %% - Single OAuth flow: Firebase UID as primary identifier throughout system
+    %% - PostOAuthHandler completely removed - no longer needed
+    %% - Race conditions resolved through simplified authentication flow
+    %% - OLD format OAuth support removed - only NEW format supported
+    %% - ~358 lines of deprecated OAuth code eliminated across all phases
