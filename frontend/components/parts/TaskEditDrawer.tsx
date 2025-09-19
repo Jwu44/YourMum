@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -112,17 +112,10 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
 
   const [editedTask, setEditedTask] = useState<Task>(() => getInitialTask())
 
-  // Ref for Task Name input to programmatically focus when opening create drawer
-  const taskNameInputRef = useRef<HTMLInputElement>(null)
-
   // Reset form when drawer is opened/closed or task changes
   useEffect(() => {
     if (isOpen) {
       setEditedTask(getInitialTask())
-      // Focus Task Name automatically when creating a new task on mobile
-      if (!isEditMode) {
-        setTimeout(() => { taskNameInputRef.current?.focus() }, 50)
-      }
     }
   }, [isOpen, task, getInitialTask])
 
@@ -325,8 +318,6 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
         <Input
           id="text"
           name="text"
-          ref={taskNameInputRef}
-          autoFocus={!isEditMode}
           value={editedTask.text}
           onChange={handleInputChange}
           onKeyDown={async (e) => await (e.key === 'Enter' && handleSave())}
@@ -510,7 +501,7 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
       modal={true}
     >
       <DrawerContent
-        className="fixed bottom-0 left-0 right-0 max-h-[85dvh] w-full bg-background shadow-lg outline-none keyboard-padding-safe flex flex-col"
+        className="fixed bottom-0 left-0 right-0 max-h-[85vh] w-full bg-background shadow-lg outline-none mobile-padding-safe flex flex-col"
         onPointerDownOutside={(e) => {
           // Allow time picker interactions - check if click is on time input or its picker
           const target = e.target as HTMLElement
