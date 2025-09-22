@@ -420,11 +420,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
    * Handle mobile tap to open action drawer
    */
   const handleMobileTap = useCallback(() => {
-    if (isMobile && !isSection && !isDragMode) {
+    // Add additional safeguards to prevent accidental drawer opening
+    if (isMobile && !isSection && !isDragMode && !hasTouchMoved && originalTouchTarget !== 'checkbox') {
       triggerHapticFeedback(HapticPatterns.TAP)
       setIsMobileDrawerOpen(true)
     }
-  }, [isMobile, isSection, isDragMode])
+  }, [isMobile, isSection, isDragMode, hasTouchMoved, originalTouchTarget])
 
   /**
    * Handle mobile drawer close
@@ -449,7 +450,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     // Track what was originally touched for smart interaction handling
     const target = e.target as HTMLElement
-    const targetType = target.closest('[data-checkbox-container]') ? 'checkbox' :
+    // Use more robust detection - check if target is within checkbox container or is the checkbox itself
+    const isCheckboxArea = target.closest('[data-checkbox-container]') ||
+                          target.closest('button[role="checkbox"]') ||
+                          target.getAttribute('role') === 'checkbox' ||
+                          target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox'
+    const targetType = isCheckboxArea ? 'checkbox' :
                       target.closest('[data-task-content]') ? 'text' : 'container'
     setOriginalTouchTarget(targetType)
 
@@ -914,18 +920,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 "flex items-center",
                 isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
-              // Handle checkbox-specific feedback but let events bubble
+              // Handle checkbox-specific feedback and prevent drawer opening
               onTouchStart={(e) => {
                 if (isMobile) {
                   triggerHapticFeedback(HapticPatterns.TAP)
                 }
-                // Let event bubble to parent for long press detection - don't call handlers
+                // Mark that this is a checkbox interaction to prevent drawer opening
+                setOriginalTouchTarget('checkbox')
               }}
               onTouchEnd={(e) => {
-                // Let event bubble to parent
+                // Ensure we don't open drawer for checkbox taps by stopping propagation
+                e.stopPropagation()
               }}
               onTouchMove={(e) => {
-                // Let event bubble to parent
+                // Let move events bubble for drag detection
               }}
               onClick={(e) => {
                 // Prevent click propagation to avoid conflicts with parent tap handling
