@@ -597,10 +597,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const segments = []
 
       // Responsive visual feedback to match actual drag zones
-      // Mobile: 40% outdent/reorder : 60% indent
+      // Mobile: 70% outdent/reorder : 30% indent
       // Desktop: 10% outdent/reorder : 90% indent
-      const firstSegmentWidth = isMobile ? 40 : 10 // Mobile: 40%, Desktop: 10%
-      const remainingWidth = isMobile ? 60 : 90 // Mobile: 60%, Desktop: 90%
+      const firstSegmentWidth = isMobile ? 70 : 10 // Mobile: 70%, Desktop: 10%
+      const remainingWidth = isMobile ? 30 : 90 // Mobile: 30%, Desktop: 90%
 
       // Always have at least 2 segments total (dark + regular)
       const totalSegments = Math.max(segmentCount, 2)
@@ -914,30 +914,22 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 "flex items-center",
                 isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
-              // Allow touch events to bubble for long press detection
-              // Handle checkbox-specific logic while forwarding to parent
+              // Handle checkbox-specific feedback but let events bubble
               onTouchStart={(e) => {
-                // Mark this as checkbox touch but don't prevent bubbling
                 if (isMobile) {
                   triggerHapticFeedback(HapticPatterns.TAP)
                 }
-                // Forward to parent for long press detection
-                handleTouchStart(e)
+                // Let event bubble to parent for long press detection - don't call handlers
               }}
               onTouchEnd={(e) => {
-                // Handle checkbox toggle only if no significant movement occurred
-                // and not in drag mode - let parent coordinate this
-                handleTouchEnd(e)
+                // Let event bubble to parent
               }}
               onTouchMove={(e) => {
-                // Forward to parent for movement tracking
-                handleTouchMove(e)
+                // Let event bubble to parent
               }}
               onClick={(e) => {
-                // Only prevent click propagation if we're not in the middle of a drag operation
-                if (!isDragMode && !hasTouchMoved) {
-                  e.stopPropagation()
-                }
+                // Prevent click propagation to avoid conflicts with parent tap handling
+                e.stopPropagation()
               }}
             >
               <Checkbox
@@ -990,10 +982,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 WebkitTouchCallout: isMobile ? 'none' : 'inherit'
               } as React.CSSProperties}
               data-task-content="true"
-              // Forward touch events to parent for long press detection
-              onTouchStart={isMobile ? handleTouchStart : undefined}
-              onTouchEnd={isMobile ? handleTouchEnd : undefined}
-              onTouchMove={isMobile ? handleTouchMove : undefined}
+              // Touch events bubble naturally to parent for long press detection
             >
               {task.start_time && task.end_time
                 ? `${task.start_time} - ${task.end_time}: `
