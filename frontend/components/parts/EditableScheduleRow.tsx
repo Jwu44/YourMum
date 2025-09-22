@@ -305,6 +305,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const [isLongPressing, setIsLongPressing] = useState(false)
   const [isDragMode, setIsDragMode] = useState(false)
   const [hasTouchMoved, setHasTouchMoved] = useState(false)
+  const [originalTouchTarget, setOriginalTouchTarget] = useState<string | null>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const longPressStartTime = useRef<number>(0)
 
@@ -446,6 +447,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     const touch = e.touches[0]
     touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
 
+    // Track what was originally touched for smart interaction handling
+    const target = e.target as HTMLElement
+    const targetType = target.closest('[data-checkbox-container]') ? 'checkbox' :
+                      target.closest('[data-task-content]') ? 'text' : 'container'
+    setOriginalTouchTarget(targetType)
+
     longPressStartTime.current = Date.now()
     setIsLongPressing(true)
     setHasTouchMoved(false)
@@ -489,7 +496,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     // Only treat as tap if it was short, didn't move, and not in drag mode
     // Also ensure minimal movement (< 10px) to distinguish from scroll
-    if (pressDuration < 600 && !isDragMode && !hasTouchMoved) {
+    // Don't trigger tap if touch started on checkbox (let checkbox handle it)
+    if (pressDuration < 600 && !isDragMode && !hasTouchMoved && originalTouchTarget !== 'checkbox') {
       handleMobileTap()
     }
 
@@ -503,8 +511,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       }
     }
 
-    // Reset touch position
+    // Reset touch position and target
     touchStartPosition.current = null
+    setOriginalTouchTarget(null)
   }, [isMobile, isSection, isDragMode, handleMobileTap, hasTouchMoved, dragDropHook.listeners])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -900,30 +909,45 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           {!isSection && (
             <div
               ref={checkboxRef}
+              data-checkbox-container
               className={cn(
                 "flex items-center",
                 isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
-              // Prevent touch events from bubbling to parent task row
+              // Allow touch events to bubble for long press detection
+              // Handle checkbox-specific logic while forwarding to parent
               onTouchStart={(e) => {
-                e.stopPropagation()
+                // Mark this as checkbox touch but don't prevent bubbling
                 if (isMobile) {
                   triggerHapticFeedback(HapticPatterns.TAP)
                 }
+                // Forward to parent for long press detection
+                handleTouchStart(e)
               }}
               onTouchEnd={(e) => {
-                e.stopPropagation()
+                // Handle checkbox toggle only if no significant movement occurred
+                // and not in drag mode - let parent coordinate this
+                handleTouchEnd(e)
               }}
               onTouchMove={(e) => {
-                e.stopPropagation()
+                // Forward to parent for movement tracking
+                handleTouchMove(e)
               }}
               onClick={(e) => {
-                e.stopPropagation()
+                // Only prevent click propagation if we're not in the middle of a drag operation
+                if (!isDragMode && !hasTouchMoved) {
+                  e.stopPropagation()
+                }
               }}
             >
               <Checkbox
                 checked={task.completed}
-                onCheckedChange={handleToggleComplete}
+                onCheckedChange={(checked) => {
+                  // Only toggle if this wasn't part of a drag gesture
+                  if (!isDragMode && !hasTouchMoved && typeof checked === 'boolean') {
+                    handleToggleComplete(checked)
+                  }
+                }}
                 className={cn(
                   "data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200",
                   isMobile ? "h-6 w-6" : "h-5 w-5" // 24x24 on mobile, 20x20 on desktop
@@ -966,6 +990,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 WebkitTouchCallout: isMobile ? 'none' : 'inherit'
               } as React.CSSProperties}
               data-task-content="true"
+              // Forward touch events to parent for long press detection
+              onTouchStart={isMobile ? handleTouchStart : undefined}
+              onTouchEnd={isMobile ? handleTouchEnd : undefined}
+              onTouchMove={isMobile ? handleTouchMove : undefined}
             >
               {task.start_time && task.end_time
                 ? `${task.start_time} - ${task.end_time}: `
