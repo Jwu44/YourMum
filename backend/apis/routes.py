@@ -1778,8 +1778,23 @@ def delete_task(task_id):
                 "error": "Cannot delete section tasks. Only regular tasks can be deleted."
             }), 400
         
-        # Remove the task from the schedule
-        updated_schedule = [task for task in current_schedule if task.get('id') != task_id]
+        # Handle task deletion based on whether it's recurring or not
+        updated_schedule = []
+        for task in current_schedule:
+            if task.get('id') == task_id:
+                # If it's a recurring task, set status to "stopped" instead of removing
+                if task.get('is_recurring'):
+                    updated_task = {**task}
+                    updated_task['is_recurring'] = {
+                        **task['is_recurring'],
+                        'status': 'stopped'
+                    }
+                    updated_schedule.append(updated_task)
+                # For non-recurring tasks, remove completely (existing behavior)
+                # else: continue (skip adding to updated_schedule)
+            else:
+                # Keep all other tasks as-is
+                updated_schedule.append(task)
         
         # Update the schedule using schedule service
         update_success, update_result = schedule_service.update_schedule_tasks(

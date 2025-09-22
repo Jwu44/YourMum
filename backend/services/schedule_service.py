@@ -755,7 +755,8 @@ class ScheduleService:
                     carry_over_calendar_tasks.append(calendar_copy)
                 else:
                     # Only carry over recurring tasks; handle non-recurring in rebuild loop
-                    if task.get('is_recurring'):
+                    recurring_config = task.get('is_recurring')
+                    if recurring_config and recurring_config.get('status', 'active') == 'active':
                         new_task = {**task}
                         new_task['id'] = str(uuid.uuid4())
                         new_task['start_date'] = date
@@ -1208,10 +1209,12 @@ class ScheduleService:
                     # Check each task for recurrence
                     for task in schedule_tasks:
                         task_text = task.get('text', '')
-                        if (task.get('is_recurring') and 
+                        recurring_config = task.get('is_recurring')
+                        if (recurring_config and
                             not task.get('is_section', False) and
                             task_text not in seen_task_texts and
-                            task_text not in exclude_texts):
+                            task_text not in exclude_texts and
+                            recurring_config.get('status', 'active') == 'active'):
                             
                             if self._should_task_recur_on_date(task, target_dt):
                                 # Create a copy of the task for the new date
