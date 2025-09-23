@@ -182,6 +182,8 @@ def handle_stripe_webhook():
             result = billing_service.handle_subscription_updated(event_data)
         elif event_type == 'customer.subscription.deleted':
             result = billing_service.handle_subscription_deleted(event_data)
+        elif event_type == 'invoice.payment_succeeded':
+            result = billing_service.handle_payment_succeeded(event_data)
         elif event_type == 'invoice.payment_failed':
             result = billing_service.handle_payment_failed(event_data)
         else:

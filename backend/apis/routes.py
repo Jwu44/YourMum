@@ -13,6 +13,7 @@ from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
 from backend.utils.auth import verify_firebase_token as utils_verify_firebase_token
 from backend.utils.timezone import validate_timezone_update, get_reliable_user_timezone
+from backend.decorators.credit_guards import requires_credits
 import os
 # Import AI service functions directly
 from backend.services.ai_service import (
@@ -1115,6 +1116,7 @@ def check_user_schedules(user_id):
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/tasks/decompose", methods=["POST"])
+@requires_credits(amount=1, operation_type='task_breakdown')
 def api_decompose_task():
     try:
         data = request.json
@@ -1254,6 +1256,7 @@ def extract_user_id_from_request() -> Tuple[Optional[str], Optional[Dict[str, An
     return user_id, None
 
 @api_bp.route("/submit_data", methods=["POST"])
+@requires_credits(amount=1, operation_type='schedule_generation')
 def submit_data():
     """
     Generate and store a new schedule based on user input data and existing tasks.

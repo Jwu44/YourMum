@@ -243,3 +243,120 @@ class CreditService:
             'nextCreditResetAt': user.get('nextCreditResetAt'),
             'resetFrequency': limits.get('reset_frequency')
         }
+
+    def has_sufficient_credits(self, user_id: str, amount: int) -> bool:
+        """
+        Check if user has sufficient credits without deducting them.
+
+        Args:
+            user_id: User's Google ID
+            amount: Number of credits required
+
+        Returns:
+            True if user has sufficient credits, False otherwise
+        """
+        try:
+            db = get_database()
+            users_collection = db['users']
+
+            user = users_collection.find_one({'googleId': user_id})
+            if not user:
+                return False
+
+            current_credits = user.get('creditsThisMonth', 0)
+            return current_credits >= amount
+
+        except Exception as e:
+            print(f"Error checking user credits: {str(e)}")
+            return False
+
+    def get_user_credits(self, user_id: str) -> int:
+        """
+        Get current credit balance for user.
+
+        Args:
+            user_id: User's Google ID
+
+        Returns:
+            Current credit balance (0 if user not found)
+        """
+        try:
+            db = get_database()
+            users_collection = db['users']
+
+            user = users_collection.find_one({'googleId': user_id})
+            if not user:
+                return 0
+
+            return user.get('creditsThisMonth', 0)
+
+        except Exception as e:
+            print(f"Error getting user credits: {str(e)}")
+            return 0
+
+    def reset_user_credits(self, user_id: str, new_amount: int) -> bool:
+        """
+        Reset user's credits to a specific amount.
+
+        Args:
+            user_id: User's Google ID
+            new_amount: New credit amount to set
+
+        Returns:
+            True if reset successful, False otherwise
+        """
+        try:
+            db = get_database()
+            users_collection = db['users']
+
+            update_data = {
+                'creditsThisMonth': new_amount,
+                'lastCreditReset': datetime.now(timezone.utc),
+                'lastCreditUpdate': datetime.now(timezone.utc)
+            }
+
+            result = users_collection.update_one(
+                {'googleId': user_id},
+                {'$set': update_data}
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            print(f"Error resetting user credits: {str(e)}")
+            return False
+
+    def refund_credits(self, user_id: str, amount: int, reason: str) -> bool:
+        """
+        Refund credits to user account (compensation for failed operations).
+
+        Args:
+            user_id: User's Google ID
+            amount: Number of credits to refund
+            reason: Reason for refund (for logging)
+
+        Returns:
+            True if refund successful, False otherwise
+        """
+        try:
+            db = get_database()
+            users_collection = db['users']
+
+            user = users_collection.find_one({'googleId': user_id})
+            if not user:
+                return False
+
+            # Add credits back to user account
+            result = users_collection.update_one(
+                {'googleId': user_id},
+                {
+                    '$inc': {'creditsThisMonth': amount},
+                    '$set': {'lastCreditUpdate': datetime.now(timezone.utc)}
+                }
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            print(f"Error refunding credits: {str(e)}")
+            return False

@@ -16,6 +16,7 @@ from backend.services.slack_service import SlackService
 from backend.services.event_bus import event_bus
 from backend.services.slack_message_processor import SlackMessageProcessor
 from backend.apis.routes import get_user_from_token
+from backend.decorators.credit_guards import requires_plan
 
 # Use an explicit frontend URL (prefer these envs, fallback to dev Next port)
 frontend_base_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL') or 'http://localhost:8000'
@@ -32,30 +33,24 @@ slack_service = SlackService(db_client=db_client, message_processor=message_proc
 def extract_user_from_request() -> tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
     Extract user ID from Firebase token in request headers
-    
+
     Returns:
         Tuple of (user_id, error_response)
     """
-    auth_header = request.headers.get('Authorization', '')
-    if not auth_header.startswith('Bearer '):
-        return None, {
-            "success": False,
-            "error": "Authentication required"
-        }
-    
-    token = auth_header.split(' ')[1]
-    user = get_user_from_token(token)
-    
-    if not user or not user.get('googleId'):
-        return None, {
-            "success": False,
-            "error": "Invalid authentication token"
-        }
-    
-    return user.get('googleId'), None
+    from backend.utils.auth_helpers import extract_user_from_request as auth_extract
+
+    user, error_response = auth_extract()
+    if error_response:
+        return None, {"success": False, "error": error_response[0].json['error']}
+
+    if user:
+        return user.get('googleId'), None
+
+    return None, {"success": False, "error": "Authentication failed"}
 
 
 @slack_bp.route('/auth/connect', methods=['GET'])
+@requires_plan('pro')
 def generate_oauth_url():
     """
     Generate Slack OAuth URL for workspace connection
@@ -342,6 +337,7 @@ async def process_interactive_component(event_data: Dict[str, Any]):
 
 
 @slack_bp.route('/status', methods=['GET'])
+@requires_plan('pro')
 def get_integration_status():
     """
     Get Slack integration status for authenticated user
@@ -381,6 +377,7 @@ def get_integration_status():
 
 
 @slack_bp.route('/disconnect', methods=['DELETE'])
+@requires_plan('pro')
 def disconnect_integration():
     """
     Disconnect Slack integration for authenticated user

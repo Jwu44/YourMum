@@ -87,6 +87,7 @@ class TestCreditService:
         with patch('backend.services.credit_service.get_database') as mock_db:
             mock_collection = Mock()
             mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = free_user  # Return the user data
             mock_collection.update_one.return_value = Mock(modified_count=1)
 
             # Act
@@ -108,6 +109,7 @@ class TestCreditService:
         with patch('backend.services.credit_service.get_database') as mock_db:
             mock_collection = Mock()
             mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = pro_user  # Return the user data
             mock_collection.update_one.return_value = Mock(modified_count=1)
 
             # Act
@@ -264,3 +266,145 @@ class TestCreditService:
         assert status['creditsLimit'] == 40
         assert status['lifetimeFreeUsed'] == 5
         assert status['planInterval'] == 'month'
+
+    def test_has_sufficient_credits_true(self, credit_service):
+        """Test has_sufficient_credits returns True when user has enough credits."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = {
+                'googleId': 'test_user',
+                'creditsThisMonth': 5
+            }
+
+            # Act
+            result = credit_service.has_sufficient_credits('test_user', 3)
+
+            # Assert
+            assert result is True
+
+    def test_has_sufficient_credits_false(self, credit_service):
+        """Test has_sufficient_credits returns False when user has insufficient credits."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = {
+                'googleId': 'test_user',
+                'creditsThisMonth': 2
+            }
+
+            # Act
+            result = credit_service.has_sufficient_credits('test_user', 3)
+
+            # Assert
+            assert result is False
+
+    def test_has_sufficient_credits_user_not_found(self, credit_service):
+        """Test has_sufficient_credits returns False when user not found."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = None
+
+            # Act
+            result = credit_service.has_sufficient_credits('nonexistent_user', 1)
+
+            # Assert
+            assert result is False
+
+    def test_get_user_credits_existing_user(self, credit_service):
+        """Test get_user_credits returns correct credits for existing user."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = {
+                'googleId': 'test_user',
+                'creditsThisMonth': 15
+            }
+
+            # Act
+            result = credit_service.get_user_credits('test_user')
+
+            # Assert
+            assert result == 15
+
+    def test_get_user_credits_user_not_found(self, credit_service):
+        """Test get_user_credits returns 0 for non-existent user."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = None
+
+            # Act
+            result = credit_service.get_user_credits('nonexistent_user')
+
+            # Assert
+            assert result == 0
+
+    def test_reset_user_credits_success(self, credit_service):
+        """Test successful user credit reset."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.update_one.return_value = Mock(modified_count=1)
+
+            # Act
+            result = credit_service.reset_user_credits('test_user', 40)
+
+            # Assert
+            assert result is True
+            mock_collection.update_one.assert_called_once()
+
+    def test_reset_user_credits_failure(self, credit_service):
+        """Test failed user credit reset."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.update_one.return_value = Mock(modified_count=0)
+
+            # Act
+            result = credit_service.reset_user_credits('test_user', 40)
+
+            # Assert
+            assert result is False
+
+    def test_refund_credits_success(self, credit_service):
+        """Test successful credit refund."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = {
+                'googleId': 'test_user',
+                'creditsThisMonth': 3,
+                'plan': 'free'
+            }
+            mock_collection.update_one.return_value = Mock(modified_count=1)
+
+            # Act
+            result = credit_service.refund_credits('test_user', 2, 'operation_failed')
+
+            # Assert
+            assert result is True
+            mock_collection.update_one.assert_called_once()
+
+    def test_refund_credits_user_not_found(self, credit_service):
+        """Test credit refund when user not found."""
+        # Arrange
+        with patch('backend.services.credit_service.get_database') as mock_db:
+            mock_collection = Mock()
+            mock_db.return_value = {'users': mock_collection}
+            mock_collection.find_one.return_value = None
+
+            # Act
+            result = credit_service.refund_credits('nonexistent_user', 2, 'operation_failed')
+
+            # Assert
+            assert result is False

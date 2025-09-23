@@ -373,6 +373,79 @@ class TestSlackRoutes:
             data = json.loads(response.data)
             assert 'Invalid state parameter' in data['error']
 
+    def test_slack_connect_requires_pro_plan(self, client):
+        """Test Slack OAuth connect endpoint requires Pro plan"""
+        # Mock user with free plan
+        with patch('backend.utils.auth_helpers.extract_user_from_request') as mock_auth:
+            mock_auth.return_value = (
+                {'googleId': 'free_user_123', 'plan': 'free'},
+                None
+            )
+
+            response = client.get('/api/integrations/slack/auth/connect',
+                                headers={'Authorization': 'Bearer valid_token'})
+
+            assert response.status_code == 403
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert data['error'] == 'Feature requires Pro plan'
+            assert data['current_plan'] == 'free'
+            assert data['required_plan'] == 'pro'
+            assert data['upgrade_required'] is True
+
+    def test_slack_connect_allows_pro_plan(self, client, mock_slack_service):
+        """Test Slack OAuth connect endpoint allows Pro plan"""
+        # Mock user with pro plan
+        with patch('backend.utils.auth_helpers.extract_user_from_request') as mock_auth, \
+             patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+
+            mock_auth.return_value = (
+                {'googleId': 'pro_user_123', 'plan': 'pro'},
+                None
+            )
+
+            response = client.get('/api/integrations/slack/auth/connect',
+                                headers={'Authorization': 'Bearer valid_token'})
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert 'oauth_url' in data
+            assert 'state' in data
+
+    def test_slack_status_requires_pro_plan(self, client):
+        """Test Slack status endpoint requires Pro plan"""
+        # Mock user with free plan
+        with patch('backend.utils.auth_helpers.extract_user_from_request') as mock_auth:
+            mock_auth.return_value = (
+                {'googleId': 'free_user_123', 'plan': 'free'},
+                None
+            )
+
+            response = client.get('/api/integrations/slack/status',
+                                headers={'Authorization': 'Bearer valid_token'})
+
+            assert response.status_code == 403
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert data['error'] == 'Feature requires Pro plan'
+
+    def test_slack_disconnect_requires_pro_plan(self, client):
+        """Test Slack disconnect endpoint requires Pro plan"""
+        # Mock user with free plan
+        with patch('backend.utils.auth_helpers.extract_user_from_request') as mock_auth:
+            mock_auth.return_value = (
+                {'googleId': 'free_user_123', 'plan': 'free'},
+                None
+            )
+
+            response = client.delete('/api/integrations/slack/disconnect',
+                                   headers={'Authorization': 'Bearer valid_token'})
+
+            assert response.status_code == 403
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert data['error'] == 'Feature requires Pro plan'
+
 
 class TestSlackService:
     """Unit tests for SlackService methods"""

@@ -28,12 +28,15 @@ import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import { useForm, hasFormModifications } from '@/lib/FormContext'
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useCreditValidation } from '@/hooks/use-credit-validation'
 
 // Types and Utils
 import { type LayoutPreference, type Priority, type TaskOrderingPattern } from '@/lib/types'
 
 import { generateSchedule, loadSchedule } from '@/lib/ScheduleHelper'
 import { formatDateToString } from '@/lib/helper'
+import { initiateProCheckout } from '@/lib/api/billing'
+import { triggerCreditRefresh } from '@/lib/credit-events'
 
 // Define energy options with icons
 const energyOptions = [
@@ -174,6 +177,7 @@ export default function PreferencesPage () {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [priorities, setPriorities] = useState(defaultPriorities)
   const hasLoadedRef = useRef(false)
+  const { billingStatus, isLoading: isLoadingCredits, hasEnoughCredits } = useCreditValidation()
 
   /**
    * Get the target date from URL parameter or fallback to today
@@ -395,6 +399,16 @@ export default function PreferencesPage () {
 
   // Handle save and generate schedule
   const handleSave = useCallback(async () => {
+    // Check credits before proceeding
+    if (!hasEnoughCredits(1)) {
+      toast({
+        title: 'Insufficient Credits',
+        description: 'You need at least 1 credit to generate a schedule.',
+        variant: 'destructive'
+      })
+      return
+    }
+
     setIsLoading(true)
     try {
       const targetDate = getTargetDate()
@@ -411,6 +425,9 @@ export default function PreferencesPage () {
       // Generate schedule with updated preferences and existing tasks
       await generateSchedule(payload)
 
+      // Trigger credit refresh across all components (simple event system per dev-guide.md)
+      triggerCreditRefresh()
+
       // Clear form state from localStorage after successful save
       clearFormState()
 
@@ -426,7 +443,7 @@ export default function PreferencesPage () {
     } finally {
       setIsLoading(false)
     }
-  }, [state, toast, router, getTargetDate])
+  }, [state, toast, router, getTargetDate, hasEnoughCredits])
 
   // Show loading page during schedule generation
   if (isLoading) {
@@ -440,6 +457,7 @@ export default function PreferencesPage () {
         showUpgradeButton={true}
         onSave={handleSave}
         isLoading={isLoading}
+        saveDisabled={isLoadingCredits || !hasEnoughCredits(1)}
       />
 
       <div className="flex-1 overflow-y-auto mobile-scroll preferences-scope">
@@ -796,10 +814,15 @@ export default function PreferencesPage () {
             <div className="hidden sm:flex justify-end">
               <Button
                 onClick={handleSave}
-                disabled={isLoading || isLoadingTasks}
+                disabled={isLoading || isLoadingTasks || isLoadingCredits || !hasEnoughCredits(1)}
                 size="lg"
               >
-                {isLoading ? 'Saving...' : 'Save'}
+                {isLoading
+                  ? 'Saving...'
+                  : !hasEnoughCredits(1)
+                    ? 'Insufficient Credits'
+                    : 'Save'
+                }
               </Button>
             </div>
           </div>

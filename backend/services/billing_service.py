@@ -141,6 +141,12 @@ class BillingService:
             print(f"DEBUG: Found user for email {customer_email}: {user.get('googleId')}")
             print(f"DEBUG: Current user plan/role: plan={user.get('plan')}, role={user.get('role')}")
 
+            # Track original subscription date for anniversary-based resets
+            subscription_start_date = datetime.fromtimestamp(
+                subscription.current_period_start,
+                tz=timezone.utc
+            )
+
             # Update user to Pro plan with 40 credits (monthly only)
             update_data = {
                 'stripeCustomerId': customer_id,
@@ -148,7 +154,8 @@ class BillingService:
                 'plan': 'pro',
                 'planInterval': 'month',
                 'creditsThisMonth': 40,
-                'nextCreditResetAt': next_reset
+                'nextCreditResetAt': next_reset,
+                'subscriptionStartDate': subscription_start_date  # Track original subscription date
             }
 
             users_collection.update_one(
@@ -279,6 +286,79 @@ class BillingService:
             return {
                 'success': False,
                 'error': f"Failed to handle subscription deletion: {str(e)}"
+            }
+
+    def handle_payment_succeeded(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle successful payment webhook for subscription renewals.
+        Resets credits to 40 on subscription anniversary date.
+
+        Args:
+            invoice: Stripe invoice data
+
+        Returns:
+            Dict containing success status and result or error
+        """
+        try:
+            customer_id = invoice.get('customer')
+            subscription_id = invoice.get('subscription')
+
+            if not subscription_id:
+                # Not a subscription payment, ignore
+                return {
+                    'success': True,
+                    'message': 'Non-subscription payment, no action needed'
+                }
+
+            # Get user from database
+            db = get_database()
+            users_collection = db['users']
+
+            user = users_collection.find_one({'stripeCustomerId': customer_id})
+            if not user:
+                return {
+                    'success': False,
+                    'error': 'User not found'
+                }
+
+            # Only reset credits for Pro users
+            if user.get('plan') != 'pro':
+                return {
+                    'success': True,
+                    'message': 'User not on Pro plan, no action needed'
+                }
+
+            # Retrieve subscription from Stripe to get period info
+            subscription = stripe.Subscription.retrieve(subscription_id)
+
+            # Calculate next credit reset date (anniversary-based)
+            next_reset = datetime.fromtimestamp(
+                subscription.current_period_end,
+                tz=timezone.utc
+            )
+
+            # Reset credits to 40 for Pro users on successful payment
+            update_data = {
+                'creditsThisMonth': 40,
+                'nextCreditResetAt': next_reset
+            }
+
+            users_collection.update_one(
+                {'googleId': user['googleId']},
+                {'$set': update_data}
+            )
+
+            return {
+                'success': True,
+                'user_id': user['googleId'],
+                'credits_reset': 40,
+                'next_reset': next_reset.isoformat()
+            }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to handle payment success: {str(e)}"
             }
 
     def handle_payment_failed(self, invoice: Dict[str, Any]) -> Dict[str, Any]:

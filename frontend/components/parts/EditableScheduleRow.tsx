@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { triggerHapticFeedback, HapticPatterns } from '@/lib/haptics'
+import { initiateProCheckout } from '@/lib/api/billing'
 
 // Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
@@ -312,12 +313,13 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   // Hooks
   const { state: formData } = useForm()
   const { toast } = useToast()
-  
+
   // Use new microstep decomposition hook
   const microstepHook = useMicrostepDecomposition()
-  
+
   // Use decomposition context for global state management
   const decompositionContext = useDecompositionContext()
+
 
   // Memoize canDecompose calculation to prevent unnecessary re-renders
   const canDecompose = useMemo(() => {
@@ -671,10 +673,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     // Guard clause - only proceed if decomposition is allowed
     if (!canDecompose || microstepHook.isDecomposing) return
 
+
     try {
       // Set global decomposition state to prevent concurrent operations
       decompositionContext.setDecomposingTask(task.id)
-      
+
       // Use the hook to handle decomposition
       await microstepHook.decompose(task, formData)
     } catch (error) {

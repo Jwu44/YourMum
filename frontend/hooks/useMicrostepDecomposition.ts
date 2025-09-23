@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { handleMicrostepDecomposition } from '@/lib/helper'
 import { type Task } from '@/lib/types'
+import { triggerCreditRefresh } from '@/lib/credit-events'
 
 interface MicrostepDecompositionState {
   isDecomposing: boolean
@@ -33,7 +34,7 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
   const [showMicrosteps, setShowMicrosteps] = useState(false)
-  
+
   const { toast } = useToast()
 
   /**
@@ -81,6 +82,9 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
 
       setSuggestedMicrosteps(microstepTasks)
       setShowMicrosteps(true)
+
+      // Trigger credit refresh across all components (simple event system per dev-guide.md)
+      triggerCreditRefresh()
 
       toast({
         title: 'Success!',

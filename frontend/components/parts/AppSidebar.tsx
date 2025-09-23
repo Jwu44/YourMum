@@ -28,9 +28,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // Import helper to get current date string
 import { formatDateToString } from '@/lib/helper'
 import { useAuth } from '@/auth/AuthContext'
-import { billingApi } from '@/lib/api/billing'
+import { billingApi, initiateProCheckout } from '@/lib/api/billing'
 import type { BillingStatus } from '@/lib/types'
-import { UpgradeModal } from '@/components/parts/UpgradeModal'
+import { onCreditRefresh } from '@/lib/credit-events'
+// Deprecated: UpgradeModal replaced by direct Stripe redirect
 
 // Hooks
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -162,7 +163,6 @@ export function AppSidebar (): JSX.Element {
   // Credits and billing state
   const [billingStatus, setBillingStatus] = React.useState<BillingStatus | null>(null)
   const [isLoadingCredits, setIsLoadingCredits] = React.useState(false)
-  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false)
 
   // Get navigation items with current active state
   const navigationItems = React.useMemo(() => getNavigationItems(pathname), [pathname])
@@ -202,26 +202,33 @@ export function AppSidebar (): JSX.Element {
     }
   }, [sidebarState, setOpen, isMobile])
 
+  // Fetch billing status function (reusable helper per dev-guide.md)
+  const fetchBillingStatus = React.useCallback(async () => {
+    if (!user) return
+
+    try {
+      setIsLoadingCredits(true)
+      const result = await billingApi.getBillingStatus()
+      if (result.success && result.status) {
+        setBillingStatus(result.status)
+      }
+    } catch (error) {
+      console.warn('Failed to fetch billing status:', error)
+    } finally {
+      setIsLoadingCredits(false)
+    }
+  }, [user])
+
   // Fetch billing status when user is available
   React.useEffect(() => {
-    const fetchBillingStatus = async () => {
-      if (!user || isLoadingCredits) return
-
-      try {
-        setIsLoadingCredits(true)
-        const result = await billingApi.getBillingStatus()
-        if (result.success && result.status) {
-          setBillingStatus(result.status)
-        }
-      } catch (error) {
-        console.warn('Failed to fetch billing status:', error)
-      } finally {
-        setIsLoadingCredits(false)
-      }
-    }
-
     fetchBillingStatus()
-  }, [user]) // Remove isLoadingCredits dependency to prevent loop
+  }, [fetchBillingStatus])
+
+  // Listen for credit refresh events (simple event system per dev-guide.md)
+  React.useEffect(() => {
+    const cleanup = onCreditRefresh(fetchBillingStatus)
+    return cleanup
+  }, [fetchBillingStatus])
 
   /**
    * Get the first letter of the user's email for the avatar
@@ -547,26 +554,16 @@ export function AppSidebar (): JSX.Element {
       <div className="px-5 pb-3">
         {/* Credits Display */}
         {billingStatus && (
-          <div className="mb-4 p-3 bg-sidebar-accent/20 rounded-lg border border-sidebar-border/50">
+          <div className="mb-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {billingStatus.plan === 'pro' ? (
-                  <Crown className="w-4 h-4 text-yellow-500" />
-                ) : (
-                  <Zap className="w-4 h-4 text-blue-500" />
-                )}
-                <span className="text-xs font-medium text-sidebar-foreground uppercase tracking-wide">
-                  {billingStatus.plan} Plan
+              <span className={`text-xs font-medium tracking-wide ${billingStatus.plan === 'free' && billingStatus.creditsThisMonth <= 1 ? 'text-orange-600' : 'text-sidebar-foreground'}`}>
+                {billingStatus.plan === 'free' && billingStatus.creditsThisMonth <= 1 ? 'Low credits remaining' : 'Credits left'}
+              </span>
+              <div className="text-sm font-bold text-sidebar-foreground">
+                {billingStatus.creditsThisMonth}
+                <span className="text-xs text-muted-foreground ml-1">
+                  / {billingStatus.creditsLimit}
                 </span>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold text-sidebar-foreground">
-                  {billingStatus.creditsThisMonth}
-                  <span className="text-xs text-muted-foreground ml-1">
-                    / {billingStatus.creditsLimit}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">credits</div>
               </div>
             </div>
 
@@ -587,24 +584,18 @@ export function AppSidebar (): JSX.Element {
               />
             </div>
 
-            {/* Plan Status */}
-            {billingStatus.plan === 'free' && billingStatus.creditsThisMonth <= 1 && (
-              <div className="mt-2 text-xs text-orange-600 font-medium">
-                Low credits remaining
-              </div>
-            )}
+            {/* Plan Status message moved to label above when low credits */}
           </div>
         )}
 
         {/* Upgrade to Pro Button - Show for free users or when billing status is unknown */}
         {(!billingStatus || billingStatus.plan === 'free') && (
           <Button
-            className="w-full mb-3 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-medium"
+            className="w-full mb-3 bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium"
             size="sm"
-            onClick={() => setShowUpgradeModal(true)}
+            onClick={() => initiateProCheckout()}
             data-testid="upgrade-to-pro-button"
           >
-            <Crown className="w-4 h-4 mr-2" />
             Upgrade to Pro
           </Button>
         )}
@@ -636,12 +627,7 @@ export function AppSidebar (): JSX.Element {
           <span className="font-medium text-sidebar-foreground truncate">{getUserEmail}</span>
         </div>
 
-        {/* Upgrade Modal */}
-        <UpgradeModal
-          isOpen={showUpgradeModal}
-          onClose={() => setShowUpgradeModal(false)}
-          creditsNeeded={1}
-        />
+        {/* Upgrade modal deprecated in favor of direct Stripe redirect */}
       </SidebarFooter>
     </Sidebar>
   )
