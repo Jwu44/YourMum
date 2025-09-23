@@ -14,11 +14,10 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       period: 'forever',
       credits: '5 credits total',
       features: [
-        '5 AI credits (lifetime)',
-        'Schedule generation (1 credit)',
-        'Task breakdown (1 credit)',
-        'Free categorization',
-        'Google Calendar sync'
+        '5 credits total',
+        'Limited schedule personalisation',
+        'Limited task breakdowns',
+        'Sync with Gcal and Slack'
       ],
       cta: 'Try For Free',
       popular: false,
@@ -30,11 +29,11 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
       period: 'month',
       credits: '40 credits/month',
       features: [
-        '40 AI credits monthly',
-        'Everything in Free',
-        'Slack integration',
+        '40 credits monthly',
+        'More schedule personalisation',
+        'More task breakdowns',
+        'Access to upcoming integrations',
         'Priority support',
-        'Advanced scheduling'
       ],
       cta: 'Choose Pro',
       popular: true,

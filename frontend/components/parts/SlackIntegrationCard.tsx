@@ -106,15 +106,15 @@ const SlackIntegrationCard: React.FC = () => {
     try {
       setIsLoading(true)
 
-      // Check if user has Pro plan before proceeding
-      if (!billingStatus || billingStatus.plan !== 'pro') {
-        toast({
-          title: 'Pro Plan Required',
-          description: 'Slack integration is only available for Pro users. Please upgrade to access this feature.',
-          variant: 'destructive'
-        })
-        return
-      }
+      // Note: Pro plan requirement removed - all users can now access Slack integration
+      // if (!billingStatus || billingStatus.plan !== 'pro') {
+      //   toast({
+      //     title: 'Pro Plan Required',
+      //     description: 'Slack integration is only available for Pro users. Please upgrade to access this feature.',
+      //     variant: 'destructive'
+      //   })
+      //   return
+      // }
 
       // Get OAuth URL from backend
       const oauthData = await slackApi.getOAuthUrl()
@@ -251,8 +251,9 @@ const SlackIntegrationCard: React.FC = () => {
   // Map current state to shell props
   const isConnected = Boolean(status.connected)
   const isBusy = isLoading || isCheckingStatus
-  const hasPro = billingStatus?.plan === 'pro'
-  const isDisabled = !hasPro && !isConnected
+  // const hasPro = billingStatus?.plan === 'pro'
+  // const isDisabled = !hasPro && !isConnected
+  const isDisabled = false // All users can now access Slack integration
 
   const ctaVariant = isConnected ? 'destructive' : (isDisabled ? 'secondary' : 'default')
   const ctaLabel = isCheckingStatus
@@ -261,13 +262,9 @@ const SlackIntegrationCard: React.FC = () => {
       ? (isConnected ? 'Disconnecting...' : 'Connecting...')
       : isConnected
         ? 'Disconnect'
-        : hasPro
-          ? 'Connect'
-          : 'Pro Required'
+        : 'Connect'
 
-  const description = hasPro
-    ? "To automatically create tasks from @mentions, please ensure the bot is added to the channels you want to use."
-    : "Pro plan required. Automatically create tasks from Slack @mentions."
+  const description = "To automatically create tasks from @mentions, please ensure the bot is added to the channels you want to use."
 
   return (
     <IntegrationCardShell
@@ -278,7 +275,7 @@ const SlackIntegrationCard: React.FC = () => {
       isBusy={isBusy}
       ctaLabel={ctaLabel}
       ctaVariant={ctaVariant as any}
-      onCtaClick={isConnected ? handleDisconnect : (isDisabled ? undefined : handleConnect)}
+      onCtaClick={isConnected ? handleDisconnect : (isDisabled ? (() => {}) : handleConnect)}
     />
   )
 }

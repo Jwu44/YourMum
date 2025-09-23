@@ -68,7 +68,7 @@ export default function SettingsPage () {
 
         // Load billing status
         const billing = await billingApi.getBillingStatus()
-        setBillingStatus(billing.status)
+        setBillingStatus(billing.status ?? null)
 
         const formData: ProfileFormData = {
           displayName: profile.displayName || '',
