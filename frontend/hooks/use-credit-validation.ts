@@ -45,7 +45,7 @@ export function useCreditValidation(): CreditValidationHook {
       if (result.success && result.status) {
         setState(prev => ({
           ...prev,
-          billingStatus: result.status,
+          billingStatus: result.status ?? null,
           isLoading: false,
           error: null,
           lastFetched: Date.now()

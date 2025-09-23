@@ -94,8 +94,8 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
     } catch (error) {
       console.error('Error decomposing task:', error)
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to break down task.',
+        title: 'Insufficient Credit',
+        description: 'You need at least 1 credit to break down a task.',
         variant: 'destructive'
       })
     } finally {

@@ -402,7 +402,7 @@ export default function PreferencesPage () {
     // Check credits before proceeding
     if (!hasEnoughCredits(1)) {
       toast({
-        title: 'Insufficient Credits',
+        title: 'Insufficient Credit',
         description: 'You need at least 1 credit to generate a schedule.',
         variant: 'destructive'
       })
@@ -457,7 +457,7 @@ export default function PreferencesPage () {
         showUpgradeButton={true}
         onSave={handleSave}
         isLoading={isLoading}
-        saveDisabled={isLoadingCredits || !hasEnoughCredits(1)}
+        saveDisabled={isLoadingCredits}
       />
 
       <div className="flex-1 overflow-y-auto mobile-scroll preferences-scope">
@@ -814,15 +814,10 @@ export default function PreferencesPage () {
             <div className="hidden sm:flex justify-end">
               <Button
                 onClick={handleSave}
-                disabled={isLoading || isLoadingTasks || isLoadingCredits || !hasEnoughCredits(1)}
+                disabled={isLoading || isLoadingTasks || isLoadingCredits}
                 size="lg"
               >
-                {isLoading
-                  ? 'Saving...'
-                  : !hasEnoughCredits(1)
-                    ? 'Insufficient Credits'
-                    : 'Save'
-                }
+                {isLoading ? 'Saving...' : 'Save'}
               </Button>
             </div>
           </div>

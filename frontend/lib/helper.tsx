@@ -44,8 +44,8 @@ export const handleMicrostepDecomposition = async (
     return data
   } catch (error) {
     console.error('Error decomposing task:', error)
-    // Return empty array on error since DecompositionResponse is now string[]
-    return []
+    // Re-throw the error so the calling code can handle it properly
+    throw error
   }
 }
 
