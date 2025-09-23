@@ -276,8 +276,8 @@ export default function PreferencesPage () {
 
   /**
    * Load current schedule tasks when component mounts
-   * Only load from backend if no user modifications exist to preserve user changes
-   * This fixes the bug where user changes are lost when navigating away and returning
+   * Always load from backend to ensure all tasks (manual + calendar) are included in payload
+   * This fixes the bug where manual tasks were lost for first-time users
    */
   useEffect(() => {
     // Only run once on mount to avoid infinite loops
@@ -285,20 +285,13 @@ export default function PreferencesPage () {
       return
     }
 
-    // Check if user has made modifications before loading from backend
-    // This preserves user changes when navigating away and returning
-    if (hasFormModifications(state)) {
-      console.log('User has modifications, preserving FormContext state instead of loading from backend')
-      hasLoadedRef.current = true
-      return
-    }
-
-    // Load current schedule from backend only if no user modifications exist
-    console.log('No user modifications detected, loading current schedule from backend...')
+    // Always load complete task list from MongoDB to ensure no tasks are lost
+    // This fixes the bug where manual tasks were missing from submit_data payload
+    console.log('Loading current schedule from backend to ensure all tasks are preserved...')
     void loadCurrentScheduleTasks()
 
     hasLoadedRef.current = true
-  }, [loadCurrentScheduleTasks, state])
+  }, [loadCurrentScheduleTasks])
 
   /**
    * Sync priorities display order with loaded form data from backend
