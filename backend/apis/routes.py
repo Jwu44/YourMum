@@ -751,7 +751,6 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "email": user_data["email"],
         "displayName": display_name,  # Use processed display_name
         "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
-        "role": "free",  # Default role for new users
         "timezone": timezone_value,  # Add timezone field with default
         "jobTitle": job_title,  # Add jobTitle field (optional)
         "age": age,  # Add age field (optional)

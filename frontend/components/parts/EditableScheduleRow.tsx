@@ -341,6 +341,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     return getSectionIcon(task.text, handleEmojiChange)
   }, [isSection, task.text, handleEmojiChange, emojiVersion])
 
+  // Determine if this is the very first section to neutralize doubled spacing from header margin
+  const isFirstSectionRow = isSection && index === 0
+
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {
     onUpdateTask({
@@ -879,8 +882,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             isLongPressing && 'scale-[1.02] shadow-lg',
             // Drag mode visual feedback
             isDragMode && 'scale-[1.05] shadow-xl z-50 rotate-1',
-            // Section styling - removed px-4 to align with task content
-            isSection ? 'mt-2.5 mb-2.5 w-full'
+            // Section styling - remove top margin for the first section to keep consistent spacing with header
+            isSection ? (isFirstSectionRow ? 'mt-0 mb-2.5 w-full' : 'mt-2.5 mb-2.5 w-full')
             // Task card styling - conditional right padding for mobile
               : isMobile
                 ? 'p-4 pr-4 my-2 rounded-xl border border-border bg-card transition-[background-color,border-color,box-shadow,transform,scale] duration-200 shadow-soft w-full'

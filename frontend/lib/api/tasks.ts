@@ -60,7 +60,6 @@ export async function POST (request: NextRequest) {
       email: userData.email,
       displayName: userData.displayName || '',
       photoURL: userData.photoURL || '',
-      role: 'free',
       calendarSynced: false,
       lastLogin: new Date().toISOString(),
       createdAt: new Date().toISOString()
@@ -73,7 +72,6 @@ export async function POST (request: NextRequest) {
         name: userDoc.displayName,
         googleId: userDoc.googleId,
         email: userDoc.email,
-        role: userDoc.role
       })
     })
 

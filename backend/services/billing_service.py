@@ -139,7 +139,7 @@ class BillingService:
                 }
 
             print(f"DEBUG: Found user for email {customer_email}: {user.get('googleId')}")
-            print(f"DEBUG: Current user plan/role: plan={user.get('plan')}, role={user.get('role')}")
+            print(f"DEBUG: Current user plan: plan={user.get('plan')}")
 
             # Track original subscription date for anniversary-based resets
             subscription_start_date = datetime.fromtimestamp(

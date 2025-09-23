@@ -195,7 +195,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   }, [isCalendarOpen, loadAvailableDates, availableDates.size])
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 mb-3 sm:mb-4">
       {isMobile ? (
         /* Mobile: Three-section layout with even spacing */
         <div className="flex items-center justify-between gap-2">

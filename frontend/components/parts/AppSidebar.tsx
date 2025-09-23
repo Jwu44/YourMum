@@ -570,11 +570,7 @@ export function AppSidebar (): JSX.Element {
             {/* Progress Bar */}
             <div className="mt-2 w-full bg-sidebar-border rounded-full h-1.5">
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  billingStatus.plan === 'pro'
-                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-600'
-                    : 'bg-gradient-to-r from-blue-400 to-blue-600'
-                }`}
+                className={"h-1.5 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-400 to-blue-600"}
                 style={{
                   width: `${Math.max(
                     (billingStatus.creditsThisMonth / billingStatus.creditsLimit) * 100,

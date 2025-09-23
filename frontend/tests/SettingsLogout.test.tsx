@@ -11,6 +11,11 @@ jest.mock('@/lib/api/settings', () => ({
   fetchUserProfile: jest.fn(),
   updateUserProfile: jest.fn()
 }));
+jest.mock('@/lib/api/billing', () => ({
+  billingApi: {
+    getBillingStatus: jest.fn()
+  }
+}));
 jest.mock('@/components/parts/SidebarLayout', () => {
   return { SidebarLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-layout">{children}</div> };
 });
@@ -40,7 +45,6 @@ const mockUserProfile = {
   email: 'john@example.com',
   jobTitle: 'Software Engineer',
   age: 30,
-  role: 'free'
 };
 
 const mockToast = jest.fn();
@@ -57,6 +61,15 @@ describe('Settings Logout Functionality', () => {
     
     // Mock successful profile fetch
     require('@/lib/api/settings').fetchUserProfile.mockResolvedValue(mockUserProfile);
+
+    // Mock billing API
+    require('@/lib/api/billing').billingApi.getBillingStatus.mockResolvedValue({
+      status: {
+        plan: 'free',
+        creditsThisMonth: 5,
+        planInterval: null
+      }
+    });
     
     // Reset location assign mock
     mockLocationAssign.mockClear();

@@ -95,7 +95,6 @@ def initialize_user_collection():
         user_indexes = [
             IndexModel([("googleId", ASCENDING)], unique=True),
             IndexModel([("email", ASCENDING)], unique=True),
-            IndexModel([("role", ASCENDING)]),  # For future RBAC queries
             IndexModel([("lastLogin", ASCENDING)])  # For user activity tracking
         ]
 
@@ -287,7 +286,6 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             "email": user_data["email"],
             "displayName": user_data.get("displayName", ""),
             "photoURL": user_data.get("photoURL"),
-            "role": user_data.get("role", "free"),
             "timezone": user_data.get("timezone", "UTC"),
             "jobTitle": user_data.get("jobTitle"),
             "age": user_data.get("age"),

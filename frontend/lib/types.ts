@@ -293,7 +293,6 @@ export interface UserDocument {
   email: string
   displayName: string
   photoURL?: string
-  role: UserRole
   timezone?: string
   jobTitle?: string
   age?: number
@@ -371,7 +370,6 @@ export interface CalendarEvent {
   organizer: { email: string, displayName?: string }
 }
 
-export type UserRole = 'free' | 'pro' | 'admin'
 
 export interface AuthResponse {
   message: string

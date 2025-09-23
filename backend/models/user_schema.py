@@ -1,13 +1,12 @@
 user_schema_validation = {
     "$jsonSchema": {
         "bsonType": "object",
-        "required": ["googleId", "email", "role", "lastLogin", "createdAt"],
+        "required": ["googleId", "email", "lastLogin", "createdAt"],
         "properties": {
             "googleId": { "bsonType": "string" },
             "email": { "bsonType": "string" },
             "displayName": { "bsonType": "string" },
             "photoURL": { "bsonType": ["string", "null"] },
-            "role": { "enum": ["free", "pro", "admin"] },
             "timezone": { 
                 "bsonType": "string",
                 "description": "User's timezone in IANA format (e.g., 'Australia/Sydney', 'UTC')"
