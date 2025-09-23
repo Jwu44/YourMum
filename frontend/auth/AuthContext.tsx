@@ -52,9 +52,9 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     if (IS_DEVELOPMENT && BYPASS_AUTH) {
       console.log('Development mode: bypassing authentication')
       const mockUser = {
-        uid: 'dev-user-123',
+        uid: 'dev_test_user_12345',
         email: 'dev@example.com',
-        displayName: 'Dev User',
+        displayName: 'Dev User Updated',
         photoURL: null,
         getIdToken: async () => 'mock-token-for-development'
       } as User

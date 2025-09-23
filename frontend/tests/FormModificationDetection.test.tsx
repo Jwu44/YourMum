@@ -7,8 +7,8 @@ import { type FormData } from '@/lib/types';
 
 // Mock the initial state from FormContext
 const initialFormState: FormData = {
-  work_start_time: '9:00 AM',
-  work_end_time: '5:00 PM',
+  work_start_time: '09:00',
+  work_end_time: '17:00',
   tasks: [],
   energy_patterns: [],
   priorities: { health: '', relationships: '', fun_activities: '', ambitions: '' },
@@ -63,7 +63,7 @@ describe('hasFormModifications', () => {
       ...initialFormState,
       layout_preference: {
         ...initialFormState.layout_preference,
-        layout: 'todolist-unstructured'
+        layout: 'todolist-unstructured' as const
       }
     };
     const result = hasFormModifications(modifiedState);

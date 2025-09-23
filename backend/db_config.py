@@ -337,7 +337,10 @@ def create_or_update_user(users_collection: Collection, user_data: Dict[str, Any
             {
                 "$set": user_doc,
                 "$setOnInsert": {
-                    "createdAt": datetime.now(timezone.utc)
+                    "createdAt": datetime.now(timezone.utc),
+                    "creditsThisMonth": 5,
+                    "lifetimeFreeUsed": 0,
+                    "plan": "free"
                 }
             },
             upsert=True

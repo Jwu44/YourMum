@@ -352,11 +352,11 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 return user
 
         # STEP 3: Development bypass - return mock user only if user not found in database
-        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
+        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev_test_user_12345':
             return {
-                'googleId': 'dev-user-123',
+                'googleId': 'dev_test_user_12345',
                 'email': 'dev@example.com',
-                'displayName': 'Dev User',
+                'displayName': 'Dev User Updated',
                 'photoURL': '',
                 'role': 'free',
                 'timezone': 'UTC',  # Add timezone field for consistency
@@ -1347,7 +1347,9 @@ def submit_data():
                 raise Exception(schedule_result.get('error', 'Schedule generation failed'))
             
             generated_tasks = schedule_result.get('tasks', [])
-            if not generated_tasks:
+            input_tasks = data.get('tasks', [])
+            # Only error if we had input tasks but generated no tasks
+            if not generated_tasks and input_tasks:
                 raise Exception('No tasks generated')
 
         except Exception as gen_error:
