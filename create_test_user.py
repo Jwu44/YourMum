@@ -47,6 +47,14 @@ def create_test_user():
                     "defaultReminders": True
                 }
             },
+            # Billing fields
+            "plan": "free",
+            "creditsThisMonth": 5,  # Free users get 5 credits per month
+            "lifetimeFreeUsed": 0,  # New test user starts with 0 used credits
+            "stripeCustomerId": None,
+            "subscriptionId": None,
+            "planInterval": "null",
+            "nextCreditResetAt": None,
             "metadata": {
                 "lastModified": datetime.now(timezone.utc),
                 "createdForTesting": True

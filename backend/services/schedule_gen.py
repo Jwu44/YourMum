@@ -12,7 +12,7 @@ import os
 import json
 import uuid
 import anthropic
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from backend.models.task import Task
 from backend.services.schedule_rag import (
     create_enhanced_ordering_prompt_content,
@@ -423,6 +423,53 @@ def process_ordering_response(response_text: str) -> List[Dict[str, Any]]:
         return []
 
 
+def create_task_dict_with_integration_fields(
+    task: Task,
+    section: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create a task dictionary preserving all integration fields.
+
+    Args:
+        task: The Task object to convert
+        section: Section name to assign to the task
+        start_time: Start time if applicable
+        end_time: End time if applicable
+
+    Returns:
+        Dictionary representation of the task with all fields preserved
+    """
+    task_dict = {
+        "id": task.id,
+        "text": task.text,
+        "categories": list(task.categories) if task.categories else [],
+        "is_section": False,
+        "completed": getattr(task, 'completed', False),
+        "section": section,
+        "parent_id": None,
+        "level": 0,
+        "type": "task",
+        "start_time": start_time,
+        "end_time": end_time
+    }
+
+    # Preserve integration fields
+    if hasattr(task, 'source') and task.source:
+        task_dict["source"] = task.source
+    if hasattr(task, 'from_gcal') and task.from_gcal:
+        task_dict["from_gcal"] = task.from_gcal
+    if hasattr(task, 'gcal_event_id') and task.gcal_event_id:
+        task_dict["gcal_event_id"] = task.gcal_event_id
+    if hasattr(task, 'slack_message_url') and task.slack_message_url:
+        task_dict["slack_message_url"] = task.slack_message_url
+    if hasattr(task, 'slack_metadata') and task.slack_metadata:
+        task_dict["slack_metadata"] = task.slack_metadata
+
+    return task_dict
+
+
 def assemble_final_schedule(
     placements: List[Dict[str, Any]],
     task_registry: Dict[str, Task],
@@ -491,19 +538,12 @@ def assemble_final_schedule(
                         start_time = time_data.get("start_time")
                         end_time = time_data.get("end_time")
                 
-                task_dict = {
-                    "id": task.id,
-                    "text": task.text,
-                    "categories": list(task.categories) if task.categories else [],
-                    "is_section": False,
-                    "completed": getattr(task, 'completed', False),
-                    "section": None,
-                    "parent_id": None,
-                    "level": 0,
-                    "type": "task",
-                    "start_time": start_time,
-                    "end_time": end_time
-                }
+                task_dict = create_task_dict_with_integration_fields(
+                    task=task,
+                    section=None,
+                    start_time=start_time,
+                    end_time=end_time
+                )
                 final_tasks.append(task_dict)
         
         # Handle structured layout (with sections)
@@ -536,19 +576,12 @@ def assemble_final_schedule(
                         end_time = time_data.get("end_time")
                         print(f"[SCHEDULE_GEN] Set time allocation for task '{task.text}': {start_time} - {end_time}")
                 
-                task_dict = {
-                    "id": task.id,
-                    "text": task.text,  # Keep original text clean
-                    "categories": list(task.categories) if task.categories else [],
-                    "is_section": False,
-                    "completed": getattr(task, 'completed', False),
-                    "section": section,
-                    "parent_id": None,
-                    "level": 0,
-                    "type": "task",
-                    "start_time": start_time,
-                    "end_time": end_time
-                }
+                task_dict = create_task_dict_with_integration_fields(
+                    task=task,
+                    section=section,
+                    start_time=start_time,
+                    end_time=end_time
+                )
                 final_tasks.append(task_dict)
         
         # Add any unplaced tasks to the end
@@ -563,36 +596,22 @@ def assemble_final_schedule(
                 last_section = sections[-1]
                 
                 for task in unplaced_tasks:
-                    task_dict = {
-                        "id": task.id,
-                        "text": task.text,
-                        "categories": list(task.categories) if task.categories else [],
-                        "is_section": False,
-                        "completed": getattr(task, 'completed', False),
-                        "section": last_section,
-                        "parent_id": None,
-                        "level": 0,
-                        "type": "task",
-                        "start_time": None,
-                        "end_time": None
-                    }
+                    task_dict = create_task_dict_with_integration_fields(
+                        task=task,
+                        section=last_section,
+                        start_time=None,
+                        end_time=None
+                    )
                     final_tasks.append(task_dict)
             else:
                 # For unstructured layouts: add directly to final_tasks
                 for task in unplaced_tasks:
-                    task_dict = {
-                        "id": task.id,
-                        "text": task.text,
-                        "categories": list(task.categories) if task.categories else [],
-                        "is_section": False,
-                        "completed": getattr(task, 'completed', False),
-                        "section": None,
-                        "parent_id": None,
-                        "level": 0,
-                        "type": "task",
-                        "start_time": None,
-                        "end_time": None
-                    }
+                    task_dict = create_task_dict_with_integration_fields(
+                        task=task,
+                        section=None,
+                        start_time=None,
+                        end_time=None
+                    )
                     final_tasks.append(task_dict)
         
         return {

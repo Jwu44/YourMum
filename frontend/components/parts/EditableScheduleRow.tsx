@@ -169,8 +169,8 @@ const getTaskSourceLogo = (task: Task): React.ReactNode => {
     )
   }
 
-  // Check for Google Calendar source (identified by gcal_event_id)
-  if (task.gcal_event_id || task.source === 'calendar') {
+  // Check for Google Calendar source (source field takes precedence, with fallback to legacy fields)
+  if (task.source === 'calendar' || task.gcal_event_id) {
     return (
       <img
         src="/images/integrations/gcal_logo_task.svg"
