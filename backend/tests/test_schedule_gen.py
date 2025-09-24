@@ -11,7 +11,7 @@ from typing import Dict, List, Any
 # Import the functions we'll be testing
 from backend.services.schedule_gen import (
     create_task_registry,
-    categorize_uncategorized_tasks,
+    categorize_tasks,
     generate_local_sections,
     create_ordering_prompt,
     process_ordering_response,
@@ -85,7 +85,7 @@ class TestCategorization:
         registry = {"1": task1, "2": task2}
         
         # Test categorization
-        success = categorize_uncategorized_tasks(uncategorized, registry)
+        success = categorize_tasks(uncategorized, registry)
         
         assert success is True
         assert registry["1"].categories == ["Exercise"]
@@ -101,7 +101,7 @@ class TestCategorization:
         uncategorized = [task1]
         registry = {"1": task1}
         
-        success = categorize_uncategorized_tasks(uncategorized, registry)
+        success = categorize_tasks(uncategorized, registry)
         
         assert success is False
         assert registry["1"].categories == ["Work"]  # Default fallback
@@ -758,6 +758,331 @@ class TestErrorHandling:
         assert result["success"] is False
         assert "error" in result
         assert "tasks" in result  # Should include fallback tasks
+
+
+class TestTaskMetadataPreservation:
+    """Test task metadata preservation for Google Calendar and Slack tasks"""
+
+    @patch('backend.services.schedule_gen.client')
+    def test_google_calendar_task_preserves_metadata_and_times(self, mock_client):
+        """Test that Google Calendar tasks preserve gcal_event_id, from_gcal, source and original times"""
+        # Mock LLM ordering response with time allocation
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "gcal-123", "section": "Morning", "order": 1, "time_allocation": "10:00am - 11:00am"}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+
+        # Google Calendar task with metadata and original times
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "timing": "timebox"
+            },
+            "tasks": [{
+                "id": "gcal-123",
+                "text": "go to walmart",
+                "categories": [],
+                "completed": False,
+                "is_subtask": False,
+                "is_section": False,
+                "section": None,
+                "parent_id": None,
+                "level": 0,
+                "section_index": 0,
+                "type": "task",
+                "start_time": "15:00",        # Original calendar time
+                "end_time": "16:00",          # Original calendar time
+                "is_recurring": None,
+                "start_date": "2025-09-24",
+                "gcal_event_id": "gcal-123",  # Google Calendar metadata
+                "from_gcal": True,            # Google Calendar flag
+                "source": "calendar"          # Source field
+            }]
+        }
+
+        result = generate_schedule(user_data)
+
+        assert result["success"] is True
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 1
+
+        gcal_task = regular_tasks[0]
+
+        # Verify Google Calendar metadata is preserved
+        assert gcal_task["gcal_event_id"] == "gcal-123"
+        assert gcal_task["from_gcal"] is True
+        assert gcal_task["source"] == "calendar"
+
+        # Verify original times are preserved (NOT overwritten by LLM time allocation)
+        assert gcal_task["start_time"] == "15:00"
+        assert gcal_task["end_time"] == "16:00"
+
+        # Verify scheduling fields are added
+        assert gcal_task["section"] == "Morning"
+        assert gcal_task["id"] == "gcal-123"
+        assert gcal_task["text"] == "go to walmart"
+
+    @patch('backend.services.schedule_gen.client')
+    def test_slack_task_preserves_metadata_and_times(self, mock_client):
+        """Test that Slack tasks preserve slack_message_url, source and original times if present"""
+        # Mock LLM ordering response with time allocation
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "slack-456", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+
+        # Slack task with metadata and original times
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_afternoon"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "timing": "timebox"
+            },
+            "tasks": [{
+                "id": "slack-456",
+                "text": "Follow up on project",
+                "categories": ["Work"],
+                "completed": False,
+                "start_time": "13:30",                    # Original Slack time
+                "end_time": "14:00",                      # Original Slack time
+                "slack_message_url": "https://slack.com/message/456",  # Slack metadata
+                "source": "slack"                         # Source field
+            }]
+        }
+
+        result = generate_schedule(user_data)
+
+        assert result["success"] is True
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 1
+
+        slack_task = regular_tasks[0]
+
+        # Verify Slack metadata is preserved
+        assert slack_task["slack_message_url"] == "https://slack.com/message/456"
+        assert slack_task["source"] == "slack"
+
+        # Verify original times are preserved (NOT overwritten by LLM time allocation)
+        assert slack_task["start_time"] == "13:30"
+        assert slack_task["end_time"] == "14:00"
+
+        # Verify scheduling fields are added
+        assert slack_task["section"] == "Afternoon"
+        assert slack_task["id"] == "slack-456"
+        assert slack_task["text"] == "Follow up on project"
+
+    @patch('backend.services.schedule_gen.client')
+    def test_manual_task_gets_llm_time_allocation(self, mock_client):
+        """Test that manual tasks (no source) get LLM time allocation normally"""
+        # Mock LLM ordering response with time allocation
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "manual-789", "section": "Evening", "order": 1, "time_allocation": "7:00pm - 8:00pm"}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+
+        # Manual task without source metadata
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_evening"],
+            "priorities": {"fun": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "timing": "timebox"
+            },
+            "tasks": [{
+                "id": "manual-789",
+                "text": "Read book",
+                "categories": ["Fun"],
+                "completed": False
+                # No source metadata, no original times
+            }]
+        }
+
+        result = generate_schedule(user_data)
+
+        assert result["success"] is True
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 1
+
+        manual_task = regular_tasks[0]
+
+        # Verify LLM time allocation is applied (since no original times to preserve)
+        assert manual_task["start_time"] == "7:00pm"  # LLM time allocation format
+        assert manual_task["end_time"] == "8:00pm"    # LLM time allocation format
+
+        # Verify scheduling fields are added
+        assert manual_task["section"] == "Evening"
+        assert manual_task["id"] == "manual-789"
+        assert manual_task["text"] == "Read book"
+
+    @patch('backend.services.schedule_gen.client')
+    def test_mixed_tasks_preserve_metadata_correctly(self, mock_client):
+        """Test mixed Google Calendar, Slack, and manual tasks all handled correctly"""
+        # Mock LLM ordering response with time allocations
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "gcal-111", "section": "Morning", "order": 1, "time_allocation": "9:00am - 10:00am"},
+                {"task_id": "slack-222", "section": "Afternoon", "order": 1, "time_allocation": "2:00pm - 3:00pm"},
+                {"task_id": "manual-333", "section": "Evening", "order": 1, "time_allocation": "6:00pm - 7:00pm"}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"work": "1"},
+            "layout_preference": {
+                "layout": "todolist-structured",
+                "subcategory": "day-sections",
+                "timing": "timebox"
+            },
+            "tasks": [
+                # Google Calendar task
+                {
+                    "id": "gcal-111",
+                    "text": "Doctor appointment",
+                    "categories": [],
+                    "start_time": "10:30",
+                    "end_time": "11:00",
+                    "gcal_event_id": "gcal-111",
+                    "from_gcal": True,
+                    "source": "calendar"
+                },
+                # Slack task
+                {
+                    "id": "slack-222",
+                    "text": "Team standup",
+                    "categories": ["Work"],
+                    "start_time": "14:00",
+                    "end_time": "14:30",
+                    "slack_message_url": "https://slack.com/message/222",
+                    "source": "slack"
+                },
+                # Manual task
+                {
+                    "id": "manual-333",
+                    "text": "Grocery shopping",
+                    "categories": ["Fun"]
+                    # No source metadata or times
+                }
+            ]
+        }
+
+        result = generate_schedule(user_data)
+
+        assert result["success"] is True
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(regular_tasks) == 3
+
+        # Find each task
+        gcal_task = next(t for t in regular_tasks if t["id"] == "gcal-111")
+        slack_task = next(t for t in regular_tasks if t["id"] == "slack-222")
+        manual_task = next(t for t in regular_tasks if t["id"] == "manual-333")
+
+        # Verify Google Calendar task preserves original times and metadata
+        assert gcal_task["start_time"] == "10:30"  # Original preserved
+        assert gcal_task["end_time"] == "11:00"    # Original preserved
+        assert gcal_task["gcal_event_id"] == "gcal-111"
+        assert gcal_task["from_gcal"] is True
+        assert gcal_task["source"] == "calendar"
+
+        # Verify Slack task preserves original times and metadata
+        assert slack_task["start_time"] == "14:00"  # Original preserved
+        assert slack_task["end_time"] == "14:30"    # Original preserved
+        assert slack_task["slack_message_url"] == "https://slack.com/message/222"
+        assert slack_task["source"] == "slack"
+
+        # Verify manual task gets LLM time allocation
+        assert manual_task["start_time"] == "6:00pm"  # LLM time allocation format
+        assert manual_task["end_time"] == "7:00pm"    # LLM time allocation format
+        # Manual task should not have source metadata
+        assert "gcal_event_id" not in manual_task
+        assert "slack_message_url" not in manual_task
+
+    @patch('backend.services.schedule_gen.client')
+    def test_unstructured_layout_preserves_metadata(self, mock_client):
+        """Test metadata preservation also works with unstructured layout"""
+        # Mock LLM ordering response
+        mock_response = Mock()
+        mock_response.content = [Mock()]
+        mock_response.content[0].text = json.dumps({
+            "placements": [
+                {"task_id": "gcal-555", "section": "", "order": 1}
+            ]
+        })
+        mock_client.messages.create.return_value = mock_response
+
+        user_data = {
+            "work_start_time": "09:00",
+            "work_end_time": "17:00",
+            "energy_patterns": ["peak_morning"],
+            "priorities": {"health": "1"},
+            "layout_preference": {
+                "layout": "todolist-unstructured",
+                "timing": "untimebox"
+            },
+            "tasks": [{
+                "id": "gcal-555",
+                "text": "Gym class",
+                "categories": [],
+                "start_time": "08:00",
+                "end_time": "09:00",
+                "gcal_event_id": "gcal-555",
+                "from_gcal": True,
+                "source": "calendar"
+            }]
+        }
+
+        result = generate_schedule(user_data)
+
+        assert result["success"] is True
+        # No sections for unstructured layout
+        section_tasks = [t for t in result["tasks"] if t.get("is_section")]
+        regular_tasks = [t for t in result["tasks"] if not t.get("is_section")]
+        assert len(section_tasks) == 0
+        assert len(regular_tasks) == 1
+
+        gcal_task = regular_tasks[0]
+
+        # Verify Google Calendar metadata is preserved even in unstructured layout
+        assert gcal_task["gcal_event_id"] == "gcal-555"
+        assert gcal_task["from_gcal"] is True
+        assert gcal_task["source"] == "calendar"
+
+        # Verify original times are preserved (for untimebox, times should still be preserved for calendar tasks)
+        assert gcal_task["start_time"] == "08:00"
+        assert gcal_task["end_time"] == "09:00"
+
+        # Verify unstructured layout fields
+        assert gcal_task["section"] is None
+        assert gcal_task["id"] == "gcal-555"
 
 
 if __name__ == "__main__":
