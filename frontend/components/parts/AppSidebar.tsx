@@ -28,8 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // Import helper to get current date string
 import { formatDateToString } from '@/lib/helper'
 import { useAuth } from '@/auth/AuthContext'
-import { billingApi, initiateProCheckout } from '@/lib/api/billing'
-import type { BillingStatus } from '@/lib/types'
+import { initiateProCheckout } from '@/lib/api/billing'
 import { onCreditRefresh } from '@/lib/credit-events'
 // Deprecated: UpgradeModal replaced by direct Stripe redirect
 
@@ -154,15 +153,18 @@ export function AppSidebar (): JSX.Element {
     isOnboardingActive = false
   }
   let user: any
+  let billingStatus: any
+  let refreshBillingStatus: any
   try {
-    user = useAuth().user
+    const auth = useAuth()
+    user = auth.user
+    billingStatus = auth.billingStatus
+    refreshBillingStatus = auth.refreshBillingStatus
   } catch (e) {
     user = { email: 'test@example.com' }
+    billingStatus = null
+    refreshBillingStatus = () => Promise.resolve()
   }
-
-  // Credits and billing state
-  const [billingStatus, setBillingStatus] = React.useState<BillingStatus | null>(null)
-  const [isLoadingCredits, setIsLoadingCredits] = React.useState(false)
 
   // Get navigation items with current active state
   const navigationItems = React.useMemo(() => getNavigationItems(pathname), [pathname])
@@ -202,33 +204,11 @@ export function AppSidebar (): JSX.Element {
     }
   }, [sidebarState, setOpen, isMobile])
 
-  // Fetch billing status function (reusable helper per dev-guide.md)
-  const fetchBillingStatus = React.useCallback(async () => {
-    if (!user) return
-
-    try {
-      setIsLoadingCredits(true)
-      const result = await billingApi.getBillingStatus()
-      if (result.success && result.status) {
-        setBillingStatus(result.status)
-      }
-    } catch (error) {
-      console.warn('Failed to fetch billing status:', error)
-    } finally {
-      setIsLoadingCredits(false)
-    }
-  }, [user])
-
-  // Fetch billing status when user is available
-  React.useEffect(() => {
-    fetchBillingStatus()
-  }, [fetchBillingStatus])
-
   // Listen for credit refresh events (simple event system per dev-guide.md)
   React.useEffect(() => {
-    const cleanup = onCreditRefresh(fetchBillingStatus)
+    const cleanup = onCreditRefresh(refreshBillingStatus)
     return cleanup
-  }, [fetchBillingStatus])
+  }, [refreshBillingStatus])
 
   /**
    * Get the first letter of the user's email for the avatar

@@ -80,17 +80,6 @@ const saveCustomEmoji = (sectionName: string, emoji: string) => {
     console.error('Failed to save custom emoji:', error)
   }
 }
-
-/**
- * Common emojis for quick selection
- */
-const COMMON_EMOJIS = [
-  '⚡️', '✏️', '☕️', '🌅', '🌆', '🎑', '🦕',
-  '🎯', '💼', '🏠', '💪', '🧠', '❤️', '🎉',
-  '📚', '🍎', '🚀', '⭐', '🔥', '💎', '🌟',
-  '📝', '💻', '🎨', '🎵', '🏃', '🛏️', '🍽️'
-]
-
 /**
  * Simple emoji picker component using Popover
  */

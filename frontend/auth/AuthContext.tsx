@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { type User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
 import { auth } from './firebase'
-import { type AuthContextType } from '@/lib/types'
+import { type AuthContextType, type BillingStatus } from '@/lib/types'
 import { detectBrowserTimezone, shouldUpdateUserTimezone } from '@/lib/utils/timezone'
 import { apiClient } from '@/lib/api/client'
+import { billingApi } from '@/lib/api/billing'
 
 /**
  * Auth Context for managing user authentication state
@@ -32,6 +33,7 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
   // Simplified state - removed complex OAuth flags
 
   // Initialize API client on mount
@@ -82,6 +84,20 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     return () => { unsubscribe() }
   }, []) // Empty dependency array - setup once on mount
 
+  // Fetch billing status when user becomes available
+  const refreshBillingStatus = React.useCallback(async () => {
+    if (!user) return
+
+    try {
+      const result = await billingApi.getBillingStatus()
+      if (result.success && result.status) {
+        setBillingStatus(result.status)
+      }
+    } catch (error) {
+      console.warn('Failed to fetch billing status:', error)
+    }
+  }, [user])
+
   // Simple timezone sync when user becomes available
   useEffect(() => {
     const syncTimezoneIfNeeded = async () => {
@@ -126,7 +142,8 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     }
 
     syncTimezoneIfNeeded()
-  }, [user])
+    refreshBillingStatus()
+  }, [user, refreshBillingStatus])
 
   // Removed complex redirect result handling - OAuth callback page handles redirects
 
@@ -187,6 +204,8 @@ export function AuthProvider ({ children }: { children: React.ReactNode }) {
     currentUser: user, // Alias for compatibility
     loading,
     error,
+    billingStatus,
+    refreshBillingStatus,
     signIn,
     signOut
   }

@@ -37,6 +37,7 @@ import { generateSchedule, loadSchedule } from '@/lib/ScheduleHelper'
 import { formatDateToString } from '@/lib/helper'
 import { initiateProCheckout } from '@/lib/api/billing'
 import { triggerCreditRefresh } from '@/lib/credit-events'
+import { useAuth } from '@/auth/AuthContext'
 
 // Define energy options with icons
 const energyOptions = [
@@ -178,6 +179,7 @@ export default function PreferencesPage () {
   const [priorities, setPriorities] = useState(defaultPriorities)
   const hasLoadedRef = useRef(false)
   const { billingStatus, isLoading: isLoadingCredits, hasEnoughCredits } = useCreditValidation()
+  const { refreshBillingStatus } = useAuth()
 
   /**
    * Get the target date from URL parameter or fallback to today
@@ -418,8 +420,8 @@ export default function PreferencesPage () {
       // Generate schedule with updated preferences and existing tasks
       await generateSchedule(payload)
 
-      // Trigger credit refresh across all components (simple event system per dev-guide.md)
-      triggerCreditRefresh()
+      // Wait for credit refresh to complete before navigation
+      await refreshBillingStatus()
 
       // Clear form state from localStorage after successful save
       clearFormState()

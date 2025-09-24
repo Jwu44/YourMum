@@ -392,6 +392,8 @@ export interface AuthState {
 
 export interface AuthContextType extends AuthState {
   currentUser: User | null
+  billingStatus: BillingStatus | null
+  refreshBillingStatus: () => Promise<void>
   signIn: (redirectTo?: string) => Promise<void>
   signOut: () => Promise<void>
 }
