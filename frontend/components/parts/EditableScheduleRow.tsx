@@ -455,7 +455,6 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
 
     // Track what was originally touched for smart interaction handling
-    const target = e.target as HTMLElement
     // Use more robust detection - check if target is within checkbox container or is the checkbox itself
     const isCheckboxArea = target.closest('[data-checkbox-container]') ||
                           target.closest('button[role="checkbox"]') ||
