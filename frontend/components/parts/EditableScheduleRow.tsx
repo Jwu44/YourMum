@@ -438,6 +438,18 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
 
+    // Early detection: If touch started in checkbox area, don't process in container
+    const target = e.target as HTMLElement
+    const isCheckboxTouch = target.closest('[data-checkbox-container]') ||
+                           target.closest('button[role="checkbox"]') ||
+                           target.getAttribute('role') === 'checkbox' ||
+                           (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox')
+
+    if (isCheckboxTouch) {
+      // This is a checkbox touch - let checkbox container handle it completely
+      return
+    }
+
     // Store initial touch position for movement detection
     const touch = e.touches[0]
     touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
@@ -916,7 +928,15 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
               // Handle checkbox-specific feedback and prevent drawer opening
+              onTouchStartCapture={(e) => {
+                // Stop propagation immediately in capture phase to prevent container handlers
+                if (isMobile) {
+                  e.stopPropagation()
+                }
+              }}
               onTouchStart={(e) => {
+                // Stop propagation as first line to prevent race conditions
+                e.stopPropagation()
                 if (isMobile) {
                   triggerHapticFeedback(HapticPatterns.TAP)
                 }
@@ -928,7 +948,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 e.stopPropagation()
               }}
               onTouchMove={(e) => {
-                // Let move events bubble for drag detection
+                // Stop propagation for move events to prevent interference
+                e.stopPropagation()
               }}
               onClick={(e) => {
                 // Prevent click propagation to avoid conflicts with parent tap handling
