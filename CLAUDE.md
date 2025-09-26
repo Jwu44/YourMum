@@ -1,152 +1,186 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides workflow-focused guidance to Claude Code when working with the YourMum task management application.
 
-## Development Commands
+## Essential Commands
 
-### Frontend (Next.js + TypeScript)
+### Daily Development Workflow
 ```bash
+# ALWAYS start both services for full-stack development
+python3 application.py &           # Backend (port 8000) - start first
+cd frontend && npm run dev         # Frontend (port 3000) - start second
+
+# Verify services are running
+lsof -i :8000  # Check backend
+lsof -i :3000  # Check frontend
+```
+
+### Code Quality (ALWAYS run before commits)
+```bash
+# Frontend quality checks - run from frontend/
 cd frontend
+npm run lint                # Check TypeScript/React issues
+npm run build              # Verify production build works
 
-# Development
-npm run dev              # Start development server (port 3000)
-npm run build           # Build for production
-npm run lint            # Run ESLint
-npm run lint:fix        # Fix ESLint issues
-npm run test            # Run Jest tests
-npm run test:watch      # Run tests in watch mode
+# Backend quality checks - run from root
+python -m pytest backend/tests/ -v    # All backend tests
 ```
 
-### Backend (Flask + Python)
+### Testing Workflow
 ```bash
-# Development
-python3 application.py  # Start Flask server (port 8000)
+# Frontend tests
+cd frontend
+npm run test               # Jest unit tests
+npm run test:watch        # Watch mode for TDD
 
-# Testing
-python -m pytest backend/tests/ -v                 # Run all backend tests with verbose output
-python -m pytest backend/tests/integration/ -v     # Run integration tests
-python -m pytest backend/tests/test_specific.py    # Run single test file
-python -m pytest backend/tests/ -k "test_name"     # Run specific test by name
-```
-
-### Full Application
-```bash
-# Start both services concurrently
-python3 application.py &    # Backend on port 8000
-cd frontend && npm run dev  # Frontend on port 3000
+# Backend tests (run from root directory)
+python -m pytest backend/tests/ -v                    # All tests verbose
+python -m pytest backend/tests/integration/ -v        # Integration only
+python -m pytest backend/tests/ -k "test_specific"    # Filter by name
 ```
 
 ## Architecture Overview
 
-### Tech Stack
-- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, shadcn/ui components
-- **Backend**: Flask with Blueprint architecture, Python 3.11+
-- **Database**: MongoDB with Pydantic schema validation
-- **AI**: Anthropic Claude API (Sonnet & Haiku models)
-- **Auth**: Firebase Authentication
-- **External APIs**: Google Calendar, Slack (via Klavis AI MCP)
-- **Documentation**: Context7 MCP for up-to-date library documentation
+**Tech Stack**: Next.js 14 + TypeScript frontend, Flask + Python backend, MongoDB database, Firebase Auth, Claude AI integration
 
-### Core Architecture Patterns
+### Key Directory Structure
+```
+frontend/
+├── components/ui/          # shadcn/ui base components (Button, Input, etc.)
+├── components/parts/       # Custom app components (TaskItem, EditableSchedule)
+├── lib/api/               # API clients (tasks.ts, calendar.ts, users.ts)
+├── lib/types.ts           # TypeScript interfaces
+└── hooks/                 # Custom React hooks
 
-#### Frontend Architecture
-- **Component Structure**: shadcn/ui components in `components/ui/`, custom components in `components/parts/`
-- **State Management**: React Context with reducer patterns (FormContext, AuthContext)
-- **API Layer**: Centralized API clients in `lib/api/` (tasks.ts, calendar.ts, users.ts, etc.)
-- **Import Organization**: (1) React/3rd-party (2) Components (3) Hooks (4) Types/Utils
-- **Path Mapping**: Uses `@/*` imports configured in tsconfig.json
+backend/
+├── apis/                  # Flask routes (routes.py, calendar_routes.py)
+├── services/              # Business logic (ai_service.py, schedule_service.py)
+├── models/                # Pydantic data models
+└── tests/                 # Backend tests
+```
 
-#### Backend Architecture
-- **Blueprint Pattern**: Modular routes in `backend/apis/` (routes.py, calendar_routes.py, integration_routes.py)
-- **Service Layer**: Business logic in `backend/services/` (ai_service.py, schedule_service.py, slack_service.py)
-- **Data Models**: Pydantic models in `backend/models/` with validation
+### Core Development Patterns
 
-#### Task Management System
-- **Hierarchical Tasks**: Support for parent-child relationships with indentation levels
-- **Drag & Drop**: Custom dnd-kit implementation with indentation support (use-drag-drop-provider.tsx)
-- **AI Integration**: Task categorization, decomposition, and schedule generation
+#### Frontend (ALWAYS follow these patterns)
+- **Import Order**: (1) React/3rd-party (2) Components (3) Hooks (4) Types/Utils
+- **Component Types**: Use `interface` for props, functional components with TypeScript
+- **API Calls**: Use centralized clients in `lib/api/`, handle errors with try-catch
+- **Styling**: Tailwind CSS with shadcn/ui components, use `@/*` imports
+- **State**: React Context for global state (FormContext, AuthContext)
 
-### Key Data Models
+#### Backend (ALWAYS follow these patterns)
+- **Layered Architecture**: Routes → Services → Models (see `product/backend-guide.md`)
+- **Routes**: Flask Blueprints in `backend/apis/`, handle HTTP only
+- **Services**: Business logic in `backend/services/`, coordinate data operations
+- **Models**: Pydantic models with validation in `backend/models/`
+- **Types**: Use Python type annotations, docstrings for functions
+- **Naming**: snake_case for Python, camelCase for TypeScript
 
-#### Task Structure (Python & TypeScript)
+**For detailed backend implementation patterns, see `product/backend-guide.md`**
+
+#### Task Model (Core Data Structure)
 ```typescript
 interface Task {
-  id: string
-  text: string
-  categories?: string[]
-  completed: boolean
-  is_subtask?: boolean
-  is_section?: boolean
-  section?: string | null
-  parent_id?: string | null
-  level?: number              // Indentation level (0-n)
-  section_index?: number
-  type?: string
-  is_recurring?: RecurrenceType | null
-  is_microstep?: boolean      // AI-generated task breakdown
-  source?: 'slack' | 'calendar' | 'manual'
-  slack_message_url?: string
+  id: string                    // UUID
+  text: string                  // Task description
+  completed: boolean            // Status
+  categories?: string[]         // AI-generated categories
+  level?: number               // Indentation (0-n for hierarchy)
+  parent_id?: string           // Parent task reference
+  is_microstep?: boolean       // AI-generated breakdown
+  source?: 'slack' | 'calendar' | 'manual'  // Origin
 }
 ```
 
-## Development Guidelines
-
-### Code Style
-- **TypeScript**: Strict mode, proper interface definitions, avoid 'any'
-- **React**: Functional components with hooks, PascalCase for components, camelCase for functions
-- **Python**: Type annotations, snake_case naming, docstrings for classes/functions
-- **Import Organization**: (1) React/3rd-party (2) Components (3) Hooks (4) Types/Utils
-
-### Key Development Practices
-1. **Task-Based Development**: Follow TDD principles - create tests first, then implement code
-2. **Type Safety**: TypeScript strict mode, proper interface definitions, avoid 'any'
-3. **Error Handling**: Comprehensive try-catch blocks with user-friendly error messages
-4. **Code Simplicity**: Keep implementation simple, avoid unnecessary complexity
-
-## Environment Configuration
-
-**Backend (.env)**:
-- `MONGODB_URI` - MongoDB connection string
-- `ANTHROPIC_API_KEY` - Claude API access
-- `FIREBASE_ADMIN_CREDENTIALS` - Firebase service account path
-- `KLAVIS_API_KEY` - Required for Slack integration via Klavis AI MCP
-
-## MCP Server Configuration
-
-**Context7 Documentation Server**:
-- Provides up-to-date documentation and code examples
-- Usage: Add "use context7" to prompts for accurate library information
-- Tools: `resolve-library-id` and `get-library-docs`
-- Supports major libraries: React, Next.js, TypeScript, Python frameworks
-
-**Frontend (.env.local)**:
-- `NEXT_PUBLIC_FIREBASE_API_KEY` - Firebase web config
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` - Firebase auth domain
-- `NEXT_PUBLIC_API_URL` - Backend API URL (http://localhost:8000 for dev)
-
-## Key Implementation Patterns
+## Key Implementation Workflows
 
 ### Adding New Task Features
-1. Update Task interface in `lib/types.ts`
-2. Modify Python Task model in `backend/models/task.py`
-3. Update API endpoints in relevant route files
-4. Add frontend components and API integration
-5. Write tests for both frontend and backend
+1. **ALWAYS update both models first**: `lib/types.ts` (frontend) + `backend/models/task.py`
+2. **API endpoints**: Add to relevant route file in `backend/apis/`
+3. **Frontend integration**: Update API client in `lib/api/tasks.ts`
+4. **UI components**: Modify TaskItem or create new component in `components/parts/`
+5. **ALWAYS write tests**: Frontend (Jest) + Backend (pytest)
 
-### Drag & Drop System
-- Core logic in `hooks/use-drag-drop-provider.tsx` and `hooks/use-drag-drop-task.tsx`
-- Uses @dnd-kit with custom collision detection for parent-child relationships
-- Supports horizontal dragging for indentation (indent/outdent operations)
+### Working with AI Integration
+```bash
+# AI service endpoints in backend/services/ai_service.py
+# Key functions:
+# - categorize_tasks()        # Auto-categorize tasks
+# - decompose_task()          # Break down complex tasks
+# - generate_schedule()       # Create daily schedules
+# - get_suggestions()         # Productivity suggestions
+```
 
-### Archive System
-- Archive service in `backend/services/archive_service.py`
-- Routes: `/archive/task` (POST), `/archive/tasks` (GET), `/archive/task/<id>` (DELETE)
-- Frontend components: `ArchivedTaskItem.tsx`, archive page at `/dashboard/archive`
+### Drag & Drop System Implementation
+- **Core files**: `hooks/use-drag-drop-provider.tsx`, `hooks/use-drag-drop-task.tsx`
+- **Library**: @dnd-kit with custom collision detection
+- **Features**: Vertical reordering + horizontal indentation (parent-child relationships)
+- **NEVER modify**: Keep existing drag logic intact, extend carefully
 
-## Database Collections (MongoDB)
+### External Integrations
+- **Google Calendar**: Two-way sync via `backend/services/calendar_service.py`
+- **Slack**: Message processing via Klavis AI MCP in `backend/services/slack_service.py`
+- **Archive System**: `backend/services/archive_service.py` with routes at `/archive/task`
+
+## Environment Setup
+
+### Required Environment Variables
+```bash
+# Backend (.env) - REQUIRED for development
+MONGODB_URI=mongodb://localhost:27017/yourdai
+ANTHROPIC_API_KEY=sk-...                    # Claude API access
+FIREBASE_ADMIN_CREDENTIALS=path/to/key.json # Firebase service account
+KLAVIS_API_KEY=...                         # Slack integration (optional)
+
+# Frontend (.env.local) - REQUIRED for development
+NEXT_PUBLIC_API_URL=http://localhost:8000   # Backend URL
+NEXT_PUBLIC_FIREBASE_API_KEY=...           # Firebase config
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...       # Firebase auth domain
+```
+
+### Database Collections (MongoDB)
+- `users` - User profiles, integration settings
 - `UserSchedules` - Daily task schedules and layouts
-- `users` - User profiles and integration settings
+- `AISuggestions` - AI-generated recommendations
+- `ArchivedTasks` - User archived task storage
 - `calendar_events` - Synced Google Calendar events
-- `AISuggestions` - Generated AI recommendations
-- `MicrostepFeedback` - Task decomposition learning data
-- `ArchivedTasks` - User archived tasks storage
+
+## Critical Development Rules
+
+### ALWAYS Do This Before Coding
+1. **Understand context**: Read existing code patterns before implementing
+2. **Ask clarifying questions**: If requirements are unclear, ask until confident
+3. **Follow TDD**: Write tests first, then implement to pass tests
+4. **Keep it SIMPLE**: Avoid unnecessary complexity or clever solutions
+5. **Validate architecture**: Ensure changes maintain modular boundaries and SOLID principles
+6. **Run quality checks**: `npm run lint` + `npm run build` + `pytest` before committing
+
+### NEVER Do This
+- **NEVER use `any` type** in TypeScript - use proper interfaces
+- **NEVER skip error handling** - always use try-catch (JS) or try-except (Python)
+- **NEVER commit without tests** - TDD is required
+- **NEVER create unnecessary files** - prefer editing existing code
+- **NEVER remove existing comments or code** unnecessarily
+- **NEVER hardcode values** - use environment variables and constants
+
+### Code Quality Standards
+- **Type Safety**: Verify type consistency, check for null/undefined values
+- **Error Handling**: Consider edge cases, validate against business rules
+- **Documentation**: JSDoc comments for TypeScript, docstrings for Python
+- **Performance**: Follow language/framework best practices
+- **Reusability**: Create helper functions for common operations
+
+### Implementation Process (Follow This Order)
+1. **Parse requirements**: Understand acceptance criteria and dependencies
+2. **Design approach**: Plan modular solution respecting architectural boundaries
+3. **Write tests first**: Create test files before implementation
+4. **Implement simply**: Code to pass tests, avoid over-engineering
+5. **Document complex logic**: Add inline comments for non-obvious code
+6. **Validate integration**: Test with existing components and services
+7. **Update status**: Mark task complete after all checks pass
+
+### When Stuck
+- Check existing similar implementations in the codebase first
+- Use `use context7` for up-to-date library documentation
+- Follow the established patterns shown in existing components/services
+- Understand module relationships and data flow patterns before making changes
