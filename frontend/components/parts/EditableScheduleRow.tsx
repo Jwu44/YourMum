@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { triggerHapticFeedback, HapticPatterns } from '@/lib/haptics'
+import { initiateProCheckout } from '@/lib/api/billing'
 
 // Import our new hooks and contexts
 import { useDragDropTask } from '../../hooks/use-drag-drop-task'
@@ -79,17 +80,6 @@ const saveCustomEmoji = (sectionName: string, emoji: string) => {
     console.error('Failed to save custom emoji:', error)
   }
 }
-
-/**
- * Common emojis for quick selection
- */
-const COMMON_EMOJIS = [
-  '⚡️', '✏️', '☕️', '🌅', '🌆', '🎑', '🦕',
-  '🎯', '💼', '🏠', '💪', '🧠', '❤️', '🎉',
-  '📚', '🍎', '🚀', '⭐', '🔥', '💎', '🌟',
-  '📝', '💻', '🎨', '🎵', '🏃', '🛏️', '🍽️'
-]
-
 /**
  * Simple emoji picker component using Popover
  */
@@ -168,8 +158,8 @@ const getTaskSourceLogo = (task: Task): React.ReactNode => {
     )
   }
 
-  // Check for Google Calendar source (identified by gcal_event_id)
-  if (task.gcal_event_id || task.source === 'calendar') {
+  // Check for Google Calendar source (source field takes precedence, with fallback to legacy fields)
+  if (task.source === 'calendar' || task.gcal_event_id) {
     return (
       <img
         src="/images/integrations/gcal_logo_task.svg"
@@ -305,18 +295,20 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const [isLongPressing, setIsLongPressing] = useState(false)
   const [isDragMode, setIsDragMode] = useState(false)
   const [hasTouchMoved, setHasTouchMoved] = useState(false)
+  const [originalTouchTarget, setOriginalTouchTarget] = useState<string | null>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const longPressStartTime = useRef<number>(0)
 
   // Hooks
   const { state: formData } = useForm()
   const { toast } = useToast()
-  
+
   // Use new microstep decomposition hook
   const microstepHook = useMicrostepDecomposition()
-  
+
   // Use decomposition context for global state management
   const decompositionContext = useDecompositionContext()
+
 
   // Memoize canDecompose calculation to prevent unnecessary re-renders
   const canDecompose = useMemo(() => {
@@ -337,6 +329,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     if (!isSection) return null
     return getSectionIcon(task.text, handleEmojiChange)
   }, [isSection, task.text, handleEmojiChange, emojiVersion])
+
+  // Determine if this is the very first section to neutralize doubled spacing from header margin
+  const isFirstSectionRow = isSection && index === 0
 
   // Handlers for task operations
   const handleToggleComplete = useCallback((checked: boolean) => {
@@ -419,11 +414,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
    * Handle mobile tap to open action drawer
    */
   const handleMobileTap = useCallback(() => {
-    if (isMobile && !isSection && !isDragMode) {
+    // Add additional safeguards to prevent accidental drawer opening
+    if (isMobile && !isSection && !isDragMode && !hasTouchMoved && originalTouchTarget !== 'checkbox') {
       triggerHapticFeedback(HapticPatterns.TAP)
       setIsMobileDrawerOpen(true)
     }
-  }, [isMobile, isSection, isDragMode])
+  }, [isMobile, isSection, isDragMode, hasTouchMoved, originalTouchTarget])
 
   /**
    * Handle mobile drawer close
@@ -442,9 +438,31 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile || isSection) return
 
+    // Early detection: If touch started in checkbox area, don't process in container
+    const target = e.target as HTMLElement
+    const isCheckboxTouch = target.closest('[data-checkbox-container]') ||
+                           target.closest('button[role="checkbox"]') ||
+                           target.getAttribute('role') === 'checkbox' ||
+                           (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox')
+
+    if (isCheckboxTouch) {
+      // This is a checkbox touch - let checkbox container handle it completely
+      return
+    }
+
     // Store initial touch position for movement detection
     const touch = e.touches[0]
     touchStartPosition.current = { x: touch.clientX, y: touch.clientY }
+
+    // Track what was originally touched for smart interaction handling
+    // Use more robust detection - check if target is within checkbox container or is the checkbox itself
+    const isCheckboxArea = target.closest('[data-checkbox-container]') ||
+                          target.closest('button[role="checkbox"]') ||
+                          target.getAttribute('role') === 'checkbox' ||
+                          target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox'
+    const targetType = isCheckboxArea ? 'checkbox' :
+                      target.closest('[data-task-content]') ? 'text' : 'container'
+    setOriginalTouchTarget(targetType)
 
     longPressStartTime.current = Date.now()
     setIsLongPressing(true)
@@ -489,7 +507,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
 
     // Only treat as tap if it was short, didn't move, and not in drag mode
     // Also ensure minimal movement (< 10px) to distinguish from scroll
-    if (pressDuration < 600 && !isDragMode && !hasTouchMoved) {
+    // Don't trigger tap if touch started on checkbox (let checkbox handle it)
+    if (pressDuration < 600 && !isDragMode && !hasTouchMoved && originalTouchTarget !== 'checkbox') {
       handleMobileTap()
     }
 
@@ -503,8 +522,9 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       }
     }
 
-    // Reset touch position
+    // Reset touch position and target
     touchStartPosition.current = null
+    setOriginalTouchTarget(null)
   }, [isMobile, isSection, isDragMode, handleMobileTap, hasTouchMoved, dragDropHook.listeners])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -588,10 +608,10 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       const segments = []
 
       // Responsive visual feedback to match actual drag zones
-      // Mobile: 40% outdent/reorder : 60% indent
+      // Mobile: 70% outdent/reorder : 30% indent
       // Desktop: 10% outdent/reorder : 90% indent
-      const firstSegmentWidth = isMobile ? 40 : 10 // Mobile: 40%, Desktop: 10%
-      const remainingWidth = isMobile ? 60 : 90 // Mobile: 60%, Desktop: 90%
+      const firstSegmentWidth = isMobile ? 70 : 10 // Mobile: 70%, Desktop: 10%
+      const remainingWidth = isMobile ? 30 : 90 // Mobile: 30%, Desktop: 90%
 
       // Always have at least 2 segments total (dark + regular)
       const totalSegments = Math.max(segmentCount, 2)
@@ -656,10 +676,11 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
     // Guard clause - only proceed if decomposition is allowed
     if (!canDecompose || microstepHook.isDecomposing) return
 
+
     try {
       // Set global decomposition state to prevent concurrent operations
       decompositionContext.setDecomposingTask(task.id)
-      
+
       // Use the hook to handle decomposition
       await microstepHook.decompose(task, formData)
     } catch (error) {
@@ -861,8 +882,8 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
             isLongPressing && 'scale-[1.02] shadow-lg',
             // Drag mode visual feedback
             isDragMode && 'scale-[1.05] shadow-xl z-50 rotate-1',
-            // Section styling - removed px-4 to align with task content
-            isSection ? 'mt-2.5 mb-2.5 w-full'
+            // Section styling - remove top margin for the first section to keep consistent spacing with header
+            isSection ? (isFirstSectionRow ? 'mt-0 mb-2.5 w-full' : 'mt-2.5 mb-2.5 w-full')
             // Task card styling - conditional right padding for mobile
               : isMobile
                 ? 'p-4 pr-4 my-2 rounded-xl border border-border bg-card transition-[background-color,border-color,box-shadow,transform,scale] duration-200 shadow-soft w-full'
@@ -900,30 +921,48 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
           {!isSection && (
             <div
               ref={checkboxRef}
+              data-checkbox-container
               className={cn(
                 "flex items-center",
                 isMobile ? "p-2.5 -m-2.5" : "" // 44x44 touch target with centered 24x24 checkbox
               )}
-              // Prevent touch events from bubbling to parent task row
+              // Handle checkbox-specific feedback and prevent drawer opening
+              onTouchStartCapture={(e) => {
+                // Stop propagation immediately in capture phase to prevent container handlers
+                if (isMobile) {
+                  e.stopPropagation()
+                }
+              }}
               onTouchStart={(e) => {
+                // Stop propagation as first line to prevent race conditions
                 e.stopPropagation()
                 if (isMobile) {
                   triggerHapticFeedback(HapticPatterns.TAP)
                 }
+                // Mark that this is a checkbox interaction to prevent drawer opening
+                setOriginalTouchTarget('checkbox')
               }}
               onTouchEnd={(e) => {
+                // Ensure we don't open drawer for checkbox taps by stopping propagation
                 e.stopPropagation()
               }}
               onTouchMove={(e) => {
+                // Stop propagation for move events to prevent interference
                 e.stopPropagation()
               }}
               onClick={(e) => {
+                // Prevent click propagation to avoid conflicts with parent tap handling
                 e.stopPropagation()
               }}
             >
               <Checkbox
                 checked={task.completed}
-                onCheckedChange={handleToggleComplete}
+                onCheckedChange={(checked) => {
+                  // Only toggle if this wasn't part of a drag gesture
+                  if (!isDragMode && !hasTouchMoved && typeof checked === 'boolean') {
+                    handleToggleComplete(checked)
+                  }
+                }}
                 className={cn(
                   "data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-200",
                   isMobile ? "h-6 w-6" : "h-5 w-5" // 24x24 on mobile, 20x20 on desktop
@@ -966,6 +1005,7 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
                 WebkitTouchCallout: isMobile ? 'none' : 'inherit'
               } as React.CSSProperties}
               data-task-content="true"
+              // Touch events bubble naturally to parent for long press detection
             >
               {task.start_time && task.end_time
                 ? `${task.start_time} - ${task.end_time}: `

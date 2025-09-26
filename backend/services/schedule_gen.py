@@ -52,6 +52,15 @@ def create_task_registry(input_tasks: List[Any]) -> Tuple[Dict[str, Task], List[
             if not task_data.get('id'):
                 task_data['id'] = str(uuid.uuid4())
             task = Task.from_dict(task_data)
+
+            # Preserve extra fields not handled by Task.from_dict as dynamic attributes
+            # This ensures Google Calendar and other source metadata is preserved
+            extra_fields = [
+                'gcal_event_id', 'from_gcal'  # Google Calendar fields
+            ]
+            for field in extra_fields:
+                if field in task_data:
+                    setattr(task, field, task_data[field])
         else:
             task = task_data
         
@@ -423,6 +432,70 @@ def process_ordering_response(response_text: str) -> List[Dict[str, Any]]:
         return []
 
 
+def preserve_task_metadata(original_task: Task, scheduled_fields: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Preserve original task metadata and overlay scheduling fields.
+
+    This helper function ensures that source-specific metadata (like Google Calendar
+    or Slack identifiers) and original appointment times are preserved during
+    schedule generation.
+
+    Args:
+        original_task: The original Task object with all metadata
+        scheduled_fields: Dictionary of scheduling-specific fields to overlay
+
+    Returns:
+        Complete task dictionary with preserved metadata and scheduling fields
+    """
+    # Start with all original task fields (comprehensive preservation)
+    task_dict = {
+        "id": original_task.id,
+        "text": original_task.text,
+        "categories": list(original_task.categories) if original_task.categories else [],
+        "completed": getattr(original_task, 'completed', False),
+        "is_section": getattr(original_task, 'is_section', False),
+        "parent_id": getattr(original_task, 'parent_id', None),
+        "level": getattr(original_task, 'level', 0),
+        "type": getattr(original_task, 'type', 'task')
+    }
+
+    # Preserve all source-specific metadata fields
+    source_fields = [
+        'source', 'gcal_event_id', 'from_gcal', 'start_date',
+        'slack_message_url', 'slack_metadata', 'is_recurring',
+        'is_subtask', 'section_index', 'is_microstep'
+    ]
+
+    for field in source_fields:
+        if hasattr(original_task, field):
+            value = getattr(original_task, field)
+            if value is not None:
+                task_dict[field] = value
+
+    # Handle time preservation logic
+    source = getattr(original_task, 'source', None)
+    original_start_time = getattr(original_task, 'start_time', None)
+    original_end_time = getattr(original_task, 'end_time', None)
+
+    # For Google Calendar and Slack tasks: preserve original times if they exist
+    if source in ['calendar', 'slack'] and original_start_time and original_end_time:
+        task_dict["start_time"] = original_start_time
+        task_dict["end_time"] = original_end_time
+        print(f"[METADATA] Preserved original times for {source} task '{original_task.text}': {original_start_time} - {original_end_time}")
+    else:
+        # For manual tasks or tasks without original times: use scheduling times
+        task_dict["start_time"] = scheduled_fields.get("start_time")
+        task_dict["end_time"] = scheduled_fields.get("end_time")
+
+    # Overlay scheduling-specific fields (these take precedence)
+    scheduling_fields = ["section", "parent_id", "level", "type", "is_section"]
+    for field in scheduling_fields:
+        if field in scheduled_fields:
+            task_dict[field] = scheduled_fields[field]
+
+    return task_dict
+
+
 def assemble_final_schedule(
     placements: List[Dict[str, Any]],
     task_registry: Dict[str, Task],
@@ -482,6 +555,7 @@ def assemble_final_schedule(
             # Sort by order and add tasks
             all_task_placements.sort(key=lambda x: x[0])
             for order, task, placement_data in all_task_placements:
+                # Parse LLM time allocation for manual tasks
                 start_time = None
                 end_time = None
                 if placement_data.get("time_allocation"):
@@ -490,13 +564,10 @@ def assemble_final_schedule(
                     if time_data:
                         start_time = time_data.get("start_time")
                         end_time = time_data.get("end_time")
-                
-                task_dict = {
-                    "id": task.id,
-                    "text": task.text,
-                    "categories": list(task.categories) if task.categories else [],
+
+                # Use helper function to preserve metadata and handle time preservation
+                scheduled_fields = {
                     "is_section": False,
-                    "completed": getattr(task, 'completed', False),
                     "section": None,
                     "parent_id": None,
                     "level": 0,
@@ -504,6 +575,8 @@ def assemble_final_schedule(
                     "start_time": start_time,
                     "end_time": end_time
                 }
+
+                task_dict = preserve_task_metadata(task, scheduled_fields)
                 final_tasks.append(task_dict)
         
         # Handle structured layout (with sections)
@@ -524,8 +597,8 @@ def assemble_final_schedule(
             
             # Add tasks in this section
             for order, (task, placement_data) in section_tasks[section]:
-                
-                # Parse time allocation and set start/end times if present
+
+                # Parse LLM time allocation for manual tasks
                 start_time = None
                 end_time = None
                 if placement_data.get("time_allocation"):
@@ -534,14 +607,11 @@ def assemble_final_schedule(
                     if time_data:
                         start_time = time_data.get("start_time")
                         end_time = time_data.get("end_time")
-                        print(f"[SCHEDULE_GEN] Set time allocation for task '{task.text}': {start_time} - {end_time}")
-                
-                task_dict = {
-                    "id": task.id,
-                    "text": task.text,  # Keep original text clean
-                    "categories": list(task.categories) if task.categories else [],
+                        print(f"[SCHEDULE_GEN] Set LLM time allocation for task '{task.text}': {start_time} - {end_time}")
+
+                # Use helper function to preserve metadata and handle time preservation
+                scheduled_fields = {
                     "is_section": False,
-                    "completed": getattr(task, 'completed', False),
                     "section": section,
                     "parent_id": None,
                     "level": 0,
@@ -549,6 +619,8 @@ def assemble_final_schedule(
                     "start_time": start_time,
                     "end_time": end_time
                 }
+
+                task_dict = preserve_task_metadata(task, scheduled_fields)
                 final_tasks.append(task_dict)
         
         # Add any unplaced tasks to the end
@@ -561,14 +633,11 @@ def assemble_final_schedule(
             if sections:
                 # For structured layouts: add to the last section at the bottom
                 last_section = sections[-1]
-                
+
                 for task in unplaced_tasks:
-                    task_dict = {
-                        "id": task.id,
-                        "text": task.text,
-                        "categories": list(task.categories) if task.categories else [],
+                    # Use helper function to preserve metadata for unplaced tasks
+                    scheduled_fields = {
                         "is_section": False,
-                        "completed": getattr(task, 'completed', False),
                         "section": last_section,
                         "parent_id": None,
                         "level": 0,
@@ -576,16 +645,14 @@ def assemble_final_schedule(
                         "start_time": None,
                         "end_time": None
                     }
+                    task_dict = preserve_task_metadata(task, scheduled_fields)
                     final_tasks.append(task_dict)
             else:
                 # For unstructured layouts: add directly to final_tasks
                 for task in unplaced_tasks:
-                    task_dict = {
-                        "id": task.id,
-                        "text": task.text,
-                        "categories": list(task.categories) if task.categories else [],
+                    # Use helper function to preserve metadata for unplaced tasks
+                    scheduled_fields = {
                         "is_section": False,
-                        "completed": getattr(task, 'completed', False),
                         "section": None,
                         "parent_id": None,
                         "level": 0,
@@ -593,6 +660,7 @@ def assemble_final_schedule(
                         "start_time": None,
                         "end_time": None
                     }
+                    task_dict = preserve_task_metadata(task, scheduled_fields)
                     final_tasks.append(task_dict)
         
         return {

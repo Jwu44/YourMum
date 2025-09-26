@@ -1,4 +1,4 @@
-1# YourdAI Technical Specifications
+# YourdAI Technical Specifications
 
 ## Data Models
 

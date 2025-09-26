@@ -10,6 +10,8 @@ import { useAuth } from '@/auth/AuthContext'
 import { type ProfileFormData, type UserDocument } from '@/lib/types'
 import { useRouter } from 'next/navigation'
 import { fetchUserProfile, updateUserProfile, deleteUserAccount } from '@/lib/api/settings'
+import { billingApi } from '@/lib/api/billing'
+import { type BillingStatus } from '@/lib/types'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
@@ -30,6 +32,9 @@ export default function SettingsPage () {
 
   // User profile data from backend
   const [userProfile, setUserProfile] = useState<UserDocument | null>(null)
+
+  // Billing status for subscription display
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
 
   // Form state for profile section
   const [profileData, setProfileData] = useState<ProfileFormData>({
@@ -60,6 +65,10 @@ export default function SettingsPage () {
         const token = await user.getIdToken()
         const profile = await fetchUserProfile(token)
         setUserProfile(profile)
+
+        // Load billing status
+        const billing = await billingApi.getBillingStatus()
+        setBillingStatus(billing.status ?? null)
 
         const formData: ProfileFormData = {
           displayName: profile.displayName || '',
@@ -396,7 +405,7 @@ export default function SettingsPage () {
                 <div>
                   <Label className="text-sm font-medium">Subscription</Label>
                   <p className="text-sm text-muted-foreground">
-                    {userProfile?.role === 'premium' ? 'Premium' : 'Free'}
+                    {billingStatus?.plan === 'pro' ? 'Pro' : 'Free'}
                   </p>
                 </div>
                 <Button variant="outline" className="mobile-form-button sm:w-auto">

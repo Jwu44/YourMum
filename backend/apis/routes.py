@@ -13,6 +13,7 @@ from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
 from backend.utils.auth import verify_firebase_token as utils_verify_firebase_token
 from backend.utils.timezone import validate_timezone_update, get_reliable_user_timezone
+from backend.decorators.credit_guards import requires_credits
 import os
 # Import AI service functions directly
 from backend.services.ai_service import (
@@ -351,11 +352,11 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 return user
 
         # STEP 3: Development bypass - return mock user only if user not found in database
-        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev-user-123':
+        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev_test_user_12345':
             return {
-                'googleId': 'dev-user-123',
+                'googleId': 'dev_test_user_12345',
                 'email': 'dev@example.com',
-                'displayName': 'Dev User',
+                'displayName': 'Dev User Updated',
                 'photoURL': '',
                 'role': 'free',
                 'timezone': 'UTC',  # Add timezone field for consistency
@@ -750,7 +751,6 @@ def _prepare_user_data_for_storage(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "email": user_data["email"],
         "displayName": display_name,  # Use processed display_name
         "photoURL": user_data.get("photoURL") or "",  # Ensure photoURL is never null
-        "role": "free",  # Default role for new users
         "timezone": timezone_value,  # Add timezone field with default
         "jobTitle": job_title,  # Add jobTitle field (optional)
         "age": age,  # Add age field (optional)
@@ -1115,6 +1115,7 @@ def check_user_schedules(user_id):
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/tasks/decompose", methods=["POST"])
+@requires_credits(amount=1, operation_type='task_breakdown')
 def api_decompose_task():
     try:
         data = request.json
@@ -1254,6 +1255,7 @@ def extract_user_id_from_request() -> Tuple[Optional[str], Optional[Dict[str, An
     return user_id, None
 
 @api_bp.route("/submit_data", methods=["POST"])
+@requires_credits(amount=1, operation_type='schedule_generation')
 def submit_data():
     """
     Generate and store a new schedule based on user input data and existing tasks.
@@ -1345,7 +1347,9 @@ def submit_data():
                 raise Exception(schedule_result.get('error', 'Schedule generation failed'))
             
             generated_tasks = schedule_result.get('tasks', [])
-            if not generated_tasks:
+            input_tasks = data.get('tasks', [])
+            # Only error if we had input tasks but generated no tasks
+            if not generated_tasks and input_tasks:
                 raise Exception('No tasks generated')
 
         except Exception as gen_error:
@@ -1778,8 +1782,23 @@ def delete_task(task_id):
                 "error": "Cannot delete section tasks. Only regular tasks can be deleted."
             }), 400
         
-        # Remove the task from the schedule
-        updated_schedule = [task for task in current_schedule if task.get('id') != task_id]
+        # Handle task deletion based on whether it's recurring or not
+        updated_schedule = []
+        for task in current_schedule:
+            if task.get('id') == task_id:
+                # If it's a recurring task, set status to "stopped" instead of removing
+                if task.get('is_recurring'):
+                    updated_task = {**task}
+                    updated_task['is_recurring'] = {
+                        **task['is_recurring'],
+                        'status': 'stopped'
+                    }
+                    updated_schedule.append(updated_task)
+                # For non-recurring tasks, remove completely (existing behavior)
+                # else: continue (skip adding to updated_schedule)
+            else:
+                # Keep all other tasks as-is
+                updated_schedule.append(task)
         
         # Update the schedule using schedule service
         update_success, update_result = schedule_service.update_schedule_tasks(

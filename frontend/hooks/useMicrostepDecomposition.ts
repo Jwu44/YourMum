@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { handleMicrostepDecomposition } from '@/lib/helper'
 import { type Task } from '@/lib/types'
+import { triggerCreditRefresh } from '@/lib/credit-events'
 
 interface MicrostepDecompositionState {
   isDecomposing: boolean
@@ -33,7 +34,7 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [suggestedMicrosteps, setSuggestedMicrosteps] = useState<Task[]>([])
   const [showMicrosteps, setShowMicrosteps] = useState(false)
-  
+
   const { toast } = useToast()
 
   /**
@@ -82,6 +83,9 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
       setSuggestedMicrosteps(microstepTasks)
       setShowMicrosteps(true)
 
+      // Trigger credit refresh across all components (simple event system per dev-guide.md)
+      triggerCreditRefresh()
+
       toast({
         title: 'Success!',
         description: 'Select relevant subtasks to add.',
@@ -90,8 +94,8 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
     } catch (error) {
       console.error('Error decomposing task:', error)
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to break down task.',
+        title: 'Insufficient Credit',
+        description: 'You need at least 1 credit to break down a task.',
         variant: 'destructive'
       })
     } finally {

@@ -110,7 +110,7 @@ const MobileTaskActionDrawer: React.FC<MobileTaskActionDrawerProps> = ({
   const visibleActions = actionOptions.filter(action => action.show)
 
   return (
-    <Drawer open={isOpen} onOpenChange={onClose}>
+    <Drawer open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DrawerContent className="focus:outline-none">
         <div className="px-4 py-4">
           <div className="space-y-2">

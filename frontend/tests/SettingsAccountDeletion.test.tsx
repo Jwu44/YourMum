@@ -13,6 +13,11 @@ jest.mock('@/lib/api/settings', () => ({
   updateUserProfile: jest.fn(),
   deleteUserAccount: jest.fn()
 }));
+jest.mock('@/lib/api/billing', () => ({
+  billingApi: {
+    getBillingStatus: jest.fn()
+  }
+}));
 jest.mock('@/components/parts/SidebarLayout', () => {
   return { SidebarLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-layout">{children}</div> };
 });
@@ -65,7 +70,15 @@ describe('Settings Page - Account Deletion', () => {
       uid: 'test-uid',
       displayName: 'John Doe',
       email: 'john@example.com',
-      role: 'free'
+    });
+
+    // Mock billing API
+    require('@/lib/api/billing').billingApi.getBillingStatus.mockResolvedValue({
+      status: {
+        plan: 'free',
+        creditsThisMonth: 5,
+        planInterval: null
+      }
     });
   });
 

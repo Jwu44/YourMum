@@ -754,15 +754,15 @@ class ScheduleService:
                     calendar_copy['from_gcal'] = True
                     carry_over_calendar_tasks.append(calendar_copy)
                 else:
-                    new_task = {**task}
-                    new_task['id'] = str(uuid.uuid4())
-                    new_task['start_date'] = date
-                    if 'type' not in new_task:
-                        new_task['type'] = 'task'
-                    carry_over_tasks.append(new_task)
-                    
-                    # Track if this is a recurring task being carried over
-                    if task.get('is_recurring'):
+                    # Only carry over recurring tasks; handle non-recurring in rebuild loop
+                    recurring_config = task.get('is_recurring')
+                    if recurring_config and recurring_config.get('status', 'active') == 'active':
+                        new_task = {**task}
+                        new_task['id'] = str(uuid.uuid4())
+                        new_task['start_date'] = date
+                        if 'type' not in new_task:
+                            new_task['type'] = 'task'
+                        carry_over_tasks.append(new_task)
                         carried_over_recurring_texts.add(task.get('text', ''))
             carry_over_duration = time.time() - carry_over_start
             print(f"[TIMING] Task carry-over processing: {carry_over_duration:.3f}s")
@@ -861,7 +861,13 @@ class ScheduleService:
                         # Do not duplicate here
                         pass
                 else:
-                    rebuilt.append(item)
+                    # Non-recurring manual task: update ID and date while preserving position
+                    updated_task = {**item}
+                    updated_task['id'] = str(uuid.uuid4())
+                    updated_task['start_date'] = date
+                    if 'type' not in updated_task:
+                        updated_task['type'] = 'task'
+                    rebuilt.append(updated_task)
 
             # Insert brand-new fetched calendar events after last calendar index, inheriting nearby section
             insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else (1 if section_tasks else 0)
@@ -897,11 +903,11 @@ class ScheduleService:
             position_preservation_duration = time.time() - position_preservation_start
             print(f"[TIMING] Calendar position preservation: {position_preservation_duration:.3f}s")
 
-            # Step 6: Deduplicate tasks to fix Bug #5: prevent duplicate tasks when generating next day schedule
+            # Step 6: No deduplication needed since double processing has been eliminated
             dedup_start = time.time()
-            final_tasks = self._deduplicate_tasks(final_tasks, date)
+            # final_tasks = self._deduplicate_tasks(final_tasks, date)  # No longer needed
             dedup_duration = time.time() - dedup_start
-            print(f"[TIMING] Task deduplication: {dedup_duration:.3f}s")
+            print(f"[TIMING] Task processing (no deduplication needed): {dedup_duration:.3f}s")
             
             task_processing_duration = time.time() - task_processing_start
             print(f"[TIMING] Total task processing (steps 3-6): {task_processing_duration:.3f}s")
@@ -1203,10 +1209,12 @@ class ScheduleService:
                     # Check each task for recurrence
                     for task in schedule_tasks:
                         task_text = task.get('text', '')
-                        if (task.get('is_recurring') and 
+                        recurring_config = task.get('is_recurring')
+                        if (recurring_config and
                             not task.get('is_section', False) and
                             task_text not in seen_task_texts and
-                            task_text not in exclude_texts):
+                            task_text not in exclude_texts and
+                            recurring_config.get('status', 'active') == 'active'):
                             
                             if self._should_task_recur_on_date(task, target_dt):
                                 # Create a copy of the task for the new date

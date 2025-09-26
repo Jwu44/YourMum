@@ -9,6 +9,11 @@ import SettingsPage from '@/app/settings/page';
 jest.mock('@/auth/AuthContext');
 jest.mock('@/hooks/use-toast');
 jest.mock('@/lib/api/settings');
+jest.mock('@/lib/api/billing', () => ({
+  billingApi: {
+    getBillingStatus: jest.fn()
+  }
+}));
 jest.mock('@/components/parts/SidebarLayout', () => {
   return { SidebarLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-layout">{children}</div> };
 });
@@ -29,7 +34,6 @@ const mockUserProfile = {
   email: 'john@example.com',
   jobTitle: 'Software Engineer',
   age: 30,
-  role: 'free'
 };
 
 const mockToast = jest.fn();
@@ -41,6 +45,15 @@ describe('Settings Profile Section', () => {
     mockUseToast.mockReturnValue({ toast: mockToast } as any);
     mockFetchUserProfile.mockResolvedValue(mockUserProfile as any);
     mockUpdateUserProfile.mockResolvedValue(mockUserProfile as any);
+
+    // Mock billing API
+    require('@/lib/api/billing').billingApi.getBillingStatus.mockResolvedValue({
+      status: {
+        plan: 'free',
+        creditsThisMonth: 5,
+        planInterval: null
+      }
+    });
   });
 
   describe('Initial State', () => {

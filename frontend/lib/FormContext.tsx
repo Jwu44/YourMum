@@ -16,8 +16,8 @@ import {
 const initialState: FormData = {
   name: '',
   age: '',
-  work_start_time: '9:00 AM',
-  work_end_time: '5:00 PM',
+  work_start_time: '09:00',
+  work_end_time: '17:00',
   tasks: [],
   energy_patterns: [],
   priorities: { health: '', relationships: '', fun_activities: '', ambitions: '' },

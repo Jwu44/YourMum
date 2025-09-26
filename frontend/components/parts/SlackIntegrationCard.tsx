@@ -20,6 +20,8 @@ import { useToast } from '@/hooks/use-toast'
 
 // API and Types
 import slackApi, { type SlackIntegrationStatus } from '@/lib/api/slack'
+import { billingApi } from '@/lib/api/billing'
+import { type BillingStatus } from '@/lib/types'
 
 // Utils
 
@@ -30,6 +32,7 @@ const SlackIntegrationCard: React.FC = () => {
   const [status, setStatus] = useState<SlackIntegrationStatus>({ connected: false })
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(true)
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
   const { toast } = useToast()
 
   /**
@@ -56,6 +59,21 @@ const SlackIntegrationCard: React.FC = () => {
       setIsCheckingStatus(false)
     }
   }, [toast])
+
+  /**
+   * Check billing status to determine if user has Pro plan
+   */
+  const checkBillingStatus = useCallback(async () => {
+    try {
+      const result = await billingApi.getBillingStatus()
+      if (result.success && result.status) {
+        setBillingStatus(result.status)
+      }
+    } catch (error) {
+      console.error('Error checking billing status:', error)
+      setBillingStatus(null)
+    }
+  }, [])
 
   /**
    * Check OAuth completion status
@@ -87,6 +105,16 @@ const SlackIntegrationCard: React.FC = () => {
   const handleConnect = useCallback(async () => {
     try {
       setIsLoading(true)
+
+      // Note: Pro plan requirement removed - all users can now access Slack integration
+      // if (!billingStatus || billingStatus.plan !== 'pro') {
+      //   toast({
+      //     title: 'Pro Plan Required',
+      //     description: 'Slack integration is only available for Pro users. Please upgrade to access this feature.',
+      //     variant: 'destructive'
+      //   })
+      //   return
+      // }
 
       // Get OAuth URL from backend
       const oauthData = await slackApi.getOAuthUrl()
@@ -168,7 +196,7 @@ const SlackIntegrationCard: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [toast, checkOAuthStatus, checkSlackStatus])
+  }, [toast, checkOAuthStatus, checkSlackStatus, billingStatus])
 
   /**
    * Handle Slack disconnection
@@ -207,7 +235,8 @@ const SlackIntegrationCard: React.FC = () => {
    */
   useEffect(() => {
     checkSlackStatus()
-  }, [checkSlackStatus])
+    checkBillingStatus()
+  }, [checkSlackStatus, checkBillingStatus])
 
   useEffect(() => {
     const handleWindowFocus = () => {
@@ -222,23 +251,31 @@ const SlackIntegrationCard: React.FC = () => {
   // Map current state to shell props
   const isConnected = Boolean(status.connected)
   const isBusy = isLoading || isCheckingStatus
-  const ctaVariant = isConnected ? 'destructive' : 'default'
+  // const hasPro = billingStatus?.plan === 'pro'
+  // const isDisabled = !hasPro && !isConnected
+  const isDisabled = false // All users can now access Slack integration
+
+  const ctaVariant = isConnected ? 'destructive' : (isDisabled ? 'secondary' : 'default')
   const ctaLabel = isCheckingStatus
     ? 'Checking...'
     : isLoading
       ? (isConnected ? 'Disconnecting...' : 'Connecting...')
-      : (isConnected ? 'Disconnect' : 'Connect')
+      : isConnected
+        ? 'Disconnect'
+        : 'Connect'
+
+  const description = "To automatically create tasks from @mentions, please ensure the bot is added to the channels you want to use."
 
   return (
     <IntegrationCardShell
       icon={<IntegrationLogo src="/images/integrations/slack_logo.webp" alt="Slack" />}
       name="Slack"
-      description="To automatically create tasks from @mentions, please ensure the bot is added to the channels you want to use."
+      description={description}
       connected={isConnected}
       isBusy={isBusy}
       ctaLabel={ctaLabel}
       ctaVariant={ctaVariant as any}
-      onCtaClick={isConnected ? handleDisconnect : handleConnect}
+      onCtaClick={isConnected ? handleDisconnect : (isDisabled ? (() => {}) : handleConnect)}
     />
   )
 }

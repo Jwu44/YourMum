@@ -15,6 +15,7 @@ interface MobileTopNavProps {
   showUpgradeButton?: boolean
   onSave?: () => void
   isLoading?: boolean
+  saveDisabled?: boolean
 }
 
 /**
@@ -30,7 +31,8 @@ interface MobileTopNavProps {
 export const MobileTopNav: React.FC<MobileTopNavProps> = ({
   showUpgradeButton = true,
   onSave,
-  isLoading = false
+  isLoading = false,
+  saveDisabled = false
 }) => {
   const isMobile = useIsMobile()
   const pathname = usePathname()
@@ -61,11 +63,16 @@ export const MobileTopNav: React.FC<MobileTopNavProps> = ({
               /* Save button for preferences page */
               <Button
                 onClick={onSave}
-                disabled={isLoading}
+                disabled={isLoading || saveDisabled}
                 size="sm"
                 className="h-8 px-4 text-sm font-medium rounded-full bg-primary hover:bg-primary/90 text-primary-foreground mobile-touch-target"
               >
-                {isLoading ? 'Saving...' : 'Save'}
+                {isLoading
+                  ? 'Saving...'
+                  : saveDisabled
+                    ? 'Insufficient Credits'
+                    : 'Save'
+                }
               </Button>
             ) : (
               /* Upgrade button for other pages */

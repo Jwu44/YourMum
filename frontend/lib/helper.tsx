@@ -24,10 +24,12 @@ export const handleMicrostepDecomposition = async (
       work_end_time: formData.work_end_time
     }
 
+    const token = await getAuthToken()
     const response = await fetch(`${API_BASE_URL}/api/tasks/decompose`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(request)
     })
@@ -42,8 +44,8 @@ export const handleMicrostepDecomposition = async (
     return data
   } catch (error) {
     console.error('Error decomposing task:', error)
-    // Return empty array on error since DecompositionResponse is now string[]
-    return []
+    // Re-throw the error so the calling code can handle it properly
+    throw error
   }
 }
 
@@ -62,10 +64,12 @@ export const submitMicrostepFeedback = async (
       timestamp: new Date().toISOString()
     }
 
+    const token = await getAuthToken()
     const response = await fetch(`${API_BASE_URL}/api/tasks/microstep-feedback`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(feedback)
     })
@@ -154,10 +158,12 @@ export const fetchAISuggestions = async (
   energyPatterns: string[]
 ): Promise<GetAISuggestionsResponse> => {
   try {
+    const token = await getAuthToken()
     const response = await fetch(`${API_BASE_URL}/api/schedule/suggestions`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         userId,

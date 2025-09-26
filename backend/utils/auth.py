@@ -60,9 +60,9 @@ def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
     # Development bypass
     if os.getenv('NODE_ENV') == 'development' and token == 'mock-token-for-development':
         return {
-            'uid': 'dev-user-123',
+            'uid': 'dev_test_user_12345',
             'email': 'dev@example.com',
-            'name': 'Dev User'
+            'name': 'Dev User Updated'
         }
 
     # Ensure Firebase Admin is initialized
