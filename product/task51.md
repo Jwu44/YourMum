@@ -9,7 +9,7 @@ Enable YourMum users to action natural-language tasks (e.g., “reply to Will on
 1. User clicks **Connect** on an integration → completes OAuth (per user).
 2. User creates a **natural-language task** in YourMum.
 3. On pickaxe click:
-   * **Classifier**: NLP + LLM maps `task.text` → `{ action, entities, payload }`.
+   * **Classifier**?: NLP + LLM maps `task.text` → `{ action, entities, payload }`.
    * **Router**: maps the action to a sub-workflow (Slack, Gmail, Calendar).
    * **Executor**: invokes the n8n sub-workflow with the user’s short-lived token.
    * **Result handler**: returns normalized JSON with a resource link (e.g. Slack permalink, Gmail draft URL, Calendar htmlLink).
@@ -21,7 +21,7 @@ Enable YourMum users to action natural-language tasks (e.g., “reply to Will on
 * Flow:
   * Webhook (POST, Bearer/HMAC auth, respond after execution)
   * Function (validate payload, parse tokens, set correlationId)
-  * Classifier (rules + LLM fallback → action schema)
+  * Classifier? (rules + LLM fallback → action schema)
   * Switch node → sub-workflows (Slack, Gmail, Calendar)
   * Sub-workflows call APIs with user tokens, return `{ success, link, error }`
   * Respond to Webhook with result JSON.
@@ -49,6 +49,8 @@ Content-Type: application/json
   "accessToken": "ya29.a0AR..." 
 }
 ```
+
+## Note: I am having trouble with understanding what input data i should parse into the initial webhook. Because I want to provide the absolute minimum data for the agent to perform the action. But because the metatdata associatd with each integration scales exponentially, it could be too much. 
 
 ### Example Response (n8n → YourMum)
 

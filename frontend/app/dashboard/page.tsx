@@ -80,6 +80,7 @@ const Dashboard: React.FC = () => {
   const hasInitiallyLoaded = useRef(false)
   const hasEnsuredRefresh = useRef(false)
   const [isEnsuringRefresh, setIsEnsuringRefresh] = useState(false)
+  const [isPageVisible, setIsPageVisible] = useState(document.visibilityState === 'visible')
 
   useEffect(() => {
     const date = new Date()
@@ -126,6 +127,16 @@ const Dashboard: React.FC = () => {
     }
 
     fetchUserCreationDate()
+  }, [])
+
+  // Page visibility listener to prevent schedule creation in background tabs
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   const addTask = useCallback(async (newTask: Task) => {
@@ -1255,15 +1266,18 @@ const Dashboard: React.FC = () => {
       }
     }
 
-    // Simplified condition: load if we haven't loaded yet and no form data
-    if (!state.formUpdate?.response && !hasInitiallyLoaded.current) {
+    // Simplified condition: load if we haven't loaded yet, no form data, and page is visible
+    if (!state.formUpdate?.response && !hasInitiallyLoaded.current && isPageVisible) {
       console.log('🚀 Dashboard: Conditions met, loading initial schedule...')
       loadInitialSchedule()
     } else if (hasInitiallyLoaded.current) {
       console.log('⏭️ Dashboard: Skipping load - already loaded')
       setIsLoadingSchedule(false)
+    } else if (!isPageVisible) {
+      console.log('⏸️ Dashboard: Page not visible, deferring schedule load...')
+      setIsLoadingSchedule(false)
     }
-  }, [state.formUpdate?.response, toast])
+  }, [state.formUpdate?.response, toast, isPageVisible])
 
 
   // Midnight auto-refresh (local timezone)
