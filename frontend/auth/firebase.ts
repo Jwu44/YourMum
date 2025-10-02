@@ -28,9 +28,9 @@ if (process.env.NODE_ENV === 'development') {
 // Create Google Auth Provider
 const provider = new GoogleAuthProvider();
 
-// Add Calendar scopes to the provider
-provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
-provider.addScope('https://www.googleapis.com/auth/calendar.events.readonly');
+// Add Calendar and Contacts scopes to the provider
+provider.addScope('https://www.googleapis.com/auth/calendar');
+provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
 
 // Set custom parameters for better user experience
 provider.setCustomParameters({

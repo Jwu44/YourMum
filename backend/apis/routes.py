@@ -332,40 +332,21 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
             print(f"✅ User found by Firebase UID: {user.get('email')}")
             return user
 
-        # STEP 2: FALLBACK - Try to find user by Google Subject ID (legacy format)
-        # Extract Google Subject ID from Firebase token identities
-        google_subject_id = None
-        firebase_data = decoded_token.get('firebase', {})
-        identities = firebase_data.get('identities', {})
-        google_identities = identities.get('google.com', [])
-
-        if google_identities:
-            google_subject_id = google_identities[0]  # Take first Google identity
-            print(f"🔄 Attempting fallback lookup with Google Subject ID: {google_subject_id}")
-
-            # Try to find user by Google Subject ID
-            user = users.find_one({"googleId": google_subject_id}, {"_id": 0})
-
-            if user:
-                print(f"✅ User found by Google Subject ID (legacy): {user.get('email')}")
-                print(f"⚠️  User needs migration from Google Subject ID to Firebase UID")
-                return user
-
-        # STEP 3: Development bypass - return mock user only if user not found in database
-        if os.getenv('NODE_ENV') == 'development' and user_id == 'dev_test_user_12345':
-            return {
-                'googleId': 'dev_test_user_12345',
-                'email': 'dev@example.com',
-                'displayName': 'Dev User Updated',
-                'photoURL': '',
-                'role': 'free',
-                'timezone': 'UTC',  # Add timezone field for consistency
-                'calendarSynced': False,
-                # Add other required fields as needed
-            }
+        # # STEP 3: Development bypass - return mock user only if user not found in database
+        # if os.getenv('NODE_ENV') == 'development' and user_id == 'dev_test_user_12345':
+        #     return {
+        #         'googleId': 'dev_test_user_12345',
+        #         'email': 'dev@example.com',
+        #         'displayName': 'Dev User Updated',
+        #         'photoURL': '',
+        #         'role': 'free',
+        #         'timezone': 'UTC',  # Add timezone field for consistency
+        #         'calendarSynced': False,
+        #         # Add other required fields as needed
+        #     }
 
         # User not found with either Firebase UID or Google Subject ID
-        print(f"❌ User not found - Firebase UID: {user_id}, Google Subject ID: {google_subject_id}")
+        print(f"❌ User not found - Firebase UID: {user_id}")
         return None
 
     except Exception as e:
