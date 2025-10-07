@@ -1381,10 +1381,12 @@ def submit_data():
             storage_duration = time.time() - storage_start_time
             print(f"[TIMING] Schedule storage failed after: {storage_duration:.3f}s")
             print(f"Error storing schedule: {str(store_error)}")
+            # Serialize tasks before returning to ensure RecurrenceType objects are converted
+            serialized_tasks = schedule_service._serialize_tasks_for_storage(generated_tasks)
             # Return generated schedule even if storage fails
             return jsonify({
                 "success": True,
-                "schedule": generated_tasks,
+                "schedule": serialized_tasks,
                 "date": date,
                 "warning": f"Schedule generated but storage failed: {str(store_error)}"
             })

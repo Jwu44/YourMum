@@ -125,7 +125,7 @@ class ScheduleService:
                 source="ai_service",
                 inputs=processed_inputs
             )
-            
+
             # Validate document before storage
             is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
                 schedule_document, user_id, date
@@ -133,7 +133,11 @@ class ScheduleService:
             if not is_valid:
                 return False, {"error": error_msg}
             schedule_document = validated_document
-            
+
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
@@ -141,17 +145,17 @@ class ScheduleService:
                 schedule_document,
                 upsert=True
             )
-            
-            # Calculate and return response metadata
-            metadata = self._calculate_schedule_metadata(generated_tasks)
+
+            # Calculate and return response metadata (use serialized tasks for consistency)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
                 "source": "ai_service"
             })
-            
+
             return True, {
-                "schedule": generated_tasks,
+                "schedule": serialized_tasks,
                 "date": date,
                 "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
                 "metadata": metadata
@@ -327,8 +331,12 @@ class ScheduleService:
             # Prepare update doc and validate
             if existing_schedule:
                 existing_metadata = existing_schedule.get('metadata', {})
+
+                # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                serialized_tasks = self._serialize_tasks_for_storage(final_tasks)
+
                 update_doc = {
-                    "schedule": final_tasks,
+                    "schedule": serialized_tasks,
                     "metadata": {
                         **existing_metadata,
                         "last_modified": format_timestamp(),
@@ -360,18 +368,25 @@ class ScheduleService:
                 is_valid, validation_error = validate_schedule_document(schedule_document)
                 if not is_valid:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+                # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                schedule_document['schedule'] = self._serialize_tasks_for_storage(schedule_document['schedule'])
+
                 self.schedules_collection.insert_one(schedule_document)
 
-            metadata = self._calculate_schedule_metadata(final_tasks)
+            # Use serialized tasks for response to ensure RecurrenceType objects are dicts
+            serialized_final_tasks = self._serialize_tasks_for_storage(final_tasks)
+
+            metadata = self._calculate_schedule_metadata(serialized_final_tasks)
             metadata.update({
                 "generatedAt": format_timestamp(),
                 "lastModified": format_timestamp(),
                 "source": "calendar_sync",
                 "calendarSynced": True,
-                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                "calendarEvents": len([t for t in serialized_final_tasks if t.get('from_gcal', False)])
             })
 
-            return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+            return True, {"schedule": serialized_final_tasks, "date": date, "metadata": metadata}
         except Exception as e:
             print(f"Error in apply_calendar_webhook_update: {str(e)}")
             traceback.print_exc()
@@ -449,7 +464,7 @@ class ScheduleService:
                 source="manual",
                 inputs=inputs
             )
-            
+
             # Validate document before storage
             is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
                 schedule_document, user_id, date
@@ -457,7 +472,11 @@ class ScheduleService:
             if not is_valid:
                 return False, {"error": error_msg}
             schedule_document = validated_document
-            
+
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
@@ -465,17 +484,17 @@ class ScheduleService:
                 schedule_document,
                 upsert=True
             )
-            
-            # Calculate response metadata
-            metadata = self._calculate_schedule_metadata(final_tasks)
+
+            # Calculate response metadata (use serialized tasks for consistency)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
                 "source": "manual"
             })
-            
+
             return True, {
-                "schedule": final_tasks,
+                "schedule": serialized_tasks,
                 "date": date,
                 "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
                 "metadata": metadata
@@ -532,12 +551,15 @@ class ScheduleService:
                 if not is_valid:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
+                # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                serialized_tasks = self._serialize_tasks_for_storage(tasks)
+
                 # Update the schedule
                 result = self.schedules_collection.update_one(
                     {"_id": existing_schedule["_id"]},
                     {
                         "$set": {
-                            "schedule": tasks,
+                            "schedule": serialized_tasks,
                             "metadata.last_modified": format_timestamp(),
                             "metadata.source": "manual"
                         }
@@ -547,8 +569,8 @@ class ScheduleService:
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule"}
 
-                # Calculate metadata
-                metadata = self._calculate_schedule_metadata(tasks)
+                # Calculate metadata (use serialized tasks for consistency)
+                metadata = self._calculate_schedule_metadata(serialized_tasks)
                 metadata.update({
                     "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
                     "lastModified": format_timestamp(),
@@ -556,7 +578,7 @@ class ScheduleService:
                 })
 
                 return True, {
-                    "schedule": tasks,
+                    "schedule": serialized_tasks,
                     "date": date,
                     "metadata": metadata
                 }
@@ -935,6 +957,10 @@ class ScheduleService:
                 print(f"[TIMING] autogenerate_schedule failed (validation): {total_duration:.3f}s")
                 return False, {"error": f"Schedule validation failed: {validation_error}"}
 
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
                 {"userId": user_id, "date": formatted_date},
@@ -944,9 +970,9 @@ class ScheduleService:
             save_duration = time.time() - save_start
             print(f"[TIMING] Document creation and save: {save_duration:.3f}s")
 
-            # Step 9: Calculate final metadata
+            # Step 9: Calculate final metadata (use serialized tasks for consistency)
             metadata_start = time.time()
-            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
@@ -954,7 +980,7 @@ class ScheduleService:
             })
             metadata_duration = time.time() - metadata_start
             print(f"[TIMING] Metadata calculation: {metadata_duration:.3f}s")
-            
+
             total_duration = time.time() - total_start_time
             print(f"[TIMING] autogenerate_schedule SUCCESS: {total_duration:.3f}s")
 
@@ -963,7 +989,7 @@ class ScheduleService:
                 "created": True,
                 "sourceFound": True,
                 "date": date,
-                "schedule": final_tasks,
+                "schedule": serialized_tasks,
                 "metadata": metadata
             }
         except Exception as e:
@@ -1550,18 +1576,18 @@ class ScheduleService:
     def _process_schedule_inputs(self, raw_inputs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Process and sanitize user inputs with safe defaults.
-        
+
         Consolidates input processing logic used across schedule creation methods.
-        
+
         Args:
             raw_inputs: Raw user input data (can be None or incomplete)
-            
+
         Returns:
             Dictionary with processed inputs and safe defaults
         """
         if raw_inputs is None:
             raw_inputs = {}
-            
+
         # Prepare inputs with safe defaults and type checking
         processed_inputs = {
             "name": raw_inputs.get('name', '') if raw_inputs.get('name') is not None else '',
@@ -1572,8 +1598,39 @@ class ScheduleService:
             "layout_preference": raw_inputs.get('layout_preference', {}) if isinstance(raw_inputs.get('layout_preference'), dict) else {},
             "tasks": raw_inputs.get('tasks', []) if isinstance(raw_inputs.get('tasks'), list) else []
         }
-        
+
         return processed_inputs
+
+    def _serialize_tasks_for_storage(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Serialize tasks for MongoDB storage, converting any RecurrenceType objects to dictionaries.
+
+        This fixes the BSON encoding error that occurs when RecurrenceType objects are passed
+        to MongoDB instead of their dictionary representation.
+
+        Args:
+            tasks: List of task dictionaries (may contain RecurrenceType objects)
+
+        Returns:
+            List of fully serialized task dictionaries safe for MongoDB storage
+        """
+        from backend.models.task import RecurrenceType
+
+        serialized_tasks = []
+        for task in tasks:
+            serialized_task = dict(task)
+
+            # Check if is_recurring is a RecurrenceType object and convert to dict
+            if 'is_recurring' in serialized_task:
+                is_recurring = serialized_task['is_recurring']
+                if isinstance(is_recurring, RecurrenceType):
+                    # Convert RecurrenceType object to dictionary
+                    serialized_task['is_recurring'] = is_recurring.to_dict()
+                # If it's already a dict or None, leave it as-is
+
+            serialized_tasks.append(serialized_task)
+
+        return serialized_tasks
 
     def _upsert_calendar_tasks_by_id(
         self, 

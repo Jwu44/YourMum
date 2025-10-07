@@ -155,6 +155,11 @@ def refresh_access_token(users, user_id: str, credentials_data: Dict[str, Any], 
         New access token or None if refresh fails
     """
     try:
+        # Development bypass - skip actual Google API call for mock tokens
+        if os.getenv('NODE_ENV') == 'development' and refresh_token == 'mock-refresh-token-for-dev':
+            print(f"🔧 DEV MODE: Skipping token refresh for dev user {user_id}, returning mock token")
+            return credentials_data.get('accessToken', 'mock-access-token-for-dev')
+
         client_id = os.getenv('GOOGLE_CLIENT_ID')
         client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
 
