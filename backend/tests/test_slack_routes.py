@@ -524,7 +524,7 @@ class TestSlackService:
             slack_service._extract_integration_data(oauth_data)
     
     def test_extract_integration_data_no_user_token(self, slack_service):
-        """Test integration data extraction without user token (should work)"""
+        """Test integration data extraction without user token (should fail - user token required)"""
         oauth_data = {
             'ok': True,
             'access_token': 'xoxb-bot-token',
@@ -532,14 +532,11 @@ class TestSlackService:
                 'name': 'Test Workspace',
                 'id': 'T9TK3CUKW'
             }
-            # No authed_user section
+            # No authed_user section - should raise error now
         }
-        
-        result = slack_service._extract_integration_data(oauth_data)
-        
-        assert result['bot_token'] == 'xoxb-bot-token'
-        assert result['access_token'] is None  # Should be None, not empty string
-        assert result['slack_user_id'] is None
+
+        with pytest.raises(ValueError, match="Missing user access token"):
+            slack_service._extract_integration_data(oauth_data)
     
     def test_sanitize_oauth_response_for_logging(self, slack_service):
         """Test OAuth response sanitization for safe logging"""
@@ -684,7 +681,37 @@ class TestSlackRoutesIntegration:
             data = json.loads(response.data)
             assert data['success'] is False
             assert 'Missing bot access token' in data['error']
-    
+
+    def test_oauth_callback_missing_user_token(self, client, mock_slack_service):
+        """Test OAuth callback when Slack response is missing user access token"""
+        import base64
+        import time
+        import uuid
+
+        # Create valid state token
+        user_id = "test-user-123"
+        timestamp = str(int(time.time()))
+        random_uuid = str(uuid.uuid4())
+        state_payload = f"{user_id}:{timestamp}:{random_uuid}"
+        secure_state = base64.urlsafe_b64encode(state_payload.encode()).decode().rstrip('=')
+
+        # Mock the validate method to return user_id
+        mock_slack_service.validate_and_extract_user_from_state.return_value = user_id
+
+        # Mock handle_oauth_callback to simulate missing user token error
+        mock_slack_service.handle_oauth_callback = AsyncMock(return_value={
+            'success': False,
+            'error': 'Missing user access token in OAuth response. User must grant user-level permissions for Slack automation to work.'
+        })
+
+        with patch('backend.apis.slack_routes.slack_service', mock_slack_service):
+            response = client.get(f'/api/integrations/slack/auth/callback?code=test_code&state={secure_state}')
+
+            assert response.status_code == 500
+            data = json.loads(response.data)
+            assert data['success'] is False
+            assert 'Missing user access token' in data['error']
+
     def test_oauth_callback_invalid_oauth_response(self, client, mock_slack_service):
         """Test OAuth callback when Slack returns oauth error"""
         import base64

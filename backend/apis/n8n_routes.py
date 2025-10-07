@@ -349,13 +349,36 @@ def execute_task():
                 "error": "Failed to obtain valid Google Calendar access token. Please reconnect your calendar."
             }), 400
 
+        # Get Slack credentials if user has connected Slack (optional)
+        slack_credentials = None
+        slack_integration = user.get('slack_integration', {})
+        if slack_integration and slack_integration.get('access_token'):
+            from backend.utils.encryption import decrypt_token
+
+            try:
+                slack_credentials = {
+                    "accessToken": decrypt_token(slack_integration['access_token']),
+                    "workspaceId": slack_integration.get('workspace_id'),
+                    "workspaceName": slack_integration.get('workspace_name'),
+                    "slackUserId": slack_integration.get('slack_user_id'),
+                    "teamId": slack_integration.get('team_id')
+                }
+                print(f"✅ Slack credentials loaded for workspace: {slack_credentials['workspaceName']}")
+            except Exception as e:
+                print(f"⚠️ Failed to decrypt Slack token: {str(e)}")
+                # Continue without Slack credentials - not all tasks require Slack
+
         # Construct n8n webhook payload
         n8n_payload = {
             "userId": user_id,
             "taskId": task_id,
             "taskText": task_text,
-            "accessToken": access_token
+            "accessToken": access_token  # Google Calendar token
         }
+
+        # Add Slack credentials if available
+        if slack_credentials:
+            n8n_payload["slackCredentials"] = slack_credentials
 
         # Get n8n webhook URL from environment
         n8n_webhook_url = os.getenv('N8N_WEBHOOK_URL')
@@ -376,6 +399,7 @@ def execute_task():
         print(f"Task ID: {task_id}")
         print(f"Task Text: {task_text}")
         print(f"Webhook URL: {n8n_webhook_url}")
+        print(f"Integrations: Google Calendar ✓{', Slack ✓' if slack_credentials else ''}")
         print(f"{'='*60}\n")
 
         # Send request to n8n webhook
