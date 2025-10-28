@@ -269,7 +269,6 @@ class ScheduleService:
             })
 
             existing_tasks: List[Dict[str, Any]] = existing_schedule.get('schedule', []) if existing_schedule else []
-            non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
             existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
 
             # If incoming list is empty, return current state non-destructively
@@ -358,19 +357,50 @@ class ScheduleService:
                 )
 
             else:
-                # No existing schedule for date
-                # Webhook's purpose is to sync calendar changes to EXISTING schedules only.
-                # If no schedule exists, the user hasn't opened the app for this date yet.
-                # When they do, autogenerate will create the schedule with sections + preferences + calendar events.
-                print(f"[WEBHOOK] No schedule exists for {date}, skipping webhook update (schedule will be created when user visits)")
-                return True, {
-                    "schedule": [],
-                    "date": date,
-                    "metadata": {
-                        "message": "No schedule exists, webhook skipped",
-                        "calendarSynced": False
-                    }
-                }
+                # No existing schedule for date → delegate to autogenerate to preserve preferences
+                print(f"[WEBHOOK] No schedule exists for {date}, calling autogenerate to preserve preferences")
+
+                # Call autogenerate which will:
+                # 1. Look back for source schedule with tasks
+                # 2. Copy sections from previous day
+                # 3. Preserve user preferences (inputs)
+                # 4. Fetch calendar events (might duplicate, but we'll merge)
+                autogen_success, autogen_result = self.autogenerate_schedule(
+                    user_id=user_id,
+                    date=date,
+                    max_days_back=30
+                )
+
+                if autogen_success and autogen_result.get('created'):
+                    # Autogenerate created a new schedule with preferences ✅
+                    # Now merge the webhook's calendar tasks on top by calling ourselves recursively
+                    print(f"[WEBHOOK] Autogenerate created schedule, now merging webhook calendar updates")
+                    return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+
+                elif autogen_success and autogen_result.get('existed'):
+                    # Edge case: Schedule was created between our initial check and autogenerate call
+                    # (race condition, unlikely but possible)
+                    print(f"[WEBHOOK] Schedule now exists (race condition), merging webhook updates")
+                    return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+
+                else:
+                    # Autogenerate failed or returned empty (first-time user, no source schedule)
+                    # Fall back to original behavior: create calendar-only schedule
+                    print(f"[WEBHOOK] Autogenerate failed or no source found, creating calendar-only schedule")
+                    schedule_document = self._create_schedule_document(
+                        user_id=user_id,
+                        date=date,
+                        tasks=final_tasks,
+                        source="calendar_sync"
+                    )
+                    is_valid, validation_error = validate_schedule_document(schedule_document)
+                    if not is_valid:
+                        return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+                    # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                    schedule_document['schedule'] = self._serialize_tasks_for_storage(schedule_document['schedule'])
+
+                    self.schedules_collection.insert_one(schedule_document)
 
             # Use serialized tasks for response to ensure RecurrenceType objects are dicts
             serialized_final_tasks = self._serialize_tasks_for_storage(final_tasks)
