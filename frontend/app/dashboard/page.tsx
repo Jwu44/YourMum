@@ -77,6 +77,7 @@ const Dashboard: React.FC = () => {
   const [suggestionsMap, setSuggestionsMap] = useState<Map<string, AISuggestion[]>>(new Map())
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [userCreationDate, setUserCreationDate] = useState<Date | null>(null)
+  const [scheduleVersion, setScheduleVersion] = useState(0) // Increment to invalidate calendar cache
   const hasInitiallyLoaded = useRef(false)
   const hasEnsuredRefresh = useRef(false)
   const [isEnsuringRefresh, setIsEnsuringRefresh] = useState(false)
@@ -206,6 +207,9 @@ const Dashboard: React.FC = () => {
         return newDays
       })
 
+      // Invalidate calendar cache to show newly created schedules
+      setScheduleVersion(prev => prev + 1)
+
       setScheduleCache(prevCache =>
         new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
       )
@@ -301,6 +305,9 @@ const Dashboard: React.FC = () => {
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Failed to update schedule')
       }
+
+      // Invalidate calendar cache to show newly created schedules
+      setScheduleVersion(prev => prev + 1)
 
       // 🔧 NEW: Close edit drawer on successful update
       if (isEditDrawerOpen) {
@@ -520,6 +527,9 @@ const Dashboard: React.FC = () => {
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Failed to save task positions')
       }
+
+      // Invalidate calendar cache to show newly created schedules
+      setScheduleVersion(prev => prev + 1)
     } catch (error) {
       console.error('Error saving reordered tasks:', error)
 
@@ -717,6 +727,8 @@ const Dashboard: React.FC = () => {
             newCache.set(nextDayDate, autogenResult.schedule!)
             return newCache
           })
+          // Invalidate calendar cache to show newly created schedules
+          setScheduleVersion(prev => prev + 1)
         } else {
           console.log('⚠️ Next day autogenerate returned no schedule, showing empty state')
           setScheduleDays(prevDays => {
@@ -823,31 +835,36 @@ const Dashboard: React.FC = () => {
       // Load schedule from backend
       const loadResult = await loadSchedule(targetDateStr)
 
-      if (loadResult.success) {
-        const targetSchedule = loadResult.schedule || []
+      // Handle success or 404 (no schedule) - both are valid states
+      // Only throw error for actual failures (network errors, auth issues, etc.)
+      const targetSchedule = loadResult.success ? (loadResult.schedule || []) : []
+      const isNotFoundError = loadResult.error?.includes('No schedule found')
 
-        setScheduleDays(prevDays => {
-          const newDays = [...prevDays]
-          const targetIndex = Math.abs(dayOffset)
-
-          // Ensure array is large enough
-          while (newDays.length <= targetIndex) {
-            newDays.push([])
-          }
-
-          newDays[targetIndex] = targetSchedule
-          return newDays
-        })
-
-        // Cache the loaded schedule
-        setScheduleCache(prevCache =>
-          new Map(prevCache).set(targetDateStr, targetSchedule)
-        )
-
-        setCurrentDayIndex(dayOffset)
-      } else {
+      if (!loadResult.success && !isNotFoundError) {
+        // Real error (not just "no schedule") - throw it
         throw new Error(loadResult.error || 'Failed to load schedule')
       }
+
+      // Navigate to the date (with schedule or empty)
+      setScheduleDays(prevDays => {
+        const newDays = [...prevDays]
+        const targetIndex = Math.abs(dayOffset)
+
+        // Ensure array is large enough
+        while (newDays.length <= targetIndex) {
+          newDays.push([])
+        }
+
+        newDays[targetIndex] = targetSchedule
+        return newDays
+      })
+
+      // Cache the loaded schedule (even if empty)
+      setScheduleCache(prevCache =>
+        new Map(prevCache).set(targetDateStr, targetSchedule)
+      )
+
+      setCurrentDayIndex(dayOffset)
     } catch (error) {
       console.error('Error navigating to date:', error)
       toast({
@@ -1184,6 +1201,9 @@ const Dashboard: React.FC = () => {
         updatedSchedule
       )
 
+      // Invalidate calendar cache to show newly created schedules
+      setScheduleVersion(prev => prev + 1)
+
       toast({
         title: 'Success!',
         description: 'Suggestion added to schedule.',
@@ -1245,6 +1265,8 @@ const Dashboard: React.FC = () => {
               console.log('✅ Dashboard: Autogenerate successful with', autogenResult.schedule.length, 'tasks')
               setScheduleDays([autogenResult.schedule])
               setScheduleCache(new Map([[today, autogenResult.schedule]]))
+              // Invalidate calendar cache to show newly created schedules
+              setScheduleVersion(prev => prev + 1)
             } else {
               console.log('⚠️ Dashboard: Autogenerate returned no schedule, showing empty state')
               setScheduleDays([[]])
@@ -1367,6 +1389,7 @@ const Dashboard: React.FC = () => {
           onAddTask={() => { setIsTaskDrawerOpen(true) }}
           showSidebarTrigger={true}
           isLoading={isLoadingSchedule}
+          scheduleVersion={scheduleVersion}
         />
 
         <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 pb-6 mobile-padding-safe">

@@ -93,6 +93,54 @@ class ScheduleService:
             traceback.print_exc()
             return False, {"error": f"Internal error: {str(e)}"}
 
+    def get_available_dates_in_range(
+        self,
+        user_id: str,
+        start_date: str,
+        end_date: str
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Get dates with existing schedules in date range (bulk endpoint optimization).
+
+        Uses MongoDB projection to fetch only date field for efficiency,
+        replacing 30+ individual schedule checks with a single query.
+
+        Args:
+            user_id: User's Google ID or Firebase UID
+            start_date: Start date string in YYYY-MM-DD format (inclusive)
+            end_date: End date string in YYYY-MM-DD format (inclusive)
+
+        Returns:
+            Tuple of (success: bool, result: Dict) where result contains either
+            available_dates list on success or error message on failure
+        """
+        try:
+            # Format dates for database query (YYYY-MM-DDTHH:mm:ss)
+            formatted_start = format_schedule_date(start_date)
+            formatted_end = format_schedule_date(end_date)
+
+            # Efficient query: only fetch date field, filter by non-empty schedules
+            # Using projection to reduce data transfer and processing time
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {"$gte": formatted_start, "$lte": formatted_end},
+                "schedule.0": {"$exists": True}  # Has at least one task
+            }, {"date": 1, "_id": 0})
+
+            # Convert to frontend format (YYYY-MM-DD)
+            available_dates = [
+                doc["date"].split("T")[0]
+                for doc in cursor
+            ]
+
+            print(f"Found {len(available_dates)} available dates between {start_date} and {end_date}")
+            return True, {"available_dates": available_dates}
+
+        except Exception as e:
+            print(f"Error in get_available_dates_in_range: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to get available dates: {str(e)}"}
+
     def create_schedule_from_ai_generation(
         self,
         user_id: str,

@@ -1544,6 +1544,107 @@ def get_schedule_by_date(date):
             "error": f"Internal server error: {str(e)}"
         }), 500
 
+@api_bp.route("/schedules/available-dates", methods=["POST"])
+def get_available_dates():
+    """
+    Get dates with existing schedules in bulk (replaces 30+ individual GET calls).
+
+    Performance optimization endpoint that uses MongoDB projection and range queries
+    to efficiently find all dates with schedules in a given range.
+
+    Request Body:
+        {
+            "start_date": "YYYY-MM-DD",  # Start date (inclusive)
+            "end_date": "YYYY-MM-DD"     # End date (inclusive)
+        }
+
+    Headers:
+        Authorization: Bearer <firebase_id_token> (required)
+
+    Returns:
+        200: Available dates found and returned successfully
+        400: Invalid request body or date format
+        401: Authentication required
+        500: Internal server error
+
+    Response:
+        {
+            "success": true,
+            "available_dates": ["2025-01-15", "2025-01-20", ...]
+        }
+    """
+    try:
+        # Validate authentication
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Authentication required"
+            }), 401
+
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({
+                "success": False,
+                "error": "Invalid authentication token"
+            }), 401
+
+        user_id = user.get('googleId')
+
+        # Parse and validate request body
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Request body required"
+            }), 400
+
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if not start_date or not end_date:
+            return jsonify({
+                "success": False,
+                "error": "Both start_date and end_date are required"
+            }), 400
+
+        # Validate date formats
+        try:
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Use schedule service to get available dates
+        success, result = schedule_service.get_available_dates_in_range(
+            user_id,
+            start_date,
+            end_date
+        )
+
+        if not success:
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Failed to get available dates")
+            }), 500
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        print(f"Error in get_available_dates: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": f"Internal server error: {str(e)}"
+        }), 500
+
 @api_bp.route("/schedules/<date>", methods=["OPTIONS"])
 def handle_schedule_options(date):
     """Handle CORS preflight requests for schedule endpoints."""
