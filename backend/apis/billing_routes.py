@@ -134,6 +134,62 @@ def get_billing_status():
         }), 500
 
 
+@billing_bp.route("/cancel-subscription", methods=["POST"])
+def cancel_subscription():
+    """
+    Cancel user's subscription.
+
+    Expected JSON body (optional):
+    {
+        "cancelImmediately": false  // Default: cancel at period end
+    }
+
+    Returns:
+        JSON response with cancellation status
+    """
+    try:
+        # Verify authentication
+        user = get_user_from_token()
+
+        # Check if user has an active subscription
+        subscription_id = user.get('subscriptionId')
+        if not subscription_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active subscription found'
+            }), 400
+
+        # Get request data
+        data = request.get_json() or {}
+        cancel_immediately = data.get('cancelImmediately', False)
+
+        # Cancel subscription
+        cancel_result = billing_service.cancel_subscription(
+            subscription_id=subscription_id,
+            cancel_immediately=cancel_immediately
+        )
+
+        if not cancel_result['success']:
+            return jsonify({
+                'success': False,
+                'error': cancel_result['error']
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'subscriptionId': cancel_result['subscription_id'],
+            'status': cancel_result['status'],
+            'cancelAtPeriodEnd': cancel_result['cancel_at_period_end'],
+            'currentPeriodEnd': cancel_result['current_period_end']
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f"Failed to cancel subscription: {str(e)}"
+        }), 500
+
+
 @billing_bp.route("/webhook", methods=["POST"])
 def handle_stripe_webhook():
     """

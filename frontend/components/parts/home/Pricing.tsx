@@ -57,7 +57,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-card rounded-2xl p-8 border transition-all duration-300 hover:shadow-elegant ${
+              className={`relative bg-card rounded-2xl p-8 border transition-all duration-300 hover:shadow-elegant flex flex-col ${
                 plan.popular
                   ? 'border-primary shadow-glow scale-105'
                   : 'border-border hover:border-primary/50'
@@ -83,7 +83,7 @@ const PricingSection = ({ handleGetStarted }: WithHandleGetStarted) => {
                 <p className="text-sm text-muted-foreground font-medium">{plan.credits}</p>
               </div>
 
-              <ul className="space-y-4 mb-8">
+              <ul className="space-y-4 mb-8 flex-grow">
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start">
                     <Check className="w-5 h-5 text-primary mt-0.5 mr-3 flex-shrink-0" />

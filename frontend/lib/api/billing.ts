@@ -78,6 +78,47 @@ export const billingApi = {
         error: error instanceof Error ? error.message : 'Failed to get billing status'
       }
     }
+  },
+
+  /**
+   * Cancel user's subscription
+   */
+  async cancelSubscription(
+    options: { cancelImmediately?: boolean } = {}
+  ): Promise<{
+    success: boolean
+    subscriptionId?: string
+    status?: string
+    cancelAtPeriodEnd?: boolean
+    currentPeriodEnd?: number
+    error?: string
+  }> {
+    try {
+      const response = await apiClient.post('/api/billing/cancel-subscription', options)
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || `HTTP error! status: ${response.status}`
+        }
+      }
+
+      return {
+        success: true,
+        subscriptionId: result.subscriptionId,
+        status: result.status,
+        cancelAtPeriodEnd: result.cancelAtPeriodEnd,
+        currentPeriodEnd: result.currentPeriodEnd
+      }
+    } catch (error) {
+      console.error('Error canceling subscription:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel subscription'
+      }
+    }
   }
 }
 

@@ -15,6 +15,7 @@ import { type BillingStatus } from '@/lib/types'
 import { SidebarLayout } from '@/components/parts/SidebarLayout'
 import { MobileTopNav } from '@/components/parts/MobileTopNav'
 import { AccountDeletionDialog } from '@/components/parts/AccountDeletionDialog'
+import { PricingModal } from '@/components/parts/PricingModal'
 
 /**
  * Settings page component implementing TASK-14 requirements
@@ -55,6 +56,9 @@ export default function SettingsPage () {
   // Account deletion state
   const [isDeletionDialogOpen, setIsDeletionDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Pricing modal state
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
 
   // Load user profile data when component mounts or user changes
   useEffect(() => {
@@ -297,6 +301,31 @@ export default function SettingsPage () {
     setIsDeletionDialogOpen(true)
   }
 
+  /**
+   * Handle opening the pricing modal
+   */
+  const handleManageBilling = () => {
+    setIsPricingModalOpen(true)
+  }
+
+  /**
+   * Handle plan change - refresh billing status
+   */
+  const handlePlanChanged = async () => {
+    try {
+      const billing = await billingApi.getBillingStatus()
+      setBillingStatus(billing.status ?? null)
+
+      toast({
+        title: 'Plan updated',
+        description: 'Your billing information has been refreshed.',
+        variant: 'success'
+      })
+    } catch (error) {
+      console.error('Error refreshing billing status:', error)
+    }
+  }
+
   // Determine if Save button should be disabled
   const isSaveDisabled = !hasChanges() || hasValidationErrors || isSaving
 
@@ -408,7 +437,11 @@ export default function SettingsPage () {
                     {billingStatus?.plan === 'pro' ? 'Pro' : 'Free'}
                   </p>
                 </div>
-                <Button variant="outline" className="mobile-form-button sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="mobile-form-button sm:w-auto"
+                  onClick={handleManageBilling}
+                >
                   Manage
                 </Button>
               </div>
@@ -462,6 +495,14 @@ export default function SettingsPage () {
         onOpenChange={setIsDeletionDialogOpen}
         onConfirmDelete={handleDeleteAccount}
         isDeleting={isDeleting}
+      />
+
+      {/* Pricing modal */}
+      <PricingModal
+        open={isPricingModalOpen}
+        onOpenChange={setIsPricingModalOpen}
+        currentPlan={billingStatus?.plan === 'pro' ? 'pro' : 'free'}
+        onPlanChanged={handlePlanChanged}
       />
     </SidebarLayout>
   )
