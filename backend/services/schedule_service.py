@@ -35,6 +35,29 @@ class ScheduleService:
     def __init__(self):
         """Initialize the schedule service."""
         self.schedules_collection = get_user_schedules_collection()
+        self._ensure_indexes()
+
+    def _ensure_indexes(self):
+        """
+        Ensure required MongoDB indexes exist for optimal query performance.
+
+        Creates compound index on (userId, date) to optimize all schedule lookups,
+        updates, and range queries. This is idempotent - MongoDB will not recreate
+        the index if it already exists.
+        """
+        try:
+            # Create compound index for fast lookups by user and date
+            # unique=True prevents duplicate schedules for the same user/date
+            self.schedules_collection.create_index(
+                [("userId", 1), ("date", 1)],
+                unique=True,
+                name="userId_date_unique",
+                background=True  # Non-blocking index creation
+            )
+            print("[OPTIMIZATION] MongoDB index ensured: (userId, date)")
+        except Exception as e:
+            # Index creation failure should not crash the service
+            print(f"[WARNING] Failed to ensure MongoDB indexes: {str(e)}")
 
     def _get_calendar_fetch_timeout(self) -> float:
         """Sub-timeout in seconds for calendar fetch; override in tests if needed."""

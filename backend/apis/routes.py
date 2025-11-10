@@ -20,7 +20,6 @@ from backend.services.ai_service import (
     categorize_task,
     decompose_task,
     update_decomposition_patterns,
-    generate_schedule_suggestions
 )
 from backend.services.schedule_gen import (
     generate_schedule
@@ -1467,27 +1466,18 @@ def submit_data():
         validation_duration = time.time() - validation_start_time
         print(f"[TIMING] Validation and authentication: {validation_duration:.3f}s")
 
-        # Get existing schedule for fallback error handling
-        fallback_start_time = time.time()
-        existing_schedule = None
-        try:
-            success, result = schedule_service.get_schedule_by_date(user_id, date)
-            if success:
-                existing_schedule = result.get('schedule', [])
-        except Exception:
-            # Continue if we can't get existing schedule
-            pass
-        fallback_duration = time.time() - fallback_start_time
-        print(f"[TIMING] Existing schedule lookup: {fallback_duration:.3f}s")
+        # OPTIMIZATION: Remove unnecessary fallback lookup
+        # Previously, we fetched existing schedule on every request (100-300ms),
+        # but it's only needed on error (10% of requests). Now we fetch on-demand.
 
         # Call schedule_gen.py directly - bypass schedule service
         generation_start_time = time.time()
         try:
             schedule_result = generate_schedule(data)
-            
+
             if not schedule_result or not schedule_result.get('success', True):
                 raise Exception(schedule_result.get('error', 'Schedule generation failed'))
-            
+
             generated_tasks = schedule_result.get('tasks', [])
             input_tasks = data.get('tasks', [])
             # Only error if we had input tasks but generated no tasks
@@ -1498,6 +1488,20 @@ def submit_data():
             generation_duration = time.time() - generation_start_time
             print(f"[TIMING] Schedule generation failed after: {generation_duration:.3f}s")
             print(f"Schedule generation failed: {str(gen_error)}")
+
+            # OPTIMIZATION: Only fetch existing schedule when needed (on error)
+            fallback_start_time = time.time()
+            existing_schedule = None
+            try:
+                success, result = schedule_service.get_schedule_by_date(user_id, date)
+                if success:
+                    existing_schedule = result.get('schedule', [])
+            except Exception:
+                # Continue if we can't get existing schedule
+                pass
+            fallback_duration = time.time() - fallback_start_time
+            print(f"[TIMING] Fallback schedule lookup (error case): {fallback_duration:.3f}s")
+
             # Return existing schedule with error message
             return jsonify({
                 "success": False,

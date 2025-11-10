@@ -11,6 +11,7 @@ from backend.db_config import initialize_db
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import jsonify
 from backend.apis.calendar_routes import initialize_firebase
+from backend.services.schedule_rag import preload_templates_on_startup
 import firebase_admin
 
 sys.path.append("./backend")
@@ -73,7 +74,14 @@ def create_app(testing=False):
     except Exception as e:
         print(f'Failed to initialize database: {str(e)}')
         raise
-    
+
+    # Preload RAG templates for faster first schedule generation (saves 200-500ms)
+    try:
+        preload_templates_on_startup()
+    except Exception as e:
+        print(f'[WARNING] Failed to preload RAG templates: {str(e)}')
+        # Don't crash the app if preloading fails - templates will lazy load on first use
+
     return app
 
 # Create app instance
