@@ -82,6 +82,20 @@ user_schema_validation = {
                 "minimum": 0,
                 "description": "Total free credits used across user lifetime"
             },
+            # User feedback fields
+            "feedbackPromptShown": {
+                "bsonType": "bool",
+                "description": "Whether the user has seen the feature feedback prompt"
+            },
+            "feedbackResponse": {
+                "bsonType": ["string", "null"],
+                "enum": ["thumbs_up", "thumbs_down", "dismissed", "null"],
+                "description": "User's response to the feature feedback prompt"
+            },
+            "feedbackTimestamp": {
+                "bsonType": ["date", "null"],
+                "description": "When the user responded to the feedback prompt"
+            },
             # Note: Legacy `slack` schema removed. Slack integration data is stored under `slack_integration`.
         }
     }

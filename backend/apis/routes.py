@@ -1163,6 +1163,99 @@ def check_user_schedules(user_id):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@api_bp.route("/user/should-show-feedback", methods=["GET"])
+def should_show_feedback():
+    """
+    Check if the user should see the feature feedback prompt.
+
+    Criteria:
+    - User has more than 1 schedule
+    - User has not seen the feedback prompt before
+
+    Auth: Firebase ID token required (Authorization: Bearer <token>)
+
+    Returns:
+        { "should_show": boolean }
+    """
+    try:
+        # Auth
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"success": False, "error": "Authentication required"}), 401
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({"success": False, "error": "Invalid authentication token"}), 401
+
+        user_id = user['googleId']
+
+        # Check if user has already seen the feedback prompt
+        if user.get('feedbackPromptShown', False):
+            return jsonify({"should_show": False}), 200
+
+        # Count user's schedules
+        user_schedules = get_user_schedules_collection()
+        schedule_count = user_schedules.count_documents({"userId": user_id})
+
+        # Show feedback if user has more than 1 schedule
+        should_show = schedule_count > 1
+
+        return jsonify({"should_show": should_show}), 200
+
+    except Exception as e:
+        print("Exception occurred in should_show_feedback:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.route("/user/feedback", methods=["POST"])
+def submit_feedback():
+    """
+    Record user's response to the feature feedback prompt.
+
+    Body: { "response": "thumbs_up" | "thumbs_down" | "dismissed" }
+    Auth: Firebase ID token required (Authorization: Bearer <token>)
+
+    Returns:
+        { "success": boolean }
+    """
+    try:
+        # Auth
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"success": False, "error": "Authentication required"}), 401
+        token = auth_header[7:]
+        user = get_user_from_token(token)
+        if not user or not user.get('googleId'):
+            return jsonify({"success": False, "error": "Invalid authentication token"}), 401
+
+        # Validate request body
+        data = request.get_json(silent=True) or {}
+        response_value = data.get('response')
+
+        if response_value not in ['thumbs_up', 'thumbs_down', 'dismissed']:
+            return jsonify({"success": False, "error": "Invalid response value"}), 400
+
+        # Update user document
+        db = get_database()
+        users = db['users']
+        users.update_one(
+            {"googleId": user['googleId']},
+            {
+                "$set": {
+                    "feedbackPromptShown": True,
+                    "feedbackResponse": response_value,
+                    "feedbackTimestamp": datetime.now(timezone.utc)
+                }
+            }
+        )
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        print("Exception occurred in submit_feedback:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 @api_bp.route("/tasks/decompose", methods=["POST"])
 @requires_credits(amount=1, operation_type='task_breakdown')
 def api_decompose_task():

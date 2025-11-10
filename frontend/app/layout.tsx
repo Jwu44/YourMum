@@ -6,6 +6,8 @@ import { RouteGuard } from '@/auth/RouteGuard'
 import { FormProvider } from '@/lib/FormContext'
 import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { ToasterClient } from '@/components/ui/toaster-client'
+import { Toaster as SonnerToaster } from '@/components/ui/sonner'
+import { FeedbackSonner } from '@/components/parts/FeedbackSonner'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -55,8 +57,10 @@ export default function RootLayout ({
               </RouteGuard>
             </FormProvider>
           </OnboardingProvider>
+          <ToasterClient />
+          <SonnerToaster />
+          <FeedbackSonner />
         </AuthProvider>
-        <ToasterClient />
       </body>
     </html>
   )
