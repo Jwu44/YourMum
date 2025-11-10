@@ -172,21 +172,23 @@ def retrieve_schedule_examples(
             # Check ordering pattern exact match
             template_pattern = template["ordering_pattern"]
             
+            # Normalize both to lists for comparison (all templates use lists, but input may be string)
             if isinstance(ordering_pattern, str):
-                # Single pattern matching
-                if template_pattern == ordering_pattern:
-                    matching_examples.append(template)
-                    print(f"[RAG] Found matching template: {template.get('id', 'unknown')}")
-                else:
-                    pattern_mismatches += 1
-            elif isinstance(ordering_pattern, list):
-                # Compound pattern matching - must be exact match including order
-                if (isinstance(template_pattern, list) and 
-                    template_pattern == ordering_pattern):
-                    matching_examples.append(template)
-                    print(f"[RAG] Found matching compound template: {template.get('id', 'unknown')}")
-                else:
-                    pattern_mismatches += 1
+                ordering_pattern_list = [ordering_pattern]
+            else:
+                ordering_pattern_list = ordering_pattern
+            
+            if isinstance(template_pattern, str):
+                template_pattern_list = [template_pattern]
+            else:
+                template_pattern_list = template_pattern
+            
+            # Compare lists (exact match including order)
+            if template_pattern_list == ordering_pattern_list:
+                matching_examples.append(template)
+                print(f"[RAG] Found matching template: {template.get('id', 'unknown')}")
+            else:
+                pattern_mismatches += 1
             
             # Limit to max 5 examples
             if len(matching_examples) >= 5:
