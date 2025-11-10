@@ -252,7 +252,7 @@ def categorize_task(task_text: str) -> List[str]:
         
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-haiku-latest",
+            model="claude-haiku-4-5-20251001",
             max_tokens=100,
             temperature=0.3,
             messages=[
@@ -306,7 +306,7 @@ def decompose_task(task_data: Dict[str, Any], user_data: Dict[str, Any]) -> List
         
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-haiku-latest",
+            model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             temperature=0.7,
             messages=[
@@ -457,7 +457,7 @@ def generate_schedule_suggestions(
         
         # Call Claude API
         response = client.messages.create(
-            model="claude-3-5-haiku-latest",
+            model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             temperature=0.7,
             messages=[
