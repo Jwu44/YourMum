@@ -36,7 +36,7 @@ import { useDragState } from '../contexts/DragStateContext'
 interface UseDragDropProviderProps {
   tasks: Task[]
   onReorderTasks: (newTasks: Task[]) => void
-  moveTask?: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null) => void
+  moveTask?: (dragIndex: number, hoverIndex: number, dragType: 'indent' | 'outdent' | 'reorder', targetSection: string | null, isLeftOutdent?: boolean) => void
 }
 
 interface DragDropProviderReturn {
@@ -251,13 +251,13 @@ export const useDragDropProvider = ({
         // The real-time drag type is tracked on the target task during cursor movement
         const activeData = active.data.current
         const overData = over.data.current
-        
+
         // Try to get drag type from target task's indentation state first
         const targetIndentationState = overData?.indentationState
         const fallbackIndentationState = activeData?.indentationState
-        
+
         const dragType = targetIndentationState?.dragType || fallbackIndentationState?.dragType || 'reorder'
-        
+        const isLeftOutdent = targetIndentationState?.isLeftOutdent || fallbackIndentationState?.isLeftOutdent || false
 
         // Determine if moving to a section
         const targetSection = overData?.type === 'section' ? overData.task.text : null
@@ -267,7 +267,7 @@ export const useDragDropProvider = ({
 
         // Use the enhanced moveTask if available, otherwise fall back to simple reordering
         if (moveTask && typeof moveTask === 'function') {
-          moveTask(oldIndex, newIndex, dragType, targetSection)
+          moveTask(oldIndex, newIndex, dragType, targetSection, isLeftOutdent)
         } else {
           // Fallback to simple reordering - use raw indices
           const newTasks = arrayMove(tasks, oldIndex, newIndex)

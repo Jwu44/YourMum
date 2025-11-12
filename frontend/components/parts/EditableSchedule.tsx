@@ -96,7 +96,8 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
     dragIndex: number,
     hoverIndex: number,
     dragType: 'indent' | 'outdent' | 'reorder',
-    targetSection: string | null
+    targetSection: string | null,
+    isLeftOutdent?: boolean
   ) => {
     try {
       // Validate indices
@@ -152,34 +153,40 @@ const EditableSchedule: React.FC<EditableScheduleProps> = ({
           const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
           newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
         } else if (dragType === 'outdent' && !targetTask.is_section) {
-        // 🔧 FIX: Outdent - Reduce level by 1 and move to same level as target task
-        // As per task26.md: "dragged task's level is reduced by 1" and "Task D + Task F on the same level"
-          const currentTaskLevel = draggedTask.level || 0
+        // 🔧 FIX: Outdent - Handle both regular outdent and left-outdent
+        // Regular outdent (first zone): match target's level and parent
+        // Left-outdent (left zone): reduce to parent level (target.level - 1)
+          const targetLevel = targetTask.level || 0
 
-          if (currentTaskLevel > 0) {
-            // Reduce level by 1 (as per task requirement)
-            const newLevel = Math.max(currentTaskLevel - 1, 0)
-
-            // Move to same level as target task (the parent)
-            updatedDraggedTask.is_subtask = newLevel > 0
-            updatedDraggedTask.level = newLevel
-            updatedDraggedTask.section = targetTask.section
-
-            if (newLevel === 0) {
-              // Moving to top level
-              updatedDraggedTask.parent_id = null
-            } else {
-              // Moving to same parent as target task
-              updatedDraggedTask.parent_id = targetTask.parent_id
-            }
-
-            // Position after the target task (the parent that was dragged over)
-            const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
-            newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
+          // Determine new level based on outdent type
+          let newLevel: number
+          if (isLeftOutdent) {
+            // Left-outdent: reduce to parent level (target.level - 1)
+            newLevel = Math.max(targetLevel - 1, 0)
           } else {
-            // Already at level 0, just reorder
-            newTasks.splice(hoverIndex, 0, updatedDraggedTask)
+            // Regular outdent: match target's level
+            newLevel = targetLevel
           }
+
+          updatedDraggedTask.is_subtask = newLevel > 0
+          updatedDraggedTask.level = newLevel
+          updatedDraggedTask.section = targetTask.section
+
+          // Set parent_id based on new level
+          if (newLevel === 0) {
+            updatedDraggedTask.parent_id = null
+          } else if (isLeftOutdent) {
+            // For left-outdent, parent becomes target's parent's parent
+            // This effectively moves up one level in the hierarchy
+            updatedDraggedTask.parent_id = targetTask.parent_id
+          } else {
+            // For regular outdent, parent is same as target's parent
+            updatedDraggedTask.parent_id = targetTask.parent_id
+          }
+
+          // Position after the target task
+          const adjustedHoverIndex = hoverIndex > dragIndex ? hoverIndex - 1 : hoverIndex
+          newTasks.splice(adjustedHoverIndex + 1, 0, updatedDraggedTask)
         } else {
           if (targetTask.is_section) {
             newTasks.splice(hoverIndex + 1, 0, {
