@@ -115,15 +115,16 @@ class SlackService:
     def generate_oauth_url(self, user_id: str, redirect_uri: str = None) -> Tuple[str, str]:
         """
         Generate OAuth URL for Slack workspace connection with secure state token
-        
+
         Args:
             user_id: YourMum user ID to embed in state token
             redirect_uri: Optional custom redirect URI
-            
+
         Returns:
             Tuple of (oauth_url, secure_state_token)
         """
-        scopes = [
+        # Bot scopes - for webhook event listening
+        bot_scopes = [
             'app_mentions:read',
             'channels:history',
             'groups:history',
@@ -132,24 +133,39 @@ class SlackService:
             'users:read',
             'team:read'
         ]
-        
+
+        # User scopes - for n8n automation (posting as user, searching messages)
+        user_scopes = [
+            'chat:write',           # Post messages as user
+            'channels:read',        # List public channels
+            'channels:history',     # Search public channel messages
+            'groups:read',          # List private channels
+            'groups:history',       # Search private channel messages
+            'im:read',              # List DMs
+            'im:history',           # Search DM messages
+            'mpim:read',            # List group DMs
+            'mpim:history',         # Search group DM messages
+            'search:read'           # Search across workspace (optional optimization)
+        ]
+
         # Generate secure state token with embedded user ID
         secure_state_token = self.generate_secure_state_token(user_id)
-        
+
         # Default redirect URI
         if not redirect_uri:
             redirect_uri = f"{os.getenv('NEXT_PUBLIC_API_URL', 'http://localhost:8000')}/api/integrations/slack/auth/callback"
-        
+
         params = {
             'client_id': self.client_id,
-            'scope': ' '.join(scopes),
+            'scope': ' '.join(bot_scopes),      # Bot permissions
+            'user_scope': ' '.join(user_scopes), # User permissions (NEW)
             'state': secure_state_token,
             'redirect_uri': redirect_uri
         }
-        
+
         param_string = '&'.join([f"{key}={value}" for key, value in params.items()])
         oauth_url = f"{self.oauth_base_url}?{param_string}"
-        
+
         return oauth_url, secure_state_token
     
     async def handle_oauth_callback(self, code: str, state: str, user_id: str) -> Dict[str, Any]:
@@ -171,14 +187,11 @@ class SlackService:
             if not oauth_data.get('ok'):
                 raise ValueError(f"OAuth failed: {oauth_data.get('error', 'Unknown error')}")
             
-            # Extract integration data
+            # Extract integration data (validates both bot and user tokens exist)
             integration_data = self._extract_integration_data(oauth_data)
-            
-            # Encrypt tokens before storage (only if they exist)
-            if integration_data['access_token']:
-                integration_data['access_token'] = encrypt_token(integration_data['access_token'])
-            
-            # Bot token is required and should always exist
+
+            # Encrypt tokens before storage (both are required now)
+            integration_data['access_token'] = encrypt_token(integration_data['access_token'])
             integration_data['bot_token'] = encrypt_token(integration_data['bot_token'])
             
             # Store integration in database
@@ -249,25 +262,30 @@ class SlackService:
         # Validate OAuth response structure
         if not oauth_data.get('ok'):
             raise ValueError(f"OAuth failed: {oauth_data.get('error', 'Unknown error')}")
-        
+
         if not oauth_data.get('team', {}).get('id'):
             raise ValueError("Missing team information in OAuth response")
-        
+
         # Extract bot token (required)
         bot_token = oauth_data.get('access_token')
         if not bot_token:
             raise ValueError("Missing bot access token in OAuth response")
-        
-        # Extract user token (optional for some integrations)
+
+        # Extract user token (REQUIRED for n8n automation)
         user_token = oauth_data.get('authed_user', {}).get('access_token')
-        
+        if not user_token:
+            raise ValueError(
+                "Missing user access token in OAuth response. "
+                "User must grant user-level permissions for Slack automation to work."
+            )
+
         return {
             'workspace_id': oauth_data['team']['id'],
             'workspace_name': oauth_data['team']['name'],
             'team_id': oauth_data['team']['id'],
             'slack_user_id': oauth_data.get('authed_user', {}).get('id'),
             'slack_username': oauth_data.get('authed_user', {}).get('name', 'Unknown User'),
-            'access_token': user_token if user_token else None,  # Keep as None if not present
+            'access_token': user_token,  # Now required, not optional
             'bot_token': bot_token,
             'bot_user_id': oauth_data.get('bot_user_id'),
             'connected_at': datetime.utcnow().isoformat(),

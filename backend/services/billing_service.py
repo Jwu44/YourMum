@@ -415,6 +415,41 @@ class BillingService:
                 'error': f"Failed to handle payment failure: {str(e)}"
             }
 
+    def cancel_subscription(self, subscription_id: str, cancel_immediately: bool = False) -> Dict[str, Any]:
+        """
+        Cancel a Stripe subscription.
+
+        Args:
+            subscription_id: Stripe subscription ID
+            cancel_immediately: If True, cancel immediately; if False, cancel at period end
+
+        Returns:
+            Dict containing success status and result or error
+        """
+        try:
+            if cancel_immediately:
+                # Cancel immediately
+                subscription = stripe.Subscription.delete(subscription_id)
+            else:
+                # Cancel at end of billing period
+                subscription = stripe.Subscription.modify(
+                    subscription_id,
+                    cancel_at_period_end=True
+                )
+
+            return {
+                'success': True,
+                'subscription_id': subscription.id,
+                'status': subscription.status,
+                'cancel_at_period_end': subscription.cancel_at_period_end,
+                'current_period_end': subscription.current_period_end
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to cancel subscription: {str(e)}"
+            }
+
     @staticmethod
     def calculate_free_credits(lifetime_used: int) -> int:
         """

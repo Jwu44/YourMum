@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 # Import the core functions to validate they work
 from backend.services.schedule_gen import generate_schedule
-from backend.services.ai_service import categorize_task, decompose_task, generate_schedule_suggestions
+from backend.services.ai_service import categorize_task, decompose_task
 
 
 class TestCompleteFlowValidation:
@@ -120,11 +120,11 @@ class TestCompleteFlowValidation:
             
             # These should exist (active functions)
             assert hasattr(ai_service, 'categorize_task')
-            assert hasattr(ai_service, 'decompose_task') 
-            assert hasattr(ai_service, 'generate_schedule_suggestions')
-            
-            # The legacy generate_schedule should no longer exist after removal
+            assert hasattr(ai_service, 'decompose_task')
+
+            # Legacy functions should no longer exist after removal
             assert not hasattr(ai_service, 'generate_schedule')  # Legacy function removed
+            assert not hasattr(ai_service, 'generate_schedule_suggestions')  # Dead code removed
             
             print("✅ All imports are clean - schedule_gen.py is primary implementation")
             
@@ -140,7 +140,7 @@ class TestCompleteFlowValidation:
         
         # Verify correct imports
         assert 'from backend.services.schedule_gen import (\n    generate_schedule\n)' in routes_content
-        assert 'from backend.services.ai_service import (\n    categorize_task,\n    decompose_task,\n    update_decomposition_patterns,\n    generate_schedule_suggestions\n)' in routes_content
+        assert 'from backend.services.ai_service import (\n    categorize_task,\n    decompose_task,\n    update_decomposition_patterns' in routes_content
         
         # Verify usage in submit_data endpoint
         assert 'schedule_result = generate_schedule(data)' in routes_content

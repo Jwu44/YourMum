@@ -535,6 +535,73 @@ export const autogenerateTodaySchedule = async (date: string): Promise<{
 }
 
 /**
+ * Get available dates with schedules in bulk (optimization endpoint)
+ *
+ * Replaces 30+ individual loadSchedule calls with a single efficient backend query.
+ * Uses MongoDB projection to fetch only dates, significantly reducing load time.
+ *
+ * @param startDate - Start date in YYYY-MM-DD format (inclusive)
+ * @param endDate - End date in YYYY-MM-DD format (inclusive)
+ * @returns Promise with success status and array of available dates
+ */
+export const getAvailableDates = async (
+  startDate: string,
+  endDate: string
+): Promise<{
+  success: boolean
+  available_dates?: string[]
+  error?: string
+}> => {
+  try {
+    // Validate date formats
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD')
+    }
+
+    // Get authentication token
+    const token = await getAuthToken()
+
+    // Call backend bulk endpoint
+    const response = await fetch(`${API_BASE_URL}/api/schedules/available-dates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        start_date: startDate,
+        end_date: endDate
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.error || `HTTP ${response.status}: Failed to get available dates`)
+    }
+
+    const result = await response.json()
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || 'Failed to get available dates'
+      }
+    }
+
+    return {
+      success: true,
+      available_dates: result.available_dates || []
+    }
+  } catch (error) {
+    console.error('Error getting available dates:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get available dates'
+    }
+  }
+}
+
+/**
  * Determine if a task should recur on a given date
  *
  * Checks if a recurring task should appear on the specified date based on its recurrence pattern.

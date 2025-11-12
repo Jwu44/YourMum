@@ -11,7 +11,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 
 // API and Helpers
 import { userApi } from '@/lib/api/users'
-import { loadSchedule } from '@/lib/ScheduleHelper'
+import { getAvailableDates } from '@/lib/ScheduleHelper'
 import { formatDateToString } from '@/lib/helper'
 
 // Hooks
@@ -26,6 +26,7 @@ interface DashboardHeaderProps {
   onAddTask?: () => void
   showSidebarTrigger?: boolean
   isLoading?: boolean
+  scheduleVersion?: number // Increment this to trigger available dates refresh
 }
 
 /**
@@ -40,7 +41,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   isCurrentDay,
   onAddTask,
   showSidebarTrigger = false,
-  isLoading = false
+  isLoading = false,
+  scheduleVersion = 0
 }) => {
   // Mobile detection hook
   const isMobile = useIsMobile()
@@ -79,7 +81,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   /**
    * Get available dates for the calendar
-   * Performance optimized with caching and reasonable date range limits
+   * Performance optimized with bulk endpoint and caching
    */
   const loadAvailableDates = useCallback(async () => {
     // Check cache first (valid for 5 minutes)
@@ -109,30 +111,21 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         currentDate.setDate(currentDate.getDate() + 1)
       }
 
-      // Check future dates (next 30 days) for existing schedules
-      // Performance optimization: limit range to reasonable bounds
-      const checkPromises: Array<Promise<any>> = []
-      for (let i = 1; i <= 30; i++) {
-        const futureDate = new Date(today)
-        futureDate.setDate(today.getDate() + i)
-        const dateStr = formatDateToString(futureDate)
+      // Use bulk endpoint to check future dates (next 30 days) for existing schedules
+      // Single API call replaces 30 parallel requests - major performance improvement
+      const futureStartDate = new Date(today)
+      futureStartDate.setDate(today.getDate() + 1)
+      const futureEndDate = new Date(today)
+      futureEndDate.setDate(today.getDate() + 30)
 
-        checkPromises.push(
-          loadSchedule(dateStr).then(result => ({
-            date: dateStr,
-            hasSchedule: result.success && result.schedule && result.schedule.length > 0
-          }))
-        )
+      const result = await getAvailableDates(
+        formatDateToString(futureStartDate),
+        formatDateToString(futureEndDate)
+      )
+
+      if (result.success && result.available_dates) {
+        result.available_dates.forEach(date => availableDatesSet.add(date))
       }
-
-      // Execute all schedule checks in parallel for performance
-      const results = await Promise.allSettled(checkPromises)
-
-      results.forEach(result => {
-        if (result.status === 'fulfilled' && result.value.hasSchedule) {
-          availableDatesSet.add(result.value.date)
-        }
-      })
 
       // Update cache and state
       datesCache.current = {
@@ -145,10 +138,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     } catch (error) {
       console.error('Error loading available dates:', error)
       // Fallback: just allow dates from creation to today
-      if (userCreationDate) {
+      if (datesCache.current.userCreationDate) {
         const today = new Date()
         const fallbackDates = new Set<string>()
-        const currentDate = new Date(userCreationDate)
+        const currentDate = new Date(datesCache.current.userCreationDate)
 
         while (currentDate <= today) {
           fallbackDates.add(formatDateToString(currentDate))
@@ -157,16 +150,28 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
         setAvailableDates(fallbackDates)
       }
-    } finally {
-      // Loading state management removed for simplicity
     }
-  }, [userCreationDate])
+  }, []) // No dependencies - stable function
 
   /**
    * Check if a date is available for selection
+   * Logic: Allow all past/present dates, only allow future dates with existing schedules
    * @param date - Date to check
    */
   const isDateAvailable = useCallback((date: Date): boolean => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const checkDate = new Date(date)
+    checkDate.setHours(0, 0, 0, 0)
+
+    // Allow all dates up to and including today
+    if (checkDate <= today) {
+      // Optionally: could add user creation date check here if needed
+      return true
+    }
+
+    // For future dates, only allow if schedule exists
     const dateStr = formatDateToString(date)
     return availableDates.has(dateStr)
   }, [availableDates])
@@ -186,13 +191,41 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   }, [isDateAvailable, onNavigateToDate])
 
   /**
-   * Load available dates when calendar is first opened
+   * Preload available dates on component mount for instant calendar opening
+   * This eliminates the 3-second delay by loading dates in the background
+   */
+  useEffect(() => {
+    loadAvailableDates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount
+
+  /**
+   * Invalidate cache and reload when schedules change
+   * This ensures newly created future schedules appear in the calendar
+   */
+  useEffect(() => {
+    if (scheduleVersion > 0) {
+      // Clear cache to force fresh load
+      datesCache.current = {
+        userCreationDate: null,
+        availableDates: new Set(),
+        lastUpdated: 0
+      }
+      // Reload available dates
+      loadAvailableDates()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleVersion]) // Only trigger on version change, loadAvailableDates is stable
+
+  /**
+   * Load available dates when calendar is first opened (fallback)
    */
   useEffect(() => {
     if (isCalendarOpen && availableDates.size === 0) {
       loadAvailableDates()
     }
-  }, [isCalendarOpen, loadAvailableDates, availableDates.size])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCalendarOpen, availableDates.size]) // loadAvailableDates is stable
 
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 mb-3 sm:mb-4">

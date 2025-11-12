@@ -9,7 +9,7 @@ All schedule creation operations are centralized here for consistency and
 to eliminate code duplication across API routes.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Callable
 import traceback
 import uuid
 from datetime import datetime, timedelta
@@ -35,10 +35,80 @@ class ScheduleService:
     def __init__(self):
         """Initialize the schedule service."""
         self.schedules_collection = get_user_schedules_collection()
+        self._ensure_indexes()
+
+    def _ensure_indexes(self):
+        """
+        Ensure required MongoDB indexes exist for optimal query performance.
+
+        Creates compound index on (userId, date) to optimize all schedule lookups,
+        updates, and range queries. This is idempotent - MongoDB will not recreate
+        the index if it already exists.
+        """
+        try:
+            # Create compound index for fast lookups by user and date
+            # unique=True prevents duplicate schedules for the same user/date
+            self.schedules_collection.create_index(
+                [("userId", 1), ("date", 1)],
+                unique=True,
+                name="userId_date_unique",
+                background=True  # Non-blocking index creation
+            )
+            print("[OPTIMIZATION] MongoDB index ensured: (userId, date)")
+        except Exception as e:
+            # Index creation failure should not crash the service
+            print(f"[WARNING] Failed to ensure MongoDB indexes: {str(e)}")
 
     def _get_calendar_fetch_timeout(self) -> float:
         """Sub-timeout in seconds for calendar fetch; override in tests if needed."""
         return 10.0
+
+    def _find_most_recent_schedule_matching(
+        self,
+        user_id: str,
+        before_date: str,
+        max_days_back: int,
+        validation_func: Callable[[Dict[str, Any]], bool]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find the most recent schedule matching validation criteria using single range query.
+
+        This replaces N sequential find_one() calls with 1 find() range query,
+        improving performance from O(n) queries to O(1) query.
+
+        Args:
+            user_id: User's Google ID or Firebase UID
+            before_date: Date string in YYYY-MM-DD format to search backwards from
+            max_days_back: Maximum number of days to search backwards
+            validation_func: Function that takes schedule_doc and returns True if it matches criteria
+
+        Returns:
+            First schedule matching validation_func, or None if not found
+        """
+        try:
+            target_dt = datetime.strptime(before_date, '%Y-%m-%d')
+            earliest_date = target_dt - timedelta(days=max_days_back)
+
+            # Single range query sorted by date descending (most recent first)
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {
+                    "$gte": format_schedule_date(earliest_date.strftime('%Y-%m-%d')),
+                    "$lt": format_schedule_date(before_date)
+                }
+            }).sort("date", -1)  # Most recent first
+
+            # Iterate through results until validation_func returns True
+            for schedule_doc in cursor:
+                if validation_func(schedule_doc):
+                    return schedule_doc
+
+            return None
+
+        except Exception as e:
+            print(f"Error in _find_most_recent_schedule_matching: {str(e)}")
+            traceback.print_exc()
+            return None
 
     def get_schedule_by_date(
         self, 
@@ -93,6 +163,54 @@ class ScheduleService:
             traceback.print_exc()
             return False, {"error": f"Internal error: {str(e)}"}
 
+    def get_available_dates_in_range(
+        self,
+        user_id: str,
+        start_date: str,
+        end_date: str
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Get dates with existing schedules in date range (bulk endpoint optimization).
+
+        Uses MongoDB projection to fetch only date field for efficiency,
+        replacing 30+ individual schedule checks with a single query.
+
+        Args:
+            user_id: User's Google ID or Firebase UID
+            start_date: Start date string in YYYY-MM-DD format (inclusive)
+            end_date: End date string in YYYY-MM-DD format (inclusive)
+
+        Returns:
+            Tuple of (success: bool, result: Dict) where result contains either
+            available_dates list on success or error message on failure
+        """
+        try:
+            # Format dates for database query (YYYY-MM-DDTHH:mm:ss)
+            formatted_start = format_schedule_date(start_date)
+            formatted_end = format_schedule_date(end_date)
+
+            # Efficient query: only fetch date field, filter by non-empty schedules
+            # Using projection to reduce data transfer and processing time
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {"$gte": formatted_start, "$lte": formatted_end},
+                "schedule.0": {"$exists": True}  # Has at least one task
+            }, {"date": 1, "_id": 0})
+
+            # Convert to frontend format (YYYY-MM-DD)
+            available_dates = [
+                doc["date"].split("T")[0]
+                for doc in cursor
+            ]
+
+            print(f"Found {len(available_dates)} available dates between {start_date} and {end_date}")
+            return True, {"available_dates": available_dates}
+
+        except Exception as e:
+            print(f"Error in get_available_dates_in_range: {str(e)}")
+            traceback.print_exc()
+            return False, {"error": f"Failed to get available dates: {str(e)}"}
+
     def create_schedule_from_ai_generation(
         self,
         user_id: str,
@@ -125,7 +243,7 @@ class ScheduleService:
                 source="ai_service",
                 inputs=processed_inputs
             )
-            
+
             # Validate document before storage
             is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
                 schedule_document, user_id, date
@@ -133,7 +251,11 @@ class ScheduleService:
             if not is_valid:
                 return False, {"error": error_msg}
             schedule_document = validated_document
-            
+
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
@@ -141,17 +263,17 @@ class ScheduleService:
                 schedule_document,
                 upsert=True
             )
-            
-            # Calculate and return response metadata
-            metadata = self._calculate_schedule_metadata(generated_tasks)
+
+            # Calculate and return response metadata (use serialized tasks for consistency)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
                 "source": "ai_service"
             })
-            
+
             return True, {
-                "schedule": generated_tasks,
+                "schedule": serialized_tasks,
                 "date": date,
                 "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
                 "metadata": metadata
@@ -265,7 +387,6 @@ class ScheduleService:
             })
 
             existing_tasks: List[Dict[str, Any]] = existing_schedule.get('schedule', []) if existing_schedule else []
-            non_calendar_tasks = self._filter_non_calendar_tasks(existing_tasks)
             existing_calendar_tasks = self._filter_calendar_tasks(existing_tasks)
 
             # If incoming list is empty, return current state non-destructively
@@ -327,8 +448,12 @@ class ScheduleService:
             # Prepare update doc and validate
             if existing_schedule:
                 existing_metadata = existing_schedule.get('metadata', {})
+
+                # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                serialized_tasks = self._serialize_tasks_for_storage(final_tasks)
+
                 update_doc = {
-                    "schedule": final_tasks,
+                    "schedule": serialized_tasks,
                     "metadata": {
                         **existing_metadata,
                         "last_modified": format_timestamp(),
@@ -350,28 +475,64 @@ class ScheduleService:
                 )
 
             else:
-                # No existing schedule for date → create one with calendar tasks only
-                schedule_document = self._create_schedule_document(
+                # No existing schedule for date → delegate to autogenerate to preserve preferences
+                print(f"[WEBHOOK] No schedule exists for {date}, calling autogenerate to preserve preferences")
+
+                # Call autogenerate which will:
+                # 1. Look back for source schedule with tasks
+                # 2. Copy sections from previous day
+                # 3. Preserve user preferences (inputs)
+                # 4. Fetch calendar events (might duplicate, but we'll merge)
+                autogen_success, autogen_result = self.autogenerate_schedule(
                     user_id=user_id,
                     date=date,
-                    tasks=final_tasks,
-                    source="calendar_sync"
+                    max_days_back=30
                 )
-                is_valid, validation_error = validate_schedule_document(schedule_document)
-                if not is_valid:
-                    return False, {"error": f"Schedule validation failed: {validation_error}"}
-                self.schedules_collection.insert_one(schedule_document)
 
-            metadata = self._calculate_schedule_metadata(final_tasks)
+                if autogen_success and autogen_result.get('created'):
+                    # Autogenerate created a new schedule with preferences ✅
+                    # Now merge the webhook's calendar tasks on top by calling ourselves recursively
+                    print(f"[WEBHOOK] Autogenerate created schedule, now merging webhook calendar updates")
+                    return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+
+                elif autogen_success and autogen_result.get('existed'):
+                    # Edge case: Schedule was created between our initial check and autogenerate call
+                    # (race condition, unlikely but possible)
+                    print(f"[WEBHOOK] Schedule now exists (race condition), merging webhook updates")
+                    return self.apply_calendar_webhook_update(user_id, date, calendar_tasks)
+
+                else:
+                    # Autogenerate failed or returned empty (first-time user, no source schedule)
+                    # Fall back to original behavior: create calendar-only schedule
+                    print(f"[WEBHOOK] Autogenerate failed or no source found, creating calendar-only schedule")
+                    schedule_document = self._create_schedule_document(
+                        user_id=user_id,
+                        date=date,
+                        tasks=final_tasks,
+                        source="calendar_sync"
+                    )
+                    is_valid, validation_error = validate_schedule_document(schedule_document)
+                    if not is_valid:
+                        return False, {"error": f"Schedule validation failed: {validation_error}"}
+
+                    # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                    schedule_document['schedule'] = self._serialize_tasks_for_storage(schedule_document['schedule'])
+
+                    self.schedules_collection.insert_one(schedule_document)
+
+            # Use serialized tasks for response to ensure RecurrenceType objects are dicts
+            serialized_final_tasks = self._serialize_tasks_for_storage(final_tasks)
+
+            metadata = self._calculate_schedule_metadata(serialized_final_tasks)
             metadata.update({
                 "generatedAt": format_timestamp(),
                 "lastModified": format_timestamp(),
                 "source": "calendar_sync",
                 "calendarSynced": True,
-                "calendarEvents": len([t for t in final_tasks if t.get('from_gcal', False)])
+                "calendarEvents": len([t for t in serialized_final_tasks if t.get('from_gcal', False)])
             })
 
-            return True, {"schedule": final_tasks, "date": date, "metadata": metadata}
+            return True, {"schedule": serialized_final_tasks, "date": date, "metadata": metadata}
         except Exception as e:
             print(f"Error in apply_calendar_webhook_update: {str(e)}")
             traceback.print_exc()
@@ -449,7 +610,7 @@ class ScheduleService:
                 source="manual",
                 inputs=inputs
             )
-            
+
             # Validate document before storage
             is_valid, error_msg, validated_document = self._validate_and_prepare_schedule_document(
                 schedule_document, user_id, date
@@ -457,7 +618,11 @@ class ScheduleService:
             if not is_valid:
                 return False, {"error": error_msg}
             schedule_document = validated_document
-            
+
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             # Replace existing schedule or create new one (upsert)
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
@@ -465,17 +630,17 @@ class ScheduleService:
                 schedule_document,
                 upsert=True
             )
-            
-            # Calculate response metadata
-            metadata = self._calculate_schedule_metadata(final_tasks)
+
+            # Calculate response metadata (use serialized tasks for consistency)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
                 "source": "manual"
             })
-            
+
             return True, {
-                "schedule": final_tasks,
+                "schedule": serialized_tasks,
                 "date": date,
                 "scheduleId": str(result.upserted_id) if result.upserted_id else "updated",
                 "metadata": metadata
@@ -532,12 +697,15 @@ class ScheduleService:
                 if not is_valid:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
+                # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                serialized_tasks = self._serialize_tasks_for_storage(tasks)
+
                 # Update the schedule
                 result = self.schedules_collection.update_one(
                     {"_id": existing_schedule["_id"]},
                     {
                         "$set": {
-                            "schedule": tasks,
+                            "schedule": serialized_tasks,
                             "metadata.last_modified": format_timestamp(),
                             "metadata.source": "manual"
                         }
@@ -547,8 +715,8 @@ class ScheduleService:
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule"}
 
-                # Calculate metadata
-                metadata = self._calculate_schedule_metadata(tasks)
+                # Calculate metadata (use serialized tasks for consistency)
+                metadata = self._calculate_schedule_metadata(serialized_tasks)
                 metadata.update({
                     "generatedAt": existing_schedule.get('metadata', {}).get('created_at', ''),
                     "lastModified": format_timestamp(),
@@ -556,7 +724,7 @@ class ScheduleService:
                 })
 
                 return True, {
-                    "schedule": tasks,
+                    "schedule": serialized_tasks,
                     "date": date,
                     "metadata": metadata
                 }
@@ -580,6 +748,8 @@ class ScheduleService:
         non-section task. Schedules containing only Google Calendar events still count as
         having tasks, as long as they are non-section tasks.
 
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             before_date: Date string in YYYY-MM-DD format to search backwards from
@@ -588,31 +758,15 @@ class ScheduleService:
         Returns:
             The schedule document if found, otherwise None
         """
-        try:
-            target_dt = datetime.strptime(before_date, '%Y-%m-%d')
+        def has_non_section_tasks(schedule_doc: Dict[str, Any]) -> bool:
+            """Check if schedule has at least one non-section task."""
+            tasks = schedule_doc.get('schedule', [])
+            non_section = [t for t in tasks if not t.get('is_section', False) and t.get('type') != 'section']
+            return len(non_section) > 0
 
-            for days_back in range(1, max_days_back + 1):
-                search_dt = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_dt.strftime('%Y-%m-%d'))
-
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-
-                if not schedule_doc:
-                    continue
-
-                tasks = schedule_doc.get('schedule', [])
-                non_section = [t for t in tasks if not t.get('is_section', False) and t.get('type') != 'section']
-                if len(non_section) > 0:
-                    return schedule_doc
-
-            return None
-        except Exception as e:
-            print(f"Error in get_most_recent_schedule_with_tasks: {str(e)}")
-            traceback.print_exc()
-            return None
+        return self._find_most_recent_schedule_matching(
+            user_id, before_date, max_days_back, has_non_section_tasks
+        )
 
     def autogenerate_schedule(
         self,
@@ -734,9 +888,8 @@ class ScheduleService:
             # Process incomplete tasks from source (including incomplete recurring tasks)
             carry_over_start = time.time()
             source_tasks = source_schedule.get('schedule', [])
-            carry_over_tasks: List[Dict[str, Any]] = []
             carry_over_calendar_tasks: List[Dict[str, Any]] = []
-            carried_over_recurring_texts: set = set()  # Track carried over recurring tasks
+            carried_over_recurring_texts: set = set()  # Track recurring tasks from source to avoid duplicates
             for task in source_tasks:
                 if task.get('is_section', False) or task.get('type') == 'section':
                     continue
@@ -753,25 +906,8 @@ class ScheduleService:
                     # Ensure flags
                     calendar_copy['from_gcal'] = True
                     carry_over_calendar_tasks.append(calendar_copy)
-                else:
-                    # Only carry over recurring tasks; handle non-recurring in rebuild loop
-                    recurring_config = task.get('is_recurring')
-                    if recurring_config and recurring_config.get('status', 'active') == 'active':
-                        new_task = {**task}
-                        new_task['id'] = str(uuid.uuid4())
-                        new_task['start_date'] = date
-                        if 'type' not in new_task:
-                            new_task['type'] = 'task'
-                        carry_over_tasks.append(new_task)
-                        carried_over_recurring_texts.add(task.get('text', ''))
             carry_over_duration = time.time() - carry_over_start
             print(f"[TIMING] Task carry-over processing: {carry_over_duration:.3f}s")
-
-            # Find recurring tasks due on target date (exclude ones already carried over)
-            recurring_start = time.time()
-            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date, exclude_texts=carried_over_recurring_texts)
-            recurring_duration = time.time() - recurring_start
-            print(f"[TIMING] Recurring tasks lookup: {recurring_duration:.3f}s")
 
             # Step 4: Fetch calendar tasks for target date with sub-timeout to respect 10s UX
             calendar_fetch_start = time.time()
@@ -840,12 +976,14 @@ class ScheduleService:
                 if item.get('is_section', False) or item.get('type') == 'section':
                     rebuilt.append(item)
                     continue
-                # Skip completed tasks from source schedule
-                if item.get('completed', False):
+
+                # Check if task is recurring before skipping completed tasks
+                is_recurring_task = bool(item.get('is_recurring'))
+
+                # Skip completed tasks UNLESS they are recurring (recurring tasks recur regardless of completion)
+                if item.get('completed', False) and not is_recurring_task:
                     continue
-                # Skip recurring tasks from rebuilt (they're handled by carry-over logic)
-                if item.get('is_recurring'):
-                    continue
+
                 if item.get('from_gcal', False):
                     gid = item.get('gcal_event_id')
                     if gid and gid in fetched_by_id:
@@ -861,12 +999,18 @@ class ScheduleService:
                         # Do not duplicate here
                         pass
                 else:
-                    # Non-recurring manual task: update ID and date while preserving position
+                    # Manual task (recurring or non-recurring): update ID and date while preserving position
                     updated_task = {**item}
                     updated_task['id'] = str(uuid.uuid4())
                     updated_task['start_date'] = date
                     if 'type' not in updated_task:
                         updated_task['type'] = 'task'
+
+                    # Reset completion status for recurring tasks (they recur incomplete on new day)
+                    if updated_task.get('is_recurring'):
+                        updated_task['completed'] = False
+                        carried_over_recurring_texts.add(updated_task.get('text', ''))
+
                     rebuilt.append(updated_task)
 
             # Insert brand-new fetched calendar events after last calendar index, inheriting nearby section
@@ -897,8 +1041,14 @@ class ScheduleService:
                 if carry_gcal_id and carry_gcal_id not in fetched_ids:
                     filtered_carry_over_calendar.append(carry_task)
 
-            # After placing calendar items, append recurring and carry-over tasks at the end
-            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + carry_over_tasks + filtered_carry_over_calendar
+            # Find recurring tasks from older schedules (exclude ones already in rebuilt from source)
+            recurring_start = time.time()
+            recurring_tasks = self._get_recurring_tasks_for_date(user_id, date, exclude_texts=carried_over_recurring_texts)
+            recurring_duration = time.time() - recurring_start
+            print(f"[TIMING] Recurring tasks lookup: {recurring_duration:.3f}s")
+
+            # After placing calendar items, append recurring tasks from older schedules at the end
+            final_tasks: List[Dict[str, Any]] = rebuilt + recurring_tasks + filtered_carry_over_calendar
             
             position_preservation_duration = time.time() - position_preservation_start
             print(f"[TIMING] Calendar position preservation: {position_preservation_duration:.3f}s")
@@ -935,6 +1085,10 @@ class ScheduleService:
                 print(f"[TIMING] autogenerate_schedule failed (validation): {total_duration:.3f}s")
                 return False, {"error": f"Schedule validation failed: {validation_error}"}
 
+            # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+            serialized_tasks = self._serialize_tasks_for_storage(schedule_document['schedule'])
+            schedule_document['schedule'] = serialized_tasks
+
             formatted_date = format_schedule_date(date)
             result = self.schedules_collection.replace_one(
                 {"userId": user_id, "date": formatted_date},
@@ -944,9 +1098,9 @@ class ScheduleService:
             save_duration = time.time() - save_start
             print(f"[TIMING] Document creation and save: {save_duration:.3f}s")
 
-            # Step 9: Calculate final metadata
+            # Step 9: Calculate final metadata (use serialized tasks for consistency)
             metadata_start = time.time()
-            metadata = self._calculate_schedule_metadata(final_tasks)
+            metadata = self._calculate_schedule_metadata(serialized_tasks)
             metadata.update({
                 "generatedAt": schedule_document["metadata"]["created_at"],
                 "lastModified": schedule_document["metadata"]["last_modified"],
@@ -954,7 +1108,7 @@ class ScheduleService:
             })
             metadata_duration = time.time() - metadata_start
             print(f"[TIMING] Metadata calculation: {metadata_duration:.3f}s")
-            
+
             total_duration = time.time() - total_start_time
             print(f"[TIMING] autogenerate_schedule SUCCESS: {total_duration:.3f}s")
 
@@ -963,7 +1117,7 @@ class ScheduleService:
                 "created": True,
                 "sourceFound": True,
                 "date": date,
-                "schedule": final_tasks,
+                "schedule": serialized_tasks,
                 "metadata": metadata
             }
         except Exception as e:
@@ -1026,54 +1180,45 @@ class ScheduleService:
         }
 
     def _get_most_recent_schedule_with_inputs(
-        self, 
-        user_id: str, 
-        target_date: str, 
+        self,
+        user_id: str,
+        target_date: str,
         max_days_back: int = 30
     ) -> Optional[Dict[str, Any]]:
         """
         Find the most recent schedule that has non-empty input config data.
-        Searches backwards from target date up to max_days_back days.
-        
+
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format to search backwards from
             max_days_back: Maximum number of days to search backwards (default 30)
-            
+
         Returns:
             Schedule document with inputs config, or None if not found
         """
-        try:
-            target_dt = datetime.strptime(target_date, '%Y-%m-%d')
-            
-            # Search backwards day by day
-            for days_back in range(1, max_days_back + 1):
-                search_date = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
-                
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-                
-                if schedule_doc:
-                    inputs = schedule_doc.get('inputs', {})
-                    # Check if inputs has meaningful data (not empty or default)
-                    if inputs and any([
-                        inputs.get('name'),
-                        inputs.get('work_start_time'),
-                        inputs.get('layout_preference', {}).get('layout')
-                    ]):
-                        print(f"Found recent schedule with inputs from {search_date.strftime('%Y-%m-%d')}")
-                        return schedule_doc
-                        
+        def has_meaningful_inputs(schedule_doc: Dict[str, Any]) -> bool:
+            """Check if schedule has non-empty input config data."""
+            inputs = schedule_doc.get('inputs', {})
+            return inputs and any([
+                inputs.get('name'),
+                inputs.get('work_start_time'),
+                inputs.get('layout_preference', {}).get('layout')
+            ])
+
+        result = self._find_most_recent_schedule_matching(
+            user_id, target_date, max_days_back, has_meaningful_inputs
+        )
+
+        if result:
+            # Extract date from result for logging (matches old behavior)
+            result_date = result.get('date', '').split('T')[0]
+            print(f"Found recent schedule with inputs from {result_date}")
+        else:
             print(f"No recent schedule with inputs found within {max_days_back} days")
-            return None
-            
-        except Exception as e:
-            print(f"Error finding recent schedule with inputs: {str(e)}")
-            traceback.print_exc()
-            return None
+
+        return result
 
     def _sort_calendar_block(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -1168,68 +1313,72 @@ class ScheduleService:
             return []
 
     def _get_recurring_tasks_for_date(
-        self, 
-        user_id: str, 
-        target_date: str, 
+        self,
+        user_id: str,
+        target_date: str,
         max_days_back: int = 30,
         exclude_texts: set = None
     ) -> List[Dict[str, Any]]:
         """
         Find all recurring tasks that should occur on the target date.
-        Searches through recent schedules to find recurring tasks.
-        
+
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format
             max_days_back: Maximum number of days to search back for recurring tasks
             exclude_texts: Set of task texts to exclude (for tasks already carried over)
-            
+
         Returns:
             List of recurring task objects that should occur on target date
         """
         try:
             target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+            earliest_date = target_dt - timedelta(days=max_days_back)
+            exclude_texts = exclude_texts or set()
+
+            # Single range query to get all schedules in date range
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {
+                    "$gte": format_schedule_date(earliest_date.strftime('%Y-%m-%d')),
+                    "$lt": format_schedule_date(target_date)
+                }
+            }).sort("date", -1)  # Most recent first for deduplication
+
             recurring_tasks = []
-            seen_task_texts = set()  # Prevent duplicates
-            exclude_texts = exclude_texts or set()  # Default to empty set if None
-            
-            # Search backwards through recent schedules
-            for days_back in range(1, max_days_back + 1):
-                search_date = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
-                
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-                
-                if schedule_doc:
-                    schedule_tasks = schedule_doc.get('schedule', [])
-                    
-                    # Check each task for recurrence
-                    for task in schedule_tasks:
-                        task_text = task.get('text', '')
-                        recurring_config = task.get('is_recurring')
-                        if (recurring_config and
-                            not task.get('is_section', False) and
-                            task_text not in seen_task_texts and
-                            task_text not in exclude_texts and
-                            recurring_config.get('status', 'active') == 'active'):
-                            
-                            if self._should_task_recur_on_date(task, target_dt):
-                                # Create a copy of the task for the new date
-                                recurring_task = {
-                                    **task,
-                                    "id": str(uuid.uuid4()),  # New ID for new date
-                                    "start_date": target_date,
-                                    "completed": False  # Reset completion status
-                                }
-                                recurring_tasks.append(recurring_task)
-                                seen_task_texts.add(task_text)
-                                
+            seen_task_texts = set()
+
+            # Process schedules in chronological order (most recent first)
+            for schedule_doc in cursor:
+                schedule_tasks = schedule_doc.get('schedule', [])
+
+                for task in schedule_tasks:
+                    task_text = task.get('text', '')
+                    recurring_config = task.get('is_recurring')
+
+                    # Same validation logic as before
+                    if (recurring_config and
+                        not task.get('is_section', False) and
+                        task.get('type') != 'section' and
+                        task_text not in seen_task_texts and
+                        task_text not in exclude_texts and
+                        recurring_config.get('status', 'active') == 'active'):
+
+                        if self._should_task_recur_on_date(task, target_dt):
+                            recurring_task = {
+                                **task,
+                                "id": str(uuid.uuid4()),
+                                "start_date": target_date,
+                                "completed": False
+                            }
+                            recurring_tasks.append(recurring_task)
+                            seen_task_texts.add(task_text)
+
             print(f"Found {len(recurring_tasks)} recurring tasks for {target_date}")
             return recurring_tasks
-            
+
         except Exception as e:
             print(f"Error finding recurring tasks: {str(e)}")
             traceback.print_exc()
@@ -1550,18 +1699,18 @@ class ScheduleService:
     def _process_schedule_inputs(self, raw_inputs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Process and sanitize user inputs with safe defaults.
-        
+
         Consolidates input processing logic used across schedule creation methods.
-        
+
         Args:
             raw_inputs: Raw user input data (can be None or incomplete)
-            
+
         Returns:
             Dictionary with processed inputs and safe defaults
         """
         if raw_inputs is None:
             raw_inputs = {}
-            
+
         # Prepare inputs with safe defaults and type checking
         processed_inputs = {
             "name": raw_inputs.get('name', '') if raw_inputs.get('name') is not None else '',
@@ -1572,8 +1721,39 @@ class ScheduleService:
             "layout_preference": raw_inputs.get('layout_preference', {}) if isinstance(raw_inputs.get('layout_preference'), dict) else {},
             "tasks": raw_inputs.get('tasks', []) if isinstance(raw_inputs.get('tasks'), list) else []
         }
-        
+
         return processed_inputs
+
+    def _serialize_tasks_for_storage(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Serialize tasks for MongoDB storage, converting any RecurrenceType objects to dictionaries.
+
+        This fixes the BSON encoding error that occurs when RecurrenceType objects are passed
+        to MongoDB instead of their dictionary representation.
+
+        Args:
+            tasks: List of task dictionaries (may contain RecurrenceType objects)
+
+        Returns:
+            List of fully serialized task dictionaries safe for MongoDB storage
+        """
+        from backend.models.task import RecurrenceType
+
+        serialized_tasks = []
+        for task in tasks:
+            serialized_task = dict(task)
+
+            # Check if is_recurring is a RecurrenceType object and convert to dict
+            if 'is_recurring' in serialized_task:
+                is_recurring = serialized_task['is_recurring']
+                if isinstance(is_recurring, RecurrenceType):
+                    # Convert RecurrenceType object to dictionary
+                    serialized_task['is_recurring'] = is_recurring.to_dict()
+                # If it's already a dict or None, leave it as-is
+
+            serialized_tasks.append(serialized_task)
+
+        return serialized_tasks
 
     def _upsert_calendar_tasks_by_id(
         self, 

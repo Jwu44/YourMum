@@ -14,7 +14,7 @@ from functools import lru_cache
 load_dotenv()
 
 # Get MongoDB URI from environment variables
-uri = os.getenv("MONGODB_URI") + "&tlsInsecure=true"
+uri = os.getenv("MONGODB_URI")
 if not uri:
     raise ValueError("MONGODB_URI environment variable is not set")
 

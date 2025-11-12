@@ -78,15 +78,42 @@ def get_cached_templates() -> Dict[str, Any]:
         return _template_cache
 
 
+def preload_templates_on_startup() -> None:
+    """
+    Preload templates into cache during application startup.
+
+    PERFORMANCE OPTIMIZATION: This function should be called during Flask
+    app initialization to load templates before the first request,
+    eliminating 200-500ms latency on first schedule generation.
+
+    This is thread-safe and idempotent - if templates are already cached,
+    this function will not reload them.
+    """
+    print("[OPTIMIZATION] Preloading RAG templates...")
+    start_time = __import__('time').time()
+
+    try:
+        # This will load templates if not already cached
+        templates = get_cached_templates()
+        template_count = len(templates.get("templates", []))
+
+        duration = (__import__('time').time() - start_time) * 1000  # Convert to ms
+        print(f"[OPTIMIZATION] RAG templates preloaded: {template_count} templates in {duration:.2f}ms")
+
+    except Exception as e:
+        print(f"[WARNING] Failed to preload RAG templates: {str(e)}")
+        # Don't crash the app if preloading fails
+
+
 def clear_template_cache() -> None:
     """
     Clear the template cache. Useful for testing and forcing cache refresh.
-    
+
     This function is thread-safe and will force the next call to get_cached_templates()
     to reload templates from disk.
     """
     global _template_cache
-    
+
     with _cache_lock:
         _template_cache = None
         print("[RAG] Template cache cleared")
@@ -172,21 +199,23 @@ def retrieve_schedule_examples(
             # Check ordering pattern exact match
             template_pattern = template["ordering_pattern"]
             
+            # Normalize both to lists for comparison (all templates use lists, but input may be string)
             if isinstance(ordering_pattern, str):
-                # Single pattern matching
-                if template_pattern == ordering_pattern:
-                    matching_examples.append(template)
-                    print(f"[RAG] Found matching template: {template.get('id', 'unknown')}")
-                else:
-                    pattern_mismatches += 1
-            elif isinstance(ordering_pattern, list):
-                # Compound pattern matching - must be exact match including order
-                if (isinstance(template_pattern, list) and 
-                    template_pattern == ordering_pattern):
-                    matching_examples.append(template)
-                    print(f"[RAG] Found matching compound template: {template.get('id', 'unknown')}")
-                else:
-                    pattern_mismatches += 1
+                ordering_pattern_list = [ordering_pattern]
+            else:
+                ordering_pattern_list = ordering_pattern
+            
+            if isinstance(template_pattern, str):
+                template_pattern_list = [template_pattern]
+            else:
+                template_pattern_list = template_pattern
+            
+            # Compare lists (exact match including order)
+            if template_pattern_list == ordering_pattern_list:
+                matching_examples.append(template)
+                print(f"[RAG] Found matching template: {template.get('id', 'unknown')}")
+            else:
+                pattern_mismatches += 1
             
             # Limit to max 5 examples
             if len(matching_examples) >= 5:
