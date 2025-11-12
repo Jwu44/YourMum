@@ -279,6 +279,15 @@ class TestScheduleServiceIntegration:
             return None
 
         self.mock_collection.find_one.side_effect = mock_find_one
+
+        # Mock find() for optimized range queries (returns cursor with day_a_schedule)
+        self.mock_collection.find.return_value.sort.return_value = iter([day_a_schedule])
+
+        # Mock the users collection for calendar check
+        mock_users_collection = Mock()
+        mock_users_collection.find_one.return_value = None  # No calendar connection
+        self.mock_collection.database = {'users': mock_users_collection}
+
         self.mock_collection.replace_one.return_value = Mock(upserted_id="new_schedule_id")
 
         # Mock calendar service to return no events

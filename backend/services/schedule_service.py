@@ -9,7 +9,7 @@ All schedule creation operations are centralized here for consistency and
 to eliminate code duplication across API routes.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Callable
 import traceback
 import uuid
 from datetime import datetime, timedelta
@@ -62,6 +62,53 @@ class ScheduleService:
     def _get_calendar_fetch_timeout(self) -> float:
         """Sub-timeout in seconds for calendar fetch; override in tests if needed."""
         return 10.0
+
+    def _find_most_recent_schedule_matching(
+        self,
+        user_id: str,
+        before_date: str,
+        max_days_back: int,
+        validation_func: Callable[[Dict[str, Any]], bool]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find the most recent schedule matching validation criteria using single range query.
+
+        This replaces N sequential find_one() calls with 1 find() range query,
+        improving performance from O(n) queries to O(1) query.
+
+        Args:
+            user_id: User's Google ID or Firebase UID
+            before_date: Date string in YYYY-MM-DD format to search backwards from
+            max_days_back: Maximum number of days to search backwards
+            validation_func: Function that takes schedule_doc and returns True if it matches criteria
+
+        Returns:
+            First schedule matching validation_func, or None if not found
+        """
+        try:
+            target_dt = datetime.strptime(before_date, '%Y-%m-%d')
+            earliest_date = target_dt - timedelta(days=max_days_back)
+
+            # Single range query sorted by date descending (most recent first)
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {
+                    "$gte": format_schedule_date(earliest_date.strftime('%Y-%m-%d')),
+                    "$lt": format_schedule_date(before_date)
+                }
+            }).sort("date", -1)  # Most recent first
+
+            # Iterate through results until validation_func returns True
+            for schedule_doc in cursor:
+                if validation_func(schedule_doc):
+                    return schedule_doc
+
+            return None
+
+        except Exception as e:
+            print(f"Error in _find_most_recent_schedule_matching: {str(e)}")
+            traceback.print_exc()
+            return None
 
     def get_schedule_by_date(
         self, 
@@ -701,6 +748,8 @@ class ScheduleService:
         non-section task. Schedules containing only Google Calendar events still count as
         having tasks, as long as they are non-section tasks.
 
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             before_date: Date string in YYYY-MM-DD format to search backwards from
@@ -709,31 +758,15 @@ class ScheduleService:
         Returns:
             The schedule document if found, otherwise None
         """
-        try:
-            target_dt = datetime.strptime(before_date, '%Y-%m-%d')
+        def has_non_section_tasks(schedule_doc: Dict[str, Any]) -> bool:
+            """Check if schedule has at least one non-section task."""
+            tasks = schedule_doc.get('schedule', [])
+            non_section = [t for t in tasks if not t.get('is_section', False) and t.get('type') != 'section']
+            return len(non_section) > 0
 
-            for days_back in range(1, max_days_back + 1):
-                search_dt = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_dt.strftime('%Y-%m-%d'))
-
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-
-                if not schedule_doc:
-                    continue
-
-                tasks = schedule_doc.get('schedule', [])
-                non_section = [t for t in tasks if not t.get('is_section', False) and t.get('type') != 'section']
-                if len(non_section) > 0:
-                    return schedule_doc
-
-            return None
-        except Exception as e:
-            print(f"Error in get_most_recent_schedule_with_tasks: {str(e)}")
-            traceback.print_exc()
-            return None
+        return self._find_most_recent_schedule_matching(
+            user_id, before_date, max_days_back, has_non_section_tasks
+        )
 
     def autogenerate_schedule(
         self,
@@ -1147,54 +1180,45 @@ class ScheduleService:
         }
 
     def _get_most_recent_schedule_with_inputs(
-        self, 
-        user_id: str, 
-        target_date: str, 
+        self,
+        user_id: str,
+        target_date: str,
         max_days_back: int = 30
     ) -> Optional[Dict[str, Any]]:
         """
         Find the most recent schedule that has non-empty input config data.
-        Searches backwards from target date up to max_days_back days.
-        
+
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format to search backwards from
             max_days_back: Maximum number of days to search backwards (default 30)
-            
+
         Returns:
             Schedule document with inputs config, or None if not found
         """
-        try:
-            target_dt = datetime.strptime(target_date, '%Y-%m-%d')
-            
-            # Search backwards day by day
-            for days_back in range(1, max_days_back + 1):
-                search_date = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
-                
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-                
-                if schedule_doc:
-                    inputs = schedule_doc.get('inputs', {})
-                    # Check if inputs has meaningful data (not empty or default)
-                    if inputs and any([
-                        inputs.get('name'),
-                        inputs.get('work_start_time'),
-                        inputs.get('layout_preference', {}).get('layout')
-                    ]):
-                        print(f"Found recent schedule with inputs from {search_date.strftime('%Y-%m-%d')}")
-                        return schedule_doc
-                        
+        def has_meaningful_inputs(schedule_doc: Dict[str, Any]) -> bool:
+            """Check if schedule has non-empty input config data."""
+            inputs = schedule_doc.get('inputs', {})
+            return inputs and any([
+                inputs.get('name'),
+                inputs.get('work_start_time'),
+                inputs.get('layout_preference', {}).get('layout')
+            ])
+
+        result = self._find_most_recent_schedule_matching(
+            user_id, target_date, max_days_back, has_meaningful_inputs
+        )
+
+        if result:
+            # Extract date from result for logging (matches old behavior)
+            result_date = result.get('date', '').split('T')[0]
+            print(f"Found recent schedule with inputs from {result_date}")
+        else:
             print(f"No recent schedule with inputs found within {max_days_back} days")
-            return None
-            
-        except Exception as e:
-            print(f"Error finding recent schedule with inputs: {str(e)}")
-            traceback.print_exc()
-            return None
+
+        return result
 
     def _sort_calendar_block(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -1289,68 +1313,72 @@ class ScheduleService:
             return []
 
     def _get_recurring_tasks_for_date(
-        self, 
-        user_id: str, 
-        target_date: str, 
+        self,
+        user_id: str,
+        target_date: str,
         max_days_back: int = 30,
         exclude_texts: set = None
     ) -> List[Dict[str, Any]]:
         """
         Find all recurring tasks that should occur on the target date.
-        Searches through recent schedules to find recurring tasks.
-        
+
+        Optimized to use single range query instead of N sequential queries.
+
         Args:
             user_id: User's Google ID or Firebase UID
             target_date: Date string in YYYY-MM-DD format
             max_days_back: Maximum number of days to search back for recurring tasks
             exclude_texts: Set of task texts to exclude (for tasks already carried over)
-            
+
         Returns:
             List of recurring task objects that should occur on target date
         """
         try:
             target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+            earliest_date = target_dt - timedelta(days=max_days_back)
+            exclude_texts = exclude_texts or set()
+
+            # Single range query to get all schedules in date range
+            cursor = self.schedules_collection.find({
+                "userId": user_id,
+                "date": {
+                    "$gte": format_schedule_date(earliest_date.strftime('%Y-%m-%d')),
+                    "$lt": format_schedule_date(target_date)
+                }
+            }).sort("date", -1)  # Most recent first for deduplication
+
             recurring_tasks = []
-            seen_task_texts = set()  # Prevent duplicates
-            exclude_texts = exclude_texts or set()  # Default to empty set if None
-            
-            # Search backwards through recent schedules
-            for days_back in range(1, max_days_back + 1):
-                search_date = target_dt - timedelta(days=days_back)
-                formatted_date = format_schedule_date(search_date.strftime('%Y-%m-%d'))
-                
-                schedule_doc = self.schedules_collection.find_one({
-                    "userId": user_id,
-                    "date": formatted_date
-                })
-                
-                if schedule_doc:
-                    schedule_tasks = schedule_doc.get('schedule', [])
-                    
-                    # Check each task for recurrence
-                    for task in schedule_tasks:
-                        task_text = task.get('text', '')
-                        recurring_config = task.get('is_recurring')
-                        if (recurring_config and
-                            not task.get('is_section', False) and
-                            task_text not in seen_task_texts and
-                            task_text not in exclude_texts and
-                            recurring_config.get('status', 'active') == 'active'):
-                            
-                            if self._should_task_recur_on_date(task, target_dt):
-                                # Create a copy of the task for the new date
-                                recurring_task = {
-                                    **task,
-                                    "id": str(uuid.uuid4()),  # New ID for new date
-                                    "start_date": target_date,
-                                    "completed": False  # Reset completion status
-                                }
-                                recurring_tasks.append(recurring_task)
-                                seen_task_texts.add(task_text)
-                                
+            seen_task_texts = set()
+
+            # Process schedules in chronological order (most recent first)
+            for schedule_doc in cursor:
+                schedule_tasks = schedule_doc.get('schedule', [])
+
+                for task in schedule_tasks:
+                    task_text = task.get('text', '')
+                    recurring_config = task.get('is_recurring')
+
+                    # Same validation logic as before
+                    if (recurring_config and
+                        not task.get('is_section', False) and
+                        task.get('type') != 'section' and
+                        task_text not in seen_task_texts and
+                        task_text not in exclude_texts and
+                        recurring_config.get('status', 'active') == 'active'):
+
+                        if self._should_task_recur_on_date(task, target_dt):
+                            recurring_task = {
+                                **task,
+                                "id": str(uuid.uuid4()),
+                                "start_date": target_date,
+                                "completed": False
+                            }
+                            recurring_tasks.append(recurring_task)
+                            seen_task_texts.add(task_text)
+
             print(f"Found {len(recurring_tasks)} recurring tasks for {target_date}")
             return recurring_tasks
-            
+
         except Exception as e:
             print(f"Error finding recurring tasks: {str(e)}")
             traceback.print_exc()
