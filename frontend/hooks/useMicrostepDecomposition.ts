@@ -93,9 +93,20 @@ export const useMicrostepDecomposition = (): UseMicrostepDecompositionReturn => 
       })
     } catch (error) {
       console.error('Error decomposing task:', error)
+
+      // Extract the actual error message from the error object
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      // Check if it's actually a credit error
+      const isCreditError = errorMessage.toLowerCase().includes('credit') ||
+                           errorMessage.toLowerCase().includes('402') ||
+                           errorMessage.toLowerCase().includes('upgrade')
+
       toast({
-        title: 'Insufficient Credit',
-        description: 'You need at least 1 credit to break down a task.',
+        title: isCreditError ? 'Insufficient Credit' : 'Decomposition Failed',
+        description: isCreditError
+          ? 'You need at least 1 credit to break down a task.'
+          : errorMessage || 'Failed to break down task. Please try again.',
         variant: 'destructive'
       })
     } finally {
