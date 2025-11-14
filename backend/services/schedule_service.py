@@ -652,33 +652,38 @@ class ScheduleService:
             return False, {"error": f"Failed to create enhanced empty schedule: {str(e)}"}
 
     def update_schedule_tasks(
-        self, 
-        user_id: str, 
-        date: str, 
+        self,
+        user_id: str,
+        date: str,
         tasks: List[Dict[str, Any]]
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Update an existing schedule with new tasks, or create if it doesn't exist.
         Now implements upsert behavior for seamless manual task addition.
-        
+
         Args:
             user_id: User's Google ID or Firebase UID
             date: Date string in YYYY-MM-DD format
             tasks: List of task objects to update the schedule with
-            
+
         Returns:
             Tuple of (success: bool, result: Dict) where result contains either
             updated schedule data on success or error message on failure
         """
         try:
+            import time
+            start_time = time.time()
+
             # Format date for database query
             formatted_date = format_schedule_date(date)
-            
+
             # Check if schedule exists
+            find_start = time.time()
             existing_schedule = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
             })
+            print(f"⏱️ BACKEND find_one: {(time.time() - find_start) * 1000:.2f}ms")
 
             if existing_schedule:
                 # Update existing schedule
@@ -698,9 +703,12 @@ class ScheduleService:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
                 # Serialize tasks to ensure RecurrenceType objects are converted to dicts
+                serialize_start = time.time()
                 serialized_tasks = self._serialize_tasks_for_storage(tasks)
+                print(f"⏱️ BACKEND serialize: {(time.time() - serialize_start) * 1000:.2f}ms")
 
                 # Update the schedule
+                update_start = time.time()
                 result = self.schedules_collection.update_one(
                     {"_id": existing_schedule["_id"]},
                     {
@@ -711,6 +719,7 @@ class ScheduleService:
                         }
                     }
                 )
+                print(f"⏱️ BACKEND update_one: {(time.time() - update_start) * 1000:.2f}ms")
 
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule"}
@@ -723,6 +732,7 @@ class ScheduleService:
                     "source": "manual"
                 })
 
+                print(f"⏱️ BACKEND TOTAL update_schedule_tasks: {(time.time() - start_time) * 1000:.2f}ms")
                 return True, {
                     "schedule": serialized_tasks,
                     "date": date,

@@ -141,7 +141,9 @@ const Dashboard: React.FC = () => {
   }, [])
 
   const addTask = useCallback(async (newTask: Task) => {
+    console.time('⏱️ TOTAL addTask')
     try {
+      console.time('⏱️ Frontend processing')
       const currentDate = getDateString(currentDayIndex)
       const currentSchedule = scheduleDays[Math.abs(currentDayIndex)] || []
 
@@ -189,16 +191,20 @@ const Dashboard: React.FC = () => {
           updatedSchedule[i] = { ...t, section_index: i - sectionStartIndex }
         }
       }
+      console.timeEnd('⏱️ Frontend processing')
 
       // Use updateSchedule which implements upsert behavior:
       // - First tries PUT (update existing schedule)
       // - If 404 (no schedule exists), automatically calls POST (create new)
+      console.time('⏱️ API call: updateSchedule')
       const updateResult = await updateSchedule(currentDate, updatedSchedule)
+      console.timeEnd('⏱️ API call: updateSchedule')
 
       if (!updateResult.success) {
         throw new Error(updateResult.error || 'Failed to add task')
       }
 
+      console.time('⏱️ UI state updates')
       // Update UI state with confirmed backend data
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
@@ -213,7 +219,10 @@ const Dashboard: React.FC = () => {
       setScheduleCache(prevCache =>
         new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
       )
+      console.timeEnd('⏱️ UI state updates')
+      console.timeEnd('⏱️ TOTAL addTask')
     } catch (error) {
+      console.timeEnd('⏱️ TOTAL addTask')
       console.error('Error adding task:', error)
       toast({
         title: 'Error',
