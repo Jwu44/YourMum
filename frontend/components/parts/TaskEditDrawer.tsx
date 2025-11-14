@@ -271,17 +271,15 @@ const TaskEditDrawer: React.FC<TaskEditDrawerProps> = ({
           id: task?.id || editedTask.id
         })
       } else if (!isEditMode && onCreateTask) {
-        // Create mode: create new task
-        await onCreateTask({
+        // Create mode: create new task (fire-and-forget, closes immediately)
+        onCreateTask({
           ...taskForBackend,
           id: ''
         })
       }
 
-      // Reset form state and close drawer after successful save
+      // Reset form state and close drawer immediately
       setEditedTask(getInitialTask())
-
-      // Close the drawer after successful save
       onClose()
     } catch (error) {
       console.error('Error saving task:', error)

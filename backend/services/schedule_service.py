@@ -671,19 +671,14 @@ class ScheduleService:
             updated schedule data on success or error message on failure
         """
         try:
-            import time
-            start_time = time.time()
-
             # Format date for database query
             formatted_date = format_schedule_date(date)
 
             # Check if schedule exists
-            find_start = time.time()
             existing_schedule = self.schedules_collection.find_one({
                 "userId": user_id,
                 "date": formatted_date
             })
-            print(f"⏱️ BACKEND find_one: {(time.time() - find_start) * 1000:.2f}ms", flush=True)
 
             if existing_schedule:
                 # Update existing schedule
@@ -703,12 +698,9 @@ class ScheduleService:
                     return False, {"error": f"Schedule validation failed: {validation_error}"}
 
                 # Serialize tasks to ensure RecurrenceType objects are converted to dicts
-                serialize_start = time.time()
                 serialized_tasks = self._serialize_tasks_for_storage(tasks)
-                print(f"⏱️ BACKEND serialize: {(time.time() - serialize_start) * 1000:.2f}ms", flush=True)
 
                 # Update the schedule
-                update_start = time.time()
                 result = self.schedules_collection.update_one(
                     {"_id": existing_schedule["_id"]},
                     {
@@ -719,7 +711,6 @@ class ScheduleService:
                         }
                     }
                 )
-                print(f"⏱️ BACKEND update_one: {(time.time() - update_start) * 1000:.2f}ms", flush=True)
 
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule"}
@@ -732,7 +723,6 @@ class ScheduleService:
                     "source": "manual"
                 })
 
-                print(f"⏱️ BACKEND TOTAL update_schedule_tasks: {(time.time() - start_time) * 1000:.2f}ms", flush=True)
                 return True, {
                     "schedule": serialized_tasks,
                     "date": date,
