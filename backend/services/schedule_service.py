@@ -683,7 +683,7 @@ class ScheduleService:
                 "userId": user_id,
                 "date": formatted_date
             })
-            print(f"⏱️ BACKEND find_one: {(time.time() - find_start) * 1000:.2f}ms")
+            print(f"⏱️ BACKEND find_one: {(time.time() - find_start) * 1000:.2f}ms", flush=True)
 
             if existing_schedule:
                 # Update existing schedule
@@ -705,7 +705,7 @@ class ScheduleService:
                 # Serialize tasks to ensure RecurrenceType objects are converted to dicts
                 serialize_start = time.time()
                 serialized_tasks = self._serialize_tasks_for_storage(tasks)
-                print(f"⏱️ BACKEND serialize: {(time.time() - serialize_start) * 1000:.2f}ms")
+                print(f"⏱️ BACKEND serialize: {(time.time() - serialize_start) * 1000:.2f}ms", flush=True)
 
                 # Update the schedule
                 update_start = time.time()
@@ -719,7 +719,7 @@ class ScheduleService:
                         }
                     }
                 )
-                print(f"⏱️ BACKEND update_one: {(time.time() - update_start) * 1000:.2f}ms")
+                print(f"⏱️ BACKEND update_one: {(time.time() - update_start) * 1000:.2f}ms", flush=True)
 
                 if result.modified_count == 0:
                     return False, {"error": "Failed to update schedule"}
@@ -732,7 +732,7 @@ class ScheduleService:
                     "source": "manual"
                 })
 
-                print(f"⏱️ BACKEND TOTAL update_schedule_tasks: {(time.time() - start_time) * 1000:.2f}ms")
+                print(f"⏱️ BACKEND TOTAL update_schedule_tasks: {(time.time() - start_time) * 1000:.2f}ms", flush=True)
                 return True, {
                     "schedule": serialized_tasks,
                     "date": date,
