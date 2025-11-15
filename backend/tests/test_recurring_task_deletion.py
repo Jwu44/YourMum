@@ -198,11 +198,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with stopped recurring task
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None
@@ -258,11 +265,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with active recurring task
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None
@@ -319,11 +333,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with recurring task (no status)
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None

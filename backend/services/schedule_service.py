@@ -1000,6 +1000,11 @@ class ScheduleService:
                         pass
                 else:
                     # Manual task (recurring or non-recurring): update ID and date while preserving position
+                    # Skip recurring tasks that have been stopped (deleted)
+                    recurring_config = item.get('is_recurring')
+                    if recurring_config and recurring_config.get('status') == 'stopped':
+                        continue  # Don't carry over stopped recurring tasks
+
                     updated_task = {**item}
                     updated_task['id'] = str(uuid.uuid4())
                     updated_task['start_date'] = date
