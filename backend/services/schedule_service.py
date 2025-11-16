@@ -14,7 +14,7 @@ import traceback
 import uuid
 from datetime import datetime, timedelta
 
-from backend.db_config import get_user_schedules_collection
+from backend.db_config import get_user_schedules_collection, get_users_collection
 from backend.services.schedule_gen import generate_local_sections
 from backend.models.schedule_schema import (
     validate_schedule_document, 
@@ -868,9 +868,20 @@ class ScheduleService:
                         "schedule": []
                     }
 
-            # Step 3: Build new tasks from source schedule
+            # Step 3: Fetch user's exclusions for filtering recurring tasks
+            exclusions_start = time.time()
+            users_collection = get_users_collection()
+            user_doc = users_collection.find_one(
+                {"googleId": user_id},
+                {"recurringTaskExclusions": 1, "_id": 0}
+            )
+            user_exclusions = user_doc.get('recurringTaskExclusions', []) if user_doc else []
+            exclusions_duration = time.time() - exclusions_start
+            print(f"[TIMING] User exclusions lookup: {exclusions_duration:.3f}s")
+
+            # Step 4: Build new tasks from source schedule
             task_processing_start = time.time()
-            
+
             # Copy sections from source schedule
             section_copy_start = time.time()
             section_tasks = self._copy_sections_from_schedule(source_schedule)
@@ -1000,10 +1011,17 @@ class ScheduleService:
                         pass
                 else:
                     # Manual task (recurring or non-recurring): update ID and date while preserving position
-                    # Skip recurring tasks that have been stopped (deleted)
+                    # Skip recurring tasks that have been deleted (check both old status='stopped' and new exclusion pattern)
                     recurring_config = item.get('is_recurring')
-                    if recurring_config and recurring_config.get('status') == 'stopped':
-                        continue  # Don't carry over stopped recurring tasks
+                    if recurring_config:
+                        # Check old status-based deletion (backward compatibility)
+                        if recurring_config.get('status') == 'stopped':
+                            continue  # Don't carry over stopped recurring tasks
+
+                        # Check new exclusion pattern (user-level deletion registry)
+                        is_excluded = any(self._matches_exclusion(item, exclusion) for exclusion in user_exclusions)
+                        if is_excluded:
+                            continue  # Don't carry over excluded recurring tasks
 
                     updated_task = {**item}
                     updated_task['id'] = str(uuid.uuid4())
@@ -1328,6 +1346,7 @@ class ScheduleService:
         Find all recurring tasks that should occur on the target date.
 
         Optimized to use single range query instead of N sequential queries.
+        Filters out tasks that match user's recurring task exclusions.
 
         Args:
             user_id: User's Google ID or Firebase UID
@@ -1342,6 +1361,14 @@ class ScheduleService:
             target_dt = datetime.strptime(target_date, '%Y-%m-%d')
             earliest_date = target_dt - timedelta(days=max_days_back)
             exclude_texts = exclude_texts or set()
+
+            # Fetch user's recurring task exclusions (exclusion pattern)
+            users_collection = get_users_collection()
+            user_doc = users_collection.find_one(
+                {"googleId": user_id},
+                {"recurringTaskExclusions": 1, "_id": 0}
+            )
+            user_exclusions = user_doc.get('recurringTaskExclusions', []) if user_doc else []
 
             # Single range query to get all schedules in date range
             cursor = self.schedules_collection.find({
@@ -1363,9 +1390,17 @@ class ScheduleService:
                     task_text = task.get('text', '')
                     recurring_config = task.get('is_recurring')
 
+                    # Skip if not a recurring task
+                    if not recurring_config:
+                        continue
+
+                    # Check if task matches any user exclusion (deleted recurring tasks)
+                    is_excluded = any(self._matches_exclusion(task, exclusion) for exclusion in user_exclusions)
+                    if is_excluded:
+                        continue
+
                     # Same validation logic as before
-                    if (recurring_config and
-                        not task.get('is_section', False) and
+                    if (not task.get('is_section', False) and
                         task.get('type') != 'section' and
                         task_text not in seen_task_texts and
                         task_text not in exclude_texts and
@@ -1439,15 +1474,15 @@ class ScheduleService:
     def _get_week_of_month(self, date: datetime) -> str:
         """
         Get which week of the month a date falls in.
-        
+
         Args:
             date: Date to check
-            
+
         Returns:
             Week identifier: 'first', 'second', 'third', 'fourth', or 'last'
         """
         day_of_month = date.day
-        
+
         if 1 <= day_of_month <= 7:
             return 'first'
         elif 8 <= day_of_month <= 14:
@@ -1459,6 +1494,51 @@ class ScheduleService:
         else:
             # Days 29-31 are considered 'last' week
             return 'last'
+
+    def _matches_exclusion(self, task: Dict[str, Any], exclusion: Dict[str, Any]) -> bool:
+        """
+        Check if a recurring task matches an exclusion entry.
+
+        Matches on task text AND recurrence pattern (frequency, dayOfWeek, weekOfMonth)
+        to handle edge cases like same text with different recurrence patterns.
+
+        Args:
+            task: Task object with is_recurring config
+            exclusion: Exclusion entry from user's recurringTaskExclusions array
+
+        Returns:
+            Boolean indicating if task matches exclusion pattern
+        """
+        try:
+            # Must match task text
+            if task.get('text', '').strip() != exclusion.get('taskText', '').strip():
+                return False
+
+            # Get recurring config from task
+            recurring_config = task.get('is_recurring')
+            if not recurring_config or not isinstance(recurring_config, dict):
+                return False
+
+            # Must match frequency
+            if recurring_config.get('frequency') != exclusion.get('frequency'):
+                return False
+
+            # For weekly/monthly tasks, also match dayOfWeek
+            frequency = exclusion.get('frequency')
+            if frequency in ['weekly', 'monthly']:
+                if recurring_config.get('dayOfWeek') != exclusion.get('dayOfWeek'):
+                    return False
+
+            # For monthly tasks, also match weekOfMonth
+            if frequency == 'monthly':
+                if recurring_config.get('weekOfMonth') != exclusion.get('weekOfMonth'):
+                    return False
+
+            return True
+
+        except Exception as e:
+            print(f"Error matching exclusion: {str(e)}")
+            return False
 
     def _deduplicate_tasks(
         self, 

@@ -96,6 +96,37 @@ user_schema_validation = {
                 "bsonType": ["date", "null"],
                 "description": "When the user responded to the feedback prompt"
             },
+            # Recurring task deletion tracking (exclusion pattern)
+            "recurringTaskExclusions": {
+                "bsonType": "array",
+                "description": "List of recurring tasks the user has deleted",
+                "items": {
+                    "bsonType": "object",
+                    "required": ["taskText", "frequency", "excludedAt"],
+                    "properties": {
+                        "taskText": {
+                            "bsonType": "string",
+                            "description": "Text content of the deleted recurring task"
+                        },
+                        "frequency": {
+                            "enum": ["daily", "weekly", "monthly"],
+                            "description": "Recurrence frequency of the deleted task"
+                        },
+                        "dayOfWeek": {
+                            "bsonType": ["string", "null"],
+                            "description": "Day of week for weekly/monthly tasks (e.g., 'Monday')"
+                        },
+                        "weekOfMonth": {
+                            "bsonType": ["string", "null"],
+                            "description": "Week of month for monthly tasks (e.g., 'first', 'second')"
+                        },
+                        "excludedAt": {
+                            "bsonType": "date",
+                            "description": "Timestamp when the task was deleted"
+                        }
+                    }
+                }
+            },
             # Note: Legacy `slack` schema removed. Slack integration data is stored under `slack_integration`.
         }
     }
