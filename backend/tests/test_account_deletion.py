@@ -52,9 +52,8 @@ class TestAccountDeletion:
         # Mock collections
         mock_collections = {}
         collection_names = [
-            'users', 'UserSchedules', 'AIsuggestions', 
-            'MicrostepFeedback', 'DecompositionPatterns', 
-            'calendar_events', 'Processed Slack Messages'
+            'users', 'UserSchedules', 'AIsuggestions',
+            'MicrostepFeedback', 'DecompositionPatterns'
         ]
         
         for name in collection_names:

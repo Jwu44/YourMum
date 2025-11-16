@@ -66,16 +66,6 @@ def get_decomposition_patterns_collection() -> Collection:
     """Get collection for storing successful decomposition patterns."""
     return get_collection('DecompositionPatterns')
 
-def get_calendar_events_collection():
-    """
-    Get the calendar_events collection from the database
-    
-    Returns:
-        MongoDB collection for calendar events
-    """
-    db = get_database()
-    return db['calendar_events']
-
 def get_archive_collection():
     """
     Get the Archive collection from the database
@@ -106,66 +96,31 @@ def initialize_user_collection():
         raise
 
 def initialize_calendar_collections():
-    """Initialize calendar-related collections and indexes."""
-    try:
-        # Get collections
-        users = get_collection('users')
-        calendar_events = get_calendar_events_collection()
+    """
+    Initialize calendar-related indexes on users collection.
 
-        # Create user calendar indexes
+    Note: The calendar_events collection has been removed as calendar data is
+    fetched directly from Google Calendar API instead of being cached locally.
+    """
+    try:
+        # Get users collection
+        users = get_collection('users')
+
+        # Create user calendar indexes (for OAuth state and sync tracking)
         user_calendar_indexes = [
             IndexModel([("calendar.lastSyncTime", DESCENDING)]),
             IndexModel([("calendar.connected", ASCENDING)]),
             IndexModel([
-                ("googleId", ASCENDING), 
+                ("googleId", ASCENDING),
                 ("calendar.selectedCalendars", ASCENDING)
             ])
         ]
         users.create_indexes(user_calendar_indexes)
 
-        # Create calendar events indexes
-        calendar_event_indexes = [
-            IndexModel([("userId", ASCENDING), ("startTime", ASCENDING)]),
-            IndexModel([("eventId", ASCENDING)], unique=True),
-            IndexModel([("calendarId", ASCENDING)]),
-            IndexModel([("taskId", ASCENDING)]),
-            IndexModel([
-                ("userId", ASCENDING), 
-                ("syncStatus", ASCENDING)
-            ]),
-            IndexModel([
-                ("userId", ASCENDING), 
-                ("startTime", ASCENDING), 
-                ("endTime", ASCENDING)
-            ])
-        ]
-        calendar_events.create_indexes(calendar_event_indexes)
+        print("Calendar user indexes initialized successfully")
 
-        print("Calendar collections initialized successfully")
-        
     except Exception as e:
         print(f"Error initializing calendar collections: {e}")
-        raise
-
-def initialize_slack_collections():
-    """Initialize Slack integration collections and indexes."""
-    try:
-        # Get database and collection
-        db = get_database()
-        processed_messages = db['Processed Slack Messages']
-        
-        # Create indexes for efficient duplicate checking and cleanup
-        slack_indexes = [
-            IndexModel([("message_key", ASCENDING)], unique=True),
-            IndexModel([("user_id", ASCENDING), ("processed_at", DESCENDING)]),
-            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=86400*30)  # 30 days TTL
-        ]
-        processed_messages.create_indexes(slack_indexes)
-        
-        print("Slack collections initialized successfully")
-        
-    except Exception as e:
-        print(f"Error initializing Slack collections: {e}")
         raise
 
 def initialize_user_schedules_collection():
@@ -220,7 +175,6 @@ def initialize_db():
         # Initialize all collections
         initialize_user_collection()
         initialize_calendar_collections()
-        initialize_slack_collections()
         initialize_archive_collections()
         initialize_user_schedules_collection()
 

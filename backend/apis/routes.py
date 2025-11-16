@@ -2243,8 +2243,6 @@ def delete_user_account():
             'UserSchedules',           # User's daily schedules
             'MicrostepFeedback',       # User's task feedback
             'DecompositionPatterns',   # User's task decomposition patterns
-            'calendar_events',         # User's synced calendar events
-            'Processed Slack Messages' # User's Slack message tracking
         ]
         
         # Delete from each collection
