@@ -520,25 +520,64 @@ class SlackService:
         return 'Unknown User'
     
     def _store_task(self, task: Task, user_id: str):
-        """Store task in database"""
+        """
+        Store task in database atomically, inserting below first section if it exists.
+
+        Uses MongoDB aggregation pipeline to achieve single atomic operation that:
+        - Inserts at top if no sections exist
+        - Inserts after first section if sections exist
+        - Handles upsert safely (empty schedules)
+        - Prevents race conditions from concurrent webhook calls
+        """
         if self.db_client is None:
             return
-        
-        # For now, we'll add to today's schedule
-        # This should integrate with existing schedule service
+
         tasks_collection = self.db_client.get_collection('UserSchedules')
 
         # Store under normalized date key used across schedule service
         today_str = datetime.utcnow().strftime('%Y-%m-%d')
         formatted_date = format_schedule_date(today_str)
 
-        # Add task and update metadata timestamp without breaking existing schema
+        # Single atomic operation using aggregation pipeline (MongoDB 4.2+)
+        # This inserts the Slack task below the first section, or at top if no sections exist
         tasks_collection.update_one(
             {'userId': user_id, 'date': formatted_date},
-            {
-                '$push': {'schedule': task.to_dict()},
-                '$set': {'metadata.last_modified': datetime.utcnow().isoformat()}
-            },
+            [
+                {
+                    '$set': {
+                        'schedule': {
+                            '$let': {
+                                'vars': {
+                                    'firstSectionIndex': {
+                                        '$indexOfArray': ['$schedule.is_section', True]
+                                    }
+                                },
+                                'in': {
+                                    '$cond': {
+                                        'if': {'$eq': ['$$firstSectionIndex', -1]},
+                                        # No sections found: insert at top of schedule
+                                        'then': {
+                                            '$concatArrays': [
+                                                [task.to_dict()],
+                                                {'$ifNull': ['$schedule', []]}
+                                            ]
+                                        },
+                                        # Section found: insert after first section
+                                        'else': {
+                                            '$concatArrays': [
+                                                {'$slice': ['$schedule', 0, {'$add': ['$$firstSectionIndex', 1]}]},
+                                                [task.to_dict()],
+                                                {'$slice': ['$schedule', {'$add': ['$$firstSectionIndex', 1]}, {'$size': '$schedule'}]}
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        'metadata.last_modified': datetime.utcnow().isoformat()
+                    }
+                }
+            ],
             upsert=True
         )
     

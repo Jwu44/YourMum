@@ -56,7 +56,7 @@ def create_prompt_categorize(task: str) -> str:
 
 def create_prompt_decompose(task: str, user_data: Dict[str, Any], categories: List[str]) -> str:
     """
-    Creates a prompt for decomposing a task into microsteps.
+    Creates a concise prompt for decomposing a task into microsteps.
 
     Args:
         task: The task to decompose
@@ -67,78 +67,32 @@ def create_prompt_decompose(task: str, user_data: Dict[str, Any], categories: Li
         Formatted prompt string
     """
     # Extract relevant user context
-    energy_patterns = ', '.join(user_data.get('energy_patterns', []))
-    priorities = ', '.join(f"{k}: {v}" for k, v in user_data.get('priorities', {}).items())
+    energy_patterns = ', '.join(user_data.get('energy_patterns', [])) or 'none specified'
+    priorities = ', '.join(f"{k}: {v}" for k, v in user_data.get('priorities', {}).items()) or 'none specified'
 
-    prompt = f"""You are an expert in behavior change and productivity optimization, tasked with helping users break down their goals into achievable microsteps. Your role is to analyze the given task and user context, then create a set of practical, science-backed microsteps that will lead to successful habit formation and task completion.
+    prompt = f"""Break down this task into 2-5 concrete, actionable microsteps.
 
-    First, review the following information:
+Task: {task}
+Categories: {', '.join(str(c) for c in categories)}
+User's energy patterns: {energy_patterns}
+User's priorities: {priorities}
 
-    Task to be broken down:
-    <task>
-    {task}
-    </task>
+Create microsteps that are:
+- Too small to fail (minimal willpower needed)
+- Immediately actionable
+- Specific and unambiguous
+- Aligned with the user's energy patterns and priorities
 
-    User's energy patterns:
-    <energy_patterns>
-    {energy_patterns}
-    </energy_patterns>
-
-    User's life priorities:
-    <priorities>
-    {priorities}
-    </priorities>
-
-    Categories related to the task:
-    <categories>
-    {', '.join(str(c) for c in categories)}
-    </categories>
-
-    Now, let's define what makes an effective microstep:
-
-    1. Too small to fail: The action should be so minor that it requires minimal willpower to complete.
-    2. Immediately actionable: It can be done right away without extensive preparation.
-    3. Highly specific: The step should be clear and unambiguous.
-    4. Linked to existing habits or timeframes: It should fit naturally into the user's current routine.
-    5. Supportive of the larger task: Each microstep should contribute to the overall goal.
-
-    Your task is to break down the given task into 2-5 concrete microsteps that adhere to these principles. Consider the following guidelines:
-
-    1. Ensure each microstep is specific and actionable.
-    2. Design microsteps that can be completed in a single session.
-    3. Create microsteps that build upon each other logically.
-    4. Take into account the user's energy patterns and priorities when designing and ordering the microsteps.
-    5. Make each microstep small enough to require minimal willpower but meaningful enough to create progress.
-
-    Before providing your final output, wrap your thought process in <task_breakdown> tags:
-
-    <task_breakdown>
-    1. Analyze the main task and its components.
-    2. List the key elements of the task that need to be addressed.
-    3. Consider how the task aligns with the user's energy patterns and priorities.
-    4. Identify potential obstacles and how they could be addressed in the microsteps.
-    5. Brainstorm potential microsteps that meet the criteria for effectiveness.
-    6. For each potential microstep, evaluate its alignment with the effectiveness criteria (too small to fail, immediately actionable, highly specific, linked to existing habits, supportive of the larger task).
-    7. Determine the logical order of the microsteps based on dependencies and the user's context.
-    8. Estimate the time required and energy level needed for each microstep.
-    9. Refine the microsteps to ensure they build upon each other and lead to the overall goal.
-    </task_breakdown>
-
-    After completing your analysis, provide your response in the following JSON format:
-
-    {{
-        "microsteps": [
-            {{
-                "text": "Brief description of the microstep",
-                "rationale": "Explanation of why this step is important and how it relates to the overall task",
-                "estimated_time": "Time in minutes",
-                "energy_level_required": "low/medium/high"
-            }}
-        ]
-    }}
-
-    Remember to focus on making each microstep concrete, achievable, and aligned with the user's context. By starting small and building momentum through these microsteps, we can help the user make meaningful progress towards their larger goal.
-    """
+Respond ONLY with valid JSON in this exact format:
+{{
+    "microsteps": [
+        {{
+            "text": "First specific action to take",
+            "estimated_time": "5-10",
+            "energy_level_required": "low"
+        }}
+    ]
+}}"""
 
     return prompt
 
@@ -214,7 +168,7 @@ def decompose_task(task_data: Dict[str, Any], user_data: Dict[str, Any]) -> List
         # Call Claude API
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
+            max_tokens=2048,  # Increased from 1024 to prevent truncated JSON responses
             temperature=0.7,
             messages=[
                 {"role": "user", "content": prompt}
@@ -244,14 +198,39 @@ def process_decomposition_response(response_text: str) -> List[Dict[str, Any]]:
         List of processed microsteps
     """
     try:
+        print("=== Raw AI Response ===")
         print(response_text)
-        # Extract JSON from response
-        json_match = re.search(r'\{[\s\S]*\}', response_text)
-        if not json_match:
-            print("No JSON found in response")
-            return []
+        print("======================")
 
-        json_str = json_match.group(0)
+        # Try to extract JSON from response - look for complete JSON objects
+        # First, try to find JSON between ``` markers (common in Claude responses)
+        json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', response_text)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # Fallback to finding any JSON object
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if not json_match:
+                print("No JSON found in response")
+                return []
+            json_str = json_match.group(0)
+
+        # Validate JSON is complete by checking balanced braces
+        if json_str.count('{') != json_str.count('}'):
+            print(f"Incomplete JSON detected: {json_str.count('{')} opening braces, {json_str.count('}')} closing braces")
+            # Try to find the last complete microstep array
+            microsteps_match = re.search(r'"microsteps"\s*:\s*\[([\s\S]*)\]', json_str)
+            if microsteps_match:
+                # Try to reconstruct valid JSON
+                json_str = '{"microsteps": [' + microsteps_match.group(1) + ']}'
+            else:
+                print("Cannot reconstruct valid JSON")
+                return []
+
+        print("=== Extracted JSON ===")
+        print(json_str)
+        print("=====================")
+
         response_data = json.loads(json_str)
 
         # Extract microsteps from the parsed JSON
@@ -270,7 +249,6 @@ def process_decomposition_response(response_text: str) -> List[Dict[str, Any]]:
 
             processed_step = {
                 'text': step_text,
-                'rationale': step.get('rationale', ''),
                 'estimated_time': step.get('estimated_time', '5-10'),
                 'energy_level_required': step.get('energy_level_required', 'medium')
             }
@@ -281,9 +259,12 @@ def process_decomposition_response(response_text: str) -> List[Dict[str, Any]]:
 
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON response: {e}")
+        print(f"Problematic JSON string: {json_str if 'json_str' in locals() else 'N/A'}")
         return []
     except Exception as e:
         print(f"Error processing decomposition response: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def update_decomposition_patterns(

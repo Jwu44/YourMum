@@ -31,6 +31,7 @@ import { useDragDropTask } from '../../hooks/use-drag-drop-task'
 import { useDragState } from '../../contexts/DragStateContext'
 import { useMicrostepDecomposition } from '@/hooks/useMicrostepDecomposition'
 import { useDecompositionContext } from '@/contexts/DecompositionContext'
+import { isInLeftOutdentZone } from '../../hooks/drag-config'
 
 interface CustomDropdownItem {
   label: string
@@ -598,8 +599,12 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )
     }
 
-    const { dragType, targetIndentLevel } = dragDropHook.indentationState
+    const { dragType, targetIndentLevel, cursorPosition, targetTaskLeftEdge, isLeftOutdent } = dragDropHook.indentationState
     const currentDragType = dragType || 'reorder'
+
+    // Check if cursor is in left-outdent zone
+    const isInLeftZone = cursorPosition && targetTaskLeftEdge &&
+      isInLeftOutdentZone(cursorPosition.x, targetTaskLeftEdge)
 
     // Progressive opacity system based on requirements
     const renderProgressiveIndentLine = (levels: number) => {
@@ -644,27 +649,52 @@ const EditableScheduleRow: React.FC<EditableScheduleRowProps> = ({
       )
     }
 
-    // Simplified visual feedback system
-    switch (currentDragType) {
-      case 'indent':
-        // Progressive opacity based on target indent level
-        const indentLevel = targetIndentLevel || 1
-        return renderProgressiveIndentLine(indentLevel)
+    // TEMPORARY: Render debug overlay with drag indicators
+    const dragIndicator = (() => {
+      switch (currentDragType) {
+        case 'indent':
+          // Progressive opacity based on target indent level
+          const indentLevel = targetIndentLevel || 1
+          return renderProgressiveIndentLine(indentLevel)
 
-      case 'outdent':
-        // Simple purple line for outdent
-        return (
-          <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
-        )
+        case 'outdent':
+          // Check if this is a left-outdent (show line extending left + full row line)
+          if (isInLeftZone || isLeftOutdent) {
+            const taskLevel = task.level || 0
+            const lineWidth = taskLevel * 30 // Each level is 30px indentation
 
-      case 'reorder':
-      default:
-        // Simple purple line for reorder
-        return (
-          <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
-        )
-    }
-  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, isSection, task.text, isMobile])
+            return (
+              <>
+                {/* Left extension line */}
+                <div
+                  className="absolute h-1 bg-purple-500 opacity-80 bottom-[-1px]"
+                  style={{
+                    left: taskLevel > 0 ? `-${lineWidth}px` : 0,
+                    width: taskLevel > 0 ? `${lineWidth}px` : 0,
+                    pointerEvents: 'none'
+                  }}
+                />
+                {/* Full row line */}
+                <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
+              </>
+            )
+          }
+          // Regular outdent: Simple purple line for outdent
+          return (
+            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-80 bottom-[-1px]" />
+          )
+
+        case 'reorder':
+        default:
+          // Simple purple line for reorder
+          return (
+            <div className="absolute right-0 left-0 h-1 bg-purple-500 opacity-60 bottom-[-1px]" />
+          )
+      }
+    })()
+
+    return dragIndicator
+  }, [dragDropHook.isOver, dragDropHook.isDragging, dragDropHook.indentationState.dragType, dragDropHook.indentationState.targetIndentLevel, dragDropHook.indentationState.cursorPosition, dragDropHook.indentationState.targetTaskLeftEdge, dragDropHook.indentationState.isLeftOutdent, isSection, task.level, task.text, isMobile])
 
   /**
    * Handles task decomposition using the new hook and context

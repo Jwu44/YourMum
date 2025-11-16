@@ -8,6 +8,7 @@ import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { ToasterClient } from '@/components/ui/toaster-client'
 import { Toaster as SonnerToaster } from '@/components/ui/sonner'
 import { FeedbackSonner } from '@/components/parts/FeedbackSonner'
+import { Analytics } from '@vercel/analytics/react'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -60,6 +61,7 @@ export default function RootLayout ({
           <ToasterClient />
           <SonnerToaster />
           <FeedbackSonner />
+          <Analytics />
         </AuthProvider>
       </body>
     </html>

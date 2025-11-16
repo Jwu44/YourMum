@@ -140,87 +140,126 @@ const Dashboard: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  const addTask = useCallback(async (newTask: Task) => {
-    try {
-      const currentDate = getDateString(currentDayIndex)
-      const currentSchedule = scheduleDays[Math.abs(currentDayIndex)] || []
+  const addTask = useCallback((newTask: Task) => {
+    const currentDate = getDateString(currentDayIndex)
+    const currentSchedule = scheduleDays[Math.abs(currentDayIndex)] || []
 
-      const taskWithId = {
-        ...newTask,
-        id: uuidv4(),
-        start_date: currentDate
+    const taskWithId = {
+      ...newTask,
+      id: uuidv4(),
+      start_date: currentDate
+    }
+
+    // Insert logic:
+    // 1) If sections exist, insert directly under the first (top) section
+    // 2) If no sections, insert at the very top of the list
+    const updatedSchedule = [...currentSchedule]
+
+    const firstSectionIndex = currentSchedule.findIndex(t => t.is_section === true)
+    if (firstSectionIndex !== -1) {
+      // Place as the first task within the top section
+      const topSection = currentSchedule[firstSectionIndex]
+      const taskForInsert: Task = {
+        ...taskWithId,
+        is_section: false,
+        is_subtask: false,
+        level: 0,
+        section: topSection.text || topSection.section || null
       }
+      updatedSchedule.splice(firstSectionIndex + 1, 0, taskForInsert)
+    } else {
+      // No sections -> add to top of list
+      updatedSchedule.unshift({
+        ...taskWithId,
+        is_section: false,
+        is_subtask: false,
+        level: 0
+      })
+    }
 
-      // Insert logic:
-      // 1) If sections exist, insert directly under the first (top) section
-      // 2) If no sections, insert at the very top of the list
-      const updatedSchedule = [...currentSchedule]
-
-      const firstSectionIndex = currentSchedule.findIndex(t => t.is_section === true)
-      if (firstSectionIndex !== -1) {
-        // Place as the first task within the top section
-        const topSection = currentSchedule[firstSectionIndex]
-        const taskForInsert: Task = {
-          ...taskWithId,
-          is_section: false,
-          is_subtask: false,
-          level: 0,
-          section: topSection.text || topSection.section || null
-        }
-        updatedSchedule.splice(firstSectionIndex + 1, 0, taskForInsert)
+    // Recompute section_index for non-section tasks based on nearest preceding section
+    let sectionStartIndex = 0
+    for (let i = 0; i < updatedSchedule.length; i++) {
+      const t = updatedSchedule[i]
+      if (t.is_section) {
+        sectionStartIndex = i
+        updatedSchedule[i] = { ...t, section_index: 0 }
       } else {
-        // No sections -> add to top of list
-        updatedSchedule.unshift({
-          ...taskWithId,
-          is_section: false,
-          is_subtask: false,
-          level: 0
+        updatedSchedule[i] = { ...t, section_index: i - sectionStartIndex }
+      }
+    }
+
+    // Optimistic update: Show task immediately in UI
+    setScheduleDays(prevDays => {
+      const newDays = [...prevDays]
+      const dayIndex = Math.abs(currentDayIndex)
+      newDays[dayIndex] = updatedSchedule
+      return newDays
+    })
+
+    setScheduleCache(prevCache =>
+      new Map(prevCache).set(currentDate, updatedSchedule)
+    )
+
+    // Sync to backend in background (fire-and-forget)
+    updateSchedule(currentDate, updatedSchedule).then(updateResult => {
+      if (updateResult.success) {
+        // Backend confirmed - update with backend data if different
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays]
+          const dayIndex = Math.abs(currentDayIndex)
+          newDays[dayIndex] = updateResult.schedule || updatedSchedule
+          return newDays
+        })
+
+        setScheduleCache(prevCache =>
+          new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
+        )
+
+        // Invalidate calendar cache to show newly created schedules
+        setScheduleVersion(prev => prev + 1)
+      } else {
+        // Backend failed - revert optimistic update
+        console.error('Error adding task:', updateResult.error)
+
+        setScheduleDays(prevDays => {
+          const newDays = [...prevDays]
+          const dayIndex = Math.abs(currentDayIndex)
+          newDays[dayIndex] = currentSchedule // Revert to original
+          return newDays
+        })
+
+        setScheduleCache(prevCache =>
+          new Map(prevCache).set(currentDate, currentSchedule)
+        )
+
+        toast({
+          title: 'Error',
+          description: updateResult.error || 'Failed to add task. Please try again.',
+          variant: 'destructive'
         })
       }
+    }).catch(error => {
+      // Network/unexpected error - revert optimistic update
+      console.error('Error adding task:', error)
 
-      // Recompute section_index for non-section tasks based on nearest preceding section
-      let sectionStartIndex = 0
-      for (let i = 0; i < updatedSchedule.length; i++) {
-        const t = updatedSchedule[i]
-        if (t.is_section) {
-          sectionStartIndex = i
-          updatedSchedule[i] = { ...t, section_index: 0 }
-        } else {
-          updatedSchedule[i] = { ...t, section_index: i - sectionStartIndex }
-        }
-      }
-
-      // Use updateSchedule which implements upsert behavior:
-      // - First tries PUT (update existing schedule)
-      // - If 404 (no schedule exists), automatically calls POST (create new)
-      const updateResult = await updateSchedule(currentDate, updatedSchedule)
-
-      if (!updateResult.success) {
-        throw new Error(updateResult.error || 'Failed to add task')
-      }
-
-      // Update UI state with confirmed backend data
       setScheduleDays(prevDays => {
         const newDays = [...prevDays]
         const dayIndex = Math.abs(currentDayIndex)
-        newDays[dayIndex] = updateResult.schedule || updatedSchedule
+        newDays[dayIndex] = currentSchedule // Revert to original
         return newDays
       })
 
-      // Invalidate calendar cache to show newly created schedules
-      setScheduleVersion(prev => prev + 1)
-
       setScheduleCache(prevCache =>
-        new Map(prevCache).set(currentDate, updateResult.schedule || updatedSchedule)
+        new Map(prevCache).set(currentDate, currentSchedule)
       )
-    } catch (error) {
-      console.error('Error adding task:', error)
+
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to add task. Please try again.',
         variant: 'destructive'
       })
-    }
+    })
   }, [currentDayIndex, scheduleDays, toast])
 
   const getDateString = (offset: number): string => {

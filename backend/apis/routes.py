@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, Response, stream_with_context
-from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection
+from backend.db_config import get_database, store_microstep_feedback, create_or_update_user as db_create_or_update_user, get_user_schedules_collection, get_users_collection
 import traceback
 
 from bson import ObjectId
@@ -2031,21 +2031,29 @@ def delete_task(task_id):
                 "error": "Cannot delete section tasks. Only regular tasks can be deleted."
             }), 400
         
-        # Handle task deletion based on whether it's recurring or not
+        # Handle task deletion: Add recurring tasks to user's exclusion list
+        if task_to_delete.get('is_recurring'):
+            # Add to user-level exclusion list (exclusion pattern)
+            recurring_config = task_to_delete['is_recurring']
+            exclusion_entry = {
+                "taskText": task_to_delete.get('text', ''),
+                "frequency": recurring_config.get('frequency'),
+                "dayOfWeek": recurring_config.get('dayOfWeek'),
+                "weekOfMonth": recurring_config.get('weekOfMonth'),
+                "excludedAt": datetime.now(timezone.utc)
+            }
+
+            # Add exclusion to user document
+            users_collection = get_users_collection()
+            users_collection.update_one(
+                {"googleId": user_id},
+                {"$push": {"recurringTaskExclusions": exclusion_entry}}
+            )
+
+        # Remove task from current schedule (both recurring and non-recurring)
         updated_schedule = []
         for task in current_schedule:
-            if task.get('id') == task_id:
-                # If it's a recurring task, set status to "stopped" instead of removing
-                if task.get('is_recurring'):
-                    updated_task = {**task}
-                    updated_task['is_recurring'] = {
-                        **task['is_recurring'],
-                        'status': 'stopped'
-                    }
-                    updated_schedule.append(updated_task)
-                # For non-recurring tasks, remove completely (existing behavior)
-                # else: continue (skip adding to updated_schedule)
-            else:
+            if task.get('id') != task_id:
                 # Keep all other tasks as-is
                 updated_schedule.append(task)
         
@@ -2235,8 +2243,6 @@ def delete_user_account():
             'UserSchedules',           # User's daily schedules
             'MicrostepFeedback',       # User's task feedback
             'DecompositionPatterns',   # User's task decomposition patterns
-            'calendar_events',         # User's synced calendar events
-            'Processed Slack Messages' # User's Slack message tracking
         ]
         
         # Delete from each collection

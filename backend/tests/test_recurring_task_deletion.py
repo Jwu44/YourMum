@@ -96,10 +96,11 @@ class TestRecurringTaskDeletion:
         }
 
     def test_delete_recurring_task_sets_status_to_stopped(self, mock_app, sample_schedule_with_recurring_task):
-        """Test that deleting a recurring task sets its status to 'stopped'"""
+        """Test that deleting a recurring task removes it from schedule and adds to exclusion list"""
 
         with patch('backend.apis.routes.get_user_from_token') as mock_get_user, \
-             patch('backend.apis.routes.schedule_service') as mock_schedule_service:
+             patch('backend.apis.routes.schedule_service') as mock_schedule_service, \
+             patch('backend.apis.routes.get_users_collection') as mock_get_users_collection:
 
             # Setup mocks
             mock_get_user.return_value = {'googleId': 'test_user_123'}
@@ -108,20 +109,8 @@ class TestRecurringTaskDeletion:
                 {"schedule": sample_schedule_with_recurring_task["schedule"], "date": "2025-01-20"}
             )
 
-            # Expected schedule after deletion - recurring task should have status = "stopped"
+            # Expected schedule after deletion - recurring task should be REMOVED
             expected_schedule_after_delete = [
-                {
-                    "id": "recurring-task-1",
-                    "text": "Daily Exercise",
-                    "categories": ["Health"],
-                    "completed": False,
-                    "is_section": False,
-                    "type": "task",
-                    "is_recurring": {
-                        "frequency": "daily",
-                        "status": "stopped"  # This should be set to stopped
-                    }
-                },
                 {
                     "id": "regular-task-1",
                     "text": "Regular task",
@@ -137,9 +126,13 @@ class TestRecurringTaskDeletion:
                 {
                     "schedule": expected_schedule_after_delete,
                     "date": "2025-01-20",
-                    "metadata": {"totalTasks": 2}
+                    "metadata": {"totalTasks": 1}
                 }
             )
+
+            # Mock users collection
+            mock_users_coll = Mock()
+            mock_get_users_collection.return_value = mock_users_coll
 
             # Test the API endpoint
             with mock_app.test_client() as client:
@@ -157,18 +150,20 @@ class TestRecurringTaskDeletion:
                 response_data = json.loads(response.data)
                 assert response_data['success'] is True
 
-                # Verify that update_schedule_tasks was called with the recurring task marked as stopped
+                # Verify that update_schedule_tasks was called with the recurring task removed
                 mock_schedule_service.update_schedule_tasks.assert_called_once()
                 call_args = mock_schedule_service.update_schedule_tasks.call_args
                 updated_schedule = call_args[0][2]  # Third argument is the updated schedule
 
-                # Find the recurring task in the updated schedule
+                # Verify the recurring task was removed from schedule
                 recurring_task = next(
                     (task for task in updated_schedule if task['id'] == 'recurring-task-1'),
                     None
                 )
-                assert recurring_task is not None
-                assert recurring_task['is_recurring']['status'] == 'stopped'
+                assert recurring_task is None, "Recurring task should be removed from schedule"
+
+                # Verify that exclusion was added to user document
+                mock_users_coll.update_one.assert_called_once()
 
     def test_autogenerate_skips_stopped_recurring_tasks(self, mock_user_schedules_collection):
         """Test that autogenerate_schedule skips recurring tasks with status = 'stopped'"""
@@ -198,11 +193,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with stopped recurring task
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None
@@ -258,11 +260,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with active recurring task
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None
@@ -319,11 +328,18 @@ class TestRecurringTaskDeletion:
         }
 
         # Mock database queries
+        # find_one is called for: 1) check existing schedule, 2) check recent inputs
         mock_user_schedules_collection.find_one.side_effect = [
             None,  # No existing schedule for target date
-            previous_schedule,  # Found previous schedule with recurring task (no status)
             None,  # No recent schedule with inputs
         ]
+
+        # Mock find() for range queries (used by _find_most_recent_schedule_matching)
+        # Create a mock cursor that returns the previous schedule
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__.return_value = iter([previous_schedule])
+        mock_cursor.sort.return_value = mock_cursor
+        mock_user_schedules_collection.find.return_value = mock_cursor
 
         mock_user_schedules_collection.database = {'users': Mock()}
         mock_user_schedules_collection.database['users'].find_one.return_value = None
