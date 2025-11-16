@@ -169,14 +169,16 @@ def initialize_slack_collections():
         raise
 
 def initialize_user_schedules_collection():
-    """Initialize user schedules collection with required indexes."""
+    """
+    Initialize user schedules collection.
+
+    Note: Index creation for UserSchedules is handled by ScheduleService._ensure_indexes()
+    which is called during service initialization. This ensures the index is created
+    with proper options (unique=True, background=True, name="userId_date_unique").
+    """
     try:
-        schedules = get_user_schedules_collection()
-        schedule_indexes = [
-            IndexModel([("userId", ASCENDING), ("date", ASCENDING)], unique=True),
-            IndexModel([("userId", ASCENDING), ("metadata.last_modified", DESCENDING)]),
-        ]
-        schedules.create_indexes(schedule_indexes)
+        # No indexes to create here - handled by ScheduleService
+        # This function remains for consistency with other collection initialization
         print("User schedules collection initialized successfully")
     except Exception as e:
         print(f"Error initializing user schedules collection: {e}")
