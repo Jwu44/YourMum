@@ -6,13 +6,32 @@ Handles checkout sessions, customer portal, and webhooks.
 import os
 import json
 import stripe
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response
 from typing import Dict, Any
+from functools import wraps
 
 from backend.services.billing_service import BillingService
 from backend.services.credit_service import CreditService
 from backend.utils.auth import verify_firebase_token
 from backend.db_config import get_database
+
+
+def bypass_cors(f):
+    """
+    Decorator to bypass CORS for webhook endpoints.
+
+    Stripe webhooks are server-to-server requests that don't need CORS.
+    This prevents CORS middleware from interfering with webhook delivery.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        response = make_response(f(*args, **kwargs))
+        # Remove any CORS headers that might have been added
+        response.headers.pop('Access-Control-Allow-Origin', None)
+        response.headers.pop('Access-Control-Allow-Methods', None)
+        response.headers.pop('Access-Control-Allow-Headers', None)
+        return response
+    return decorated_function
 
 
 billing_bp = Blueprint("billing", __name__, url_prefix="/api/billing")
@@ -191,13 +210,20 @@ def cancel_subscription():
 
 
 @billing_bp.route("/webhook", methods=["POST"])
+@bypass_cors
 def handle_stripe_webhook():
     """
     Handle Stripe webhook events.
 
+    Note: This endpoint receives requests directly from Stripe's servers (server-to-server).
+    Security is handled via webhook signature verification, not CORS.
+
     Returns:
         JSON response confirming webhook receipt
     """
+    # Add logging for debugging webhook delivery
+    print(f"[STRIPE WEBHOOK] Received event from {request.remote_addr}")
+
     payload = request.get_data()
     sig_header = request.headers.get('Stripe-Signature')
 
@@ -267,19 +293,3 @@ def handle_stripe_webhook():
             'success': False,
             'error': f"Failed to process webhook: {str(e)}"
         }), 500
-
-
-# Global OPTIONS request handler for CORS
-@billing_bp.route('/<path:path>', methods=['OPTIONS'])
-@billing_bp.route('/', methods=['OPTIONS'])
-def handle_options_requests(path=None):
-    """
-    Handle OPTIONS preflight requests for CORS.
-
-    Args:
-        path: Optional path parameter
-
-    Returns:
-        JSON response with 200 OK status
-    """
-    return jsonify({"status": "ok"})
