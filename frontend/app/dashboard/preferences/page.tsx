@@ -675,7 +675,7 @@ export default function PreferencesPage () {
                   <div>
                     <label className="text-sm font-medium mb-2 block">Sections</label>
                     <Select
-                      value={state.layout_preference?.subcategory || 'day-sections'}
+                      value={state.layout_preference?.subcategory || 'priority'}
                       onValueChange={(value) => { handleLayoutChange('subcategory', value) }}
                     >
                       <SelectTrigger className="w-full mobile-form-input">

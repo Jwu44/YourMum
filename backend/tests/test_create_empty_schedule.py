@@ -91,26 +91,34 @@ class TestEmptyScheduleCreation:
             date=date,
             tasks=empty_tasks
         )
-        
+
         # Verify success
         assert success is True
-        assert result['schedule'] == empty_tasks
+        # First-time users now get priority sections by default
+        assert len(result['schedule']) == 3
+        assert result['schedule'][0]['text'] == "High Priority"
+        assert result['schedule'][0]['is_section'] is True
+        assert result['schedule'][1]['text'] == "Medium Priority"
+        assert result['schedule'][1]['is_section'] is True
+        assert result['schedule'][2]['text'] == "Low Priority"
+        assert result['schedule'][2]['is_section'] is True
         assert result['date'] == date
         assert 'metadata' in result
-        
+
         # Verify database was called with correct document structure
         mock_user_schedules_collection.replace_one.assert_called_once()
         call_args = mock_user_schedules_collection.replace_one.call_args
-        
+
         # Check the filter (first argument)
         filter_dict = call_args[0][0]
         assert filter_dict['userId'] == user_id
         assert date in filter_dict['date']  # Date should be formatted to include time
-        
+
         # Check the document (second argument)
         document = call_args[0][1]
         assert document['userId'] == user_id
-        assert document['schedule'] == empty_tasks
+        # Schedule now contains priority sections for first-time users
+        assert len(document['schedule']) == 3
         assert 'metadata' in document
         assert document['metadata']['source'] == 'manual'
 
@@ -167,11 +175,12 @@ class TestEmptyScheduleCreation:
             assert response_data['date'] == "2025-01-16"
             assert 'metadata' in response_data
             
-            # Verify schedule service was called correctly
+            # Verify schedule service was called correctly (now includes inputs parameter)
             mock_schedule_service.create_empty_schedule.assert_called_once_with(
                 user_id='test_user_123',
                 date='2025-01-16',
-                tasks=[]
+                tasks=[],
+                inputs=None
             )
 
     @patch('backend.apis.routes.schedule_service')
