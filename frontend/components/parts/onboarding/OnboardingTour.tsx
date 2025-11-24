@@ -31,14 +31,14 @@ const TOUR_STEPS = [
   {
     id: 'add-first-task',
     title: 'Add your first task',
-    body: 'Click the button and simply add the task name. YourMum can auto-categorise tasks later and even assign times.',
+    body: 'YourMum will auto-categorise tasks later and even assign times.',
     targetSelector: '[data-testid="create-task-button"], [data-testid="create-task-fab"]',
     position: 'below' as const
   },
   {
     id: 'fill-preferences',
     title: 'Fill out your preferences',
-    body: 'Provide details about your lifestyle and how you like to operate so YourMum can generate a personalised schedule for you.',
+    body: 'Provide details about your lifestyle so YourMum can plan your day that best suits you.',
     targetAttribute: 'data-onboarding-target="preferences-nav"',
     targetSelector: '[data-onboarding-target="preferences-nav"]',
     position: 'right' as const
@@ -50,6 +50,14 @@ const TOUR_STEPS = [
     targetAttribute: 'data-onboarding-target="integrations-nav"',
     targetSelector: '[data-onboarding-target="integrations-nav"]',
     position: 'right' as const
+  },
+  {
+    id: 'next-day-navigation',
+    title: 'Auto create next day.',
+    body: 'Simply click the arrow and YourMum will rollover tasks for tomorrow!',
+    targetAttribute: 'data-onboarding-target="next-day-button"',
+    targetSelector: '[data-onboarding-target="next-day-button"]',
+    position: 'below' as const
   }
 ]
 
@@ -93,17 +101,22 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
   // Enhanced next step handler with mobile sidebar behavior
   const handleNextStep = React.useCallback(() => {
     console.log('handleNextStep called', { currentStep: currentStepData?.stepCounter, isMobile })
-    
+
     // If Step 1 and mobile, open sidebar for Steps 2 & 3 visibility
-    if (currentStepData?.stepCounter.includes('1 of 3') && isMobile) {
+    if (currentStepData?.stepCounter.includes('1 of 4') && isMobile) {
       setOpenMobile(true)
       // Increased delay to ensure Sheet portal is fully rendered
       setTimeout(() => {
         nextStep()
       }, 300)
-    } else if (currentStepData?.stepCounter.includes('3 of 3') && isMobile) {
-      // If Step 3 (last step) and mobile, close sidebar when finishing
+    } else if (currentStepData?.stepCounter.includes('3 of 4') && isMobile) {
+      // If Step 3 and mobile, close sidebar for Step 4 visibility (next day button in header)
       setOpenMobile(false)
+      setTimeout(() => {
+        nextStep()
+      }, 300)
+    } else if (currentStepData?.stepCounter.includes('4 of 4') && isMobile) {
+      // If Step 4 (last step) and mobile, just finish the tour
       nextStep()
     } else {
       nextStep()
@@ -113,9 +126,15 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
   // Enhanced previous step handler with mobile sidebar behavior
   const handlePreviousStep = React.useCallback(() => {
     console.log('handlePreviousStep called', { currentStep: currentStepData?.stepCounter, isMobile })
-    
-    // If going back to Step 1 and mobile, we might want to close the sidebar
-    if (currentStepData?.stepCounter.includes('2 of 3') && isMobile) {
+
+    // If going back from Step 4 to Step 3 and mobile, open the sidebar
+    if (currentStepData?.stepCounter.includes('4 of 4') && isMobile) {
+      setOpenMobile(true)
+      setTimeout(() => {
+        previousStep()
+      }, 300)
+    } else if (currentStepData?.stepCounter.includes('2 of 4') && isMobile) {
+      // If going back to Step 1 and mobile, close the sidebar
       previousStep()
       // Small delay then close sidebar to return to Step 1 view
       setTimeout(() => {

@@ -41,13 +41,17 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
 
   // Simple position preference based on step - Radix handles collision detection
   const getSide = React.useCallback((): "top" | "bottom" | "left" | "right" => {
-    const isStep1 = stepCounter.includes('1 of 3')
-    const isStep2or3 = stepCounter.includes('2 of 3') || stepCounter.includes('3 of 3')
+    const isStep1 = stepCounter.includes('1 of 4')
+    const isStep2 = stepCounter.includes('2 of 4')
+    const isStep3 = stepCounter.includes('3 of 4')
+    const isStep4 = stepCounter.includes('4 of 4')
     const isMobile = window.innerWidth < 768 // Tailwind's md breakpoint
-    
+
     // Step-based positioning preferences (Radix will handle fallbacks)
     if (isStep1) return isMobile ? 'left' : 'bottom'   // FAB positioning: left on mobile, bottom on web
-    if (isStep2or3) return 'bottom' // Sidebar nav positioning  
+    if (isStep2) return 'right' // Preferences nav positioning - to the right of sidebar item
+    if (isStep3) return 'right' // Integrations nav positioning - to the right of sidebar item
+    if (isStep4) return 'bottom' // Next day button positioning
     return 'bottom' // Default
   }, [stepCounter])
 
@@ -145,18 +149,18 @@ export const OnboardingCallout: React.FC<OnboardingCalloutProps> = ({
           aria-labelledby="onboarding-title"
           aria-describedby="onboarding-body"
         >
-          <Popover.Arrow 
-            className="fill-card" 
-            width={20} 
+          <Popover.Arrow
+            className="fill-card"
+            width={20}
             height={10}
-            style={{ 
-              fill: 'hsl(var(--card))', 
+            style={{
+              fill: 'hsl(var(--card))',
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
               display: 'block',
-              // Center the arrow for bottom-positioned steps
-              // For step 1: only center when on desktop (bottom), not on mobile (left)
-              // For steps 2 & 3: always center since they're always bottom
-              ...((side === 'bottom' && (stepCounter?.includes('1 of 3') || stepCounter?.includes('2 of 3') || stepCounter?.includes('3 of 3'))) ? {
+              // Center the arrow for bottom-positioned steps only
+              // Step 1 on desktop (bottom) and Step 4 (bottom) should have centered arrows
+              // Steps 2 & 3 are positioned 'right', so no centering needed (arrow aligns with target naturally)
+              ...((side === 'bottom' && (stepCounter?.includes('1 of 4') || stepCounter?.includes('4 of 4'))) ? {
                 left: '50%',
                 transform: 'translateX(-50%)'
               } : {})
