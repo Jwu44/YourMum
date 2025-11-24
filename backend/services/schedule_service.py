@@ -887,7 +887,7 @@ class ScheduleService:
                     "start_date": date
                 })
 
-                # Low Priority section (empty for now)
+                # Low Priority section + its default task
                 initial_schedule.append({
                     "id": str(uuid.uuid4()),
                     "text": "Low Priority",
@@ -895,6 +895,15 @@ class ScheduleService:
                     "type": "section",
                     "level": 0,
                     "completed": False
+                })
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "30 mins walk",
+                    "section": "Low Priority",
+                    "level": 0,
+                    "completed": False,
+                    "type": "task",
+                    "start_date": date
                 })
 
                 # Check if user has calendar connection

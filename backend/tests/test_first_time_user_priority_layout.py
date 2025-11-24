@@ -65,9 +65,9 @@ class TestFirstTimeUserPriorityLayout:
 
         # Verify priority sections and default tasks were created (interleaved)
         schedule = result['schedule']
-        assert len(schedule) == 6  # 3 sections + 3 default tasks (interleaved)
+        assert len(schedule) == 7  # 3 sections + 4 default tasks (interleaved)
 
-        # Verify structure: High section + tasks, Medium section + task, Low section
+        # Verify structure: High section + tasks, Medium section + task, Low section + task
         assert schedule[0]['text'] == "High Priority"
         assert schedule[0]['is_section'] is True
 
@@ -88,6 +88,10 @@ class TestFirstTimeUserPriorityLayout:
 
         assert schedule[5]['text'] == "Low Priority"
         assert schedule[5]['is_section'] is True
+
+        assert schedule[6]['text'] == "30 mins walk"
+        assert schedule[6]['section'] == "Low Priority"
+        assert schedule[6].get('is_section') is not True
 
     @patch('backend.services.schedule_service.calendar_service')
     @patch('backend.services.schedule_service.get_users_collection')
@@ -200,10 +204,16 @@ class TestFirstTimeUserPriorityLayout:
         assert medium_task_idx == medium_section_idx + 1
         assert schedule[medium_task_idx]['text'] == "Spend time with family"
 
-        # Low Priority section should be last
+        # Low Priority section should come after Medium task
         low_section_idx = next((i for i, t in enumerate(schedule) if t.get('is_section') and t.get('text') == "Low Priority"), None)
         assert low_section_idx is not None
         assert low_section_idx > medium_task_idx
+
+        # Low Priority default task should be last
+        low_task_idx = next((i for i, t in enumerate(schedule) if not t.get('is_section') and t.get('section') == "Low Priority" and not t.get('from_gcal')), None)
+        assert low_task_idx is not None
+        assert low_task_idx == low_section_idx + 1
+        assert schedule[low_task_idx]['text'] == "30 mins walk"
 
     @patch('backend.services.schedule_service.get_users_collection')
     def test_create_empty_schedule_creates_priority_sections_for_first_time_user(
