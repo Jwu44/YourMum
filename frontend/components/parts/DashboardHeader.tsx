@@ -283,11 +283,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     disabled={isLoading || isCurrentDay}
                     className={`h-11 w-11 p-0 transition-colors duration-200 ${
                       isLoading || isCurrentDay
-                        ? 'text-muted-foreground/50 cursor-not-allowed' 
+                        ? 'text-muted-foreground/50 cursor-not-allowed'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                     aria-label="Next day"
                     aria-disabled={isLoading || isCurrentDay}
+                    data-onboarding-target="next-day-button"
                   >
                     <ChevronRight size={20} />
                   </Button>
@@ -430,11 +431,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                       disabled={isLoading || isCurrentDay}
                       className={`h-8 w-8 p-0 transition-colors duration-200 ${
                         isLoading || isCurrentDay
-                          ? 'text-muted-foreground/50 cursor-not-allowed' 
+                          ? 'text-muted-foreground/50 cursor-not-allowed'
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
                       aria-label="Next day"
                       aria-disabled={isLoading || isCurrentDay}
+                      data-onboarding-target="next-day-button"
                     >
                       <ChevronRight size={16} />
                     </Button>

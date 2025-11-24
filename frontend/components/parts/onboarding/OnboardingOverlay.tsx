@@ -87,7 +87,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     const padding = 8
 
     // Debug logging for step 2 positioning
-    if (stepCounter?.includes('2 of 3')) {
+    if (stepCounter?.includes('2 of 4')) {
       console.log('Step 2 spotlight positioning:', {
         stepCounter,
         element: targetElement,
@@ -109,33 +109,28 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
 
     // Check if this is a sidebar navigation element
     const isSidebarElement = targetElement.closest('[data-sidebar="sidebar"]')
-    
+
+    // Default: center the spotlight on the target element
     let adjustedX = rect.left - padding
-    
-    // Step 1 (FAB button) - keep centered positioning
-    if (stepCounter?.includes('1 of 3')) {
-      adjustedX = rect.left - padding
-    }
+    let adjustedY = rect.top - padding
+
     // Steps 2-3 (sidebar navigation) - use boundary-aware positioning
-    else if (isSidebarElement) {
+    if (isSidebarElement) {
       // For sidebar elements, ensure we don't cut off the left side
       const sidebarRect = isSidebarElement.getBoundingClientRect()
       const minX = Math.max(0, sidebarRect.left)
       adjustedX = Math.max(minX, rect.left - padding)
-      
+
       // Also ensure we don't go off the right side of the viewport
-      const maxX = window.innerWidth - rect.width - padding
+      const maxX = window.innerWidth - rect.width - padding * 2
       adjustedX = Math.min(maxX, adjustedX)
-    } else {
-      // For other elements, use standard boundary checking
-      const minX = Math.max(0, rect.left - padding)
-      const maxX = Math.min(window.innerWidth - rect.width - padding, rect.left)
-      adjustedX = Math.max(minX, maxX)
     }
+    // For all other elements (Steps 1 & 4), simply center the spotlight
+    // No special adjustments needed - just use the element's position with padding
 
     return {
       '--spotlight-x': `${adjustedX}px`,
-      '--spotlight-y': `${rect.top - padding}px`,
+      '--spotlight-y': `${adjustedY}px`,
       '--spotlight-width': `${rect.width + padding * 2}px`,
       '--spotlight-height': `${rect.height + padding * 2}px`
     } as React.CSSProperties

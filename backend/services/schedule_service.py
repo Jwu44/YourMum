@@ -593,6 +593,20 @@ class ScheduleService:
                 if layout_preference.get('layout') == 'todolist-structured':
                     section_tasks = self._create_sections_from_config(layout_preference)
                     print(f"Created {len(section_tasks)} section tasks from layout config")
+            else:
+                # Final fallback for first-time users: create priority sections
+                print(f"No recent schedule or layout preference - creating default priority sections for first-time user")
+                section_names = ["High Priority", "Medium Priority", "Low Priority"]
+                for section_name in section_names:
+                    section_tasks.append({
+                        "id": str(uuid.uuid4()),
+                        "text": section_name,
+                        "is_section": True,
+                        "type": "section",
+                        "level": 0,
+                        "completed": False
+                    })
+                print(f"Created {len(section_tasks)} default priority sections")
             
             # Step 4: Find recurring tasks for this date
             recurring_tasks = self._get_recurring_tasks_for_date(user_id, date)
@@ -819,7 +833,80 @@ class ScheduleService:
             print(f"[TIMING] Source schedule lookup (up to {max_days_back} days): {source_lookup_duration:.3f}s")
             
             if not source_schedule:
-                # Check if user has calendar connection before early return
+                # First-time user - create priority layout sections
+                print(f"[FIRST_TIME_USER] No source schedule found - creating priority layout for first-time user")
+
+                # Create priority sections with default tasks interleaved
+                # This ensures tasks appear under their respective sections in the UI
+                initial_schedule = []
+
+                # High Priority section + its default tasks
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "High Priority",
+                    "is_section": True,
+                    "type": "section",
+                    "level": 0,
+                    "completed": False
+                })
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "Manually add tasks to YourMum",
+                    "section": "High Priority",
+                    "level": 0,
+                    "completed": False,
+                    "type": "task",
+                    "start_date": date
+                })
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "Fill out YourMum preferences",
+                    "section": "High Priority",
+                    "level": 0,
+                    "completed": False,
+                    "type": "task",
+                    "start_date": date
+                })
+
+                # Medium Priority section + its default task
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "Medium Priority",
+                    "is_section": True,
+                    "type": "section",
+                    "level": 0,
+                    "completed": False
+                })
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "Spend time with family",
+                    "section": "Medium Priority",
+                    "level": 0,
+                    "completed": False,
+                    "type": "task",
+                    "start_date": date
+                })
+
+                # Low Priority section + its default task
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "Low Priority",
+                    "is_section": True,
+                    "type": "section",
+                    "level": 0,
+                    "completed": False
+                })
+                initial_schedule.append({
+                    "id": str(uuid.uuid4()),
+                    "text": "30 mins walk",
+                    "section": "Low Priority",
+                    "level": 0,
+                    "completed": False,
+                    "type": "task",
+                    "start_date": date
+                })
+
+                # Check if user has calendar connection
                 try:
                     # Atomic check: get user with calendar data in single query
                     user_doc = self.schedules_collection.database['users'].find_one(
@@ -836,24 +923,42 @@ class ScheduleService:
                         )
 
                     if has_valid_calendar:
-                        # First-time user with calendar - continue to Step 4 calendar fetch
+                        # First-time user with calendar - continue to calendar fetch with initial schedule
                         print(f"[CALENDAR] First-time user with calendar connection - proceeding to calendar sync")
-                        # Create minimal source to continue processing
+                        # Create minimal source with sections and default tasks
                         source_schedule = {
-                            "schedule": [],
+                            "schedule": initial_schedule,
                             "inputs": {},
                             "metadata": {"source": "first_time_calendar_check"}
                         }
                     else:
-                        # No calendar or first-time user - early return (existing behavior)
+                        # First-time user without calendar - save initial schedule (sections + default tasks) and return
+                        print(f"[FIRST_TIME_USER] No calendar connection - creating schedule with priority sections and default tasks")
+
+                        schedule_document = self._create_schedule_document(
+                            user_id=user_id,
+                            date=date,
+                            tasks=initial_schedule,
+                            source="manual",
+                            inputs={}
+                        )
+
+                        # Save to database
+                        formatted_date = format_schedule_date(date)
+                        self.schedules_collection.replace_one(
+                            {"userId": user_id, "date": formatted_date},
+                            schedule_document,
+                            upsert=True
+                        )
+
                         total_duration = time.time() - total_start_time
-                        print(f"[TIMING] autogenerate_schedule (no source found, no calendar): {total_duration:.3f}s")
+                        print(f"[TIMING] autogenerate_schedule (first-time user, no calendar): {total_duration:.3f}s")
                         return True, {
                             "existed": False,
-                            "created": False,
+                            "created": True,
                             "sourceFound": False,
                             "date": date,
-                            "schedule": []
+                            "schedule": initial_schedule
                         }
                 except Exception as e:
                     # Database error - fail safe to empty schedule
@@ -1037,11 +1142,30 @@ class ScheduleService:
                     rebuilt.append(updated_task)
 
             # Insert brand-new fetched calendar events after last calendar index, inheriting nearby section
-            insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else (1 if section_tasks else 0)
-            inherited_section: Optional[str] = None
-            if insertion_index > 0 and insertion_index <= len(rebuilt):
-                prev = rebuilt[insertion_index - 1]
-                inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
+            # For first-time users, default to "High Priority" section
+            is_first_time_user = source_schedule.get('metadata', {}).get('source') == 'first_time_calendar_check'
+
+            if is_first_time_user:
+                # First-time user - insert calendar events after default tasks in High Priority section
+                # Find the last task in High Priority section (which includes default tasks)
+                insertion_index = 0
+                for i, item in enumerate(rebuilt):
+                    # Skip sections, look for last task in High Priority
+                    if not item.get('is_section') and item.get('section') == "High Priority":
+                        insertion_index = i + 1
+                # If no High Priority tasks found, insert after last section
+                if insertion_index == 0:
+                    for i, item in enumerate(rebuilt):
+                        if item.get('is_section') or item.get('type') == 'section':
+                            insertion_index = i + 1
+                # Assign all calendar events to "High Priority"
+                inherited_section = "High Priority"
+            else:
+                insertion_index = last_calendar_index + 1 if last_calendar_index >= 0 else (1 if section_tasks else 0)
+                inherited_section = None
+                if insertion_index > 0 and insertion_index <= len(rebuilt):
+                    prev = rebuilt[insertion_index - 1]
+                    inherited_section = prev.get('section') if not prev.get('is_section', False) else prev.get('text')
 
             new_ids_in_order = [gid for gid in fetched_ids if gid not in source_calendar_map]
             new_items = []
