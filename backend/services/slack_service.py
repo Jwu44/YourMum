@@ -18,6 +18,7 @@ import aiohttp
 from backend.models.task import Task
 from backend.models.schedule_schema import format_schedule_date
 from backend.utils.encryption import encrypt_token, decrypt_token
+from backend.utils.timezone import get_today_in_user_timezone
 
 
 class SlackService:
@@ -397,9 +398,12 @@ class SlackService:
                 task_text=task_text,
                 user_id=user_id
             )
-            
-            # Store task in database
-            self._store_task(task, user_id)
+
+            # Get user's timezone for correct date storage
+            user_timezone = self._get_user_timezone(user_id)
+
+            # Store task in database using user's timezone
+            self._store_task(task, user_id, user_timezone)
             
             # Light debug log for observability
             try:
@@ -449,6 +453,19 @@ class SlackService:
             return None
 
         return user_doc['slack_integration']
+
+    def _get_user_timezone(self, user_id: str) -> Optional[str]:
+        """Get user's timezone from database"""
+        if self.db_client is None:
+            return None
+
+        users_collection = self.db_client.get_collection('users')
+        user_doc = users_collection.find_one({'googleId': user_id})
+
+        if not user_doc:
+            return None
+
+        return user_doc.get('timezone')
     
     def _is_user_mentioned(self, event: Dict[str, Any], slack_user_id: str) -> bool:
         """Check if the user is mentioned in the message"""
@@ -519,7 +536,7 @@ class SlackService:
         
         return 'Unknown User'
     
-    def _store_task(self, task: Task, user_id: str):
+    def _store_task(self, task: Task, user_id: str, user_timezone: Optional[str] = None):
         """
         Store task in database atomically, inserting below first section if it exists.
 
@@ -528,14 +545,20 @@ class SlackService:
         - Inserts after first section if sections exist
         - Handles upsert safely (empty schedules)
         - Prevents race conditions from concurrent webhook calls
+
+        Args:
+            task: Task object to store
+            user_id: YourMum user ID
+            user_timezone: User's timezone for determining "today"
         """
         if self.db_client is None:
             return
 
         tasks_collection = self.db_client.get_collection('UserSchedules')
 
-        # Store under normalized date key used across schedule service
-        today_str = datetime.utcnow().strftime('%Y-%m-%d')
+        # Store under normalized date key in user's timezone (not UTC)
+        # This ensures Slack tasks appear on the correct day for the user
+        today_str = get_today_in_user_timezone(user_timezone)
         formatted_date = format_schedule_date(today_str)
 
         # Single atomic operation using aggregation pipeline (MongoDB 4.2+)

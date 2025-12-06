@@ -11,6 +11,7 @@ from unittest.mock import Mock, MagicMock
 from backend.services.slack_service import SlackService
 from backend.models.task import Task
 from backend.models.schedule_schema import format_schedule_date
+from backend.utils.timezone import get_today_in_user_timezone
 
 
 class TestSlackTaskPositioning:
@@ -207,15 +208,16 @@ class TestSlackTaskPositioning:
         mock_db_client,
         sample_slack_task
     ):
-        """Test that date is formatted correctly for storage"""
+        """Test that date is formatted correctly for storage using user timezone"""
         service = SlackService(db_client=mock_db_client)
-        service._store_task(sample_slack_task, 'test_user_123')
+        # Pass None timezone to test default behavior (uses fallback timezone)
+        service._store_task(sample_slack_task, 'test_user_123', user_timezone=None)
 
         mock_collection = mock_db_client.get_collection.return_value
         call = mock_collection.update_calls[0]
 
-        # Get expected formatted date
-        today_str = datetime.utcnow().strftime('%Y-%m-%d')
+        # Get expected formatted date in user timezone (defaults to Australia/Sydney)
+        today_str = get_today_in_user_timezone(None)
         expected_date = format_schedule_date(today_str)
 
         # Verify date in filter

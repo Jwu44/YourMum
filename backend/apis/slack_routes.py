@@ -17,6 +17,7 @@ from backend.services.event_bus import event_bus
 from backend.services.slack_message_processor import SlackMessageProcessor
 from backend.apis.routes import get_user_from_token
 from backend.decorators.credit_guards import requires_plan
+from backend.utils.timezone import get_today_in_user_timezone
 
 # Use an explicit frontend URL (prefer these envs, fallback to dev Next port)
 frontend_base_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL') or 'http://localhost:8000'
@@ -298,12 +299,13 @@ async def process_workspace_event(event_data: Dict[str, Any]):
             if user_id:
                 # Process event through SlackService (run async function)
                 task = await slack_service.process_event(event_data, user_id)
-                
+
                 if task:
                     print(f"Created task from Slack event: {task.text} for user {user_id}")
                     # Notify user's active clients that today's schedule has been updated
-                    # Using UTC date to match current storage semantics
-                    date_str = datetime.utcnow().strftime('%Y-%m-%d')
+                    # Use user's timezone to match the date the task was stored under
+                    user_timezone = user.get('timezone')
+                    date_str = get_today_in_user_timezone(user_timezone)
                     event_bus.publish(user_id, {
                         "type": "schedule_updated",
                         "date": date_str
