@@ -53,7 +53,7 @@ const TOUR_STEPS = [
   },
   {
     id: 'next-day-navigation',
-    title: 'Auto create next day.',
+    title: 'Auto create next day',
     body: 'Simply click the arrow and YourMum will rollover tasks for tomorrow!',
     targetAttribute: 'data-onboarding-target="next-day-button"',
     targetSelector: '[data-onboarding-target="next-day-button"]',
